@@ -1,0 +1,42 @@
+# Gradle / Kotlin
+.gradle/
+build/
+**/build/
+*.class
+
+# Kotlin Multiplatform / IDE
+.idea/
+*.iml
+local.properties
+
+# Android
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# iOS / Xcode
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# Node / web tooling
+node_modules/
+dist/
+.next/
+.vercel/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+
+# OS files
+.DS_Store
+Thumbs.db
