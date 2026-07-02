@@ -1,0 +1,41 @@
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  LongMethod:
+    threshold: 40
+  LargeClass:
+    threshold: 400
+  CyclomaticComplexMethod:
+    threshold: 12
+  NestedBlockDepth:
+    threshold: 4
+  LongParameterList:
+    functionThreshold: 6
+    constructorThreshold: 7
+  TooManyFunctions:
+    thresholdInClasses: 15
+    thresholdInFiles: 20
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  ReturnCount:
+    max: 4
+    excludeGuardClauses: true
+  WildcardImport:
+    active: true
+  MagicNumber:
+    ignoreNumbers: ["-1", "0", "1", "2"]
+    ignoreHashCodeFunction: true
+
+exceptions:
+  SwallowedException:
+    active: true
+  TooGenericExceptionCaught:
+    active: true
+
+coroutines:
+  GlobalCoroutineUsage:
+    active: true
