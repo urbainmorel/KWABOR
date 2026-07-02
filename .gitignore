@@ -6,6 +6,8 @@ build/
 
 # Kotlin Multiplatform / IDE
 .idea/
+.kotlin/
+kotlin-js-store/
 *.iml
 local.properties
 

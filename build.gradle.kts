@@ -2,6 +2,12 @@ plugins {
     base
     id("com.diffplug.spotless") version "6.25.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("com.android.application") version "9.2.0" apply false
+    id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
+    id("org.jetbrains.compose") version "1.9.3" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0" apply false
 }
 
 fun Project.configureQualityTools() {
@@ -9,7 +15,9 @@ fun Project.configureQualityTools() {
         kotlin {
             target("src/**/*.kt")
             targetExclude("**/build/**/*.kt")
-            ktlint()
+            ktlint().editorConfigOverride(
+                mapOf("ktlint_function_naming_ignore_when_annotated_with" to "Composable"),
+            )
             trimTrailingWhitespace()
             endWithNewline()
         }
@@ -40,6 +48,12 @@ fun Project.configureQualityTools() {
 }
 
 configureQualityTools()
+
+allprojects {
+    tasks.matching { it.name == "kotlinWasmToolingSetup" }.configureEach {
+        doNotTrackState("Kotlin/Wasm tooling may contain unreadable cache files on Windows.")
+    }
+}
 
 subprojects {
     apply(plugin = "base")
