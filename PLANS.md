@@ -85,3 +85,23 @@ Ces zones demandent un plan dédié avant implémentation.
 - `git diff --check`.
 - Relecture ciblée des mentions Web/PWA restantes.
 - Pas de build requis pour cette tranche documentaire.
+
+## Plan MOB-002 — Suppression de la cible Web/PWA
+
+**Agent responsable** : Build/Tooling.
+
+**Objectif atomique** : retirer `webApp` et la cible Kotlin/Wasm du build après acceptation d'ADR-0010, sans modifier les features métier.
+
+**Livrables**
+
+- `include(":webApp")` supprimé de `settings.gradle.kts`.
+- Module `webApp` supprimé.
+- Cible `wasmJs` supprimée de `shared`.
+- Contournement Gradle spécifique Kotlin/Wasm supprimé.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
+
+**Validation**
+
+- `git diff --check`.
+- `./gradlew.bat check`.
+- Recherche ciblée des références build `webApp`/`wasmJs`.

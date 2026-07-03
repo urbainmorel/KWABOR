@@ -19,10 +19,11 @@ Fondations techniques et organisation staff senior.
 - Shell Compose partagé, primitives domaine, tokens design et i18n FR minimale ajoutés.
 - Cadrage mobile-only validé : Android/iOS uniquement, Android Compose Multiplatform, iOS SwiftUI, Web/PWA hors scope.
 - Modèle d'équipe vérifiée cadré : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés côté serveur/RLS.
+- Module `webApp` supprimé du dépôt et du build Gradle ; cible Kotlin/Wasm retirée de `shared`.
 
 ## Tâche en cours
 
-Aucune tâche de code ouverte après MOB-001.
+Aucune tâche de code ouverte après MOB-002.
 
 ## Blocages / limites
 
@@ -30,9 +31,8 @@ Aucune tâche de code ouverte après MOB-001.
 - Les DTO Supabase et les implémentations repository `data` ne sont pas encore présents.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - L'hôte iOS complet doit être finalisé sur macOS avec Xcode.
-- Le module `webApp` existe encore dans le dépôt mais il est hors scope depuis ADR-0010 ; il doit être supprimé dans MOB-002.
 - La CI iOS macOS n'est pas encore créée ; elle nécessite un hôte Xcode SwiftUI.
 
 ## Prochaine tâche logique
 
-Démarrer MOB-002 : supprimer proprement `webApp`, retirer son include Gradle et vérifier que `./gradlew.bat check` reste vert.
+Démarrer IOS-001 : créer l'hôte iOS SwiftUI et l'intégration du framework `shared`, puis préparer le job CI macOS.

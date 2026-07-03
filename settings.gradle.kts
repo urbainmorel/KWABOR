@@ -18,4 +18,3 @@ rootProject.name = "kwabor"
 
 include(":shared")
 include(":androidApp")
-include(":webApp")

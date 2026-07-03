@@ -27,7 +27,7 @@ Nous retenons une cible V1 mobile-only : Android et iOS uniquement.
 - Android utilise Compose Multiplatform pour l'interface.
 - iOS utilise SwiftUI pour l'interface.
 - `shared` reste Kotlin Multiplatform et expose domaine, data, contrats repositories, use cases, modèles d'état et utilitaires transverses.
-- Le module `webApp` est hors scope et doit être supprimé dans la tâche suivante.
+- Le module `webApp` est hors scope et a été supprimé en MOB-002.
 - Aucun nouveau travail ne doit cibler Web, PWA, Web Push, responsive desktop ou Kotlin/Wasm tant qu'une ADR ultérieure ne réouvre pas ce périmètre.
 
 ## CI iOS

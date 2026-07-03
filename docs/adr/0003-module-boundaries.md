@@ -9,7 +9,7 @@
 
 Le dépôt devait compiler rapidement sur Windows tout en préparant Android, iOS et PWA.
 
-Depuis ADR-0010, Web/PWA sort du scope V1. Aucun nouveau travail ne doit cibler `webApp`. La suppression physique du module est planifiée en MOB-002.
+Depuis ADR-0010, Web/PWA sort du scope V1. Aucun nouveau travail ne doit cibler `webApp`. La suppression physique du module a été exécutée en MOB-002.
 
 ## Options envisagées
 
@@ -31,7 +31,7 @@ Cette décision est remplacée par ADR-0010 : le découpage cible devient `share
 
 **Négatives / compromis assumés**
 - La compilation iOS complète n'est pas garantie sur Windows.
-- Le module `webApp` doit être retiré proprement.
+- Le module `webApp` a été retiré proprement en MOB-002.
 
 **À revoir si**
 - Une cible Web/PWA est réouverte par ADR.

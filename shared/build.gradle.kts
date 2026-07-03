@@ -6,22 +6,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-@OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 kotlin {
     android {
         namespace = "com.kwabor.shared"
         compileSdk = 36
         minSdk = 26
+        withHostTest {}
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
     jvmToolchain(21)
-
-    wasmJs {
-        browser()
-        binaries.executable()
-    }
 
     sourceSets {
         commonMain.dependencies {
