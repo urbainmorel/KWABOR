@@ -6,14 +6,15 @@ Fondations techniques et organisation staff senior.
 
 ## Dernière tâche terminée
 
+- PR fondation `#1` mergée dans `main`.
+- Contrats domaine ajoutés pour catalogue, auth, profil, social, promotion et notifications.
 - Scaffold KMP minimal créé avec `shared`, `androidApp`, `webApp` et documentation `iosApp`.
 - ADR fondateurs normalisés sous `docs/adr/`.
 - Shell Compose partagé, primitives domaine, tokens design et i18n FR minimale ajoutés.
-- Validation `./gradlew.bat check` verte.
 
 ## Tâche en cours
 
-Préparer la revue de la branche `foundation/app-foundations`.
+Préparer la PR `foundation/catalog-repository-contracts`.
 
 ## Blocages / limites
 
@@ -22,4 +23,4 @@ Préparer la revue de la branche `foundation/app-foundations`.
 
 ## Prochaine tâche logique
 
-Pousser `foundation/app-foundations`, ouvrir une PR et traiter les retours CI/revue avant de démarrer les contrats repositories du catalogue.
+Ouvrir la PR `foundation/catalog-repository-contracts`, puis démarrer FND-005 : migrations Supabase initiales avec RLS.

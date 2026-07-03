@@ -22,7 +22,7 @@ Avant de créer ou modifier une fonctionnalité, lire le périmètre concerné d
 - [PRD.md](PRD.md) : vision produit, périmètre, exigences fonctionnelles, rôles, roadmap, exigences non fonctionnelles.
 - [DESIGN.md](DESIGN.md) : design system, navigation, écrans, états, composants, wizards, modèle de données cible.
 - [TOOLING_SETUP_qualite_kmp.md](TOOLING_SETUP_qualite_kmp.md) : chaîne qualité attendue pour KMP.
-- [0001-record-architecture-decisions.md](0001-record-architecture-decisions.md) et futurs ADR : décisions structurantes déjà actées.
+- [docs/adr/0001-record-architecture-decisions.md](docs/adr/0001-record-architecture-decisions.md) et futurs ADR : décisions structurantes déjà actées.
 
 Si le PRD et le DESIGN semblent diverger, ne pas deviner silencieusement. Signaler la divergence, proposer une option argumentée, puis attendre validation si le choix est structurant.
 
