@@ -32,10 +32,11 @@ Fondations techniques et organisation staff senior.
 - PR DATA-TEAM-002 `#8` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - RPC Supabase organisations ajouté : création/révocation/acceptation d'invitation et suspension membre, avec pgTAP.
 - `OrganizationDataSource` branché sur Supabase PostgREST/RPC via `postgrest-kt`, moteurs Ktor Android/iOS et fabrique client sans secret commité.
+- PR DATA-TEAM-003 `#9` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 
 ## Tâche en cours
 
-DATA-TEAM-003 est validée localement sur la branche `foundation/team-supabase-data-source`; PR/CI GitHub à ouvrir après commit.
+Aucune tâche active après merge DATA-TEAM-003.
 
 ## Blocages / limites
 
@@ -48,4 +49,4 @@ DATA-TEAM-003 est validée localement sur la branche `foundation/team-supabase-d
 
 ## Prochaine tâche logique
 
-Ouvrir la PR DATA-TEAM-003 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-CATALOG-001 : brancher les repositories catalogue sur Supabase PostgREST en réutilisant la fabrique client et les règles d'erreurs data.
+Lancer DATA-CATALOG-001 sur une branche dédiée : brancher les repositories catalogue sur Supabase PostgREST en réutilisant la fabrique client et les règles d'erreurs data.
