@@ -1,7 +1,7 @@
 # DESIGN.md — Kwabor
 ### Design System & Spécification UI/UX — *Le guide visuel et intelligent du Bénin*
 **Version :** 1.0 · **Date :** 1 juillet 2026
-**Cible technique :** Kotlin Multiplatform + Compose Multiplatform (Android / iOS / Web-PWA)
+**Cible technique :** Kotlin Multiplatform mobile — Android Compose Multiplatform / iOS SwiftUI
 **Document lié :** `PRD.md` — vision produit, périmètre, exigences fonctionnelles, KPIs.
 
 > **Source de vérité du design.** Système **monochrome noir premium** · **photo plein cadre + overlay** · **couleur uniquement quand elle porte un sens métier** (jaune *Sponsorisé*, rouge *billetterie/danger*) · **navbar basse plate à 5 items égaux** (pas de bouton central) · **en-tête allégée** · **FAB IA unique** · titre `Découvrez le Bénin` · **composant prix multidevise**. **Intro vidéo** au 1er lancement → **« Se connecter ou s'inscrire »** ; **mur souple** (invité en FCFA) ; auth **Email / Google / Apple-iOS**. **Rôles** (Utilisateur · Guide · Institution · Promoteur · Admin Kwabor) × **classes implicites** (Patrimonial / Commercial / Événementiel) ; **création de fiche réservée** ; **fiche = catalogue only**. **Social façon TikTok dès le MVP** (photo/diaporama ; vidéo V1.1) avec **UGC rattaché** et **mention → aperçu ≤ 25 %**. Mono-pays Bénin, i18n-ready (6 langues), 4 devises d'affichage.
@@ -23,7 +23,7 @@
 11. Spécifications écran par écran
 12. Wizards d'enregistrement de contenu
 13. Navigation & architecture de l'information
-14. Responsive (mobile / tablette / desktop)
+14. Adaptatif (mobile / tablette)
 15. Motion & micro-interactions
 16. Performance
 17. Internationalisation & accessibilité
@@ -39,7 +39,7 @@ Kwabor n'a pas une « charte décorative » : l'identité visuelle est un **levi
 1. **La photo est le héros, l'UI s'efface.** Le contenu occupe le plein cadre. L'interface vit en **overlays translucides** posés *sur* l'image, jamais dans une boîte à côté d'elle.
 2. **Monochrome par défaut, couleur par exception.** Tout le système est **noir / blanc / nuances de gris**. La couleur est **interdite sauf deux cas métier** : le **jaune Sponsorisé** (transparence publicitaire) et le **rouge billetterie/danger** (transaction, urgence). Sur fond monochrome, ces deux couleurs deviennent *plus* repérables.
 3. **Le noir est l'accent.** Les éléments actifs (CTA principal, FAB IA, item de navbar actif, bouton sélectionné) sont **noir plein** — signature « ink premium ». *(En thème sombre, ce noir s'inverse en surface claire — §3.3.)*
-4. **Premium par le design, jamais par le poids.** La cible utilise majoritairement des Android low/mid-range sur réseau dégradé. Tout effet premium est rendu **en CSS/Compose**, jamais par des images lourdes empilées. Budget non négociable : mur d'exploration **P75 < 1,5 s** (§16).
+4. **Premium par le design, jamais par le poids.** La cible utilise majoritairement des Android low/mid-range sur réseau dégradé. Tout effet premium est rendu **en Compose/SwiftUI**, jamais par des images lourdes empilées. Budget non négociable : mur d'exploration **P75 < 1,5 s** (§16).
 
 **Mood de référence.** Monochrome éditorial photo-first : grille de cartes plein cadre, en-tête légère, pastilles translucides, fiche détail immersive à hero plein écran. La couleur n'apparaît que sur le badge jaune *Sponsorisé* et le bouton rouge *Acheter un billet*.
 
@@ -81,7 +81,7 @@ Rampe neutre légèrement chaude (pour que les photos « respirent »). Elle por
 | `paper/50` (**Fond app**) | `#FAFAF8` | Background global (off-white chaud) |
 | `surface/0` | `#FFFFFF` | Cartes, sheets, surfaces blanches |
 
-**Overlay photo (recette premium-sans-poids).** Dégradé CSS/Compose, **jamais** une image PNG sombre empilée :
+**Overlay photo (recette premium-sans-poids).** Dégradé Compose/SwiftUI, **jamais** une image PNG sombre empilée :
 - `overlay/card` : `linear-gradient(180deg, transparent 0%, transparent 45%, rgba(0,0,0,0.78) 100%)` — calibré **35–45 %** de hauteur selon la densité de texte. Le texte vit dans le **tiers bas**.
 - `overlay/hero` : version plus profonde (`…rgba(0,0,0,0.86) 100%`) pour la fiche détail, garantissant le contraste AA du titre.
 
@@ -240,7 +240,7 @@ Deux actions **distinctes**, jamais confondues :
 | **Notification Item** | §11 (D1) — icône de famille, titre, extrait, vignette, horodatage, point non-lu, badge « Sponsorisé » si applicable. | Centre de notifications |
 | **Bottom Sheet générique** | Coins 28, drag handle 36×4 `ink/200`, drag-to-dismiss, anim 300 ms `cubic-bezier(0.32,0.72,0,1)`. | Détail, filtres, partage, avis, IA, convertisseur, contact |
 | **Sélecteur de ville** | §11 (C5) — recherche + liste des communes BJ + « Utiliser ma position ». | En-tête, onboarding, wizard |
-| **Filter Drawer** | §11 (C6) — bottom sheet (mobile) → panneau latéral (desktop). Ville / prix (double slider XOF) / date / type + **Appliquer/Réinitialiser** + compteur. | Événements, Hôtels & Restau. |
+| **Filter Drawer** | §11 (C6) — bottom sheet (mobile) → panneau latéral (tablette). Ville / prix (double slider XOF) / date / type + **Appliquer/Réinitialiser** + compteur. | Événements, Hôtels & Restau. |
 | **Sheet de contact** | §11 (C7) — choix de canal : Appel / WhatsApp / Site / Email. | Détail Établissement |
 | **Lightbox galerie** | §11 (C8) — plein écran, swipe, pinch-zoom, compteur, fermeture. | Fiches Détail |
 | **Champ de formulaire** | 48 px, radius 14, fond `ink/100`, label flottant, erreur inline rouge sous le champ. | Auth, wizards, paramètres |
@@ -254,7 +254,7 @@ Deux actions **distinctes**, jamais confondues :
 | **Banner Offline** | Pleine largeur, **persistante**, fond `ink/900` texte blanc « Vous êtes hors ligne ». | Global (au-dessus navbar) |
 | **Dialog** | Surface élevée, titre + corps + 2 actions ; **action destructive en rouge**. | Confirmations (suppression, archivage, déconnexion) |
 | **Segmented control** | 2–3 segments, actif = `ink/950` ; ex. **Personnel / Promoteur**, tri avis. | Profil, listes |
-| **Intro Video Layer** | Vidéo verticale aspectFill, muet+playsinline, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué + remote. | Écran E1 |
+| **Intro Video Layer** | Vidéo verticale aspectFill, muette, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué + remote. | Écran E1 |
 | **Auth Landing** | Fond image plein écran + « Découvrez le Bénin » + **pastille de langue** haut-droite + CTA S'inscrire/Se connecter + **« Ne pas s'inscrire »**. | Écran E3 |
 | **Pastille de langue** | Frosted (§3.5) `🌐 FR ▾` ; lisible sur photo, discrète ; ouvre la liste des langues livrées. | E3, E5, E6 |
 | **Bouton fournisseur d'auth** | Google (toujours) · **Apple (iOS uniquement)** ; style outline, logo + label. | E5, E6 |
@@ -442,7 +442,7 @@ Bottom sheet : montant de référence en **XOF (FCFA)** en tête, puis les **3 c
 Bottom sheet : champ de recherche en haut, **liste des communes du Bénin** (`cities`), section « Récentes », bouton **« Utiliser ma position »** (géoloc → ville la plus proche). Sélection = fermeture + maj du contexte.
 
 **C6. Filter Drawer**
-Bottom sheet (mobile) → **panneau latéral persistant** (desktop). Sections selon l'onglet : **Ville** (multi), **Prix** (double slider XOF), **Date** (chips), **Type**. Pied collant : **Réinitialiser** (gauche) + **Appliquer (N résultats)** noir (droite). Compteur live.
+Bottom sheet (mobile) → **panneau latéral** (tablette). Sections selon l'onglet : **Ville** (multi), **Prix** (double slider XOF), **Date** (chips), **Type**. Pied collant : **Réinitialiser** (gauche) + **Appliquer (N résultats)** noir (droite). Compteur live.
 
 **C7. Sheet de contact** *(établissement, CTA « Contacter »)*
 Bottom sheet : boutons pleins **Appel** / **WhatsApp** / **Site web** / **Email** (selon les canaux renseignés). Annonce ARIA « ouvre une application externe ». Masque les canaux absents.
@@ -465,7 +465,7 @@ Interactions : **tap → `DetailSheet`** (deep link selon le type) ; **swipe →
 ### Groupe E — Intro, compte & mur souple
 
 **E1. Écran d'intro vidéo** *(premier lancement uniquement)*
-Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet + playsinline**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `prefers-reduced-motion`. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). **Analytics : taux de skip.** *(Lancements suivants : pas de vidéo → E3 si déconnecté, Accueil si connecté.)*
+Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). **Analytics : taux de skip.** *(Lancements suivants : pas de vidéo → E3 si déconnecté, Accueil si connecté.)*
 
 **E2. Langue — détection automatique** *(pas d'écran dans le cas courant)*
 **Principe : respecter la langue système, sans intervention.** Aucun sélecteur imposé — un écran de choix bloquant serait une friction inutile (au MVP, mono-langue FR).
@@ -591,7 +591,10 @@ Formulaire **spécifique au rôle** + **upload de justificatif**, puis écran de
 Segmented control sur le Profil (visible si **habilité et vérifié** : Promoteur, Guide, Institution, Admin). « Promoteur » ouvre le tableau de bord I4.
 
 **I4. Tableau de bord Promoteur**
-AppBar + **sélecteur de fiche gérée**. Bloc **stats clés** (vues · likes · **clics itinéraire** · **clics contact**, période). Accès rapide en liste : **Mes fiches** (I5) · **Avis** (I6) · **Promouvoir** (I7) · **Statistiques** (I13) · **Facturation** (I14). Respect monochrome.
+AppBar + **sélecteur de fiche gérée**. Bloc **stats clés** (vues · likes · **clics itinéraire** · **clics contact**, période). Accès rapide en liste : **Mes fiches** (I5) · **Avis** (I6) · **Promouvoir** (I7) · **Équipe** (I4bis) · **Statistiques** (I13) · **Facturation** (I14). Respect monochrome.
+
+**I4bis. Équipe**
+Liste des membres de l'organisation vérifiée, invitation par email/lien, statut (invité, actif, suspendu), rôle et budget publicitaire alloué. Rôles cumulatifs : **Propriétaire > Gestionnaire > Éditeur > Modérateur**. Le Propriétaire contrôle budget global, paiements, moyens de paiement, suppression et transfert. Le Gestionnaire gère l'équipe et alloue les budgets autorisés. L'Éditeur modifie les fiches, publie événements et programme des publicités dans son budget. Le Modérateur répond uniquement aux avis/messages clients.
 
 **I5. Mes fiches**
 Liste des fiches possédées, chip de statut, actions : **Éditer** (H3 en mode édition → re-modération si champ sensible ; **mise à jour illimitée**) · **Archiver** · **Voir les stats** · **Promouvoir**.
@@ -784,12 +787,13 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 
 ### 12.12 Modèle de données (Supabase / PostgreSQL)
 
-**Enums** — `listing_type` (lieu, etablissement, evenement) · **`listing_class` (patrimonial, commercial, evenementiel)** · `listing_status` (brouillon, en_attente, publie, rejete, archive) · `price_unit` (par_nuit, par_personne, consommation, par_entree, aucune) · `ticket_type` (gratuit, payant) · **`user_role` (user, guide, institution, promoteur, admin)** · `claim_status` (en_attente, approuve, refuse) · **`report_status` (nouveau, en_revue, traite, rejete)** · **`social_media_type` (photo, diaporama, video)** · `campaign_status` (brouillon, en_attente_paiement, active, terminee) · `payment_status` (en_cours, reussi, echoue).
+**Enums** — `listing_type` (lieu, etablissement, evenement) · **`listing_class` (patrimonial, commercial, evenementiel)** · `listing_status` (brouillon, en_attente, publie, rejete, archive) · `price_unit` (par_nuit, par_personne, consommation, par_entree, aucune) · `ticket_type` (gratuit, payant) · **`user_role` (user, guide, institution, promoteur, admin)** · **`organization_role` (proprietaire, gestionnaire, editeur, moderateur)** · `claim_status` (en_attente, approuve, refuse) · **`report_status` (nouveau, en_revue, traite, rejete)** · **`social_media_type` (photo, diaporama, video)** · `campaign_status` (brouillon, en_attente_paiement, active, terminee) · `payment_status` (en_cours, reussi, echoue).
 
 **`listings` (socle polymorphe)** — `id`, `type`, `subtype`, **`listing_class`**, `category_id`, `owner_id` (nullable → non revendiqué ; **toujours NULL en Patrimonial**), **`steward_id`** (nullable, institution responsable d'une fiche patrimoniale), `submitted_by`, `status`, `name`, `slug`, `description`, `content_lang`, `city_id`, `district`, `address`, `lat`, `lng`, `geog`, `google_place_id`, `price_from_xof`, `price_unit`, `price_tier`, `opening_hours` (JSONB), `contact_phone`, `contact_whatsapp`, `website_url`, `email`, `socials` (JSONB), `tags` (text[]), `verified`, `sponsored_until` (nullable), **`editorial_pin_until`** (nullable — mise en avant éditoriale, ≠ sponsoring), `rating_avg`, `rating_count`, `views_count`, `likes_count`, `created_at`, `updated_at`, `published_at`.
 
 **Extensions 1-1** — `place_details`, `lodging_details`, `food_details`, `nightlife_details`, `event_details`, **`guide_details`** (langues[], zones[], spécialités[], tarif_indicatif_xof, agrément, expérience).
 **Identité & rôles** — **`profiles`** (user_id, nom, prénom, avatar, cover, bio, city_id) ; **`user_roles`** (user_id, `user_role`, `verified`, statut, justificatif_url, **cumulables**) — un compte peut être à la fois `promoteur` et `guide`.
+**Organisations vérifiées & équipes** — **`organizations`** (type : promoteur, institution, admin_kwabor, etablissement, statut de vérification, propriétaire principal) ; **`organization_members`** (organization_id, user_id, `organization_role`, statut, invited_by, accepted_at) ; **`organization_invites`** (token, rôle proposé, expiration, statut) ; **`member_ad_budgets`** (budget XOF alloué par période, consommé, alloué par).
 **Contenu social (UGC)** — **`social_posts`** (id, author_id, `social_media_type`, **`listing_id` NOT NULL** → rattachement obligatoire, légende, `content_lang`, statut de modération, watermark_applied, likes_count, created_at) ; **`social_media`** (post_id, ordre, url, alt) ; **`post_likes`**, **`comments`** (V1.1), **`follows`** (follower_id, followee_id).
 **Tables filles fiche** — `room_types`, `ticket_tiers`, `media`, `listing_amenities` (→ `amenities`), **`reviews`**, **`review_replies`**, **`favorites`**, **`likes`**, **`notifications`**, **`campaigns`** (`cost_xof`), **`payments`** (`amount_xof`), **`linked_accounts`** (TikTok-ready, nullable, chiffré).
 **Référentiels** — `cities` (communes BJ), `categories` (avec **`default_listing_class`** par sous-type), `amenities`, **`guide_languages`**, **`guide_specialties`**.
@@ -801,6 +805,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
   - lecture publique des `listings.status = publie` et des `social_posts` publiés ;
   - **fiche Commercial/Événementiel** : écriture par `owner_id = auth.uid()` (rôle `promoteur`/`guide` vérifié) ;
   - **fiche Patrimonial** : écriture/enrichissement par rôle `institution` (périmètre/steward) ou `admin` ; **jamais** par `user` ni par `guide` ;
+  - **organisations vérifiées** : les écritures d'équipe vérifient l'appartenance active, le rôle cumulatif requis et le budget autorisé côté RLS/fonctions SQL ; jamais par simple masquage UI ;
   - **`social_posts`** : insert par tout compte authentifié **avec `listing_id` non nul** (contrainte) ; un `user` n'a **aucun** droit d'écriture sur `listings` ;
   - **`missing_place_reports`** : insert par tout compte authentifié ; lecture/traitement par `admin` ;
   - secrets paiement/OAuth **jamais** côté client.
@@ -813,6 +818,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 - **Édition d'un publié** : champs **sensibles** (nom, type/sous-type, GPS, prix, billetterie) → **re-modération** (ancienne version en ligne via `listing_revisions`) ; champs **mineurs** → publication directe + journalisation.
 - **Revendication (claim)** : flow I12, **restreint à Commercial/Événementiel** (contrainte sur `claims`) ; Patrimonial non revendicable (stewardship attribuée par Admin — I17).
 - **Activation** : `promoter_invites` génère le lien d'activation (E8) ; à l'activation, le compte reçoit le rôle et l'`owner_id` de sa fiche pré-remplie.
+- **Équipes** : les organisations vérifiées appliquent les rôles cumulatifs Propriétaire > Gestionnaire > Éditeur > Modérateur ; invitations expirables, révocables et auditables.
 
 ---
 
@@ -845,7 +851,7 @@ Bottom Nav (plate, 5 items égaux — aucun central)
     ├── Signaler un lieu manquant ──► file Admin Kwabor
     ├── Modifier le profil
     ├── Sélecteur Personnel/Promoteur ──► Tableau de bord (si habilité)
-    │      ├── Mes fiches · Avis (réponse) · Statistiques · Facturation
+    │      ├── Mes fiches · Avis (réponse) · Équipe · Statistiques · Facturation
     │      ├── Promouvoir ──► Ciblage ──► Paiement Mobile Money ──► Reçu
     │      ├── [Guide] Service de guide + Événements
     │      └── [Institution] Enrichissement / stewardship (Patrimonial)
@@ -868,18 +874,17 @@ Tout prix plein ──► Convertisseur de devise
 
 ---
 
-## 14. Responsive — Mobile / Tablette / Desktop (PWA)
+## 14. Adaptatif — Mobile / Tablette
 
 | Breakpoint | Largeur | Grille Explore | Détail | Navigation |
 |---|---|---|---|---|
 | **Mobile** | < 600 px | 2 colonnes | Modal sheet 92 % | Bottom Nav |
 | **Tablette** | 600–1024 px | 3 colonnes | Modal centrée, max 640, 85 % | **Rail latéral gauche** (5 entrées) |
-| **Desktop (PWA)** | > 1024 px | 4 colonnes, contenu plafonné 1280 centré | **Split-view** (grille 60 % / détail 40 %) | Rail latéral gauche |
 
-- Le **FAB IA** reste flottant à toutes les tailles (bas-droite du viewport sur desktop).
-- Le **Filter Drawer** passe de bottom sheet (mobile) à **panneau latéral persistant** (desktop).
-- Le **tableau de bord Promoteur** passe en layout 2 colonnes (navigation + contenu) sur desktop.
-- Pas de version desktop native : le web reste **PWA responsive**.
+- Le **FAB IA** reste flottant à toutes les tailles mobiles/tablettes.
+- Le **Filter Drawer** passe de bottom sheet (mobile) à **panneau latéral** sur tablette.
+- Le **tableau de bord Promoteur** peut passer en layout 2 colonnes sur tablette.
+- Web/PWA/Desktop est hors scope V1.
 
 ---
 
@@ -893,7 +898,7 @@ Tout prix plein ──► Convertisseur de devise
 | Transition Bottom Nav | 180 ms ease-out |
 | Crossfade Surprenez-moi | 250 ms + léger scale |
 | Skeleton → contenu | fade 150 ms |
-| Parallax cover Profil / hero | **léger uniquement** (translation ≤ 12 %), CSS/Compose |
+| Parallax cover Profil / hero | **léger uniquement** (translation ≤ 12 %), Compose/SwiftUI |
 | Apparition image (lazy-load) | fade-in 200 ms depuis le placeholder dégradé |
 | Speed-dial FAB (appui long) | expansion 180 ms des 2 entrées |
 
@@ -902,10 +907,10 @@ Tout prix plein ──► Convertisseur de devise
 ## 16. Performance — « premium sans poids » (garde-fou non négociable)
 
 - **Mur d'exploration : P75 < 1,5 s** sur 3G/4G dégradée.
-- Overlays/dégradés/profondeur = **CSS/Compose**, jamais des images sombres empilées.
+- Overlays/dégradés/profondeur = **Compose/SwiftUI**, jamais des images sombres empilées.
 - Photos en **WebP/AVIF**, variantes responsives, **lazy-load**, **placeholder dégradé immédiat**, CDN + compression serveur.
 - **Aucun blur temps réel massif**, aucun parallax lourd. Le frosted utilise un blur **léger (≤ 8 px)** sur petites surfaces seulement.
-- Webfonts : `font-display: swap` + fallback système.
+- Typographies système en fallback ; polices embarquées optimisées par plateforme si validées.
 - Offline : cache du dernier mur (lecture seule), bannière persistante, file locale des likes/favoris à synchroniser.
 
 ---

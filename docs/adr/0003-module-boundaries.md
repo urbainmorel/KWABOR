@@ -1,13 +1,15 @@
-# 0003 — Découper le socle en shared, androidApp et webApp
+# 0003 — Découper le socle initial en shared, androidApp et webApp
 
-- **Statut** : accepté
+- **Statut** : remplacé par [ADR-0010](0010-mobile-only-swiftui-team-access.md)
 - **Date** : 2026-07-02
 - **Décideurs** : Équipe
 - **Remplace** : —
 
 ## Contexte et problème
 
-Le dépôt doit compiler rapidement sur Windows tout en préparant Android, iOS et PWA.
+Le dépôt devait compiler rapidement sur Windows tout en préparant Android, iOS et PWA.
+
+Depuis ADR-0010, Web/PWA sort du scope V1. Aucun nouveau travail ne doit cibler `webApp`. La suppression physique du module est planifiée en MOB-002.
 
 ## Options envisagées
 
@@ -17,7 +19,9 @@ Le dépôt doit compiler rapidement sur Windows tout en préparant Android, iOS 
 
 ## Décision
 
-Nous retenons `shared`, `androidApp` et `webApp`, avec `iosApp` documenté pour intégration Xcode ultérieure.
+La décision initiale retenait `shared`, `androidApp` et `webApp`, avec `iosApp` documenté pour intégration Xcode ultérieure.
+
+Cette décision est remplacée par ADR-0010 : le découpage cible devient `shared`, `androidApp` et `iosApp` SwiftUI.
 
 ## Conséquences
 
@@ -27,6 +31,7 @@ Nous retenons `shared`, `androidApp` et `webApp`, avec `iosApp` documenté pour 
 
 **Négatives / compromis assumés**
 - La compilation iOS complète n'est pas garantie sur Windows.
+- Le module `webApp` doit être retiré proprement.
 
 **À revoir si**
-- Le build PWA ou iOS impose un découpage plus spécialisé.
+- Une cible Web/PWA est réouverte par ADR.

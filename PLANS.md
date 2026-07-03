@@ -19,9 +19,11 @@ Une tâche à la fois. Aucun agent ne démarre une deuxième tâche tant que son
 - Authentification.
 - RLS Supabase.
 - Paiements.
+- Droits d'équipe et budgets publicitaires.
 - Offline/synchronisation.
 - Upload média.
 - IA et clés provider.
+- CI release/signature iOS.
 
 Ces zones demandent un plan dédié avant implémentation.
 
@@ -57,3 +59,29 @@ Ces zones demandent un plan dédié avant implémentation.
 - `supabase test db` pour les tests pgTAP.
 - `./gradlew.bat check`.
 - `git diff --check`.
+
+## Plan MOB-001 — Cadrage mobile-only, iOS SwiftUI et équipes vérifiées
+
+**Agent responsable** : Architecture, avec revue Data/Supabase et Build/Tooling.
+
+**Objectif atomique** : acter le nouveau périmètre Android/iOS uniquement, clarifier Android Compose Multiplatform + iOS SwiftUI, préparer la stratégie CI macOS et formaliser les rôles d'équipe vérifiée avant toute suppression de module ou migration.
+
+**Livrables**
+
+- ADR mobile-only acceptée.
+- `AGENTS.md` aligné sur Android/iOS uniquement.
+- `PRD.md` et `DESIGN.md` corrigés sur les exigences directement contradictoires Web/PWA.
+- Modèle d'équipe vérifiée documenté : Propriétaire > Gestionnaire > Éditeur > Modérateur.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour avec la suite logique.
+
+**Règles de sécurité**
+
+- Aucun droit d'équipe ne doit dépendre d'un masquage UI.
+- Les budgets et paiements publicitaires restent contrôlés côté serveur.
+- La signature iOS App Store/TestFlight utilisera uniquement des secrets GitHub chiffrés lors d'une tranche release dédiée.
+
+**Validation**
+
+- `git diff --check`.
+- Relecture ciblée des mentions Web/PWA restantes.
+- Pas de build requis pour cette tranche documentaire.

@@ -17,10 +17,12 @@ Fondations techniques et organisation staff senior.
 - Scaffold KMP minimal créé avec `shared`, `androidApp`, `webApp` et documentation `iosApp`.
 - ADR fondateurs normalisés sous `docs/adr/`.
 - Shell Compose partagé, primitives domaine, tokens design et i18n FR minimale ajoutés.
+- Cadrage mobile-only validé : Android/iOS uniquement, Android Compose Multiplatform, iOS SwiftUI, Web/PWA hors scope.
+- Modèle d'équipe vérifiée cadré : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés côté serveur/RLS.
 
 ## Tâche en cours
 
-Aucune tâche de code ouverte après merge FND-005.
+Aucune tâche de code ouverte après MOB-001.
 
 ## Blocages / limites
 
@@ -28,7 +30,9 @@ Aucune tâche de code ouverte après merge FND-005.
 - Les DTO Supabase et les implémentations repository `data` ne sont pas encore présents.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - L'hôte iOS complet doit être finalisé sur macOS avec Xcode.
+- Le module `webApp` existe encore dans le dépôt mais il est hors scope depuis ADR-0010 ; il doit être supprimé dans MOB-002.
+- La CI iOS macOS n'est pas encore créée ; elle nécessite un hôte Xcode SwiftUI.
 
 ## Prochaine tâche logique
 
-Démarrer FND-006 : previews UI et tests du design system, sans feature métier complète.
+Démarrer MOB-002 : supprimer proprement `webApp`, retirer son include Gradle et vérifier que `./gradlew.bat check` reste vert.

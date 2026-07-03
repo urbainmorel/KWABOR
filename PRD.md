@@ -43,7 +43,7 @@ Trois décisions fondatrices, non négociables, gouvernent tout le reste :
 ## 1. Résumé exécutif & parti pris
 
 ### 1.1 Le produit en une phrase
-Kwabor est une application mobile multiplateforme (Android, iOS, **PWA**) qui aide les résidents, la diaspora béninoise et les touristes à **découvrir, en un coup d'œil et dans leur langue, les meilleurs lieux, hôtels, restaurants et événements du Bénin** — avec la beauté d'un feed social et la fiabilité d'un guide structuré.
+Kwabor est une application mobile multiplateforme (**Android et iOS**) qui aide les résidents, la diaspora béninoise et les touristes à **découvrir, en un coup d'œil et dans leur langue, les meilleurs lieux, hôtels, restaurants et événements du Bénin** — avec la beauté d'un feed social et la fiabilité d'un guide structuré.
 
 ### 1.2 Les trois piliers
 1. **Inspiration visuelle premium.** Un mur de cartes immersif où la photo est plein cadre et l'interface s'efface derrière des overlays. La découverte est passive et « donne envie » dès le premier regard. Ce niveau de finition est un **avantage concurrentiel** : aucun acteur local (Google Maps, guides papier, Instagram) n'offre une expérience à la fois aussi soignée et aussi structurée.
@@ -64,7 +64,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - **Image plein cadre + overlay dégradé** sur cartes et fiches : le texte vit *sur* l'image, jamais dans un bandeau séparé.
 - **Couleur uniquement quand elle porte un sens métier** : le **jaune « Sponsorisé »** (transparence publicitaire) et le **rouge « billetterie / danger »** sont les **deux seuls** écarts de couleur tolérés. Sur fond monochrome, ils en deviennent plus repérables — ce qui sert directement les règles de transparence et d'urgence.
 
-**Garde-fou non négociable — le premium ne coûte jamais la performance.** La cible utilise majoritairement des Android low/mid-range sur réseau 3G/4G dégradé. L'esthétique premium s'obtient **par le design, pas par le poids** : overlays/dégradés en CSS/Compose (jamais d'images lourdes empilées) ; photos en WebP/AVIF compressées, lazy-load, placeholder dégradé immédiat ; aucun effet coûteux (blur temps réel massif, parallax lourd) qui dégraderait le budget **P75 < 1,5 s** (§8). Arbitrage explicite : viser le rendu des meilleures apps premium **sans** copier leurs recettes gourmandes en data.
+**Garde-fou non négociable — le premium ne coûte jamais la performance.** La cible utilise majoritairement des Android low/mid-range sur réseau 3G/4G dégradé. L'esthétique premium s'obtient **par le design, pas par le poids** : overlays/dégradés en Compose/SwiftUI (jamais d'images lourdes empilées) ; photos en WebP/AVIF compressées, lazy-load, placeholder dégradé immédiat ; aucun effet coûteux (blur temps réel massif, parallax lourd) qui dégraderait le budget **P75 < 1,5 s** (§8). Arbitrage explicite : viser le rendu des meilleures apps premium **sans** copier leurs recettes gourmandes en data.
 
 ---
 
@@ -155,6 +155,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - **Bouton « + » contextuel** selon le rôle (§6.0).
 - **Compte Promoteur** : inscription pro + vérification du justificatif (formulaire spécifique aux **guides**), **revendication de fiche** (claim) — **uniquement pour les classes Commercial/Événementiel**.
 - **Tableau de bord Promoteur** : gestion des fiches, **gestion + réponse aux avis**, section **« Promouvoir »** (campagnes sponsorisées + ciblage), **statistiques séparées organique/payé**, **facturation**.
+- **Équipe d'organisation vérifiée** : les promoteurs, institutions et Admin Kwabor peuvent inviter des membres avec rôles cumulatifs **Propriétaire > Gestionnaire > Éditeur > Modérateur**. Les droits financiers et d'équipe restent contrôlés par Propriétaire/Gestionnaire selon budget autorisé.
 - **Mise en avant éditoriale** (gratuite, décidée par Kwabor, pour le Patrimonial/événements) — **distincte** du sponsoring payant.
 - **Paiement Mobile Money** (XOF) des campagnes : opérateurs **MTN MoMo** et **Moov Money** via agrégateurs (**CinetPay**, **FedaPay**), validation côté serveur.
 
@@ -162,7 +163,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - **Langue : FR** livrée ; i18n complète câblée pour les 6 langues.
 - **Devises d'affichage : XOF, NGN, USD, EUR** (conversion indicative ; **€/$/₦ réservés aux comptes**).
 - **Licence de contenu UGC + procédure de retrait** dans les CGU (acceptées à l'inscription).
-- **PWA installable**, offline partiel sur le mur (cache lecture seule), bannière offline persistante.
+- **Applications Android/iOS uniquement**, offline partiel sur le mur (cache lecture seule), bannière offline persistante.
 
 ### 5.2 V1.1 (post-lancement rapide)
 - **Langue : Anglais (EN).**
@@ -181,7 +182,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - Réservation/paiement **in-app** de tables ou de chambres (le MVP redirige vers WhatsApp/téléphone/site).
 - Billetterie événementielle à paiement **intégré** (le MVP redirige vers une URL externe).
 - Programme de fidélité multi-établissements.
-- Version desktop **native** (le web reste PWA responsive).
+- Version Web/PWA/Desktop. Le produit V1 est mobile-only Android/iOS.
 - Extension à d'autres pays (Kwabor est **mono-pays Bénin** par décision produit).
 
 ### 5.5 Hors produit
@@ -330,7 +331,7 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 
 **6.9.3 Écran d'intro vidéo.** Objectif : immerger instantanément dans l'univers touristique, culturel et festif du Bénin.
 - **Asset embarqué** dans l'app (lecture **indépendante du réseau**, instantanée au premier lancement) **et remplaçable à distance** (remote config + CDN, précaché) — permet de varier la vidéo saisonnièrement (Vodun Days, festivals) **sans republier** sur les stores. Au MVP, l'**emplacement et toute la mécanique sont provisionnés**, l'asset final est fourni séparément.
-- **Spec d'asset stricte** : format **vertical natif** (cadré pour écrans mobiles allongés), **H.264** (universel Android bas de gamme + PWA), **muet** (autoplay), **playsinline**, durée **15–25 s**, **budget de poids serré** (viser ~2–3 Mo).
+- **Spec d'asset stricte** : format **vertical natif** (cadré pour écrans mobiles allongés), **H.264** (universel Android/iOS), **muet**, durée **15–25 s**, **budget de poids serré** (viser ~2–3 Mo).
 - **Sautable** (bouton « Passer » visible immédiatement) ; **premier lancement uniquement** (les lancements suivants vont directement à l'auth ou à l'accueil) ; **fallback image statique** si `prefers-reduced-motion`. **Analytics : taux de skip** pour vérifier que la vidéo mérite sa place.
 
 **6.9.4 Mur souple (soft wall) — acté.** L'invité **parcourt le mur et ouvre les fiches en lecture seule** ; les **prix s'affichent en FCFA uniquement**. Le mur se lève (invite d'inscription) à la **première action engageante** : **Like, Favori, avis, publier, suivre, ou changement de devise**. Au choix **« Ne pas s'inscrire »**, un **message** explique que l'inscription débloque l'affichage en **€ / $ / ₦** (et l'ensemble des interactions). Ce compromis protège la conversion (le touriste voit d'abord le contenu) tout en cadrant les actions à valeur.
@@ -420,6 +421,17 @@ Kwabor sépare **deux axes indépendants** : la **classe de la fiche** (sa natur
 - **Activation des comptes pré-inscrits** : flux dédié (§6.9.5), sans inscription à froid.
 
 **6.12.2 Sélecteur Personnel/Promoteur.** Bascule de contexte sur le Profil (visible si habilité et vérifié) menant au tableau de bord.
+
+**Équipe d'organisation vérifiée.** Une organisation vérifiée représente un promoteur, une institution, un établissement ou une entité interne Kwabor. Elle peut avoir plusieurs membres avec droits cumulatifs :
+
+| Rôle équipe | Droits |
+|---|---|
+| **Modérateur** | Répondre uniquement aux avis/messages clients. |
+| **Éditeur** | Droits Modérateur + modifier les fiches autorisées, ajouter médias, publier événements, créer/programmer des publicités avec budget alloué. |
+| **Gestionnaire** | Droits Éditeur + gérer l'équipe, inviter/suspendre membres, attribuer Éditeur/Modérateur, allouer les budgets autorisés. |
+| **Propriétaire** | Droits Gestionnaire + budget global, paiements, moyens de paiement, suppression, transfert de propriété, paramètres critiques. |
+
+Règles financières : un Éditeur ne peut consommer que son budget alloué ; un Gestionnaire ne peut allouer que le budget autorisé ; seul le Propriétaire contrôle les moyens de paiement et le budget global.
 
 **6.12.3 Tableau de bord.** Vue d'ensemble : sélecteur de fiche gérée ; stats clés (vues, likes, **clics itinéraire**, **clics contact**) ; accès à : Mes fiches · Avis · **Promouvoir** · Statistiques · Facturation.
 
@@ -517,7 +529,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 
 | Catégorie | Exigence |
 |---|---|
-| **Performance** | Chargement initial du mur < **1,5 s P75** sur 3G/4G dégradée ; images WebP/AVIF, CDN, compression serveur, lazy-load, placeholder dégradé immédiat ; overlays/dégradés rendus en CSS/Compose, jamais par des images lourdes (§1.4). Budget contrôlé **à chaque écran**. |
+| **Performance** | Chargement initial du mur < **1,5 s P75** sur 3G/4G dégradée ; images WebP/AVIF, CDN, compression serveur, lazy-load, placeholder dégradé immédiat ; overlays/dégradés rendus en Compose/SwiftUI, jamais par des images lourdes (§1.4). Budget contrôlé **à chaque écran**. |
 | **Offline / résilience** | Cache local du dernier mur (lecture seule) ; **bannière « Vous êtes hors ligne » persistante** ; **file locale** pour les actions (Like/Favori) synchronisée à la reconnexion ; saisie de brouillon de fiche autorisée (upload média et géocodage mis en file). Les fiches Détail ne sont pas garanties hors-ligne au MVP. |
 | **Accessibilité (WCAG AA)** | Contrastes ≥ **4.5:1** sur tous textes/overlays (y compris titre sur hero et sur cartes) ; labels ARIA/VoiceOver sur tout composant interactif ; **focus order documenté par écran** ; **alt text** généré (éditable) par image ; cibles tactiles ≥ 44 px ; états annoncés (« Événement terminé », « Ouvre une app externe »…). |
 | **Internationalisation** | **6 langues** (FR au MVP, EN en V1.1, puis PT/DE/ES/IT) ; **toute** l'UI via i18n dès le MVP ; **4 devises** d'affichage (conversion indicative, formatage ICU/CLDR) ; formats date/heure localisés ; **tolérance à l'expansion de texte** (DE +30–40 %), aucune largeur de label figée, tests pseudo-localisés. Pas de RTL (langues latines). |
@@ -532,7 +544,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 
 > Détails d'implémentation en `DESIGN.md` et futurs ADR. Résumé orienté décisions produit :
 
-- **Client : Kotlin Multiplatform + Compose Multiplatform** — code métier et UI partagés Android / iOS / **Web-PWA** (cible Kotlin/Wasm). Une seule base de code, un seul design system.
+- **Client : Kotlin Multiplatform mobile** — `shared` pour domaine, data, contrats, use cases et états ; Android en Compose Multiplatform ; iOS en SwiftUI natif. Web/PWA est hors scope V1.
 - **Backend : Supabase** (PostgreSQL managé, Auth, Storage, Realtime pour compteurs et notifications, **Row Level Security**). RLS pilotée par le couple **rôle × `listing_class`** (§6.11) : lecture publique des fiches publiées ; écriture d'une fiche selon le rôle et la classe (Promoteur → ses fiches Commercial/Événementiel ; Institution/Admin → Patrimonial ; Utilisateur → aucun droit de fiche, seulement UGC et signalement). Colonnes/tables nullable « TikTok-ready » dès le MVP, chiffrées au repos, sans UI ni OAuth avant V1.2.
 - **Authentification** : Supabase Auth — **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS uniquement)** ; **flux d'activation** par lien invité pour les promoteurs pré-inscrits ; secrets OAuth côté serveur.
 - **UGC & médias sociaux** : Storage + pipeline d'images (WebP/AVIF) ; **rattachement obligatoire** d'un média à une entité (contrainte applicative + FK) ; **watermark non maskable** à l'export ; modération image automatique ; **licence + retrait** journalisés.
@@ -542,7 +554,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 - **i18n** : ressources structurées dès le MVP (clés des 6 langues, FR rempli en premier).
 - **Assistant IA** : API Anthropic (Claude) **côté serveur** (clé jamais exposée) ; recherche sémantique sur le catalogue (embeddings + filtrage structuré) pour **ancrer les réponses** et éviter les hallucinations ; réponses dans la langue de l'utilisateur.
 - **Cartographie** : Google Maps Platform (Static Maps en fiche + Directions pour le CTA Itinéraire).
-- **Notifications push** : FCM (Android) / APNs (iOS) / Web Push (PWA), orchestrés par un service de campagne backend, segmentation ville/centres d'intérêt.
+- **Notifications push** : FCM (Android) / APNs (iOS), orchestrés par un service de campagne backend, segmentation ville/centres d'intérêt.
 - **Médias** : pipeline d'images adaptatives (WebP/AVIF), variantes responsives, lazy-load, placeholder dégradé — condition du « premium sans poids ».
 - **Vidéo (V1.1)** : stockage/transcodage adaptatif, streaming progressif (plafonds taille/durée — §14).
 - **TikTok (V1.2)** : TikTok Login Kit + Content Posting API (Upload to Inbox d'abord) ; tokens orchestrés côté backend ; polling Display API pour les stats cross-plateforme.
@@ -623,11 +635,14 @@ Chaque événement porte : `ville`, `type_entite`, `entite_id`, `source_session`
 - **Langue du contenu** : `content_lang` stockée + **traduction automatique à l'affichage**.
 - **Re-modération à l'édition** déclenchée par : nom, type/sous-type, GPS, prix, billetterie. **Une fiche est publiée une fois puis mise à jour à volonté.**
 - **Limites médias** : photo ≤ 8 Mo (JPG/PNG/WebP) ; vidéo ≤ 60 s, ≤ 50 Mo (V1.1) ; intro ~2–3 Mo.
+- **Cible V1 mobile-only** : Android + iOS ; Web/PWA/Desktop hors scope jusqu'à ADR contraire.
+- **Architecture UI mobile** : Android Compose Multiplatform ; iOS SwiftUI ; `shared` KMP limité au métier/data/contrats/états partagés.
+- **Rôles d'équipe vérifiée** : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés.
 
 **Questions résiduelles (Finance / partenaires) :**
 1. Vérification Promoteur/Guide/Institution : manuelle (Kwabor) ou semi-automatisée dès le MVP ?
 2. Budget d'acquisition pour atteindre 25 000 MAU à 6 mois ?
-3. Compose for Web/Wasm validé pour la perf attendue sur PWA bas de gamme, ou fallback web ?
+3. Stratégie exacte de signature Apple Developer pour TestFlight/App Store : certificats, provisioning profiles, rotation et ownership des secrets ?
 4. Politique exacte de fréquence/plafond des notifications sponsorisées ?
 5. Source et fréquence du taux de change (API tierce vs taux fixe paramétré) ?
 6. Liste définitive des opérateurs/agrégateurs Mobile Money à intégrer.
