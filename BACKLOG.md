@@ -15,10 +15,11 @@
 - [x] CI-002 — Vérifier la CI macOS après push et corriger le build Xcode si nécessaire.
 - [x] DATA-TEAM-001 — Créer les migrations Supabase équipes, membres, invitations, budgets et tests RLS.
 - [x] DOMAIN-TEAM-001 — Ajouter les modèles domaine et contrats repository des organisations vérifiées.
+- [x] DATA-TEAM-002 — Implémenter les DTO et repository data des organisations vérifiées.
 
 ## Ensuite
 
-- [ ] DATA-TEAM-002 — Implémenter les DTO et repository Supabase des organisations vérifiées.
+- [ ] DATA-TEAM-003 — Brancher `OrganizationDataSource` sur Supabase PostgREST/RPC.
 - [ ] FND-006 — Ajouter les previews UI et tests de design system.
 - [ ] FND-008 — Implémenter les repositories data Supabase du catalogue.
 

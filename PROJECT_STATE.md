@@ -27,15 +27,17 @@ Fondations techniques et organisation staff senior.
 - RLS équipes validée par pgTAP : lecture limitée aux membres, invitations selon Propriétaire/Gestionnaire, blocage Éditeur, budgets publicitaires alloués selon rôle et plafond Gestionnaire.
 - PR DATA-TEAM-001 `#6` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Modèles domaine organisations ajoutés : organisation, membre, invitation, budget publicitaire, hiérarchie Propriétaire > Gestionnaire > Éditeur > Modérateur, requêtes validées et contrat `OrganizationRepository`.
+- PR DOMAIN-TEAM-001 `#7` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- Couche data organisations ajoutée : DTO Supabase, mappers domaine, contrat `OrganizationDataSource`, implémentation `DataOrganizationRepository` et tests `commonTest`.
 
 ## Tâche en cours
 
-DOMAIN-TEAM-001 est validée localement sur la branche `foundation/team-domain-contracts`; PR/CI GitHub à ouvrir après commit.
+DATA-TEAM-002 est validée localement sur la branche `foundation/team-data-repository`; PR/CI GitHub à ouvrir après commit.
 
 ## Blocages / limites
 
 - La protection de branche GitHub `main` a été refusée sur dépôt privé sans GitHub Pro ou dépôt public.
-- Les DTO Supabase et les implémentations repository `data` ne sont pas encore présents.
+- Le data source Supabase PostgREST/RPC concret pour `OrganizationDataSource` n'est pas encore branché.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
@@ -43,4 +45,4 @@ DOMAIN-TEAM-001 est validée localement sur la branche `foundation/team-domain-c
 
 ## Prochaine tâche logique
 
-Ouvrir la PR DOMAIN-TEAM-001 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `OrganizationRepository`.
+Ouvrir la PR DATA-TEAM-002 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC, sans exposer Supabase au domaine ni à l'UI.
