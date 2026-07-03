@@ -30,20 +30,22 @@ Fondations techniques et organisation staff senior.
 - PR DOMAIN-TEAM-001 `#7` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Couche data organisations ajoutée : DTO Supabase, mappers domaine, contrat `OrganizationDataSource`, implémentation `DataOrganizationRepository` et tests `commonTest`.
 - PR DATA-TEAM-002 `#8` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- RPC Supabase organisations ajouté : création/révocation/acceptation d'invitation et suspension membre, avec pgTAP.
+- `OrganizationDataSource` branché sur Supabase PostgREST/RPC via `postgrest-kt`, moteurs Ktor Android/iOS et fabrique client sans secret commité.
 
 ## Tâche en cours
 
-Aucune tâche active après merge DATA-TEAM-002.
+DATA-TEAM-003 est validée localement sur la branche `foundation/team-supabase-data-source`; PR/CI GitHub à ouvrir après commit.
 
 ## Blocages / limites
 
 - La protection de branche GitHub `main` a été refusée sur dépôt privé sans GitHub Pro ou dépôt public.
-- Le data source Supabase PostgREST/RPC concret pour `OrganizationDataSource` n'est pas encore branché.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
+- L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 
 ## Prochaine tâche logique
 
-Lancer DATA-TEAM-003 sur une branche dédiée : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC, sans exposer Supabase au domaine ni à l'UI.
+Ouvrir la PR DATA-TEAM-003 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-CATALOG-001 : brancher les repositories catalogue sur Supabase PostgREST en réutilisant la fabrique client et les règles d'erreurs data.

@@ -231,3 +231,37 @@ Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `Organizati
 **Suite logique**
 
 Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC en vérifiant l'API `supabase-kt` actuelle et sans commiter de secret.
+
+## Plan DATA-TEAM-003 — Data source Supabase organisations
+
+**Agent responsable** : Data/Supabase, avec revue QA.
+
+**Objectif atomique** : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC réel, en gardant Supabase hors du domaine et de l'UI.
+
+**Livrables**
+
+- Dépendances `postgrest-kt` et moteurs Ktor Android/iOS.
+- Fabrique `createKwaborSupabaseClient` installant PostgREST sans secret commité.
+- Implémentation `SupabaseOrganizationDataSource`.
+- RPC SQL pour opérations sensibles : invitation, acceptation, révocation, suspension.
+- Tests pgTAP des RPC et tests Kotlin des DTO RPC/patch.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
+
+**Règles de sécurité**
+
+- Les invitations ne sont pas créées par insert client avec `token_hash` fourni par le client.
+- Les RPC publics ont `search_path` fixé et `EXECUTE` limité à `authenticated`.
+- L'acceptation d'invitation vérifie `auth.uid()` et l'email réel de `auth.users`.
+- Les erreurs Supabase/PostgREST sont converties en `DomainError`, sans message technique brut.
+
+**Validation**
+
+- `supabase db reset`.
+- `supabase test db`.
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Suite logique**
+
+Après merge, lancer DATA-CATALOG-001 : implémenter les repositories data Supabase du catalogue avec le même client, les mêmes règles d'erreurs et des tests ciblés.

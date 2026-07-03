@@ -9,6 +9,7 @@ import com.kwabor.shared.domain.organization.OrganizationInvite
 import com.kwabor.shared.domain.organization.OrganizationInviteRequest
 import com.kwabor.shared.domain.organization.OrganizationInviteStatus
 import com.kwabor.shared.domain.organization.OrganizationMember
+import com.kwabor.shared.domain.organization.OrganizationMemberRoleUpdate
 import com.kwabor.shared.domain.organization.OrganizationMemberStatus
 import com.kwabor.shared.domain.organization.OrganizationRole
 import com.kwabor.shared.domain.organization.OrganizationType
@@ -91,20 +92,6 @@ internal data class MemberAdBudgetDto(
 )
 
 @Serializable
-internal data class OrganizationInviteCommandDto(
-    @SerialName("organization_id")
-    val organizationId: String,
-    @SerialName("invited_by_member_id")
-    val invitedByMemberId: String,
-    @SerialName("email")
-    val email: String,
-    @SerialName("proposed_role")
-    val proposedRole: String,
-    @SerialName("expires_at")
-    val expiresAt: String,
-)
-
-@Serializable
 internal data class MemberAdBudgetCommandDto(
     @SerialName("organization_id")
     val organizationId: String,
@@ -118,6 +105,46 @@ internal data class MemberAdBudgetCommandDto(
     val periodEnd: String,
     @SerialName("allocated_xof")
     val allocatedXof: Long,
+)
+
+@Serializable
+internal data class CreateOrganizationInviteRpcDto(
+    @SerialName("p_organization_id")
+    val organizationId: String,
+    @SerialName("p_invited_by_member_id")
+    val invitedByMemberId: String,
+    @SerialName("p_email")
+    val email: String,
+    @SerialName("p_proposed_role")
+    val proposedRole: String,
+    @SerialName("p_expires_at")
+    val expiresAt: String,
+)
+
+@Serializable
+internal data class AcceptOrganizationInviteRpcDto(
+    @SerialName("p_invite_token")
+    val inviteToken: String,
+)
+
+@Serializable
+internal data class RevokeOrganizationInviteRpcDto(
+    @SerialName("p_invite_id")
+    val inviteId: String,
+)
+
+@Serializable
+internal data class SuspendOrganizationMemberRpcDto(
+    @SerialName("p_organization_id")
+    val organizationId: String,
+    @SerialName("p_member_id")
+    val memberId: String,
+)
+
+@Serializable
+internal data class OrganizationMemberRolePatchDto(
+    @SerialName("role")
+    val role: String,
 )
 
 internal fun OrganizationDto.toDomain(): Organization = Organization(
@@ -168,12 +195,16 @@ internal fun MemberAdBudgetDto.toDomain(): MemberAdBudget {
     )
 }
 
-internal fun OrganizationInviteRequest.toCommandDto(): OrganizationInviteCommandDto = OrganizationInviteCommandDto(
+internal fun OrganizationInviteRequest.toRpcDto(): CreateOrganizationInviteRpcDto = CreateOrganizationInviteRpcDto(
     organizationId = organizationId,
     invitedByMemberId = invitedByMemberId,
     email = email,
     proposedRole = proposedRole.toDatabaseValue(),
     expiresAt = Instant.fromEpochMilliseconds(expiresAtEpochMilliseconds).toString(),
+)
+
+internal fun OrganizationMemberRoleUpdate.toPatchDto(): OrganizationMemberRolePatchDto = OrganizationMemberRolePatchDto(
+    role = newRole.toDatabaseValue(),
 )
 
 internal fun MemberAdBudgetAllocationRequest.toCommandDto(): MemberAdBudgetCommandDto = MemberAdBudgetCommandDto(
@@ -210,7 +241,7 @@ private fun String.toOrganizationRole(): OrganizationRole = when (this) {
     else -> invalidDatabaseValue("organization_members.role", this)
 }
 
-private fun OrganizationRole.toDatabaseValue(): String = when (this) {
+internal fun OrganizationRole.toDatabaseValue(): String = when (this) {
     OrganizationRole.Moderator -> "moderateur"
     OrganizationRole.Editor -> "editeur"
     OrganizationRole.Manager -> "gestionnaire"
