@@ -7,9 +7,15 @@ interface AuthRepository {
 
     suspend fun requestEmailOtp(email: String): DomainResult<Unit>
 
+    suspend fun verifyEmailOtp(email: String, otpCode: String): DomainResult<Unit>
+
     suspend fun signUpWithEmail(request: EmailSignUpRequest): DomainResult<AuthSession>
 
     suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession>
+
+    suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession>
+
+    suspend fun activatePromoterInvite(request: PromoterActivationRequest): DomainResult<AuthSession>
 
     suspend fun signOut(): DomainResult<Unit>
 }
