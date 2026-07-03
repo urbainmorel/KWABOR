@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
@@ -6,21 +8,30 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-@OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 kotlin {
+    val sharedXcFramework = XCFramework("Shared")
+
     android {
         namespace = "com.kwabor.shared"
         compileSdk = 36
         minSdk = 26
+        withHostTest {}
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
     jvmToolchain(21)
 
-    wasmJs {
-        browser()
-        binaries.executable()
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "Shared"
+            isStatic = true
+            sharedXcFramework.add(this)
+        }
     }
 
     sourceSets {

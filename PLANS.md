@@ -19,9 +19,11 @@ Une tâche à la fois. Aucun agent ne démarre une deuxième tâche tant que son
 - Authentification.
 - RLS Supabase.
 - Paiements.
+- Droits d'équipe et budgets publicitaires.
 - Offline/synchronisation.
 - Upload média.
 - IA et clés provider.
+- CI release/signature iOS.
 
 Ces zones demandent un plan dédié avant implémentation.
 
@@ -57,3 +59,75 @@ Ces zones demandent un plan dédié avant implémentation.
 - `supabase test db` pour les tests pgTAP.
 - `./gradlew.bat check`.
 - `git diff --check`.
+
+## Plan MOB-001 — Cadrage mobile-only, iOS SwiftUI et équipes vérifiées
+
+**Agent responsable** : Architecture, avec revue Data/Supabase et Build/Tooling.
+
+**Objectif atomique** : acter le nouveau périmètre Android/iOS uniquement, clarifier Android Compose Multiplatform + iOS SwiftUI, préparer la stratégie CI macOS et formaliser les rôles d'équipe vérifiée avant toute suppression de module ou migration.
+
+**Livrables**
+
+- ADR mobile-only acceptée.
+- `AGENTS.md` aligné sur Android/iOS uniquement.
+- `PRD.md` et `DESIGN.md` corrigés sur les exigences directement contradictoires Web/PWA.
+- Modèle d'équipe vérifiée documenté : Propriétaire > Gestionnaire > Éditeur > Modérateur.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour avec la suite logique.
+
+**Règles de sécurité**
+
+- Aucun droit d'équipe ne doit dépendre d'un masquage UI.
+- Les budgets et paiements publicitaires restent contrôlés côté serveur.
+- La signature iOS App Store/TestFlight utilisera uniquement des secrets GitHub chiffrés lors d'une tranche release dédiée.
+
+**Validation**
+
+- `git diff --check`.
+- Relecture ciblée des mentions Web/PWA restantes.
+- Pas de build requis pour cette tranche documentaire.
+
+## Plan MOB-002 — Suppression de la cible Web/PWA
+
+**Agent responsable** : Build/Tooling.
+
+**Objectif atomique** : retirer `webApp` et la cible Kotlin/Wasm du build après acceptation d'ADR-0010, sans modifier les features métier.
+
+**Livrables**
+
+- `include(":webApp")` supprimé de `settings.gradle.kts`.
+- Module `webApp` supprimé.
+- Cible `wasmJs` supprimée de `shared`.
+- Contournement Gradle spécifique Kotlin/Wasm supprimé.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
+
+**Validation**
+
+- `git diff --check`.
+- `./gradlew.bat check`.
+- Recherche ciblée des références build `webApp`/`wasmJs`.
+
+## Plan IOS-001 / CI-001 — Hôte iOS SwiftUI et CI macOS
+
+**Agents responsables** : Build/Tooling et UI iOS.
+
+**Objectif atomique** : créer un hôte SwiftUI minimal qui importe le framework KMP `Shared`, puis ajouter une CI macOS qui compile l'app iOS simulateur sans signature.
+
+**Livrables**
+
+- Cibles `iosX64`, `iosArm64`, `iosSimulatorArm64` dans `shared`.
+- XCFramework `Shared` configuré.
+- Bridge `KwaborSharedBridge` exposant une donnée stable à SwiftUI.
+- Projet Xcode `iosApp/Kwabor.xcodeproj`.
+- Scheme partagé `Kwabor`.
+- Workflow GitHub Actions macOS avec `xcodebuild`.
+
+**Validation locale**
+
+- `./gradlew.bat :shared:tasks --all`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Validation distante requise**
+
+- GitHub Actions job `iOS simulator build` sur `macos-15`.
+- Le build iOS utilise `CODE_SIGNING_ALLOWED=NO`; la signature release reste une tranche séparée.

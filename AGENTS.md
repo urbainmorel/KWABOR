@@ -10,8 +10,8 @@ Ce fichier est la règle de travail ferme issue du prompt senior KMP initial.
 Tout agent doit le lire avant toute tâche non triviale et en appliquer les contraintes comme des exigences, pas comme des conseils.
 En particulier :
 
-- Stack cible : Kotlin Multiplatform + Compose Multiplatform + Supabase.
-- Cibles : Android, iOS, Web-PWA.
+- Stack cible : Kotlin Multiplatform partagé + Android Compose Multiplatform + iOS SwiftUI + Supabase.
+- Cibles : Android et iOS uniquement. Web/PWA est hors scope tant qu'une ADR ultérieure ne le réouvre pas.
 - Contexte produit : Kwabor, guide visuel et intelligent du Bénin, marché mono-pays Bénin.
 - Niveau attendu : ingénierie staff/senior, code maintenable, testable, robuste et livrable en production.
 
@@ -72,8 +72,11 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Erreurs attendues modélisées en erreurs de domaine, pas en exceptions de contrôle de flux.
 - Aucun `catch` silencieux.
 
-## Compose Multiplatform et UI
+## UI Android Compose Multiplatform et UI iOS SwiftUI
 
+- Android : interface en Compose Multiplatform.
+- iOS : interface native SwiftUI. Ne pas imposer Compose à l'UI iOS.
+- `shared` expose domaine, data, contrats, use cases, modèles d'état et utilitaires transverses consommables par Android et iOS.
 - Composables stateless, state hoisting, paramètres immuables/stables.
 - Aucun effet de bord dans la composition.
 - Design system centralisé : couleurs, dimensions, typographies, espacements, strings via tokens/ressources.
@@ -85,6 +88,8 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 
 - Supabase ne fuite jamais dans le domaine ou l'UI.
 - RLS respecté, jamais contourné côté client.
+- Les droits d'équipe des organisations vérifiées sont appliqués côté Supabase/RLS, jamais seulement par masquage UI.
+- Rôles d'équipe cumulatifs officiels : Propriétaire > Gestionnaire > Éditeur > Modérateur.
 - Prix saisis et stockés en XOF ; autres devises uniquement en affichage indicatif.
 - Paiements promoteur validés côté serveur uniquement.
 - Auth tokens en stockage sécurisé plateforme via `expect`/`actual`.

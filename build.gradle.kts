@@ -49,12 +49,6 @@ fun Project.configureQualityTools() {
 
 configureQualityTools()
 
-allprojects {
-    tasks.matching { it.name == "kotlinWasmToolingSetup" }.configureEach {
-        doNotTrackState("Kotlin/Wasm tooling may contain unreadable cache files on Windows.")
-    }
-}
-
 subprojects {
     apply(plugin = "base")
     apply(plugin = "com.diffplug.spotless")
