@@ -11,6 +11,7 @@ class OrganizationRequestsTest {
     fun inviteRequest_normalizesEmail() {
         val result = OrganizationInviteRequest.create(
             organizationId = "organization-1",
+            invitedByMemberId = "member-owner",
             email = "  Editor@Kwabor.Test  ",
             proposedRole = OrganizationRole.Editor,
             expiresAtEpochMilliseconds = 2_000,
@@ -18,6 +19,7 @@ class OrganizationRequestsTest {
         )
 
         val success = assertIs<DomainResult.Success<OrganizationInviteRequest>>(result)
+        assertEquals("member-owner", success.value.invitedByMemberId)
         assertEquals("editor@kwabor.test", success.value.email)
     }
 
@@ -25,6 +27,7 @@ class OrganizationRequestsTest {
     fun inviteRequest_rejectsOwnerInvitation() {
         val result = OrganizationInviteRequest.create(
             organizationId = "organization-1",
+            invitedByMemberId = "member-owner",
             email = "owner@kwabor.test",
             proposedRole = OrganizationRole.Owner,
             expiresAtEpochMilliseconds = 2_000,
@@ -38,6 +41,7 @@ class OrganizationRequestsTest {
     fun inviteRequest_rejectsExpiredInvitation() {
         val result = OrganizationInviteRequest.create(
             organizationId = "organization-1",
+            invitedByMemberId = "member-owner",
             email = "editor@kwabor.test",
             proposedRole = OrganizationRole.Editor,
             expiresAtEpochMilliseconds = 1_000,
@@ -65,6 +69,7 @@ class OrganizationRequestsTest {
         val result = MemberAdBudgetAllocationRequest.create(
             organizationId = "organization-1",
             memberId = "member-editor",
+            allocatedByMemberId = "member-manager",
             memberRole = OrganizationRole.Editor,
             periodStartEpochDay = 20_000,
             periodEndEpochDay = 20_030,
@@ -81,6 +86,7 @@ class OrganizationRequestsTest {
         val result = MemberAdBudgetAllocationRequest.create(
             organizationId = "organization-1",
             memberId = "member-moderator",
+            allocatedByMemberId = "member-manager",
             memberRole = OrganizationRole.Moderator,
             periodStartEpochDay = 20_000,
             periodEndEpochDay = 20_030,
@@ -97,6 +103,7 @@ class OrganizationRequestsTest {
         val result = MemberAdBudgetAllocationRequest.create(
             organizationId = "organization-1",
             memberId = "member-editor",
+            allocatedByMemberId = "member-manager",
             memberRole = OrganizationRole.Editor,
             periodStartEpochDay = 20_000,
             periodEndEpochDay = 20_030,
@@ -113,9 +120,27 @@ class OrganizationRequestsTest {
         val result = MemberAdBudgetAllocationRequest.create(
             organizationId = "organization-1",
             memberId = "member-editor",
+            allocatedByMemberId = "member-manager",
             memberRole = OrganizationRole.Editor,
             periodStartEpochDay = 20_030,
             periodEndEpochDay = 20_000,
+            allocatedXof = money,
+        )
+
+        assertIs<DomainResult.Failure>(result)
+    }
+
+    @Test
+    fun budgetAllocation_rejectsSelfAllocation() {
+        val money = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(10_000)).value
+
+        val result = MemberAdBudgetAllocationRequest.create(
+            organizationId = "organization-1",
+            memberId = "member-manager",
+            allocatedByMemberId = "member-manager",
+            memberRole = OrganizationRole.Manager,
+            periodStartEpochDay = 20_000,
+            periodEndEpochDay = 20_030,
             allocatedXof = money,
         )
 

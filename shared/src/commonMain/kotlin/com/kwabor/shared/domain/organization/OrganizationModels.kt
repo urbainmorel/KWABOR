@@ -124,6 +124,7 @@ data class MemberAdBudget(
 
 class OrganizationInviteRequest private constructor(
     val organizationId: String,
+    val invitedByMemberId: String,
     val email: String,
     val proposedRole: OrganizationRole,
     val expiresAtEpochMilliseconds: Long,
@@ -131,13 +132,14 @@ class OrganizationInviteRequest private constructor(
     companion object {
         fun create(
             organizationId: String,
+            invitedByMemberId: String,
             email: String,
             proposedRole: OrganizationRole,
             expiresAtEpochMilliseconds: Long,
             nowEpochMilliseconds: Long,
         ): DomainResult<OrganizationInviteRequest> {
-            if (organizationId.isBlank()) {
-                return DomainResult.Failure(DomainError.Validation("error.organization.id_required"))
+            if (organizationId.isBlank() || invitedByMemberId.isBlank()) {
+                return DomainResult.Failure(DomainError.Validation("error.organization.member_required"))
             }
 
             val normalizedEmail = email.trim().lowercase()
@@ -156,6 +158,7 @@ class OrganizationInviteRequest private constructor(
             return DomainResult.Success(
                 OrganizationInviteRequest(
                     organizationId = organizationId,
+                    invitedByMemberId = invitedByMemberId,
                     email = normalizedEmail,
                     proposedRole = proposedRole,
                     expiresAtEpochMilliseconds = expiresAtEpochMilliseconds,
@@ -166,12 +169,14 @@ class OrganizationInviteRequest private constructor(
 
     override fun equals(other: Any?): Boolean = other is OrganizationInviteRequest &&
         organizationId == other.organizationId &&
+        invitedByMemberId == other.invitedByMemberId &&
         email == other.email &&
         proposedRole == other.proposedRole &&
         expiresAtEpochMilliseconds == other.expiresAtEpochMilliseconds
 
     override fun hashCode(): Int {
         var result = organizationId.hashCode()
+        result = 31 * result + invitedByMemberId.hashCode()
         result = 31 * result + email.hashCode()
         result = 31 * result + proposedRole.hashCode()
         result = 31 * result + expiresAtEpochMilliseconds.hashCode()
@@ -179,8 +184,8 @@ class OrganizationInviteRequest private constructor(
     }
 
     override fun toString(): String =
-        "OrganizationInviteRequest(organizationId=$organizationId, email=$email, proposedRole=$proposedRole, " +
-            "expiresAt=$expiresAtEpochMilliseconds)"
+        "OrganizationInviteRequest(organizationId=$organizationId, invitedByMemberId=$invitedByMemberId, " +
+            "email=$email, proposedRole=$proposedRole, expiresAt=$expiresAtEpochMilliseconds)"
 }
 
 class OrganizationMemberRoleUpdate private constructor(
@@ -231,6 +236,7 @@ class OrganizationMemberRoleUpdate private constructor(
 class MemberAdBudgetAllocationRequest private constructor(
     val organizationId: String,
     val memberId: String,
+    val allocatedByMemberId: String,
     val memberRole: OrganizationRole,
     val periodStartEpochDay: Int,
     val periodEndEpochDay: Int,
@@ -240,13 +246,20 @@ class MemberAdBudgetAllocationRequest private constructor(
         fun create(
             organizationId: String,
             memberId: String,
+            allocatedByMemberId: String,
             memberRole: OrganizationRole,
             periodStartEpochDay: Int,
             periodEndEpochDay: Int,
             allocatedXof: MoneyXof,
         ): DomainResult<MemberAdBudgetAllocationRequest> {
-            if (organizationId.isBlank() || memberId.isBlank()) {
+            if (organizationId.isBlank() || memberId.isBlank() || allocatedByMemberId.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.member_required"))
+            }
+
+            if (memberId == allocatedByMemberId) {
+                return DomainResult.Failure(
+                    DomainError.Validation("error.organization.budget_self_allocation_forbidden"),
+                )
             }
 
             if (memberRole == OrganizationRole.Moderator || memberRole == OrganizationRole.Owner) {
@@ -265,6 +278,7 @@ class MemberAdBudgetAllocationRequest private constructor(
                 MemberAdBudgetAllocationRequest(
                     organizationId = organizationId,
                     memberId = memberId,
+                    allocatedByMemberId = allocatedByMemberId,
                     memberRole = memberRole,
                     periodStartEpochDay = periodStartEpochDay,
                     periodEndEpochDay = periodEndEpochDay,
@@ -277,6 +291,7 @@ class MemberAdBudgetAllocationRequest private constructor(
     override fun equals(other: Any?): Boolean = other is MemberAdBudgetAllocationRequest &&
         organizationId == other.organizationId &&
         memberId == other.memberId &&
+        allocatedByMemberId == other.allocatedByMemberId &&
         memberRole == other.memberRole &&
         periodStartEpochDay == other.periodStartEpochDay &&
         periodEndEpochDay == other.periodEndEpochDay &&
@@ -285,6 +300,7 @@ class MemberAdBudgetAllocationRequest private constructor(
     override fun hashCode(): Int {
         var result = organizationId.hashCode()
         result = 31 * result + memberId.hashCode()
+        result = 31 * result + allocatedByMemberId.hashCode()
         result = 31 * result + memberRole.hashCode()
         result = 31 * result + periodStartEpochDay
         result = 31 * result + periodEndEpochDay
@@ -294,8 +310,8 @@ class MemberAdBudgetAllocationRequest private constructor(
 
     override fun toString(): String =
         "MemberAdBudgetAllocationRequest(organizationId=$organizationId, memberId=$memberId, " +
-            "memberRole=$memberRole, periodStart=$periodStartEpochDay, periodEnd=$periodEndEpochDay, " +
-            "allocatedXof=$allocatedXof)"
+            "allocatedByMemberId=$allocatedByMemberId, memberRole=$memberRole, periodStart=$periodStartEpochDay, " +
+            "periodEnd=$periodEndEpochDay, allocatedXof=$allocatedXof)"
 }
 
 private fun String.looksLikeEmail(): Boolean {

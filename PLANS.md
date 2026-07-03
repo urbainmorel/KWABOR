@@ -198,3 +198,36 @@ Après merge, lancer DOMAIN-TEAM-001 : modèles Kotlin purs et contrats reposito
 **Suite logique**
 
 Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `OrganizationRepository` dans `data`.
+
+## Plan DATA-TEAM-002 — Repository data organisations vérifiées
+
+**Agent responsable** : Data/Supabase, avec revue QA.
+
+**Objectif atomique** : ajouter les DTO alignés sur le schéma Supabase équipes, les mappers domaine et une implémentation `OrganizationRepository` testable dans `data`, sans encore figer l'API PostgREST/RPC concrète.
+
+**Livrables**
+
+- DTO `organizations`, `organization_members`, `organization_invites` et `member_ad_budgets`.
+- Mappers explicites DTO -> domaine pour enums, dates, montants XOF et statuts.
+- Command DTO pour invitation et allocation de budget.
+- Contrat `OrganizationDataSource` isolant le transport Supabase.
+- Implémentation `DataOrganizationRepository`.
+- Tests `commonTest` sur mapping, pagination, délégation, erreur `NotFound` et DTO invalide.
+
+**Règles de sécurité**
+
+- Aucun SDK Supabase dans le domaine.
+- Aucun droit d'équipe confié à l'UI.
+- Les erreurs de transport sont ramenées en `DomainError`.
+- La création d'invitation réelle devra passer par un mécanisme serveur sûr pour le token/hash, pas par un secret client.
+
+**Validation**
+
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat check`.
+- `supabase test db`.
+- `git diff --check`.
+
+**Suite logique**
+
+Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC en vérifiant l'API `supabase-kt` actuelle et sans commiter de secret.
