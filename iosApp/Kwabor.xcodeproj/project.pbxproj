@@ -91,7 +91,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1A0000010000000000000018 /* Build configuration list for PBXNativeTarget "Kwabor" */;
 			buildPhases = (
-				1A0000010000000000000019 /* Build Shared KMP Framework */,
 				1A0000010000000000000020 /* Sources */,
 				1A0000010000000000000010 /* Frameworks */,
 				1A0000010000000000000021 /* Resources */,
@@ -149,29 +148,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		1A0000010000000000000019 /* Build Shared KMP Framework */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Build Shared KMP Framework";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/../shared/build/XCFrameworks/debug/Shared.xcframework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/..\"\n./gradlew :shared:assembleSharedDebugXCFramework\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1A0000010000000000000020 /* Sources */ = {
