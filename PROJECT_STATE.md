@@ -22,10 +22,13 @@ Fondations techniques et organisation staff senior.
 - Module `webApp` supprimé du dépôt et du build Gradle ; cible Kotlin/Wasm retirée de `shared`.
 - Cibles iOS KMP ajoutées dans `shared`, XCFramework `Shared` configuré et bridge `KwaborSharedBridge` exposé à Swift.
 - Hôte iOS SwiftUI minimal créé avec projet Xcode, scheme partagé et job GitHub Actions macOS `iOS simulator build`.
+- PR mobile-only `#5` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- Socle Supabase équipes ajouté : `organizations`, `organization_members`, `organization_invites`, `member_ad_budgets`, helpers RLS privés et grants explicites.
+- RLS équipes validée par pgTAP : lecture limitée aux membres, invitations selon Propriétaire/Gestionnaire, blocage Éditeur, budgets publicitaires alloués selon rôle et plafond Gestionnaire.
 
 ## Tâche en cours
 
-Aucune tâche de code ouverte après IOS-001/CI-001 local.
+DATA-TEAM-001 est validée localement sur la branche `foundation/team-access-data`; PR/CI GitHub à ouvrir après commit.
 
 ## Blocages / limites
 
@@ -34,7 +37,8 @@ Aucune tâche de code ouverte après IOS-001/CI-001 local.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
+- Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 
 ## Prochaine tâche logique
 
-Pousser la branche et vérifier le job GitHub Actions macOS. Si CI verte, démarrer DATA-TEAM-001 : migrations Supabase équipes, membres, invitations, budgets et tests RLS.
+Ouvrir la PR DATA-TEAM-001 et vérifier `quality` + tests Supabase. Après merge, lancer DOMAIN-TEAM-001 : modèles Kotlin purs et contrats repository pour organisations, membres, invitations et budgets.
