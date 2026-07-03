@@ -47,6 +47,9 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
+      - name: Build shared iOS XCFramework
+        run: ./gradlew :shared:assembleSharedDebugXCFramework
+
       - name: Build iOS simulator app
         run: |
           xcodebuild \
