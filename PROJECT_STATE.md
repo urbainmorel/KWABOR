@@ -29,10 +29,11 @@ Fondations techniques et organisation staff senior.
 - Modèles domaine organisations ajoutés : organisation, membre, invitation, budget publicitaire, hiérarchie Propriétaire > Gestionnaire > Éditeur > Modérateur, requêtes validées et contrat `OrganizationRepository`.
 - PR DOMAIN-TEAM-001 `#7` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Couche data organisations ajoutée : DTO Supabase, mappers domaine, contrat `OrganizationDataSource`, implémentation `DataOrganizationRepository` et tests `commonTest`.
+- PR DATA-TEAM-002 `#8` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 
 ## Tâche en cours
 
-DATA-TEAM-002 est validée localement sur la branche `foundation/team-data-repository`; PR/CI GitHub à ouvrir après commit.
+Aucune tâche active après merge DATA-TEAM-002.
 
 ## Blocages / limites
 
@@ -45,4 +46,4 @@ DATA-TEAM-002 est validée localement sur la branche `foundation/team-data-repos
 
 ## Prochaine tâche logique
 
-Ouvrir la PR DATA-TEAM-002 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC, sans exposer Supabase au domaine ni à l'UI.
+Lancer DATA-TEAM-003 sur une branche dédiée : brancher `OrganizationDataSource` sur Supabase PostgREST/RPC, sans exposer Supabase au domaine ni à l'UI.
