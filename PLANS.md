@@ -131,3 +131,38 @@ Ces zones demandent un plan dédié avant implémentation.
 
 - GitHub Actions job `iOS simulator build` sur `macos-15`.
 - Le build iOS utilise `CODE_SIGNING_ALLOWED=NO`; la signature release reste une tranche séparée.
+
+## Plan DATA-TEAM-001 — Organisations vérifiées, membres et budgets
+
+**Agent responsable** : Data/Supabase, avec revue QA.
+
+**Objectif atomique** : ajouter le socle SQL/RLS permettant aux organisations vérifiées de gérer une équipe et des budgets publicitaires alloués, sans encore ouvrir la création directe de campagnes ni de paiements côté client.
+
+**Livrables**
+
+- Types `organization_type`, `organization_role`, statuts de vérification, membre et invitation.
+- Tables `organizations`, `organization_members`, `organization_invites`, `member_ad_budgets`.
+- Helpers RLS privés dans `app_private` pour éviter la récursion sur `organization_members`.
+- RLS et grants explicites sur toutes les nouvelles tables.
+- Tests pgTAP couvrant visibilité, invitations, droits cumulés et plafonds budgétaires.
+
+**Règles de sécurité**
+
+- Aucune autorisation ne dépend de `user_metadata`.
+- Un Éditeur ne peut pas gérer l'équipe.
+- Un Gestionnaire peut inviter/attribuer seulement Éditeur ou Modérateur.
+- Un Propriétaire peut inviter/attribuer Gestionnaire, Éditeur ou Modérateur.
+- Un Gestionnaire ne peut allouer un budget Éditeur que dans son propre budget disponible.
+- Un Modérateur n'a aucun accès financier.
+- Les campagnes et paiements restent non insérables directement par les clients dans cette tranche.
+
+**Validation**
+
+- `supabase db reset`.
+- `supabase test db`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Suite logique**
+
+Après merge, lancer DOMAIN-TEAM-001 : modèles Kotlin purs et contrats repository pour organisations, membres, invitations et budgets.
