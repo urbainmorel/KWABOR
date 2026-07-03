@@ -25,10 +25,12 @@ Fondations techniques et organisation staff senior.
 - PR mobile-only `#5` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Socle Supabase équipes ajouté : `organizations`, `organization_members`, `organization_invites`, `member_ad_budgets`, helpers RLS privés et grants explicites.
 - RLS équipes validée par pgTAP : lecture limitée aux membres, invitations selon Propriétaire/Gestionnaire, blocage Éditeur, budgets publicitaires alloués selon rôle et plafond Gestionnaire.
+- PR DATA-TEAM-001 `#6` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- Modèles domaine organisations ajoutés : organisation, membre, invitation, budget publicitaire, hiérarchie Propriétaire > Gestionnaire > Éditeur > Modérateur, requêtes validées et contrat `OrganizationRepository`.
 
 ## Tâche en cours
 
-DATA-TEAM-001 est validée localement sur la branche `foundation/team-access-data`; PR/CI GitHub à ouvrir après commit.
+DOMAIN-TEAM-001 est validée localement sur la branche `foundation/team-domain-contracts`; PR/CI GitHub à ouvrir après commit.
 
 ## Blocages / limites
 
@@ -41,4 +43,4 @@ DATA-TEAM-001 est validée localement sur la branche `foundation/team-access-dat
 
 ## Prochaine tâche logique
 
-Ouvrir la PR DATA-TEAM-001 et vérifier `quality` + tests Supabase. Après merge, lancer DOMAIN-TEAM-001 : modèles Kotlin purs et contrats repository pour organisations, membres, invitations et budgets.
+Ouvrir la PR DOMAIN-TEAM-001 et vérifier `quality` + `iOS simulator build`. Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `OrganizationRepository`.

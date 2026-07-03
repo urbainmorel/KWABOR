@@ -166,3 +166,35 @@ Ces zones demandent un plan dédié avant implémentation.
 **Suite logique**
 
 Après merge, lancer DOMAIN-TEAM-001 : modèles Kotlin purs et contrats repository pour organisations, membres, invitations et budgets.
+
+## Plan DOMAIN-TEAM-001 — Domaine organisations vérifiées
+
+**Agent responsable** : Domain, avec revue QA.
+
+**Objectif atomique** : ajouter les modèles Kotlin purs et contrats repository pour manipuler les organisations vérifiées, membres, invitations et budgets, sans dépendance Supabase ni UI.
+
+**Livrables**
+
+- Enums domaine pour type/statut organisation, rôle équipe, statut membre et statut invitation.
+- Helpers de droits cumulés : Propriétaire > Gestionnaire > Éditeur > Modérateur.
+- Modèles `Organization`, `OrganizationMember`, `OrganizationInvite`, `MemberAdBudget`.
+- Requêtes validées `OrganizationInviteRequest`, `OrganizationMemberRoleUpdate`, `MemberAdBudgetAllocationRequest`.
+- Contrat `OrganizationRepository`.
+- Tests `commonTest` sur hiérarchie, invitations, transfert propriétaire hors scope et budgets.
+
+**Règles de sécurité**
+
+- Le domaine ne contient aucun SDK Supabase, DTO SQL ni hypothèse de table.
+- Les droits côté domaine servent de garde-fou UX ; la source d'autorité reste RLS/fonctions serveur.
+- Le transfert de Propriétaire reste hors simple changement de rôle.
+- Un Modérateur n'a aucun budget publicitaire.
+
+**Validation**
+
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Suite logique**
+
+Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `OrganizationRepository` dans `data`.
