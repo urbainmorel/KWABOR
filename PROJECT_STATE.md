@@ -8,6 +8,7 @@ Fondations techniques et organisation staff senior.
 
 - PR fondation `#1` mergée dans `main`.
 - PR FND-004 `#2` mergée dans `main` avec CI `quality` verte.
+- PR FND-005 `#4` vérifiée avec CI `quality` verte.
 - Contrats domaine ajoutés pour catalogue, auth, profil, social, promotion et notifications.
 - Contrats sensibles durcis après revue QA : création campagne via demande/devis, onboarding auth avec acceptations obligatoires.
 - Migrations Supabase initiales ajoutées : référentiels, profils/rôles, fiches, médias, social, favoris, likes, notifications, claims, signalements, campagnes et paiements.
@@ -19,7 +20,7 @@ Fondations techniques et organisation staff senior.
 
 ## Tâche en cours
 
-Préparer la PR `foundation/supabase-initial-migrations`.
+Aucune tâche de code ouverte après merge FND-005.
 
 ## Blocages / limites
 
