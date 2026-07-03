@@ -41,5 +41,11 @@ internal sealed class OrganizationDataException(
         messageKey: String = "error.organization.permission_denied",
     ) : OrganizationDataException(DomainError.PermissionDenied(messageKey))
 
+    class Validation(
+        messageKey: String = "error.organization.invalid_request",
+    ) : OrganizationDataException(DomainError.Validation(messageKey))
+
     class NetworkUnavailable : OrganizationDataException(DomainError.NetworkUnavailable())
+
+    class Unexpected : OrganizationDataException(DomainError.Unexpected())
 }

@@ -4,6 +4,7 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationRequest
 import com.kwabor.shared.domain.organization.OrganizationInviteRequest
+import com.kwabor.shared.domain.organization.OrganizationMemberRoleUpdate
 import com.kwabor.shared.domain.organization.OrganizationRole
 import com.kwabor.shared.domain.organization.OrganizationType
 import com.kwabor.shared.domain.organization.OrganizationVerificationStatus
@@ -87,7 +88,7 @@ class OrganizationDtoMappingTest {
     }
 
     @Test
-    fun inviteCommandDto_serializesRoleAndExpiryForSupabase() {
+    fun inviteRpcDto_serializesRoleAndExpiryForSupabase() {
         val request = assertIs<DomainResult.Success<OrganizationInviteRequest>>(
             OrganizationInviteRequest.create(
                 organizationId = "organization-1",
@@ -99,11 +100,28 @@ class OrganizationDtoMappingTest {
             ),
         ).value
 
-        val dto = request.toCommandDto()
+        val dto = request.toRpcDto()
 
+        assertEquals("organization-1", dto.organizationId)
         assertEquals("member-owner", dto.invitedByMemberId)
+        assertEquals("editor@kwabor.test", dto.email)
         assertEquals("editeur", dto.proposedRole)
         assertEquals("2026-07-03T10:15:30Z", dto.expiresAt)
+    }
+
+    @Test
+    fun memberRolePatchDto_serializesRoleForSupabaseUpdate() {
+        val request = assertIs<DomainResult.Success<OrganizationMemberRoleUpdate>>(
+            OrganizationMemberRoleUpdate.create(
+                organizationId = "organization-1",
+                memberId = "member-editor",
+                newRole = OrganizationRole.Manager,
+            ),
+        ).value
+
+        val dto = request.toPatchDto()
+
+        assertEquals("gestionnaire", dto.role)
     }
 
     @Test
