@@ -105,3 +105,29 @@ Ces zones demandent un plan dédié avant implémentation.
 - `git diff --check`.
 - `./gradlew.bat check`.
 - Recherche ciblée des références build `webApp`/`wasmJs`.
+
+## Plan IOS-001 / CI-001 — Hôte iOS SwiftUI et CI macOS
+
+**Agents responsables** : Build/Tooling et UI iOS.
+
+**Objectif atomique** : créer un hôte SwiftUI minimal qui importe le framework KMP `Shared`, puis ajouter une CI macOS qui compile l'app iOS simulateur sans signature.
+
+**Livrables**
+
+- Cibles `iosX64`, `iosArm64`, `iosSimulatorArm64` dans `shared`.
+- XCFramework `Shared` configuré.
+- Bridge `KwaborSharedBridge` exposant une donnée stable à SwiftUI.
+- Projet Xcode `iosApp/Kwabor.xcodeproj`.
+- Scheme partagé `Kwabor`.
+- Workflow GitHub Actions macOS avec `xcodebuild`.
+
+**Validation locale**
+
+- `./gradlew.bat :shared:tasks --all`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Validation distante requise**
+
+- GitHub Actions job `iOS simulator build` sur `macos-15`.
+- Le build iOS utilise `CODE_SIGNING_ALLOWED=NO`; la signature release reste une tranche séparée.

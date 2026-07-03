@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
@@ -7,6 +9,8 @@ plugins {
 }
 
 kotlin {
+    val sharedXcFramework = XCFramework("Shared")
+
     android {
         namespace = "com.kwabor.shared"
         compileSdk = 36
@@ -17,6 +21,18 @@ kotlin {
         }
     }
     jvmToolchain(21)
+
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "Shared"
+            isStatic = true
+            sharedXcFramework.add(this)
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
