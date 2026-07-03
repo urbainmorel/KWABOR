@@ -7,11 +7,12 @@
 - [x] FND-003 — Installer le shell Compose partagé.
 - [x] FND-007 — Créer la PR `foundation/app-foundations`.
 - [x] FND-004 — Ajouter les contrats repositories du catalogue.
+- [x] FND-005 — Préparer les migrations Supabase initiales avec RLS.
 
 ## Ensuite
 
-- [ ] FND-005 — Préparer les migrations Supabase initiales avec RLS.
 - [ ] FND-006 — Ajouter les previews UI et tests de design system.
+- [ ] FND-008 — Implémenter les repositories data Supabase du catalogue.
 
 ## À ne pas faire maintenant
 

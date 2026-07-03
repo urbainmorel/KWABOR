@@ -18,5 +18,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: supabase/setup-cli@v2.1.1
+        with:
+          version: 2.84.2
+          github-token: ${{ github.token }}
+
       - name: Quality gate
         run: ./gradlew check
+
+      - name: Supabase database tests
+        run: |
+          supabase db start
+          supabase test db
