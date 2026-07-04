@@ -265,3 +265,40 @@ Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supab
 **Suite logique**
 
 Après merge, lancer DATA-CATALOG-001 : implémenter les repositories data Supabase du catalogue avec le même client, les mêmes règles d'erreurs et des tests ciblés.
+
+## Plan DATA-CATALOG-001 — Data source Supabase catalogue
+
+**Agent responsable** : Data/Supabase, avec revue QA.
+
+**Objectif atomique** : brancher `CatalogRepository` sur Supabase PostgREST pour la lecture catalogue existante, sans feature UI, sans auth réelle et sans nouvelle migration.
+
+**Livrables**
+
+- DTO Supabase pour `cities`, `categories`, `listings` et `listing_media`.
+- Mappers explicites DTO -> domaine pour enums, dates, montants XOF, locale et médias.
+- Contrat `CatalogDataSource` isolant le transport Supabase.
+- Implémentation `DataCatalogRepository`.
+- Implémentation `SupabaseCatalogDataSource` pour liste, recherche, détail et médias.
+- Fabrique `createCatalogRepository(environment)`.
+- Tests `commonTest` sur mapping, pagination, délégation, erreur `NotFound` et DTO invalide.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
+
+**Règles de sécurité**
+
+- Supabase reste strictement dans `data`.
+- Le domaine et l'UI ne reçoivent aucun SDK Supabase.
+- La lecture publique reste bornée par RLS et par `ListingFilters.onlyPublished`.
+- Aucune action Like/Favori n'est ajoutée sans session auth partagée.
+- Aucun secret Supabase ni endpoint projet réel n'est commité.
+
+**Validation**
+
+- Vérifier le changelog Supabase pour changement Data API/PostgREST pertinent.
+- `./gradlew.bat :shared:check`.
+- `supabase test db`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+
+**Suite logique**
+
+Après merge, lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens, prérequis aux actions authentifiées Like/Favori et aux opérations équipes en runtime.

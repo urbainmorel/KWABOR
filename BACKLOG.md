@@ -17,12 +17,13 @@
 - [x] DOMAIN-TEAM-001 — Ajouter les modèles domaine et contrats repository des organisations vérifiées.
 - [x] DATA-TEAM-002 — Implémenter les DTO et repository data des organisations vérifiées.
 - [x] DATA-TEAM-003 — Brancher `OrganizationDataSource` sur Supabase PostgREST/RPC.
+- [x] DATA-CATALOG-001 — Brancher les repositories catalogue sur Supabase PostgREST.
 
 ## Ensuite
 
-- [ ] DATA-CATALOG-001 — Brancher les repositories catalogue sur Supabase PostgREST.
-- [ ] FND-006 — Ajouter les previews UI et tests de design system.
 - [ ] AUTH-FOUNDATION-001 — Préparer la session auth partagée et le stockage sécurisé des tokens.
+- [ ] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
+- [ ] FND-006 — Ajouter les previews UI et tests de design system.
 
 ## À ne pas faire maintenant
 
