@@ -40,6 +40,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.runtime)
             implementation("io.insert-koin:koin-core:4.2.2")
+            implementation("io.github.jan-tennert.supabase:auth-kt:3.6.0")
             implementation("io.github.jan-tennert.supabase:postgrest-kt:3.6.0")
             implementation("io.github.jan-tennert.supabase:supabase-kt:3.6.0")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
@@ -48,6 +49,7 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation("androidx.security:security-crypto:1.1.0")
             implementation("io.ktor:ktor-client-okhttp:3.4.3")
         }
 

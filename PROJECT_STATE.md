@@ -36,10 +36,14 @@ Fondations techniques et organisation staff senior.
 - Repository catalogue branché sur Supabase PostgREST : villes, catégories, liste/recherche de fiches, détail et médias, sans fuite Supabase dans le domaine.
 - Tests `commonTest` ajoutés pour DTO/mappers catalogue, pagination, erreurs data et détail de fiche.
 - PR DATA-CATALOG-001 `#10` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- Socle Auth partagé ajouté : `auth-kt`, `DataAuthRepository`, `SupabaseAuthDataSource`, `SessionManager` Kwabor et mapping domaine sans fuite de tokens.
+- Stockage sécurisé de session ajouté côté Android via AndroidX Security Crypto et côté iOS via Keychain/CoreFoundation.
+- Factories Android/iOS ajoutées pour créer le repository Auth avec stockage sécurisé plateforme ; permission réseau Android déclarée.
+- Tests `commonTest` ajoutés pour session manager, validation auth, mapping session et garde d'activation promoteur côté client.
 
 ## Tâche en cours
 
-Aucune tâche active après merge DATA-CATALOG-001.
+Aucune tâche active après AUTH-FOUNDATION-001.
 
 ## Blocages / limites
 
@@ -50,8 +54,9 @@ Aucune tâche active après merge DATA-CATALOG-001.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
-- Les actions Like/Favori catalogue ne sont pas encore exposées par contrat domaine ; elles dépendent de la session auth partagée.
+- L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
+- Les actions Like/Favori catalogue ne sont pas encore exposées par contrat domaine ; elles peuvent maintenant démarrer en consommant la session auth partagée.
 
 ## Prochaine tâche logique
 
-Lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens pour permettre les actions authentifiées Supabase.
+Lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase pour Like/Favori catalogue en consommant la session auth partagée.
