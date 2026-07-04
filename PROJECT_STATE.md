@@ -35,10 +35,11 @@ Fondations techniques et organisation staff senior.
 - PR DATA-TEAM-003 `#9` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Repository catalogue branché sur Supabase PostgREST : villes, catégories, liste/recherche de fiches, détail et médias, sans fuite Supabase dans le domaine.
 - Tests `commonTest` ajoutés pour DTO/mappers catalogue, pagination, erreurs data et détail de fiche.
+- PR DATA-CATALOG-001 `#10` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 
 ## Tâche en cours
 
-DATA-CATALOG-001 en validation GitHub après implémentation locale.
+Aucune tâche active après merge DATA-CATALOG-001.
 
 ## Blocages / limites
 
@@ -53,4 +54,4 @@ DATA-CATALOG-001 en validation GitHub après implémentation locale.
 
 ## Prochaine tâche logique
 
-Finaliser DATA-CATALOG-001 en PR, puis lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens pour permettre les actions authentifiées Supabase.
+Lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens pour permettre les actions authentifiées Supabase.
