@@ -33,10 +33,12 @@ Fondations techniques et organisation staff senior.
 - RPC Supabase organisations ajouté : création/révocation/acceptation d'invitation et suspension membre, avec pgTAP.
 - `OrganizationDataSource` branché sur Supabase PostgREST/RPC via `postgrest-kt`, moteurs Ktor Android/iOS et fabrique client sans secret commité.
 - PR DATA-TEAM-003 `#9` mergée dans `main` avec `quality` et `iOS simulator build` verts.
+- Repository catalogue branché sur Supabase PostgREST : villes, catégories, liste/recherche de fiches, détail et médias, sans fuite Supabase dans le domaine.
+- Tests `commonTest` ajoutés pour DTO/mappers catalogue, pagination, erreurs data et détail de fiche.
 
 ## Tâche en cours
 
-Aucune tâche active après merge DATA-TEAM-003.
+DATA-CATALOG-001 en validation GitHub après implémentation locale.
 
 ## Blocages / limites
 
@@ -46,7 +48,9 @@ Aucune tâche active après merge DATA-TEAM-003.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
+- Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
+- Les actions Like/Favori catalogue ne sont pas encore exposées par contrat domaine ; elles dépendent de la session auth partagée.
 
 ## Prochaine tâche logique
 
-Lancer DATA-CATALOG-001 sur une branche dédiée : brancher les repositories catalogue sur Supabase PostgREST en réutilisant la fabrique client et les règles d'erreurs data.
+Finaliser DATA-CATALOG-001 en PR, puis lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens pour permettre les actions authentifiées Supabase.
