@@ -302,3 +302,40 @@ Après merge, lancer DATA-CATALOG-001 : implémenter les repositories data Supab
 **Suite logique**
 
 Après merge, lancer AUTH-FOUNDATION-001 : session auth partagée et stockage sécurisé des tokens, prérequis aux actions authentifiées Like/Favori et aux opérations équipes en runtime.
+
+## Plan AUTH-FOUNDATION-001 — Session auth partagée et stockage sécurisé
+
+**Agent responsable** : Data/Supabase, avec revue Architecture et QA.
+
+**Objectif atomique** : installer le socle d'authentification partagé Supabase pour Android/iOS, stocker les sessions en stockage sécurisé plateforme et exposer au domaine uniquement une `AuthSession` sans token.
+
+**Livrables**
+
+- Dépendance `auth-kt` installée sans exposer Supabase au domaine ou à l'UI.
+- `SessionManager` Kwabor utilisant un stockage de chaînes sécurisé injectable.
+- Stockage Android via AndroidX Security Crypto.
+- Stockage iOS via Keychain.
+- `SupabaseAuthDataSource` pour session courante, OTP email, email/mot de passe, ID token Google/Apple et déconnexion.
+- `DataAuthRepository` mappant les erreurs vers `DomainError` sans message technique brut.
+- Factories Android/iOS pour créer le repository avec stockage sécurisé plateforme.
+- Tests `commonTest` sur session manager, mapping session, validation email/mot de passe et garde d'activation promoteur.
+
+**Règles de sécurité**
+
+- Aucun access token, refresh token ou provider token ne sort du data layer.
+- Le stockage par défaut Auth Supabase non sécurisé n'est pas utilisé pour les repositories runtime Android/iOS.
+- L'activation promoteur par invite reste bloquée tant que le RPC serveur dédié n'existe pas.
+- Les erreurs Supabase Auth sont converties en clés i18n stables, jamais en messages techniques.
+- Android doit déclarer la permission réseau explicitement.
+
+**Validation**
+
+- Vérifier le changelog Supabase Auth et l'API `auth-kt` 3.6.0.
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+- CI GitHub `quality` et `ios`.
+
+**Suite logique**
+
+Après merge, lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase pour Like/Favori catalogue en consommant la session auth partagée.
