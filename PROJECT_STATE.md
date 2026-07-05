@@ -14,12 +14,12 @@ Fondations techniques et organisation staff senior.
 - Migrations Supabase initiales ajoutées : référentiels, profils/rôles, fiches, médias, social, favoris, likes, notifications, claims, signalements, campagnes et paiements.
 - RLS initiale validée par pgTAP : lecture publique limitée aux fiches publiées, écriture `listings` par rôle vérifié × `listing_class`, UGC rattaché obligatoire, claims patrimoniaux bloqués, paiements/campagnes non insérables par client.
 - Seeds Bénin minimaux ajoutés : villes, catégories et fiches publiées de test.
-- Scaffold KMP minimal créé avec `shared`, `androidApp`, `webApp` et documentation `iosApp`.
+- Scaffold KMP mobile-only stabilisé avec `shared`, `androidApp` et hôte `iosApp`.
 - ADR fondateurs normalisés sous `docs/adr/`.
 - Shell Compose partagé, primitives domaine, tokens design et i18n FR minimale ajoutés.
-- Cadrage mobile-only validé : Android/iOS uniquement, Android Compose Multiplatform, iOS SwiftUI, Web/PWA hors scope.
+- Cadrage mobile-only validé : Android/iOS uniquement, Android Compose Multiplatform, iOS SwiftUI, aucun autre client applicatif dans la roadmap active.
 - Modèle d'équipe vérifiée cadré : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés côté serveur/RLS.
-- Module `webApp` supprimé du dépôt et du build Gradle ; cible Kotlin/Wasm retirée de `shared`.
+- Ancienne cible non mobile supprimée du dépôt et du build Gradle ; cible de compilation associée retirée de `shared`.
 - Cibles iOS KMP ajoutées dans `shared`, XCFramework `Shared` configuré et bridge `KwaborSharedBridge` exposé à Swift.
 - Hôte iOS SwiftUI minimal créé avec projet Xcode, scheme partagé et job GitHub Actions macOS `iOS simulator build`.
 - PR mobile-only `#5` mergée dans `main` avec `quality` et `iOS simulator build` verts.

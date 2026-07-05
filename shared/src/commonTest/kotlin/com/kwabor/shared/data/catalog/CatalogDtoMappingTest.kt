@@ -135,7 +135,7 @@ internal fun listingDto(
     priceUnit = if (priceFromXof == null) "aucune" else "consommation",
     contactPhone = "+2290100000000",
     contactWhatsapp = "+2290100000000",
-    websiteUrl = "https://kwabor.test",
+    externalUrl = "https://kwabor.test",
     email = "contact@kwabor.test",
     tags = listOf("benin", "restaurant"),
     verified = true,

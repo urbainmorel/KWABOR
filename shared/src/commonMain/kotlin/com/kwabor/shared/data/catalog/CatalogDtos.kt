@@ -82,8 +82,8 @@ internal data class ListingDto(
     val contactPhone: String? = null,
     @SerialName("contact_whatsapp")
     val contactWhatsapp: String? = null,
-    @SerialName("website_url")
-    val websiteUrl: String? = null,
+    @SerialName("external_url")
+    val externalUrl: String? = null,
     @SerialName("email")
     val email: String? = null,
     @SerialName("tags")
@@ -154,7 +154,7 @@ internal fun ListingDetailDto.toDomain(): ListingDetail {
         contact = ListingContact(
             phone = listing.contactPhone,
             whatsapp = listing.contactWhatsapp,
-            websiteUrl = listing.websiteUrl,
+            externalUrl = listing.externalUrl,
             email = listing.email,
         ),
         media = sortedMedia.map { item -> item.toDomain() },

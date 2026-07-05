@@ -124,7 +124,7 @@ Pairing premium éditorial **+ chiffres tabulaires** (essentiels au composant pr
 |---|---|---|
 | **Display / titres** | **General Sans** (ou Clash Grotesk) 500/600/700 | Premium géométrique, Latin Extended complet (FR/EN/PT/DE/ES/IT). |
 | **Texte / UI / chiffres** | **Inter** 400/500/600 | Lisibilité écran + **chiffres tabulaires** (`tnum`) pour aligner les prix. |
-| **Fallback système** | `-apple-system, Roboto, "Segoe UI", sans-serif` | Garantit le rendu avant chargement du webfont (perf). |
+| **Fallback système** | `-apple-system, Roboto, "Segoe UI", sans-serif` | Garantit le rendu avant chargement de la police distante (perf). |
 
 **Échelle (mobile) :**
 
@@ -306,7 +306,7 @@ Composant signature. Grille **2 colonnes**, gutter 12, ratio **3:4**, image **co
 
 | Élément | Position | Style |
 |---|---|---|
-| Image | plein cadre | WebP/AVIF, lazy-load, placeholder dégradé immédiat |
+| Image | plein cadre | AVIF/JPG/PNG compressés, lazy-load, placeholder dégradé immédiat |
 | Pastille note | haut-gauche | frosted, `star` ambre + valeur blanche |
 | **Pastille Like (cœur)** | haut-droite | frosted, cœur rouge si actif (§5) |
 | **Pastille Favori (marque-page)** | sous la note (si densité) | frosted, ink si actif (§5) |
@@ -445,7 +445,7 @@ Bottom sheet : champ de recherche en haut, **liste des communes du Bénin** (`ci
 Bottom sheet (mobile) → **panneau latéral** (tablette). Sections selon l'onglet : **Ville** (multi), **Prix** (double slider XOF), **Date** (chips), **Type**. Pied collant : **Réinitialiser** (gauche) + **Appliquer (N résultats)** noir (droite). Compteur live.
 
 **C7. Sheet de contact** *(établissement, CTA « Contacter »)*
-Bottom sheet : boutons pleins **Appel** / **WhatsApp** / **Site web** / **Email** (selon les canaux renseignés). Annonce ARIA « ouvre une application externe ». Masque les canaux absents.
+Bottom sheet : boutons pleins **Appel** / **WhatsApp** / **Lien externe** / **Email** (selon les canaux renseignés). Annonce ARIA « ouvre une application externe ». Masque les canaux absents.
 
 **C8. Lightbox galerie**
 Plein écran noir : image centrée, **swipe** horizontal, **pinch/double-tap zoom**, compteur « 3 / 8 », bouton fermer (haut-droite). Fond `#000`.
@@ -653,7 +653,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 ### Groupe K — Connexion TikTok *(V1.2)*
 
 **K1. Connexion TikTok**
-**Sheet de consentement éclairé (45 %)** **avant** l'OAuth : ce qui sera partagé + logo TikTok + **« Continuer vers TikTok »** + Annuler → OAuth natif (webview) → toast succès + chip `@username` dans Paramètres (G7). Point d'entrée : composeur social (H2, toggle « Publier aussi sur TikTok ») ou Paramètres → Comptes liés. Déconnexion = rouge clair + dialog. Labels ARIA sur la redirection externe.
+**Sheet de consentement éclairé (45 %)** **avant** l'OAuth : ce qui sera partagé + logo TikTok + **« Continuer vers TikTok »** + Annuler → OAuth natif → toast succès + chip `@username` dans Paramètres (G7). Point d'entrée : composeur social (H2, toggle « Publier aussi sur TikTok ») ou Paramètres → Comptes liés. Déconnexion = rouge clair + dialog. Labels ARIA sur la redirection externe.
 
 ---
 
@@ -715,7 +715,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 | Note tarifaire | ○ | texte court | `place_details.fee_note` | sous le prix |
 | Horaires d'accès | ○ | éditeur 7 j ou « Accès libre 24h/24 » | `listings.opening_hours` | info pratique |
 | Équipements sur site | ○ | multi (parking, guide, toilettes, PMR…) | `listing_amenities` | rangée services |
-| Contact (site / tél.) | ○ | URL / E.164 | `listings.website_url/contact_phone` | liens |
+| Contact (lien / tél.) | ○ | URL / E.164 | `listings.external_url/contact_phone` | liens |
 
 *(Stats vues/likes/note = système, jamais saisies.)*
 
@@ -730,7 +730,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 | **Services** | ✓ (≥1) | multi à icônes, filtrés par sous-type | `listing_amenities` | rangée services |
 | Contact — Téléphone | cond. | E.164 (+229) ; ≥1 canal requis | `listings.contact_phone` | bouton Appel |
 | Contact — WhatsApp | cond. | E.164 | `listings.contact_whatsapp` | bouton WhatsApp |
-| Contact — Site / Email | ○ | URL https / email | `listings.website_url/email` | boutons |
+| Contact — Lien / Email | ○ | URL https / email | `listings.external_url/email` | boutons |
 | Réseaux sociaux | ○ | URLs | `listings.socials` | liens |
 
 ### 12.7 Hébergement *(par_nuit)*
@@ -782,14 +782,14 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 
 ### 12.11 Géolocalisation, médias & validation
 - **Map picker** : autocomplétion biaisée Bénin, dépôt/déplacement d'épingle, « Utiliser ma position » ; reverse-geocoding pré-remplit l'adresse + suggère ville/quartier. **Validation mono-pays** : point **dans le Bénin** (bounding box lat 6,10–12,50 / lng 0,77–3,86 puis polygone serveur). Hors Bénin → blocage « Kwabor ne référence que des lieux au Bénin. »
-- **Médias** : photos ≥1 cover (≥3 recommandées), JPG/PNG/**WebP**, **≤ 8 Mo/photo**, compression + variantes serveur ; cover + drag-reorder. Vidéo ≤ **60 s**, ≤ **50 Mo**, transcodage (V1.1). **Alt text** auto par image, éditable.
+- **Médias** : photos ≥1 cover (≥3 recommandées), JPG/PNG/AVIF, **≤ 8 Mo/photo**, compression + variantes serveur ; cover + drag-reorder. Vidéo ≤ **60 s**, ≤ **50 Mo**, transcodage (V1.1). **Alt text** auto par image, éditable.
 - **Validation transverse** : « Suivant » désactivé tant que l'étape est invalide (erreur inline rouge) ; Nom 3–80 (anti-doublon souple) ; Description 40–1500 ; GPS Bénin ; Prix XOF ≥0 (« Gratuit » désactive le montant ; transactionnel jamais compact) ; Téléphone/WhatsApp E.164 `+229` ; URL `https://` ; Dates `end_at ≥ start_at` (passé → publié « Terminé ») ; Étoiles 1–5 requis pour Hôtel.
 
 ### 12.12 Modèle de données (Supabase / PostgreSQL)
 
 **Enums** — `listing_type` (lieu, etablissement, evenement) · **`listing_class` (patrimonial, commercial, evenementiel)** · `listing_status` (brouillon, en_attente, publie, rejete, archive) · `price_unit` (par_nuit, par_personne, consommation, par_entree, aucune) · `ticket_type` (gratuit, payant) · **`user_role` (user, guide, institution, promoteur, admin)** · **`organization_role` (proprietaire, gestionnaire, editeur, moderateur)** · `claim_status` (en_attente, approuve, refuse) · **`report_status` (nouveau, en_revue, traite, rejete)** · **`social_media_type` (photo, diaporama, video)** · `campaign_status` (brouillon, en_attente_paiement, active, terminee) · `payment_status` (en_cours, reussi, echoue).
 
-**`listings` (socle polymorphe)** — `id`, `type`, `subtype`, **`listing_class`**, `category_id`, `owner_id` (nullable → non revendiqué ; **toujours NULL en Patrimonial**), **`steward_id`** (nullable, institution responsable d'une fiche patrimoniale), `submitted_by`, `status`, `name`, `slug`, `description`, `content_lang`, `city_id`, `district`, `address`, `lat`, `lng`, `geog`, `google_place_id`, `price_from_xof`, `price_unit`, `price_tier`, `opening_hours` (JSONB), `contact_phone`, `contact_whatsapp`, `website_url`, `email`, `socials` (JSONB), `tags` (text[]), `verified`, `sponsored_until` (nullable), **`editorial_pin_until`** (nullable — mise en avant éditoriale, ≠ sponsoring), `rating_avg`, `rating_count`, `views_count`, `likes_count`, `created_at`, `updated_at`, `published_at`.
+**`listings` (socle polymorphe)** — `id`, `type`, `subtype`, **`listing_class`**, `category_id`, `owner_id` (nullable → non revendiqué ; **toujours NULL en Patrimonial**), **`steward_id`** (nullable, institution responsable d'une fiche patrimoniale), `submitted_by`, `status`, `name`, `slug`, `description`, `content_lang`, `city_id`, `district`, `address`, `lat`, `lng`, `geog`, `google_place_id`, `price_from_xof`, `price_unit`, `price_tier`, `opening_hours` (JSONB), `contact_phone`, `contact_whatsapp`, `external_url`, `email`, `socials` (JSONB), `tags` (text[]), `verified`, `sponsored_until` (nullable), **`editorial_pin_until`** (nullable — mise en avant éditoriale, ≠ sponsoring), `rating_avg`, `rating_count`, `views_count`, `likes_count`, `created_at`, `updated_at`, `published_at`.
 
 **Extensions 1-1** — `place_details`, `lodging_details`, `food_details`, `nightlife_details`, `event_details`, **`guide_details`** (langues[], zones[], spécialités[], tarif_indicatif_xof, agrément, expérience).
 **Identité & rôles** — **`profiles`** (user_id, nom, prénom, avatar, cover, bio, city_id) ; **`user_roles`** (user_id, `user_role`, `verified`, statut, justificatif_url, **cumulables**) — un compte peut être à la fois `promoteur` et `guide`.
@@ -884,7 +884,7 @@ Tout prix plein ──► Convertisseur de devise
 - Le **FAB IA** reste flottant à toutes les tailles mobiles/tablettes.
 - Le **Filter Drawer** passe de bottom sheet (mobile) à **panneau latéral** sur tablette.
 - Le **tableau de bord Promoteur** peut passer en layout 2 colonnes sur tablette.
-- Web/PWA/Desktop est hors scope V1.
+- Aucune autre cible applicative n'est dans la roadmap active.
 
 ---
 
@@ -908,7 +908,7 @@ Tout prix plein ──► Convertisseur de devise
 
 - **Mur d'exploration : P75 < 1,5 s** sur 3G/4G dégradée.
 - Overlays/dégradés/profondeur = **Compose/SwiftUI**, jamais des images sombres empilées.
-- Photos en **WebP/AVIF**, variantes responsives, **lazy-load**, **placeholder dégradé immédiat**, CDN + compression serveur.
+- Photos en **AVIF/JPG/PNG**, variantes responsives, **lazy-load**, **placeholder dégradé immédiat**, CDN + compression serveur.
 - **Aucun blur temps réel massif**, aucun parallax lourd. Le frosted utilise un blur **léger (≤ 8 px)** sur petites surfaces seulement.
 - Typographies système en fallback ; polices embarquées optimisées par plateforme si validées.
 - Offline : cache du dernier mur (lecture seule), bannière persistante, file locale des likes/favoris à synchroniser.

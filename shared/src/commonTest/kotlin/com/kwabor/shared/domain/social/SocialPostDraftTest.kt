@@ -40,7 +40,7 @@ class SocialPostDraftTest {
     }
 
     private fun sampleMediaAsset(order: Int = 1): SocialMediaAsset = SocialMediaAsset(
-        url = "https://cdn.kwabor.test/media-$order.webp",
+        url = "https://cdn.kwabor.test/media-$order.jpg",
         alt = "Vue $order",
         order = order,
     )

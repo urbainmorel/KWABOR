@@ -110,7 +110,7 @@ create table public.listings (
   opening_hours jsonb not null default '{}'::jsonb,
   contact_phone text,
   contact_whatsapp text,
-  website_url text,
+  external_url text,
   email text,
   socials jsonb not null default '{}'::jsonb,
   tags text[] not null default '{}',
