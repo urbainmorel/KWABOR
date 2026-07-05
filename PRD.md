@@ -64,7 +64,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - **Image plein cadre + overlay dégradé** sur cartes et fiches : le texte vit *sur* l'image, jamais dans un bandeau séparé.
 - **Couleur uniquement quand elle porte un sens métier** : le **jaune « Sponsorisé »** (transparence publicitaire) et le **rouge « billetterie / danger »** sont les **deux seuls** écarts de couleur tolérés. Sur fond monochrome, ils en deviennent plus repérables — ce qui sert directement les règles de transparence et d'urgence.
 
-**Garde-fou non négociable — le premium ne coûte jamais la performance.** La cible utilise majoritairement des Android low/mid-range sur réseau 3G/4G dégradé. L'esthétique premium s'obtient **par le design, pas par le poids** : overlays/dégradés en Compose/SwiftUI (jamais d'images lourdes empilées) ; photos en WebP/AVIF compressées, lazy-load, placeholder dégradé immédiat ; aucun effet coûteux (blur temps réel massif, parallax lourd) qui dégraderait le budget **P75 < 1,5 s** (§8). Arbitrage explicite : viser le rendu des meilleures apps premium **sans** copier leurs recettes gourmandes en data.
+**Garde-fou non négociable — le premium ne coûte jamais la performance.** La cible utilise majoritairement des Android low/mid-range sur réseau 3G/4G dégradé. L'esthétique premium s'obtient **par le design, pas par le poids** : overlays/dégradés en Compose/SwiftUI (jamais d'images lourdes empilées) ; photos AVIF/JPG/PNG compressées, lazy-load, placeholder dégradé immédiat ; aucun effet coûteux (blur temps réel massif, parallax lourd) qui dégraderait le budget **P75 < 1,5 s** (§8). Arbitrage explicite : viser le rendu des meilleures apps premium **sans** copier leurs recettes gourmandes en data.
 
 ---
 
@@ -118,7 +118,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 
 **Persona secondaire — Moussa, 41 ans, restaurateur à Cotonou.** Gère seul sa visibilité digitale, budget marketing limité, paie en Mobile Money, veut un **ROI direct et mesurable** sur ses campagnes.
 
-**Persona guide — Koffi, 36 ans, guide touristique à Ouidah.** Agréé, parle français/anglais/portugais, propose des circuits (Route des esclaves, Ganvié, Pendjari). Cherche un canal pour **exposer ses services** et **annoncer ses sorties/événements** à une audience de voyageurs qualifiés — sans site web ni budget pub.
+**Persona guide — Koffi, 36 ans, guide touristique à Ouidah.** Agréé, parle français/anglais/portugais, propose des circuits (Route des esclaves, Ganvié, Pendjari). Cherche un canal pour **exposer ses services** et **annoncer ses sorties/événements** à une audience de voyageurs qualifiés — sans page externe ni budget pub.
 
 ---
 
@@ -182,7 +182,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - Réservation/paiement **in-app** de tables ou de chambres (le MVP redirige vers WhatsApp/téléphone/site).
 - Billetterie événementielle à paiement **intégré** (le MVP redirige vers une URL externe).
 - Programme de fidélité multi-établissements.
-- Version Web/PWA/Desktop. Le produit V1 est mobile-only Android/iOS.
+- Toute autre version applicative. Le produit V1 est mobile-only Android/iOS.
 - Extension à d'autres pays (Kwabor est **mono-pays Bénin** par décision produit).
 
 ### 5.5 Hors produit
@@ -529,7 +529,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 
 | Catégorie | Exigence |
 |---|---|
-| **Performance** | Chargement initial du mur < **1,5 s P75** sur 3G/4G dégradée ; images WebP/AVIF, CDN, compression serveur, lazy-load, placeholder dégradé immédiat ; overlays/dégradés rendus en Compose/SwiftUI, jamais par des images lourdes (§1.4). Budget contrôlé **à chaque écran**. |
+| **Performance** | Chargement initial du mur < **1,5 s P75** sur 3G/4G dégradée ; images AVIF/JPG/PNG, CDN, compression serveur, lazy-load, placeholder dégradé immédiat ; overlays/dégradés rendus en Compose/SwiftUI, jamais par des images lourdes (§1.4). Budget contrôlé **à chaque écran**. |
 | **Offline / résilience** | Cache local du dernier mur (lecture seule) ; **bannière « Vous êtes hors ligne » persistante** ; **file locale** pour les actions (Like/Favori) synchronisée à la reconnexion ; saisie de brouillon de fiche autorisée (upload média et géocodage mis en file). Les fiches Détail ne sont pas garanties hors-ligne au MVP. |
 | **Accessibilité (WCAG AA)** | Contrastes ≥ **4.5:1** sur tous textes/overlays (y compris titre sur hero et sur cartes) ; labels ARIA/VoiceOver sur tout composant interactif ; **focus order documenté par écran** ; **alt text** généré (éditable) par image ; cibles tactiles ≥ 44 px ; états annoncés (« Événement terminé », « Ouvre une app externe »…). |
 | **Internationalisation** | **6 langues** (FR au MVP, EN en V1.1, puis PT/DE/ES/IT) ; **toute** l'UI via i18n dès le MVP ; **4 devises** d'affichage (conversion indicative, formatage ICU/CLDR) ; formats date/heure localisés ; **tolérance à l'expansion de texte** (DE +30–40 %), aucune largeur de label figée, tests pseudo-localisés. Pas de RTL (langues latines). |
@@ -544,10 +544,10 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 
 > Détails d'implémentation en `DESIGN.md` et futurs ADR. Résumé orienté décisions produit :
 
-- **Client : Kotlin Multiplatform mobile** — `shared` pour domaine, data, contrats, use cases et états ; Android en Compose Multiplatform ; iOS en SwiftUI natif. Web/PWA est hors scope V1.
+- **Client : Kotlin Multiplatform mobile** — `shared` pour domaine, data, contrats, use cases et états ; Android en Compose Multiplatform ; iOS en SwiftUI natif. Aucune autre cible applicative n'est prévue.
 - **Backend : Supabase** (PostgreSQL managé, Auth, Storage, Realtime pour compteurs et notifications, **Row Level Security**). RLS pilotée par le couple **rôle × `listing_class`** (§6.11) : lecture publique des fiches publiées ; écriture d'une fiche selon le rôle et la classe (Promoteur → ses fiches Commercial/Événementiel ; Institution/Admin → Patrimonial ; Utilisateur → aucun droit de fiche, seulement UGC et signalement). Colonnes/tables nullable « TikTok-ready » dès le MVP, chiffrées au repos, sans UI ni OAuth avant V1.2.
 - **Authentification** : Supabase Auth — **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS uniquement)** ; **flux d'activation** par lien invité pour les promoteurs pré-inscrits ; secrets OAuth côté serveur.
-- **UGC & médias sociaux** : Storage + pipeline d'images (WebP/AVIF) ; **rattachement obligatoire** d'un média à une entité (contrainte applicative + FK) ; **watermark non maskable** à l'export ; modération image automatique ; **licence + retrait** journalisés.
+- **UGC & médias sociaux** : Storage + pipeline d'images (AVIF/JPG/PNG) ; **rattachement obligatoire** d'un média à une entité (contrainte applicative + FK) ; **watermark non maskable** à l'export ; modération image automatique ; **licence + retrait** journalisés.
 - **Vidéo d'intro** : asset **embarqué** dans le binaire + **remplacement à distance** (remote config + CDN, précaché) ; H.264, muet, vertical, budget de poids serré ; **analytics de skip**.
 - **Paiement Promoteur** : Mobile Money béninois (**MTN MoMo**, **Moov Money**) via agrégateurs (**CinetPay**, **FedaPay**) ; orchestration anti-fraude côté serveur ; **transactions en XOF uniquement**.
 - **Devises & taux** : prix stockés en XOF ; service backend de taux de change pour l'affichage indicatif (NGN/USD/EUR) ; formatage localisé ICU/CLDR côté client.
@@ -555,7 +555,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 - **Assistant IA** : API Anthropic (Claude) **côté serveur** (clé jamais exposée) ; recherche sémantique sur le catalogue (embeddings + filtrage structuré) pour **ancrer les réponses** et éviter les hallucinations ; réponses dans la langue de l'utilisateur.
 - **Cartographie** : Google Maps Platform (Static Maps en fiche + Directions pour le CTA Itinéraire).
 - **Notifications push** : FCM (Android) / APNs (iOS), orchestrés par un service de campagne backend, segmentation ville/centres d'intérêt.
-- **Médias** : pipeline d'images adaptatives (WebP/AVIF), variantes responsives, lazy-load, placeholder dégradé — condition du « premium sans poids ».
+- **Médias** : pipeline d'images adaptatives (AVIF/JPG/PNG), variantes responsives, lazy-load, placeholder dégradé — condition du « premium sans poids ».
 - **Vidéo (V1.1)** : stockage/transcodage adaptatif, streaming progressif (plafonds taille/durée — §14).
 - **TikTok (V1.2)** : TikTok Login Kit + Content Posting API (Upload to Inbox d'abord) ; tokens orchestrés côté backend ; polling Display API pour les stats cross-plateforme.
 
@@ -634,8 +634,8 @@ Chaque événement porte : `ville`, `type_entite`, `entite_id`, `source_session`
 - **Classification hôtelière** : étoiles **déclaratives** (promoteur), contrôlées par la modération.
 - **Langue du contenu** : `content_lang` stockée + **traduction automatique à l'affichage**.
 - **Re-modération à l'édition** déclenchée par : nom, type/sous-type, GPS, prix, billetterie. **Une fiche est publiée une fois puis mise à jour à volonté.**
-- **Limites médias** : photo ≤ 8 Mo (JPG/PNG/WebP) ; vidéo ≤ 60 s, ≤ 50 Mo (V1.1) ; intro ~2–3 Mo.
-- **Cible V1 mobile-only** : Android + iOS ; Web/PWA/Desktop hors scope jusqu'à ADR contraire.
+- **Limites médias** : photo ≤ 8 Mo (JPG/PNG/AVIF) ; vidéo ≤ 60 s, ≤ 50 Mo (V1.1) ; intro ~2–3 Mo.
+- **Cible V1 mobile-only** : Android + iOS ; aucune autre cible applicative dans la roadmap active.
 - **Architecture UI mobile** : Android Compose Multiplatform ; iOS SwiftUI ; `shared` KMP limité au métier/data/contrats/états partagés.
 - **Rôles d'équipe vérifiée** : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés.
 

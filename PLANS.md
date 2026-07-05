@@ -4,6 +4,16 @@
 
 Une tâche à la fois. Aucun agent ne démarre une deuxième tâche tant que son livrable n'est pas vérifié.
 
+## Périmètre cible ferme
+
+Kwabor est une application Android/iOS uniquement.
+
+- Android : Compose Multiplatform.
+- iOS : SwiftUI natif.
+- `shared` : domaine, data, contrats, use cases, états et utilitaires communs.
+- Aucun autre client applicatif n'est une suite logique, une cible latente ou un axe de développement de la roadmap active.
+- Les mentions historiques de suppression d'ancienne cible servent uniquement à documenter ce qui a été retiré.
+
 ## Séquence de fondation
 
 1. Verrouillage Git et branche de fondation.
@@ -70,7 +80,7 @@ Ces zones demandent un plan dédié avant implémentation.
 
 - ADR mobile-only acceptée.
 - `AGENTS.md` aligné sur Android/iOS uniquement.
-- `PRD.md` et `DESIGN.md` corrigés sur les exigences directement contradictoires Web/PWA.
+- `PRD.md` et `DESIGN.md` corrigés sur les exigences directement contradictoires avec le mobile-only.
 - Modèle d'équipe vérifiée documenté : Propriétaire > Gestionnaire > Éditeur > Modérateur.
 - `PROJECT_STATE.md` et `BACKLOG.md` mis à jour avec la suite logique.
 
@@ -83,28 +93,28 @@ Ces zones demandent un plan dédié avant implémentation.
 **Validation**
 
 - `git diff --check`.
-- Relecture ciblée des mentions Web/PWA restantes.
+- Relecture ciblée des anciennes mentions de cible non mobile restantes.
 - Pas de build requis pour cette tranche documentaire.
 
-## Plan MOB-002 — Suppression de la cible Web/PWA
+## Plan MOB-002 — Suppression de l'ancienne cible non mobile
 
 **Agent responsable** : Build/Tooling.
 
-**Objectif atomique** : retirer `webApp` et la cible Kotlin/Wasm du build après acceptation d'ADR-0010, sans modifier les features métier.
+**Objectif atomique** : retirer l'ancienne cible non mobile du build après acceptation d'ADR-0010, sans modifier les features métier.
 
 **Livrables**
 
-- `include(":webApp")` supprimé de `settings.gradle.kts`.
-- Module `webApp` supprimé.
-- Cible `wasmJs` supprimée de `shared`.
-- Contournement Gradle spécifique Kotlin/Wasm supprimé.
+- Ancien include non mobile supprimé de `settings.gradle.kts`.
+- Ancien module non mobile supprimé.
+- Ancienne cible de compilation non mobile supprimée de `shared`.
+- Contournement Gradle lié à l'ancienne cible supprimé.
 - `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
 
 **Validation**
 
 - `git diff --check`.
 - `./gradlew.bat check`.
-- Recherche ciblée des références build `webApp`/`wasmJs`.
+- Recherche ciblée des références build de l'ancienne cible.
 
 ## Plan IOS-001 / CI-001 — Hôte iOS SwiftUI et CI macOS
 

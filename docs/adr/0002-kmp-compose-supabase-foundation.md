@@ -8,14 +8,14 @@
 
 ## Contexte et problème
 
-Kwabor ciblait Android, iOS et PWA avec une base produit commune, un design system partagé, un backend rapide à opérer et des règles d'accès fortes.
+Kwabor ciblait plusieurs clients avec une base produit commune, un design system partagé, un backend rapide à opérer et des règles d'accès fortes.
 
 Depuis ADR-0010, la cible produit V1 est Android/iOS uniquement. Compose Multiplatform reste retenu pour Android et les fondations UI existantes ; l'interface iOS devient SwiftUI native.
 
 ## Options envisagées
 
 - **Apps natives séparées** : contrôle maximal, mais duplication forte.
-- **Framework web mobile** : vitesse initiale, mais risque sur expérience native et offline.
+- **Framework mobile non natif** : vitesse initiale, mais risque sur expérience native et offline.
 - **KMP + Compose + Supabase** : partage métier/UI initial, backend managé et RLS.
 
 ## Décision
@@ -34,4 +34,4 @@ Nous retenons Kotlin Multiplatform, Compose Multiplatform et Supabase parce que 
 - L'UI iOS native SwiftUI crée une surface de maintenance séparée.
 
 **À revoir si**
-- Le périmètre Web/PWA est rouvert par une ADR dédiée.
+- Android/iOS cesse d'être le périmètre produit validé.

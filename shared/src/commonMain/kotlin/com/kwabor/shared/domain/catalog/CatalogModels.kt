@@ -87,7 +87,7 @@ data class ListingDetail(
 data class ListingContact(
     val phone: String?,
     val whatsapp: String?,
-    val websiteUrl: String?,
+    val externalUrl: String?,
     val email: String?,
 )
 

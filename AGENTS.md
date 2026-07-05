@@ -11,7 +11,7 @@ Tout agent doit le lire avant toute tâche non triviale et en appliquer les cont
 En particulier :
 
 - Stack cible : Kotlin Multiplatform partagé + Android Compose Multiplatform + iOS SwiftUI + Supabase.
-- Cibles : Android et iOS uniquement. Web/PWA est hors scope tant qu'une ADR ultérieure ne le réouvre pas.
+- Cibles : Android et iOS uniquement. Aucun autre client applicatif ne doit être proposé, planifié, scaffoldé ou réintroduit.
 - Contexte produit : Kwabor, guide visuel et intelligent du Bénin, marché mono-pays Bénin.
 - Niveau attendu : ingénierie staff/senior, code maintenable, testable, robuste et livrable en production.
 

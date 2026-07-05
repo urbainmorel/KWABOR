@@ -9,7 +9,7 @@
 - [x] FND-004 — Ajouter les contrats repositories du catalogue.
 - [x] FND-005 — Préparer les migrations Supabase initiales avec RLS.
 - [x] MOB-001 — Acter le cadrage mobile-only, iOS SwiftUI, CI macOS et rôles d'équipe vérifiée.
-- [x] MOB-002 — Supprimer proprement `webApp` et retirer la cible Web/PWA du build.
+- [x] MOB-002 — Supprimer proprement l'ancienne cible non mobile du build.
 - [x] IOS-001 — Créer l'hôte iOS SwiftUI et l'intégration du framework `shared`.
 - [x] CI-001 — Ajouter un job GitHub Actions macOS qui compile iOS en simulateur sans signature.
 - [x] CI-002 — Vérifier la CI macOS après push et corriger le build Xcode si nécessaire.
@@ -32,4 +32,4 @@
 - Paiement Mobile Money.
 - Assistant IA.
 - Flux social complet.
-- Web/PWA, sauf nouvelle ADR explicite.
+- Autre client applicatif : exclu du produit, ne pas planifier ni rouvrir dans la roadmap active.

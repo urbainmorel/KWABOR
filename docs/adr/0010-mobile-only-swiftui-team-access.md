@@ -7,8 +7,8 @@
 
 ## Contexte et problème
 
-Le cadrage initial préparait Android, iOS et Web-PWA avec Compose Multiplatform comme socle UI partagé.
-La décision produit actuelle retire entièrement la version web du périmètre et cible uniquement Android et iOS.
+Le cadrage initial préparait plusieurs clients avec Compose Multiplatform comme socle UI partagé.
+La décision produit actuelle retire entièrement les cibles non mobiles du périmètre et cible uniquement Android et iOS.
 
 Cette décision impose aussi de clarifier l'architecture iOS : l'interface iOS doit être native SwiftUI, tandis que le partage Kotlin Multiplatform reste centré sur le domaine, les contrats, la data, les use cases et les états exploitables par les deux plateformes.
 
@@ -16,7 +16,7 @@ Enfin, les comptes vérifiés ne sont pas toujours opérés par une seule person
 
 ## Options envisagées
 
-- **Conserver Android/iOS/Web-PWA** : maximise la couverture, mais disperse l'effort de fondation et maintient une cible non prioritaire.
+- **Conserver plusieurs clients** : maximise la couverture, mais disperse l'effort de fondation et maintient une cible non prioritaire.
 - **Partager toute l'UI Compose sur Android et iOS** : réduit la duplication UI, mais contredit la demande d'une interface iOS SwiftUI native.
 - **Mobile-only avec Android Compose Multiplatform, iOS SwiftUI et shared KMP métier** : concentre la V1 sur les plateformes mobiles prioritaires et garde un partage fort sans imposer Compose à iOS.
 
@@ -27,8 +27,8 @@ Nous retenons une cible V1 mobile-only : Android et iOS uniquement.
 - Android utilise Compose Multiplatform pour l'interface.
 - iOS utilise SwiftUI pour l'interface.
 - `shared` reste Kotlin Multiplatform et expose domaine, data, contrats repositories, use cases, modèles d'état et utilitaires transverses.
-- Le module `webApp` est hors scope et a été supprimé en MOB-002.
-- Aucun nouveau travail ne doit cibler Web, PWA, Web Push, responsive desktop ou Kotlin/Wasm tant qu'une ADR ultérieure ne réouvre pas ce périmètre.
+- L'ancienne cible non mobile a été supprimée en MOB-002.
+- Aucun nouveau travail ne doit cibler un autre client applicatif. Ces cibles ne font pas partie de la roadmap active.
 
 ## CI iOS
 
@@ -85,18 +85,17 @@ Règles de sécurité :
 ## Conséquences
 
 **Positives**
-- Le scope V1 est plus net : production mobile Android/iOS, pas de dispersion Web.
+- Le scope V1 est plus net : production mobile Android/iOS, pas de dispersion multi-client.
 - L'iOS peut respecter les conventions natives SwiftUI.
 - Le partage KMP reste utile sans coupler l'UI iOS à Compose.
 - Le modèle d'équipe prépare les vrais usages B2B sans multiplier les rôles métier publics.
 
 **Négatives / compromis assumés**
-- La suppression de `webApp` casse toute expérimentation Web/PWA existante.
+- La suppression de l'ancienne cible non mobile casse toute expérimentation associée existante.
 - SwiftUI iOS implique une couche UI séparée et des tests iOS dédiés.
 - La compilation iOS ne peut pas être validée localement sur ce poste Windows ; le runner macOS devient la source de validation.
 - Le modèle équipe demande une migration Supabase et des tests RLS avant toute UI de gestion d'équipe.
 
 **À revoir si**
-- La V1 doit impérativement inclure une présence web publique.
 - Compose Multiplatform iOS devient une exigence produit explicite.
 - Les droits d'équipe deviennent trop fins pour le modèle cumulatif retenu.
