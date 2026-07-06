@@ -93,6 +93,29 @@ class CatalogDtoMappingTest {
     }
 
     @Test
+    fun listingViewerInteractionDto_mapsStateAndCount() {
+        val interaction = listingViewerInteractionDto(
+            likedByCurrentUser = true,
+            favoritedByCurrentUser = false,
+            likesCount = 7,
+        ).toDomain()
+
+        assertEquals("listing-1", interaction.listingId)
+        assertEquals(true, interaction.likedByViewer)
+        assertEquals(false, interaction.favoritedByViewer)
+        assertEquals(7, interaction.likesCount)
+    }
+
+    @Test
+    fun listingViewerInteractionDto_rejectsNegativeCount() {
+        val dto = listingViewerInteractionDto(likesCount = -1)
+
+        assertFailsWith<IllegalStateException> {
+            dto.toDomain()
+        }
+    }
+
+    @Test
     fun listingTypeAndClass_serializeToDatabaseValues() {
         assertEquals("lieu", ListingType.Place.toDatabaseValue())
         assertEquals("etablissement", ListingType.Establishment.toDatabaseValue())
@@ -143,4 +166,16 @@ internal fun listingDto(
     ratingAverage = 4.5,
     likesCount = 12,
     publishedAt = publishedAt,
+)
+
+internal fun listingViewerInteractionDto(
+    listingId: String = "listing-1",
+    likedByCurrentUser: Boolean = false,
+    favoritedByCurrentUser: Boolean = false,
+    likesCount: Int = 12,
+): ListingViewerInteractionDto = ListingViewerInteractionDto(
+    listingId = listingId,
+    likedByCurrentUser = likedByCurrentUser,
+    favoritedByCurrentUser = favoritedByCurrentUser,
+    likesCount = likesCount,
 )

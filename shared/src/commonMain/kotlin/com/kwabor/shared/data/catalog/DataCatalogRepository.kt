@@ -7,6 +7,7 @@ import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.core.PageRequest
@@ -42,7 +43,39 @@ class DataCatalogRepository internal constructor(
     }
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = runDataCall {
-        dataSource.getListingDetail(listingId).toDomain()
+        dataSource.getListingDetail(listingId.toRequiredListingId()).toDomain()
+    }
+
+    override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
+        runDataCall {
+            dataSource.getListingViewerInteraction(listingId.toRequiredListingId()).toDomain()
+        }
+
+    override suspend fun listListingViewerInteractions(
+        listingIds: List<String>,
+    ): DomainResult<List<ListingViewerInteraction>> = runDataCall {
+        val requestedListingIds = listingIds.toRequiredListingIds()
+        if (requestedListingIds.isEmpty()) {
+            emptyList()
+        } else {
+            dataSource.listListingViewerInteractions(requestedListingIds).map { item -> item.toDomain() }
+        }
+    }
+
+    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
+        dataSource.likeListing(listingId.toRequiredListingId()).toDomain()
+    }
+
+    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
+        dataSource.unlikeListing(listingId.toRequiredListingId()).toDomain()
+    }
+
+    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
+        dataSource.favoriteListing(listingId.toRequiredListingId()).toDomain()
+    }
+
+    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
+        dataSource.unfavoriteListing(listingId.toRequiredListingId()).toDomain()
     }
 }
 
@@ -64,3 +97,15 @@ private fun <T> List<T>.toPageResult(page: PageRequest): PageResult<T> = PageRes
     items = this,
     nextOffset = if (size >= page.limit) page.offset + page.limit else null,
 )
+
+private fun String.toRequiredListingId(): String {
+    val value = trim()
+    if (value.isBlank()) {
+        throw CatalogDataException.Validation("error.catalog.listing_id_required")
+    }
+
+    return value
+}
+
+private fun List<String>.toRequiredListingIds(): List<String> = map { listingId -> listingId.toRequiredListingId() }
+    .distinct()

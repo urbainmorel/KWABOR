@@ -8,6 +8,7 @@ import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
 
 internal class SupabaseCatalogDataSource(
@@ -89,6 +90,49 @@ internal class SupabaseCatalogDataSource(
         )
     }
 
+    override suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto = runPostgrest {
+        postgrest.rpc(
+            function = "get_listing_viewer_interaction",
+            parameters = ListingInteractionRpcDto(listingId = listingId),
+        ).decodeSingle()
+    }
+
+    override suspend fun listListingViewerInteractions(listingIds: List<String>): List<ListingViewerInteractionDto> =
+        runPostgrest {
+            postgrest.rpc(
+                function = "list_listing_viewer_interactions",
+                parameters = ListingInteractionsRpcDto(listingIds = listingIds),
+            ).decodeList()
+        }
+
+    override suspend fun likeListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
+        postgrest.rpc(
+            function = "like_listing",
+            parameters = ListingInteractionRpcDto(listingId = listingId),
+        ).decodeSingle()
+    }
+
+    override suspend fun unlikeListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
+        postgrest.rpc(
+            function = "unlike_listing",
+            parameters = ListingInteractionRpcDto(listingId = listingId),
+        ).decodeSingle()
+    }
+
+    override suspend fun favoriteListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
+        postgrest.rpc(
+            function = "add_listing_to_favorites",
+            parameters = ListingInteractionRpcDto(listingId = listingId),
+        ).decodeSingle()
+    }
+
+    override suspend fun unfavoriteListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
+        postgrest.rpc(
+            function = "remove_listing_from_favorites",
+            parameters = ListingInteractionRpcDto(listingId = listingId),
+        ).decodeSingle()
+    }
+
     private suspend fun findCoverImageUrl(listingId: String): String? {
         val media = postgrest.from(LISTING_MEDIA)
             .select {
@@ -156,13 +200,14 @@ private fun RestException.toCatalogDataException(): CatalogDataException {
     if (this is PostgrestRestException) {
         when (code) {
             "P0002", "PGRST116" -> return CatalogDataException.NotFound()
-            "42501" -> return CatalogDataException.PermissionDenied()
+            "42501" -> return CatalogDataException.AuthenticationRequired()
             "22023", "23503", "23505", "23514" -> return CatalogDataException.Validation()
         }
     }
 
     return when (statusCode) {
-        401, 403 -> CatalogDataException.PermissionDenied()
+        401 -> CatalogDataException.AuthenticationRequired()
+        403 -> CatalogDataException.PermissionDenied()
         404 -> CatalogDataException.NotFound()
         400, 409, 422 -> CatalogDataException.Validation()
         else -> CatalogDataException.Unexpected()

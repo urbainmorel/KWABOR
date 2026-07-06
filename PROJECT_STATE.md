@@ -40,10 +40,15 @@ Fondations techniques et organisation staff senior.
 - Stockage sécurisé de session ajouté côté Android via AndroidX Security Crypto et côté iOS via Keychain/CoreFoundation.
 - Factories Android/iOS ajoutées pour créer le repository Auth avec stockage sécurisé plateforme ; permission réseau Android déclarée.
 - Tests `commonTest` ajoutés pour session manager, validation auth, mapping session et garde d'activation promoteur côté client.
+- Interactions catalogue Like/Favori ajoutées côté Supabase : policies RLS séparées, RPC idempotents authentifiés, trigger interne de maintien `listings.likes_count`.
+- Contrats domaine et data ajoutés pour lire l'état viewer, lire un batch d'états, liker/unliker et ajouter/retirer un favori sans exposer Supabase au domaine.
+- Fabrique `createAuthenticatedCatalogRepository` ajoutée pour consommer la session auth partagée lors des actions catalogue authentifiées.
+- Tests pgTAP ajoutés pour anonymes, isolation utilisateur, fiche non publiée, idempotence, compteur de likes et batch publié.
+- Tests `commonTest` ajoutés pour mapping DTO, validation identifiant fiche, batch vide, délégation Like/Favori et absence de session.
 
 ## Tâche en cours
 
-Aucune tâche active après AUTH-FOUNDATION-001.
+Aucune tâche active après DATA-CATALOG-002.
 
 ## Blocages / limites
 
@@ -55,8 +60,8 @@ Aucune tâche active après AUTH-FOUNDATION-001.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
-- Les actions Like/Favori catalogue ne sont pas encore exposées par contrat domaine ; elles peuvent maintenant démarrer en consommant la session auth partagée.
+- Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais ne sont pas encore reliées aux écrans Explore/Détail.
 
 ## Prochaine tâche logique
 
-Lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase pour Like/Favori catalogue en consommant la session auth partagée.
+Lancer FND-006 : compléter les previews UI et le design system minimal avant de brancher Explore/Détail.
