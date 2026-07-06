@@ -22,12 +22,12 @@
 - [x] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
 - [x] FND-006 — Ajouter les previews UI et tests de design system.
 - [x] CI-003 — Débloquer GitHub Actions et relancer les checks des PR ouvertes.
+- [x] EXPLORE-001A — Injecter le `CatalogRepository` réel depuis Android/iOS sans secret commité.
+- [x] EXPLORE-001B — Rendre les images distantes des cartes catalogue en KMP.
 - [ ] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
 
 ## Ensuite
 
-- [ ] EXPLORE-001A — Injecter le `CatalogRepository` réel depuis Android/iOS sans secret commité.
-- [ ] EXPLORE-001B — Rendre les images distantes des cartes catalogue en KMP.
 - [ ] EXPLORE-001C — Relier Like/Favori au mur souple auth et préparer la queue offline.
 
 ## À ne pas faire maintenant

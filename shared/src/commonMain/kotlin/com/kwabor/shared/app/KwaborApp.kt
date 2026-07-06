@@ -112,7 +112,7 @@ private fun ExploreRoute(
         state = if (presenter == null) {
             initialExploreUiState(strings = strings, request = request)
         } else {
-            loadingExploreUiState(strings = strings, request = request)
+            state = loadingExploreUiState(strings = strings, request = request)
             presenter.load(request = request, strings = strings)
         }
     }

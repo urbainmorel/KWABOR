@@ -53,6 +53,10 @@ Fondations techniques et organisation staff senior.
 - PR FND-006 `#15` mergée dans `main` avec `quality` et `iOS simulator build` verts après recréation propre depuis l'ancienne PR empilée `#14`.
 - Repository GitHub rendu public afin de débloquer l'exécution GitHub Actions sans limite privée bloquante immédiate.
 - EXPLORE-001 démarrée : écran Explore stateless, modèle d'état lecture seule, presenter partagé alimenté par `CatalogRepository`, onglets/chips sélectionnables, états loading/empty/error/offline et tests `commonTest` ciblés.
+- EXPLORE-001A ajoutée : runtime partagé `KwaborRuntimeDependencies`, horloge système, injection Android du `CatalogRepository` réel depuis `local.properties` / propriétés Gradle / variables d'environnement, sans secret commité.
+- Bridge iOS préparé pour recevoir `KWABOR_SUPABASE_URL` et `KWABOR_SUPABASE_PUBLISHABLE_KEY` depuis l'environnement du scheme ou Info.plist locale.
+- EXPLORE-001B ajoutée côté carte Compose Android : abstraction KMP `ListingCoverImage`, actual Android avec Coil/Ktor, fallback placeholder, textes bornés et état loading réellement assigné avant chargement repository.
+- Tests `commonTest` ajoutés pour la création des dépendances runtime sans secret et validations Gradle `:shared:check`, `:androidApp:assembleDebug`, `:shared:assembleSharedDebugXCFramework`, `check` vertes.
 
 ## Tâche en cours
 
@@ -68,10 +72,10 @@ EXPLORE-001 — écran Explore lecture seule avec cartes catalogue et états tra
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
-- EXPLORE-001 n'affiche pas encore les vraies images distantes des fiches : `coverImageUrl` est propagé dans l'état, mais le composant image KMP reste à choisir/intégrer.
-- EXPLORE-001 n'injecte pas encore l'environnement Supabase depuis Android/iOS ; `KwaborApp` accepte un `CatalogRepository` réel, mais les hosts ne fournissent pas encore les variables publiques.
+- Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
+- L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
 - Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais le mur souple auth et la queue offline ne sont pas encore reliés à l'écran Explore.
 
 ## Prochaine tâche logique
 
-Terminer EXPLORE-001 par l'injection mobile du `CatalogRepository`, le rendu image distant KMP des cartes, puis ouvrir la PR `feature/explore-read-only` avec `quality` et `iOS simulator build` verts.
+Poursuivre EXPLORE-001C : relier Like/Favori au mur souple auth et préparer la queue offline, puis finaliser la PR `feature/explore-read-only` avec `quality` et `iOS simulator build` verts.

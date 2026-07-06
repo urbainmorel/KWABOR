@@ -17,6 +17,13 @@ Commande macOS avant ouverture/build Xcode :
 ./gradlew :shared:assembleSharedDebugXCFramework
 ```
 
+Configuration locale Supabase, sans secret commité :
+
+- `KWABOR_SUPABASE_URL`
+- `KWABOR_SUPABASE_PUBLISHABLE_KEY`
+
+Ces valeurs peuvent être définies comme variables d'environnement du scheme Xcode ou comme clés Info.plist locales.
+
 Suite logique :
 
 1. vérifier le job `iOS simulator build`;

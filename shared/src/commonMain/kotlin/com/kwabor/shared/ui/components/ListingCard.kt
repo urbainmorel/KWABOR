@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.kwabor.shared.design.KwaborAlpha
 import com.kwabor.shared.design.KwaborColors
 import com.kwabor.shared.design.KwaborRadius
@@ -71,6 +72,11 @@ fun ListingCard(
                     ),
                 ),
         ) {
+            ListingCoverImage(
+                imageUrl = state.coverImageUrl,
+                modifier = Modifier.fillMaxSize(),
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -110,11 +116,15 @@ fun ListingCard(
                     color = KwaborColors.Surface0,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = state.cityLabel,
                     color = KwaborColors.Ink100,
                     style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 state.ratingLabel?.let { rating ->
                     Row(
