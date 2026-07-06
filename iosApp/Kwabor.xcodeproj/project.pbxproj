@@ -11,6 +11,7 @@
 		1A0000010000000000000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000004 /* ContentView.swift */; };
 		1A0000010000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000006 /* Assets.xcassets */; };
 		1A0000010000000000000007 /* Shared.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000008 /* Shared.xcframework */; };
+		1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000029 /* KwaborDesignTokens.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,7 @@
 		1A0000010000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = ../shared/build/XCFrameworks/debug/Shared.xcframework; sourceTree = "<group>"; };
 		1A0000010000000000000009 /* Kwabor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kwabor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000010000000000000029 /* KwaborDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborDesignTokens.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 			children = (
 				1A0000010000000000000002 /* KwaborApp.swift */,
 				1A0000010000000000000004 /* ContentView.swift */,
+				1A0000010000000000000029 /* KwaborDesignTokens.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -156,6 +159,7 @@
 			files = (
 				1A0000010000000000000001 /* KwaborApp.swift in Sources */,
 				1A0000010000000000000003 /* ContentView.swift in Sources */,
+				1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

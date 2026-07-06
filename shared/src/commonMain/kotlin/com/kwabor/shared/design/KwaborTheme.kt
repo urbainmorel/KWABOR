@@ -31,6 +31,7 @@ private val DarkColors = darkColorScheme(
 fun KwaborTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
+        typography = KwaborTypography,
         content = content,
     )
 }

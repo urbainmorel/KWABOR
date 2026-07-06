@@ -45,23 +45,29 @@ Fondations techniques et organisation staff senior.
 - Fabrique `createAuthenticatedCatalogRepository` ajoutée pour consommer la session auth partagée lors des actions catalogue authentifiées.
 - Tests pgTAP ajoutés pour anonymes, isolation utilisateur, fiche non publiée, idempotence, compteur de likes et batch publié.
 - Tests `commonTest` ajoutés pour mapping DTO, validation identifiant fiche, batch vide, délégation Like/Favori et absence de session.
+- Design system Compose complété : tokens spacing/radius/sizing/typo, `PriceTag` compact/plein, badge sponsorisé, états empty/error/offline/loading skeleton et carte catalogue previewable.
+- Previews Compose ajoutées pour `PriceTag`, carte catalogue, états transverses, light/dark.
+- Socle SwiftUI aligné avec des tokens iOS minimaux et un aperçu de badge sponsorisé dans l'hôte iOS.
+- Tests `commonTest` ajoutés pour le formatage `PriceTag` et les tokens de fondation.
 
 ## Tâche en cours
 
-Aucune tâche active après DATA-CATALOG-002.
+Aucune tâche active après FND-006.
 
 ## Blocages / limites
 
 - La protection de branche GitHub `main` a été refusée sur dépôt privé sans GitHub Pro ou dépôt public.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
+- GitHub Actions est actuellement bloqué côté compte par un problème Billing/Spending : les jobs `quality` et `iOS simulator build` ne démarrent pas sur PR `#13`.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
 - Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais ne sont pas encore reliées aux écrans Explore/Détail.
+- Les composants UI FND-006 ne remplacent pas un écran Explore complet ; ils sont la base réutilisable avant intégration produit.
 
 ## Prochaine tâche logique
 
-Lancer FND-006 : compléter les previews UI et le design system minimal avant de brancher Explore/Détail.
+Débloquer GitHub Actions, relancer les checks des PR ouvertes, puis lancer EXPLORE-001 : écran Explore lecture seule avec cartes catalogue et états transverses.

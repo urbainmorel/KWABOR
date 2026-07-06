@@ -12,6 +12,14 @@ data class KwaborStrings(
     val profile: String,
     val foundationStatus: String,
     val free: String,
+    val sponsored: String,
+    val retry: String,
+    val loading: String,
+    val emptyStateTitle: String,
+    val errorStateTitle: String,
+    val offlineBanner: String,
+    val like: String,
+    val favorite: String,
 )
 
 fun stringsFor(locale: AppLocale): KwaborStrings = when (locale) {
@@ -34,4 +42,12 @@ private val frenchStrings = KwaborStrings(
     profile = "Profil",
     foundationStatus = "Socle applicatif en place",
     free = "Gratuit",
+    sponsored = "Sponsorisé",
+    retry = "Réessayer",
+    loading = "Chargement",
+    emptyStateTitle = "Aucun contenu pour le moment",
+    errorStateTitle = "Une erreur est survenue",
+    offlineBanner = "Vous êtes hors ligne",
+    like = "J'aime",
+    favorite = "Favori",
 )

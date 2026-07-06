@@ -37,6 +37,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(compose.foundation)
+            implementation(compose.components.uiToolingPreview)
+            implementation(compose.materialIconsExtended)
             implementation(compose.material3)
             implementation(compose.runtime)
             implementation("io.insert-koin:koin-core:4.2.2")
