@@ -24,12 +24,6 @@ DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcuserstate
 
-# Node / web tooling
-node_modules/
-dist/
-.next/
-.vercel/
-
 # Secrets and local environment
 .env
 .env.*
