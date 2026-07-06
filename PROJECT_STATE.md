@@ -45,29 +45,33 @@ Fondations techniques et organisation staff senior.
 - Fabrique `createAuthenticatedCatalogRepository` ajoutée pour consommer la session auth partagée lors des actions catalogue authentifiées.
 - Tests pgTAP ajoutés pour anonymes, isolation utilisateur, fiche non publiée, idempotence, compteur de likes et batch publié.
 - Tests `commonTest` ajoutés pour mapping DTO, validation identifiant fiche, batch vide, délégation Like/Favori et absence de session.
+- PR DATA-CATALOG-002 `#13` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Design system Compose complété : tokens spacing/radius/sizing/typo, `PriceTag` compact/plein, badge sponsorisé, états empty/error/offline/loading skeleton et carte catalogue previewable.
 - Previews Compose ajoutées pour `PriceTag`, carte catalogue, états transverses, light/dark.
 - Socle SwiftUI aligné avec des tokens iOS minimaux et un aperçu de badge sponsorisé dans l'hôte iOS.
 - Tests `commonTest` ajoutés pour le formatage `PriceTag` et les tokens de fondation.
+- PR FND-006 `#15` mergée dans `main` avec `quality` et `iOS simulator build` verts après recréation propre depuis l'ancienne PR empilée `#14`.
+- Repository GitHub rendu public afin de débloquer l'exécution GitHub Actions sans limite privée bloquante immédiate.
+- EXPLORE-001 démarrée : écran Explore stateless, modèle d'état lecture seule, presenter partagé alimenté par `CatalogRepository`, onglets/chips sélectionnables, états loading/empty/error/offline et tests `commonTest` ciblés.
 
 ## Tâche en cours
 
-Aucune tâche active après FND-006.
+EXPLORE-001 — écran Explore lecture seule avec cartes catalogue et états transverses.
 
 ## Blocages / limites
 
-- La protection de branche GitHub `main` a été refusée sur dépôt privé sans GitHub Pro ou dépôt public.
+- La protection de branche GitHub `main` doit être reconfigurée maintenant que le dépôt est public.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
-- GitHub Actions est actuellement bloqué côté compte par un problème Billing/Spending : les jobs `quality` et `iOS simulator build` ne démarrent pas sur PR `#13`.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
-- Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais ne sont pas encore reliées aux écrans Explore/Détail.
-- Les composants UI FND-006 ne remplacent pas un écran Explore complet ; ils sont la base réutilisable avant intégration produit.
+- EXPLORE-001 n'affiche pas encore les vraies images distantes des fiches : `coverImageUrl` est propagé dans l'état, mais le composant image KMP reste à choisir/intégrer.
+- EXPLORE-001 n'injecte pas encore l'environnement Supabase depuis Android/iOS ; `KwaborApp` accepte un `CatalogRepository` réel, mais les hosts ne fournissent pas encore les variables publiques.
+- Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais le mur souple auth et la queue offline ne sont pas encore reliés à l'écran Explore.
 
 ## Prochaine tâche logique
 
-Débloquer GitHub Actions, relancer les checks des PR ouvertes, puis lancer EXPLORE-001 : écran Explore lecture seule avec cartes catalogue et états transverses.
+Terminer EXPLORE-001 par l'injection mobile du `CatalogRepository`, le rendu image distant KMP des cartes, puis ouvrir la PR `feature/explore-read-only` avec `quality` et `iOS simulator build` verts.
