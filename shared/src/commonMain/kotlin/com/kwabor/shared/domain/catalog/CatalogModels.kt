@@ -84,6 +84,13 @@ data class ListingDetail(
     val publishedAtEpochMilliseconds: Long?,
 )
 
+data class ListingViewerInteraction(
+    val listingId: String,
+    val likedByViewer: Boolean,
+    val favoritedByViewer: Boolean,
+    val likesCount: Int,
+)
+
 data class ListingContact(
     val phone: String?,
     val whatsapp: String?,

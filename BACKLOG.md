@@ -19,10 +19,10 @@
 - [x] DATA-TEAM-003 — Brancher `OrganizationDataSource` sur Supabase PostgREST/RPC.
 - [x] DATA-CATALOG-001 — Brancher les repositories catalogue sur Supabase PostgREST.
 - [x] AUTH-FOUNDATION-001 — Préparer la session auth partagée et le stockage sécurisé des tokens.
+- [x] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
 
 ## Ensuite
 
-- [ ] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
 - [ ] FND-006 — Ajouter les previews UI et tests de design system.
 
 ## À ne pas faire maintenant

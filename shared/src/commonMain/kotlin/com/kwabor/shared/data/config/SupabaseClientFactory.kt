@@ -57,3 +57,15 @@ fun createCatalogRepository(environment: KwaborEnvironment): CatalogRepository =
         postgrest = createKwaborSupabaseClient(environment).postgrest,
     ),
 )
+
+fun createAuthenticatedCatalogRepository(
+    environment: KwaborEnvironment,
+    authSessionManager: SessionManager,
+): CatalogRepository = DataCatalogRepository(
+    dataSource = SupabaseCatalogDataSource(
+        postgrest = createKwaborSupabaseClient(
+            environment = environment,
+            authSessionManager = authSessionManager,
+        ).postgrest,
+    ),
+)

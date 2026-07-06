@@ -15,6 +15,18 @@ internal interface CatalogDataSource {
     suspend fun searchListings(query: ListingSearchQuery, page: PageRequest): List<ListingSummaryDto>
 
     suspend fun getListingDetail(listingId: String): ListingDetailDto
+
+    suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto
+
+    suspend fun listListingViewerInteractions(listingIds: List<String>): List<ListingViewerInteractionDto>
+
+    suspend fun likeListing(listingId: String): ListingViewerInteractionDto
+
+    suspend fun unlikeListing(listingId: String): ListingViewerInteractionDto
+
+    suspend fun favoriteListing(listingId: String): ListingViewerInteractionDto
+
+    suspend fun unfavoriteListing(listingId: String): ListingViewerInteractionDto
 }
 
 internal sealed class CatalogDataException(
@@ -27,6 +39,8 @@ internal sealed class CatalogDataException(
     class PermissionDenied(
         messageKey: String = "error.catalog.permission_denied",
     ) : CatalogDataException(DomainError.PermissionDenied(messageKey))
+
+    class AuthenticationRequired : CatalogDataException(DomainError.AuthenticationRequired())
 
     class Validation(
         messageKey: String = "error.catalog.invalid_request",

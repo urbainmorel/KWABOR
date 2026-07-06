@@ -349,3 +349,43 @@ Après merge, lancer AUTH-FOUNDATION-001 : session auth partagée et stockage s�
 **Suite logique**
 
 Après merge, lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase pour Like/Favori catalogue en consommant la session auth partagée.
+
+## Plan DATA-CATALOG-002 — Interactions catalogue Like/Favori
+
+**Agent responsable** : Data/Supabase, avec revue Domain et QA.
+
+**Objectif atomique** : ajouter les contrats domaine et l'implémentation Supabase pour lire et modifier l'état Like/Favori d'une fiche catalogue, en consommant la session auth partagée et sans écran produit complet.
+
+**Livrables**
+
+- Modèle domaine d'état viewer d'une fiche catalogue.
+- Méthodes `CatalogRepository` pour lire l'état, lire un batch d'états, liker/unliker, ajouter/retirer un favori.
+- RPC Supabase idempotents pour les mutations Like/Favori.
+- Policies RLS durcies : interactions créables uniquement sur fiches publiées, lecture/modification limitée au propriétaire de l'interaction.
+- Trigger serveur maintenant `listings.likes_count`.
+- Implémentation `CatalogDataSource`, `DataCatalogRepository` et `SupabaseCatalogDataSource`.
+- Tests Kotlin `commonTest` et tests pgTAP ciblés.
+- `PROJECT_STATE.md` et `BACKLOG.md` mis à jour.
+
+**Règles de sécurité**
+
+- Supabase reste strictement dans `data`.
+- Aucune session, token ou `user_id` n'entre dans le domaine.
+- Une session absente retourne `DomainError.AuthenticationRequired`.
+- Les RPC publiques sont `SECURITY INVOKER`, avec `EXECUTE` limité à `authenticated`.
+- Le trigger de compteur reste interne, dans `app_private`, avec `search_path` fixé et aucun droit d'appel public.
+- Les erreurs SQL/PostgREST sont mappées en `DomainError`, sans message technique brut.
+
+**Validation**
+
+- Vérifier le changelog Supabase avant implémentation.
+- `supabase db reset`.
+- `supabase test db`.
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+- GitHub Actions `quality` et `iOS simulator build`.
+
+**Suite logique**
+
+Après merge, lancer FND-006 : compléter previews UI/design system ou préparer la slice Explore selon le backlog confirmé.

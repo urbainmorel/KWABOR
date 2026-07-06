@@ -10,6 +10,7 @@ import com.kwabor.shared.domain.catalog.ListingMedia
 import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingType
+import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.catalog.PriceUnit
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
@@ -122,6 +123,30 @@ internal data class ListingDetailDto(
     val media: List<ListingMediaDto>,
 )
 
+@Serializable
+internal data class ListingViewerInteractionDto(
+    @SerialName("listing_id")
+    val listingId: String,
+    @SerialName("liked_by_current_user")
+    val likedByCurrentUser: Boolean,
+    @SerialName("favorited_by_current_user")
+    val favoritedByCurrentUser: Boolean,
+    @SerialName("likes_count")
+    val likesCount: Int,
+)
+
+@Serializable
+internal data class ListingInteractionRpcDto(
+    @SerialName("p_listing_id")
+    val listingId: String,
+)
+
+@Serializable
+internal data class ListingInteractionsRpcDto(
+    @SerialName("p_listing_ids")
+    val listingIds: List<String>,
+)
+
 internal fun CityDto.toDomain(): City = City(
     id = id,
     name = name,
@@ -164,6 +189,13 @@ internal fun ListingDetailDto.toDomain(): ListingDetail {
         publishedAtEpochMilliseconds = listing.publishedAt?.toEpochMilliseconds(),
     )
 }
+
+internal fun ListingViewerInteractionDto.toDomain(): ListingViewerInteraction = ListingViewerInteraction(
+    listingId = listingId,
+    likedByViewer = likedByCurrentUser,
+    favoritedByViewer = favoritedByCurrentUser,
+    likesCount = likesCount.toNonNegativeCount("listings.likes_count"),
+)
 
 internal fun ListingType.toDatabaseValue(): String = when (this) {
     ListingType.Place -> "lieu"
@@ -249,6 +281,14 @@ private fun String.toEpochMilliseconds(): Long = Instant.parse(this).toEpochMill
 private fun Long.toNonNegativeMoney(fieldName: String): MoneyXof = when (val result = MoneyXof.fromAmount(this)) {
     is DomainResult.Success -> result.value
     is DomainResult.Failure -> invalidDatabaseValue(fieldName, toString())
+}
+
+private fun Int.toNonNegativeCount(fieldName: String): Int {
+    if (this >= 0) {
+        return this
+    }
+
+    invalidDatabaseValue(fieldName, toString())
 }
 
 private fun invalidDatabaseValue(fieldName: String, value: String): Nothing {

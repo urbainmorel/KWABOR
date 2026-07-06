@@ -20,4 +20,16 @@ interface CatalogRepository {
     ): DomainResult<PageResult<ListingSummary>>
 
     suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail>
+
+    suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction>
+
+    suspend fun listListingViewerInteractions(listingIds: List<String>): DomainResult<List<ListingViewerInteraction>>
+
+    suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction>
+
+    suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction>
+
+    suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction>
+
+    suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction>
 }
