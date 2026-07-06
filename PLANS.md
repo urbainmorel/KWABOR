@@ -389,3 +389,41 @@ Après merge, lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase
 **Suite logique**
 
 Après merge, lancer FND-006 : compléter previews UI/design system ou préparer la slice Explore selon le backlog confirmé.
+
+## Plan FND-006 — Design system et previews UI
+
+**Agent responsable** : UI/Design System, avec revue QA.
+
+**Objectif atomique** : compléter le socle design system partagé avant les écrans produit complets, avec composants previewables et tests purs non fragiles.
+
+**Livrables**
+
+- Tokens Compose pour spacing, radius, sizing, alpha et typographie mobile.
+- `PriceTag` avec modes compact/plein, XOF référence, conversion indicative et interdiction du compact transactionnel.
+- Badge sponsorisé textuel obligatoire.
+- États transverses : empty/error, loading skeleton, offline banner.
+- Carte catalogue previewable fondée sur un état UI dédié, sans coupler la composition au modèle domaine brut.
+- Previews Compose light/dark couvrant prix, badge, états et carte.
+- Tokens SwiftUI minimaux pour l'hôte iOS.
+- Tests `commonTest` sur formatage prix et tokens.
+
+**Règles**
+
+- Aucun écran Explore complet dans cette tranche.
+- Aucun formatting de prix à la main dans les futurs écrans : passer par `PriceTag`.
+- Le badge sponsorisé doit contenir un texte, pas seulement une couleur.
+- Les chargements réseau utilisent une base skeleton, pas un spinner isolé.
+- Les cartes restent photo-first avec overlay Compose, en attendant le chargement image réel.
+- Le socle iOS reste SwiftUI natif.
+
+**Validation**
+
+- `./gradlew.bat :shared:check`.
+- `./gradlew.bat :androidApp:assembleDebug`.
+- `./gradlew.bat check`.
+- `git diff --check`.
+- Audit lexical strict des cibles exclues.
+
+**Suite logique**
+
+Après merge et CI distante verte, lancer EXPLORE-001 : écran Explore lecture seule avec cartes catalogue, états transverses et données catalogue existantes.

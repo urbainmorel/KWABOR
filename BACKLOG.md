@@ -20,10 +20,12 @@
 - [x] DATA-CATALOG-001 — Brancher les repositories catalogue sur Supabase PostgREST.
 - [x] AUTH-FOUNDATION-001 — Préparer la session auth partagée et le stockage sécurisé des tokens.
 - [x] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
+- [x] FND-006 — Ajouter les previews UI et tests de design system.
 
 ## Ensuite
 
-- [ ] FND-006 — Ajouter les previews UI et tests de design system.
+- [ ] CI-003 — Débloquer GitHub Actions et relancer les checks des PR ouvertes.
+- [ ] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
 
 ## À ne pas faire maintenant
 
