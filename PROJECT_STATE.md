@@ -59,10 +59,11 @@ Fondations techniques et organisation staff senior.
 - Tests `commonTest` ajoutés pour la création des dépendances runtime sans secret et validations Gradle `:shared:check`, `:androidApp:assembleDebug`, `:shared:assembleSharedDebugXCFramework`, `check` vertes.
 - EXPLORE-001C implémentée localement : état viewer Like/Favori chargé par batch, toggles Like/Favori branchés dans Explore, mur souple auth non bloquant, queue offline en mémoire avec mise à jour optimiste, messages i18n FR et tests `commonTest` ciblés.
 - Runtime Android ajusté pour utiliser un catalogue Supabase authentifié avec le même `SessionManager` sécurisé, sans exposer `SessionManager` ni Supabase à `androidApp` ou à l'UI.
+- PR EXPLORE-001 `#16` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
 
 ## Tâche en cours
 
-EXPLORE-001 — finalisation PR `feature/explore-read-only` avec quality gate locale et CI GitHub.
+AUTH-001 — cadrage et implémentation du parcours auth MVP déclenché par le mur souple Explore.
 
 ## Blocages / limites
 
@@ -81,4 +82,4 @@ EXPLORE-001 — finalisation PR `feature/explore-read-only` avec quality gate lo
 
 ## Prochaine tâche logique
 
-Finaliser la PR `feature/explore-read-only` : lancer `check`, vérifier l'audit mobile-only, pousser le commit EXPLORE-001C, attendre `quality` et `iOS simulator build` verts, puis merger avant de démarrer AUTH-001.
+Démarrer AUTH-001 sur une branche dédiée : session invitée, email OTP, Google/Apple selon plateforme, profil minimal et reprise d'action Like/Favori après authentification.
