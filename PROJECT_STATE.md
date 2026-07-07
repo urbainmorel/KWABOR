@@ -45,29 +45,40 @@ Fondations techniques et organisation staff senior.
 - Fabrique `createAuthenticatedCatalogRepository` ajoutée pour consommer la session auth partagée lors des actions catalogue authentifiées.
 - Tests pgTAP ajoutés pour anonymes, isolation utilisateur, fiche non publiée, idempotence, compteur de likes et batch publié.
 - Tests `commonTest` ajoutés pour mapping DTO, validation identifiant fiche, batch vide, délégation Like/Favori et absence de session.
+- PR DATA-CATALOG-002 `#13` mergée dans `main` avec `quality` et `iOS simulator build` verts.
 - Design system Compose complété : tokens spacing/radius/sizing/typo, `PriceTag` compact/plein, badge sponsorisé, états empty/error/offline/loading skeleton et carte catalogue previewable.
 - Previews Compose ajoutées pour `PriceTag`, carte catalogue, états transverses, light/dark.
 - Socle SwiftUI aligné avec des tokens iOS minimaux et un aperçu de badge sponsorisé dans l'hôte iOS.
 - Tests `commonTest` ajoutés pour le formatage `PriceTag` et les tokens de fondation.
+- PR FND-006 `#15` mergée dans `main` avec `quality` et `iOS simulator build` verts après recréation propre depuis l'ancienne PR empilée `#14`.
+- Repository GitHub rendu public afin de débloquer l'exécution GitHub Actions sans limite privée bloquante immédiate.
+- EXPLORE-001 démarrée : écran Explore stateless, modèle d'état lecture seule, presenter partagé alimenté par `CatalogRepository`, onglets/chips sélectionnables, états loading/empty/error/offline et tests `commonTest` ciblés.
+- EXPLORE-001A ajoutée : runtime partagé `KwaborRuntimeDependencies`, horloge système, injection Android du `CatalogRepository` réel depuis `local.properties` / propriétés Gradle / variables d'environnement, sans secret commité.
+- Bridge iOS préparé pour recevoir `KWABOR_SUPABASE_URL` et `KWABOR_SUPABASE_PUBLISHABLE_KEY` depuis l'environnement du scheme ou Info.plist locale.
+- EXPLORE-001B ajoutée côté carte Compose Android : abstraction KMP `ListingCoverImage`, actual Android avec Coil/Ktor, fallback placeholder, textes bornés et état loading réellement assigné avant chargement repository.
+- Tests `commonTest` ajoutés pour la création des dépendances runtime sans secret et validations Gradle `:shared:check`, `:androidApp:assembleDebug`, `:shared:assembleSharedDebugXCFramework`, `check` vertes.
+- EXPLORE-001C implémentée localement : état viewer Like/Favori chargé par batch, toggles Like/Favori branchés dans Explore, mur souple auth non bloquant, queue offline en mémoire avec mise à jour optimiste, messages i18n FR et tests `commonTest` ciblés.
+- Runtime Android ajusté pour utiliser un catalogue Supabase authentifié avec le même `SessionManager` sécurisé, sans exposer `SessionManager` ni Supabase à `androidApp` ou à l'UI.
 
 ## Tâche en cours
 
-Aucune tâche active après FND-006.
+EXPLORE-001 — finalisation PR `feature/explore-read-only` avec quality gate locale et CI GitHub.
 
 ## Blocages / limites
 
-- La protection de branche GitHub `main` a été refusée sur dépôt privé sans GitHub Pro ou dépôt public.
+- La protection de branche GitHub `main` doit être reconfigurée maintenant que le dépôt est public.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
-- GitHub Actions est actuellement bloqué côté compte par un problème Billing/Spending : les jobs `quality` et `iOS simulator build` ne démarrent pas sur PR `#13`.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
-- Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais ne sont pas encore reliées aux écrans Explore/Détail.
-- Les composants UI FND-006 ne remplacent pas un écran Explore complet ; ils sont la base réutilisable avant intégration produit.
+- Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
+- L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
+- La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
+- Le mur auth Explore affiche un message non bloquant ; la bottom sheet/login complet et la reprise de l'action après authentification appartiennent à la tranche Auth MVP.
 
 ## Prochaine tâche logique
 
-Débloquer GitHub Actions, relancer les checks des PR ouvertes, puis lancer EXPLORE-001 : écran Explore lecture seule avec cartes catalogue et états transverses.
+Finaliser la PR `feature/explore-read-only` : lancer `check`, vérifier l'audit mobile-only, pousser le commit EXPLORE-001C, attendre `quality` et `iOS simulator build` verts, puis merger avant de démarrer AUTH-001.

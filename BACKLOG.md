@@ -21,15 +21,20 @@
 - [x] AUTH-FOUNDATION-001 — Préparer la session auth partagée et le stockage sécurisé des tokens.
 - [x] DATA-CATALOG-002 — Ajouter les contrats et la data Supabase pour Like/Favori catalogue.
 - [x] FND-006 — Ajouter les previews UI et tests de design system.
+- [x] CI-003 — Débloquer GitHub Actions et relancer les checks des PR ouvertes.
+- [x] EXPLORE-001A — Injecter le `CatalogRepository` réel depuis Android/iOS sans secret commité.
+- [x] EXPLORE-001B — Rendre les images distantes des cartes catalogue en KMP.
+- [x] EXPLORE-001C — Relier Like/Favori au mur souple auth et préparer la queue offline.
+- [ ] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
 
 ## Ensuite
 
-- [ ] CI-003 — Débloquer GitHub Actions et relancer les checks des PR ouvertes.
-- [ ] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
+- [ ] PR-EXPLORE-001 — Finaliser, pousser et merger la PR `feature/explore-read-only` après `quality` et `iOS simulator build` verts.
+- [ ] AUTH-001 — Créer le parcours auth MVP déclenché par le mur souple : session invitée, email OTP, Google/Apple selon plateforme, profil minimal.
 
 ## À ne pas faire maintenant
 
-- Écrans Explore complets.
+- DetailSheet complet.
 - Écrans auth complets.
 - Paiement Mobile Money.
 - Assistant IA.

@@ -117,3 +117,16 @@ fun OfflineBanner(strings: KwaborStrings, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelLarge,
     )
 }
+
+@Composable
+fun KwaborInlineBanner(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier
+            .fillMaxWidth()
+            .background(color = MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = KwaborSpacing.Lg, vertical = KwaborSpacing.Md),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelLarge,
+    )
+}

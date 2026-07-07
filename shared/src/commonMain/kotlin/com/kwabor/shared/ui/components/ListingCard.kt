@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.kwabor.shared.design.KwaborAlpha
 import com.kwabor.shared.design.KwaborColors
 import com.kwabor.shared.design.KwaborRadius
@@ -70,6 +72,11 @@ fun ListingCard(
                     ),
                 ),
         ) {
+            ListingCoverImage(
+                imageUrl = state.coverImageUrl,
+                modifier = Modifier.fillMaxSize(),
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -109,12 +116,35 @@ fun ListingCard(
                     color = KwaborColors.Surface0,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = state.cityLabel,
                     color = KwaborColors.Ink100,
                     style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                state.ratingLabel?.let { rating ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = strings.rating,
+                            modifier = Modifier.size(KwaborSpacing.Lg),
+                            tint = KwaborColors.Sponsored,
+                        )
+                        Text(
+                            text = rating,
+                            color = KwaborColors.Surface0,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 PriceTag(
                     price = state.price,
                     strings = strings,
@@ -130,6 +160,7 @@ fun ListingCard(
 data class ListingCardState(
     val title: String,
     val cityLabel: String,
+    val coverImageUrl: String? = null,
     val price: MoneyXof?,
     val ratingLabel: String? = null,
     val sponsored: Boolean = false,
