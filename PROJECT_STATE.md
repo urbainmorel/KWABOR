@@ -57,10 +57,12 @@ Fondations techniques et organisation staff senior.
 - Bridge iOS préparé pour recevoir `KWABOR_SUPABASE_URL` et `KWABOR_SUPABASE_PUBLISHABLE_KEY` depuis l'environnement du scheme ou Info.plist locale.
 - EXPLORE-001B ajoutée côté carte Compose Android : abstraction KMP `ListingCoverImage`, actual Android avec Coil/Ktor, fallback placeholder, textes bornés et état loading réellement assigné avant chargement repository.
 - Tests `commonTest` ajoutés pour la création des dépendances runtime sans secret et validations Gradle `:shared:check`, `:androidApp:assembleDebug`, `:shared:assembleSharedDebugXCFramework`, `check` vertes.
+- EXPLORE-001C implémentée localement : état viewer Like/Favori chargé par batch, toggles Like/Favori branchés dans Explore, mur souple auth non bloquant, queue offline en mémoire avec mise à jour optimiste, messages i18n FR et tests `commonTest` ciblés.
+- Runtime Android ajusté pour utiliser un catalogue Supabase authentifié avec le même `SessionManager` sécurisé, sans exposer `SessionManager` ni Supabase à `androidApp` ou à l'UI.
 
 ## Tâche en cours
 
-EXPLORE-001 — écran Explore lecture seule avec cartes catalogue et états transverses.
+EXPLORE-001 — finalisation PR `feature/explore-read-only` avec quality gate locale et CI GitHub.
 
 ## Blocages / limites
 
@@ -74,8 +76,9 @@ EXPLORE-001 — écran Explore lecture seule avec cartes catalogue et états tra
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
-- Les actions Like/Favori catalogue sont prêtes côté domaine/data, mais le mur souple auth et la queue offline ne sont pas encore reliés à l'écran Explore.
+- La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
+- Le mur auth Explore affiche un message non bloquant ; la bottom sheet/login complet et la reprise de l'action après authentification appartiennent à la tranche Auth MVP.
 
 ## Prochaine tâche logique
 
-Poursuivre EXPLORE-001C : relier Like/Favori au mur souple auth et préparer la queue offline, puis finaliser la PR `feature/explore-read-only` avec `quality` et `iOS simulator build` verts.
+Finaliser la PR `feature/explore-read-only` : lancer `check`, vérifier l'audit mobile-only, pousser le commit EXPLORE-001C, attendre `quality` et `iOS simulator build` verts, puis merger avant de démarrer AUTH-001.

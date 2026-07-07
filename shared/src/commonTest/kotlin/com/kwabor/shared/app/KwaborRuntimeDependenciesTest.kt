@@ -40,6 +40,7 @@ class KwaborRuntimeDependenciesTest {
         )
 
         assertNotNull(dependencies)
+        assertNull(dependencies.authRepository)
         assertTrue(dependencies.clockProvider.nowEpochMilliseconds() > 0L)
     }
 }

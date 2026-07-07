@@ -5,14 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.remember
 import com.kwabor.shared.app.KwaborApp
-import com.kwabor.shared.app.KwaborRuntimeDependencies
+import com.kwabor.shared.app.createAndroidKwaborRuntimeDependenciesOrNull
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val dependencies = remember {
-                KwaborRuntimeDependencies.createOrNull(
+                createAndroidKwaborRuntimeDependenciesOrNull(
+                    context = applicationContext,
                     supabaseUrl = BuildConfig.KWABOR_SUPABASE_URL,
                     supabasePublishableKey = BuildConfig.KWABOR_SUPABASE_PUBLISHABLE_KEY,
                 )

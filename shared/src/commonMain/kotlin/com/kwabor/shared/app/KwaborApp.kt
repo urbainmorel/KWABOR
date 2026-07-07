@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,6 +37,7 @@ import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.initialExploreUiState
 import com.kwabor.shared.presentation.explore.loadingExploreUiState
 import com.kwabor.shared.ui.screens.explore.ExploreScreen
+import kotlinx.coroutines.launch
 
 enum class RootDestination {
     Home,
@@ -97,6 +99,7 @@ private fun ExploreRoute(
     var request by remember { mutableStateOf(ExploreLoadRequest()) }
     var reloadTrigger by remember { mutableStateOf(0) }
     var state by remember(strings) { mutableStateOf(initialExploreUiState(strings = strings, request = request)) }
+    val coroutineScope = rememberCoroutineScope()
     val presenter = remember(catalogRepository, clockProvider) {
         if (catalogRepository != null && clockProvider != null) {
             ExplorePresenter(
@@ -129,6 +132,20 @@ private fun ExploreRoute(
         },
         onRetry = {
             reloadTrigger += 1
+        },
+        onLikeClick = { listingId ->
+            presenter?.let { activePresenter ->
+                coroutineScope.launch {
+                    state = activePresenter.toggleLike(state = state, listingId = listingId, strings = strings)
+                }
+            }
+        },
+        onFavoriteClick = { listingId ->
+            presenter?.let { activePresenter ->
+                coroutineScope.launch {
+                    state = activePresenter.toggleFavorite(state = state, listingId = listingId, strings = strings)
+                }
+            }
         },
     )
 }

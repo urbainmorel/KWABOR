@@ -24,11 +24,13 @@
 - [x] CI-003 — Débloquer GitHub Actions et relancer les checks des PR ouvertes.
 - [x] EXPLORE-001A — Injecter le `CatalogRepository` réel depuis Android/iOS sans secret commité.
 - [x] EXPLORE-001B — Rendre les images distantes des cartes catalogue en KMP.
+- [x] EXPLORE-001C — Relier Like/Favori au mur souple auth et préparer la queue offline.
 - [ ] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
 
 ## Ensuite
 
-- [ ] EXPLORE-001C — Relier Like/Favori au mur souple auth et préparer la queue offline.
+- [ ] PR-EXPLORE-001 — Finaliser, pousser et merger la PR `feature/explore-read-only` après `quality` et `iOS simulator build` verts.
+- [ ] AUTH-001 — Créer le parcours auth MVP déclenché par le mur souple : session invitée, email OTP, Google/Apple selon plateforme, profil minimal.
 
 ## À ne pas faire maintenant
 

@@ -29,9 +29,22 @@ data class ExploreListingItem(
     val coverImageUrl: String?,
     val price: MoneyXof?,
     val ratingLabel: String? = null,
+    val likesCount: Int = 0,
     val sponsored: Boolean = false,
     val liked: Boolean = false,
     val favorited: Boolean = false,
+)
+
+enum class ExploreInteractionKind {
+    Like,
+    Favorite,
+}
+
+data class QueuedExploreInteraction(
+    val listingId: String,
+    val kind: ExploreInteractionKind,
+    val selected: Boolean,
+    val queuedAtEpochMilliseconds: Long,
 )
 
 data class ExploreUiState(
@@ -44,12 +57,17 @@ data class ExploreUiState(
     val isLoading: Boolean = false,
     val isOffline: Boolean = false,
     val errorMessage: String? = null,
+    val interactionMessage: String? = null,
+    val queuedInteractions: List<QueuedExploreInteraction> = emptyList(),
 ) {
     val hasError: Boolean
         get() = errorMessage != null
 
     val isEmpty: Boolean
         get() = !isLoading && !hasError && listings.isEmpty()
+
+    val hasQueuedInteractions: Boolean
+        get() = queuedInteractions.isNotEmpty()
 }
 
 fun ExploreTab.label(strings: KwaborStrings): String = when (this) {

@@ -109,6 +109,215 @@ class ExplorePresenterTest {
 
         assertFalse(state.listings.single().sponsored)
     }
+
+    @Test
+    fun load_appliesViewerInteractionsWhenSessionAllowsIt() = runSuspendTest {
+        val repository = FakeCatalogRepository(
+            listings = listOf(listingSummary(id = "listing-1", likesCount = 12)),
+            viewerInteractions = listOf(
+                ListingViewerInteraction(
+                    listingId = "listing-1",
+                    likedByViewer = true,
+                    favoritedByViewer = true,
+                    likesCount = 13,
+                ),
+            ),
+        )
+        val presenter = ExplorePresenter(repository, clockProvider)
+
+        val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
+
+        val listing = state.listings.single()
+        assertTrue(listing.liked)
+        assertTrue(listing.favorited)
+        assertEquals(13, listing.likesCount)
+        assertFalse(state.hasError)
+    }
+
+    @Test
+    fun load_keepsListingsWhenViewerInteractionsRequireAuth() = runSuspendTest {
+        val repository = FakeCatalogRepository(interactionError = DomainError.AuthenticationRequired())
+        val presenter = ExplorePresenter(repository, clockProvider)
+
+        val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
+
+        assertFalse(state.hasError)
+        assertEquals(1, state.listings.size)
+        assertFalse(state.listings.single().liked)
+        assertFalse(state.listings.single().favorited)
+    }
+
+    @Test
+    fun toggleLike_updatesListingFromRepositoryInteraction() = runSuspendTest {
+        val repository = FakeCatalogRepository(
+            interactionResult = ListingViewerInteraction(
+                listingId = "listing-1",
+                likedByViewer = true,
+                favoritedByViewer = false,
+                likesCount = 13,
+            ),
+        )
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+                likesCount = 12,
+            ),
+        )
+
+        val updatedState = presenter.toggleLike(state = state, listingId = "listing-1", strings = strings)
+
+        assertEquals("like", repository.lastInteractionAction)
+        assertTrue(updatedState.listings.single().liked)
+        assertEquals(13, updatedState.listings.single().likesCount)
+        assertFalse(updatedState.hasQueuedInteractions)
+    }
+
+    @Test
+    fun toggleLike_whenAlreadyLikedDelegatesUnlike() = runSuspendTest {
+        val repository = FakeCatalogRepository(
+            interactionResult = ListingViewerInteraction(
+                listingId = "listing-1",
+                likedByViewer = false,
+                favoritedByViewer = true,
+                likesCount = 12,
+            ),
+        )
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+                liked = true,
+                favorited = true,
+                likesCount = 13,
+            ),
+        )
+
+        val updatedState = presenter.toggleLike(state = state, listingId = "listing-1", strings = strings)
+
+        assertEquals("unlike", repository.lastInteractionAction)
+        assertFalse(updatedState.listings.single().liked)
+        assertTrue(updatedState.listings.single().favorited)
+        assertEquals(12, updatedState.listings.single().likesCount)
+    }
+
+    @Test
+    fun toggleFavorite_authRequiredShowsSoftWallWithoutBlockingListings() = runSuspendTest {
+        val repository = FakeCatalogRepository(interactionError = DomainError.AuthenticationRequired())
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+            ),
+        )
+
+        val updatedState = presenter.toggleFavorite(state = state, listingId = "listing-1", strings = strings)
+
+        assertFalse(updatedState.hasError)
+        assertEquals(strings.signInRequiredForInteraction, updatedState.interactionMessage)
+        assertFalse(updatedState.listings.single().favorited)
+        assertFalse(updatedState.hasQueuedInteractions)
+    }
+
+    @Test
+    fun toggleLike_networkFailureQueuesOptimisticInteraction() = runSuspendTest {
+        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+                likesCount = 12,
+            ),
+        )
+
+        val updatedState = presenter.toggleLike(state = state, listingId = "listing-1", strings = strings)
+
+        assertTrue(updatedState.isOffline)
+        assertEquals(strings.interactionQueuedOffline, updatedState.interactionMessage)
+        assertTrue(updatedState.listings.single().liked)
+        assertEquals(13, updatedState.listings.single().likesCount)
+        assertEquals(
+            QueuedExploreInteraction(
+                listingId = "listing-1",
+                kind = ExploreInteractionKind.Like,
+                selected = true,
+                queuedAtEpochMilliseconds = 1_000L,
+            ),
+            updatedState.queuedInteractions.single(),
+        )
+    }
+
+    @Test
+    fun toggleFavorite_networkFailureQueuesOptimisticInteraction() = runSuspendTest {
+        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+            ),
+        )
+
+        val updatedState = presenter.toggleFavorite(state = state, listingId = "listing-1", strings = strings)
+
+        assertTrue(updatedState.isOffline)
+        assertTrue(updatedState.listings.single().favorited)
+        assertEquals(ExploreInteractionKind.Favorite, updatedState.queuedInteractions.single().kind)
+        assertEquals(true, updatedState.queuedInteractions.single().selected)
+    }
+
+    @Test
+    fun queuedInteraction_replacesPreviousActionForSameListingAndKind() = runSuspendTest {
+        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val presenter = ExplorePresenter(repository, clockProvider)
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+                liked = true,
+                likesCount = 1,
+            ),
+        ).copy(
+            queuedInteractions = listOf(
+                QueuedExploreInteraction(
+                    listingId = "listing-1",
+                    kind = ExploreInteractionKind.Like,
+                    selected = true,
+                    queuedAtEpochMilliseconds = 500L,
+                ),
+            ),
+        )
+
+        val updatedState = presenter.toggleLike(state = state, listingId = "listing-1", strings = strings)
+
+        assertFalse(updatedState.listings.single().liked)
+        assertEquals(0, updatedState.listings.single().likesCount)
+        assertEquals(1, updatedState.queuedInteractions.size)
+        assertEquals(false, updatedState.queuedInteractions.single().selected)
+        assertEquals(1_000L, updatedState.queuedInteractions.single().queuedAtEpochMilliseconds)
+    }
 }
 
 private class FakeCatalogRepository(
@@ -132,8 +341,17 @@ private class FakeCatalogRepository(
     ),
     private val listings: List<ListingSummary> = listOf(listingSummary()),
     private val listingsError: DomainError? = null,
+    private val viewerInteractions: List<ListingViewerInteraction> = emptyList(),
+    private val interactionResult: ListingViewerInteraction = ListingViewerInteraction(
+        listingId = "listing-1",
+        likedByViewer = false,
+        favoritedByViewer = false,
+        likesCount = 0,
+    ),
+    private val interactionError: DomainError? = null,
 ) : CatalogRepository {
     var lastFilters: ListingFilters? = null
+    var lastInteractionAction: String? = null
 
     override suspend fun listCities(): DomainResult<List<City>> = DomainResult.Success(cities)
 
@@ -176,25 +394,33 @@ private class FakeCatalogRepository(
     )
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
-        DomainResult.Success(
-            ListingViewerInteraction(listingId, likedByViewer = false, favoritedByViewer = false, likesCount = 0),
-        )
+        interactionError?.let { error -> DomainResult.Failure(error) }
+            ?: DomainResult.Success(interactionResult.copy(listingId = listingId))
 
     override suspend fun listListingViewerInteractions(
         listingIds: List<String>,
-    ): DomainResult<List<ListingViewerInteraction>> = DomainResult.Success(emptyList())
+    ): DomainResult<List<ListingViewerInteraction>> = interactionError?.let { error -> DomainResult.Failure(error) }
+        ?: DomainResult.Success(viewerInteractions.filter { interaction -> interaction.listingId in listingIds })
 
-    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        getListingViewerInteraction(listingId)
+    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        lastInteractionAction = "like"
+        return getListingViewerInteraction(listingId)
+    }
 
-    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        getListingViewerInteraction(listingId)
+    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        lastInteractionAction = "unlike"
+        return getListingViewerInteraction(listingId)
+    }
 
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        getListingViewerInteraction(listingId)
+    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        lastInteractionAction = "favorite"
+        return getListingViewerInteraction(listingId)
+    }
 
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        getListingViewerInteraction(listingId)
+    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        lastInteractionAction = "unfavorite"
+        return getListingViewerInteraction(listingId)
+    }
 }
 
 private class FixedClockProvider(private val nowEpochMilliseconds: Long) : ClockProvider {
@@ -207,6 +433,7 @@ private fun listingSummary(
     cityId: String = "cotonou",
     coverImageUrl: String? = null,
     ratingAverage: Double? = null,
+    likesCount: Int = 12,
     sponsoredUntilEpochMilliseconds: Long? = null,
 ): ListingSummary {
     val price = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(5_000)).value
@@ -221,11 +448,19 @@ private fun listingSummary(
         coverImageUrl = coverImageUrl,
         priceFromXof = price,
         ratingAverage = ratingAverage,
-        likesCount = 12,
+        likesCount = likesCount,
         verified = true,
         sponsoredUntilEpochMilliseconds = sponsoredUntilEpochMilliseconds,
     )
 }
+
+private fun stateWithListing(listing: ExploreListingItem): ExploreUiState = ExploreUiState(
+    cityLabel = "Cotonou",
+    selectedTab = ExploreTab.Places,
+    selectedChipId = null,
+    chips = emptyList(),
+    listings = listOf(listing),
+)
 
 private fun runSuspendTest(block: suspend () -> Unit) = kotlinx.coroutines.test.runTest {
     block()

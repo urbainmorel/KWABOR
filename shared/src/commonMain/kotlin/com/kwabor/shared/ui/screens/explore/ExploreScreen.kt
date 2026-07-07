@@ -45,6 +45,7 @@ import com.kwabor.shared.presentation.explore.ExploreListingItem
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
 import com.kwabor.shared.presentation.explore.label
+import com.kwabor.shared.ui.components.KwaborInlineBanner
 import com.kwabor.shared.ui.components.KwaborSkeletonCard
 import com.kwabor.shared.ui.components.KwaborStateMessage
 import com.kwabor.shared.ui.components.ListingCard
@@ -70,6 +71,9 @@ fun ExploreScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.isOffline) {
                 OfflineBanner(strings = strings)
+            }
+            state.interactionMessage?.let { message ->
+                KwaborInlineBanner(text = message)
             }
             ExploreContent(
                 state = state,
