@@ -47,6 +47,11 @@ data class QueuedExploreInteraction(
     val queuedAtEpochMilliseconds: Long,
 )
 
+data class PendingExploreAuthInteraction(
+    val listingId: String,
+    val kind: ExploreInteractionKind,
+)
+
 data class ExploreUiState(
     val cityLabel: String,
     val selectedTab: ExploreTab,
@@ -58,6 +63,7 @@ data class ExploreUiState(
     val isOffline: Boolean = false,
     val errorMessage: String? = null,
     val interactionMessage: String? = null,
+    val pendingAuthInteraction: PendingExploreAuthInteraction? = null,
     val queuedInteractions: List<QueuedExploreInteraction> = emptyList(),
 ) {
     val hasError: Boolean

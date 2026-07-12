@@ -2,6 +2,7 @@ package com.kwabor.shared.data.auth
 
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
+import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
 import com.kwabor.shared.domain.auth.EmailSignUpRequest
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.SocialSignInRequest
@@ -25,6 +26,18 @@ class DataAuthRepository internal constructor(
         requireOtpCode(otpCode)
         dataSource.verifyEmailOtp(email = email.trim(), otpCode = otpCode.trim())
     }
+
+    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): DomainResult<AuthSession> =
+        runAuthCall {
+            requireValidEmail(request.email)
+            requireOtpCode(request.otpCode)
+            dataSource.verifyEmailOtpWithProfile(
+                request.copy(
+                    email = request.email.trim(),
+                    otpCode = request.otpCode.trim(),
+                ),
+            ).toDomain()
+        }
 
     override suspend fun signUpWithEmail(request: EmailSignUpRequest): DomainResult<AuthSession> = runAuthCall {
         requireValidEmail(request.email)

@@ -27,15 +27,17 @@
 - [x] EXPLORE-001C — Relier Like/Favori au mur souple auth et préparer la queue offline.
 - [x] EXPLORE-001 — Créer l'écran Explore lecture seule avec cartes catalogue et états transverses.
 - [x] PR-EXPLORE-001 — Finaliser, pousser et merger la PR `feature/explore-read-only` après `quality` et `iOS simulator build` verts.
+- [x] AUTH-001A — Brancher le mur souple Explore sur email OTP, profil minimal, acceptations légales et reprise Like/Favori après authentification.
 
 ## Ensuite
 
-- [ ] AUTH-001 — Créer le parcours auth MVP déclenché par le mur souple : session invitée, email OTP, Google/Apple selon plateforme, profil minimal.
+- [ ] PR-AUTH-001A — Finaliser, pousser et merger la PR `feature/auth-mvp` après `quality` et `iOS simulator build` verts.
+- [ ] AUTH-001B — Brancher Google/Apple natifs Android/iOS, écran SwiftUI iOS minimal et finaliser le profil/session multi-plateforme.
 
 ## À ne pas faire maintenant
 
 - DetailSheet complet.
-- Écrans auth complets.
+- Écrans auth complets hors tranche AUTH-001B.
 - Paiement Mobile Money.
 - Assistant IA.
 - Flux social complet.

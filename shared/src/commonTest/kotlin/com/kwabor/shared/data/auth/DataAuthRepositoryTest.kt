@@ -1,6 +1,7 @@
 package com.kwabor.shared.data.auth
 
 import com.kwabor.shared.domain.auth.AuthSession
+import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
 import com.kwabor.shared.domain.auth.EmailSignUpRequest
 import com.kwabor.shared.domain.auth.OnboardingProfileInput
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
@@ -72,6 +73,43 @@ class DataAuthRepositoryTest {
     }
 
     @Test
+    fun verifyEmailOtpWithProfile_trimsInputAndMapsSession() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.verifyEmailOtpWithProfile(
+            EmailOtpProfileRequest(
+                email = " user@kwabor.test ",
+                otpCode = " 123456 ",
+                onboarding = onboardingInput(),
+            ),
+        )
+
+        val session = assertIs<DomainResult.Success<AuthSession>>(result).value
+        assertEquals("user@kwabor.test", dataSource.lastEmailOtpProfile?.email)
+        assertEquals("123456", dataSource.lastEmailOtpProfile?.otpCode)
+        assertEquals("user-1", session.userId)
+    }
+
+    @Test
+    fun verifyEmailOtpWithProfile_rejectsInvalidOtpBeforeDataSourceCall() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.verifyEmailOtpWithProfile(
+            EmailOtpProfileRequest(
+                email = "user@kwabor.test",
+                otpCode = "123",
+                onboarding = onboardingInput(),
+            ),
+        )
+
+        val failure = assertIs<DomainResult.Failure>(result)
+        assertIs<DomainError.Validation>(failure.error)
+        assertEquals(null, dataSource.lastEmailOtpProfile)
+    }
+
+    @Test
     fun signInWithSocialProvider_requiresIdToken() = runTest {
         val repository = DataAuthRepository(FakeAuthDataSource())
 
@@ -126,6 +164,8 @@ private class FakeAuthDataSource(
         private set
     var lastEmailSignUp: EmailSignUpRequest? = null
         private set
+    var lastEmailOtpProfile: EmailOtpProfileRequest? = null
+        private set
 
     override suspend fun getCurrentSession(): AuthSessionDto? = session
 
@@ -134,6 +174,11 @@ private class FakeAuthDataSource(
     }
 
     override suspend fun verifyEmailOtp(email: String, otpCode: String) = Unit
+
+    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): AuthSessionDto {
+        lastEmailOtpProfile = request
+        return authSessionDto()
+    }
 
     override suspend fun signUpWithEmail(request: EmailSignUpRequest): AuthSessionDto {
         lastEmailSignUp = request
