@@ -56,6 +56,7 @@ import com.kwabor.shared.ui.components.OfflineBanner
 fun ExploreScreen(
     state: ExploreUiState,
     strings: KwaborStrings,
+    isGuestSession: Boolean = true,
     modifier: Modifier = Modifier,
     onTabSelected: (ExploreTab) -> Unit = {},
     onChipSelected: (ExploreChip) -> Unit = {},
@@ -78,6 +79,7 @@ fun ExploreScreen(
             ExploreContent(
                 state = state,
                 strings = strings,
+                isGuestSession = isGuestSession,
                 onTabSelected = onTabSelected,
                 onChipSelected = onChipSelected,
                 onSearchClick = onSearchClick,
@@ -111,6 +113,7 @@ fun ExploreScreen(
 private fun ExploreContent(
     state: ExploreUiState,
     strings: KwaborStrings,
+    isGuestSession: Boolean,
     onTabSelected: (ExploreTab) -> Unit,
     onChipSelected: (ExploreChip) -> Unit,
     onSearchClick: () -> Unit,
@@ -136,6 +139,7 @@ private fun ExploreContent(
             ExploreHeader(
                 state = state,
                 strings = strings,
+                isGuestSession = isGuestSession,
                 onTabSelected = onTabSelected,
                 onChipSelected = onChipSelected,
                 onSearchClick = onSearchClick,
@@ -181,6 +185,7 @@ private fun ExploreContent(
 private fun ExploreHeader(
     state: ExploreUiState,
     strings: KwaborStrings,
+    isGuestSession: Boolean,
     onTabSelected: (ExploreTab) -> Unit,
     onChipSelected: (ExploreChip) -> Unit,
     onSearchClick: () -> Unit,
@@ -209,6 +214,17 @@ private fun ExploreHeader(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
             )
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(KwaborRadius.Control),
+            ) {
+                Text(
+                    text = if (isGuestSession) strings.authGuestSession else strings.authConnectedSession,
+                    modifier = Modifier.padding(horizontal = KwaborSpacing.Sm, vertical = KwaborSpacing.Xs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         Text(

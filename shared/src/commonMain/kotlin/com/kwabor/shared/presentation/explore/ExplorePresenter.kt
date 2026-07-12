@@ -118,6 +118,7 @@ class ExplorePresenter(
     ): ExploreUiState = copy(
         isOffline = false,
         interactionMessage = null,
+        pendingAuthInteraction = null,
         listings = listings.map { listing ->
             if (listing.id == interaction.listingId) {
                 listing.copy(
@@ -143,7 +144,13 @@ class ExplorePresenter(
     ): ExploreUiState = when (error) {
         is DomainError.AuthenticationRequired,
         is DomainError.PermissionDenied,
-        -> copy(interactionMessage = strings.signInRequiredForInteraction)
+        -> copy(
+            interactionMessage = strings.signInRequiredForInteraction,
+            pendingAuthInteraction = PendingExploreAuthInteraction(
+                listingId = listingId,
+                kind = kind,
+            ),
+        )
         is DomainError.NetworkUnavailable -> queueOfflineInteraction(
             listingId = listingId,
             kind = kind,
@@ -153,7 +160,7 @@ class ExplorePresenter(
         is DomainError.NotFound,
         is DomainError.Unexpected,
         is DomainError.Validation,
-        -> copy(interactionMessage = strings.interactionFailed)
+        -> copy(interactionMessage = strings.interactionFailed, pendingAuthInteraction = null)
     }
 
     private fun ExploreUiState.queueOfflineInteraction(
@@ -164,6 +171,7 @@ class ExplorePresenter(
     ): ExploreUiState = copy(
         isOffline = true,
         interactionMessage = message,
+        pendingAuthInteraction = null,
         listings = listings.map { listing ->
             if (listing.id == listingId) {
                 listing.applyOptimisticInteraction(kind = kind, selected = selected)

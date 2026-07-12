@@ -1,5 +1,6 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
 import com.kwabor.shared.domain.auth.EmailSignUpRequest
 import com.kwabor.shared.domain.auth.OnboardingProfileInput
 import com.kwabor.shared.domain.auth.SocialAuthProvider
@@ -41,6 +42,15 @@ internal class SupabaseAuthDataSource(
 
     override suspend fun verifyEmailOtp(email: String, otpCode: String): Unit = runAuthRequest {
         auth.verifyEmailOtpForSession(email = email, otpCode = otpCode).let { }
+    }
+
+    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): AuthSessionDto = runAuthRequest {
+        val verifiedSession = auth.verifyEmailOtpForSession(email = request.email, otpCode = request.otpCode)
+            ?: throw AuthDataException.AuthenticationRequired()
+        auth.updateUser(updateCurrentUser = true) {
+            applyOnboarding(request.onboarding)
+        }
+        auth.currentSessionOrNull()?.toDto() ?: verifiedSession
     }
 
     override suspend fun signUpWithEmail(request: EmailSignUpRequest): AuthSessionDto = runAuthRequest {

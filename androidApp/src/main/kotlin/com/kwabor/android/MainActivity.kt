@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
             KwaborApp(
                 catalogRepository = dependencies?.catalogRepository,
                 clockProvider = dependencies?.clockProvider,
+                authRepository = dependencies?.authRepository,
             )
         }
     }

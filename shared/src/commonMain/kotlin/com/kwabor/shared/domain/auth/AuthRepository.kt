@@ -9,6 +9,8 @@ interface AuthRepository {
 
     suspend fun verifyEmailOtp(email: String, otpCode: String): DomainResult<Unit>
 
+    suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): DomainResult<AuthSession>
+
     suspend fun signUpWithEmail(request: EmailSignUpRequest): DomainResult<AuthSession>
 
     suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession>

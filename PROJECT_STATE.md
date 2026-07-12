@@ -60,10 +60,12 @@ Fondations techniques et organisation staff senior.
 - EXPLORE-001C implémentée localement : état viewer Like/Favori chargé par batch, toggles Like/Favori branchés dans Explore, mur souple auth non bloquant, queue offline en mémoire avec mise à jour optimiste, messages i18n FR et tests `commonTest` ciblés.
 - Runtime Android ajusté pour utiliser un catalogue Supabase authentifié avec le même `SessionManager` sécurisé, sans exposer `SessionManager` ni Supabase à `androidApp` ou à l'UI.
 - PR EXPLORE-001 `#16` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
+- AUTH-001A implémentée sur branche : mur souple Explore relié à une bottom sheet email OTP, création de profil minimal avec acceptations légales, badge session invité/connecté et reprise de l'action Like/Favori après authentification.
+- Tests `commonTest` ajoutés pour `AuthPresenter`, vérification OTP + profil dans `DataAuthRepository` et interaction Explore en attente d'authentification.
 
 ## Tâche en cours
 
-AUTH-001 — cadrage et implémentation du parcours auth MVP déclenché par le mur souple Explore.
+AUTH-001A — finalisation PR du parcours email OTP minimal déclenché par le mur souple Explore.
 
 ## Blocages / limites
 
@@ -78,8 +80,8 @@ AUTH-001 — cadrage et implémentation du parcours auth MVP déclenché par le 
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
-- Le mur auth Explore affiche un message non bloquant ; la bottom sheet/login complet et la reprise de l'action après authentification appartiennent à la tranche Auth MVP.
+- Le flux email OTP Android est préparé côté shared/Compose, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
 
 ## Prochaine tâche logique
 
-Démarrer AUTH-001 sur une branche dédiée : session invitée, email OTP, Google/Apple selon plateforme, profil minimal et reprise d'action Like/Favori après authentification.
+Finaliser la PR AUTH-001A, vérifier `quality` et `iOS simulator build`, puis lancer AUTH-001B : acquisition Google/Apple native Android/iOS et surface SwiftUI iOS minimale.

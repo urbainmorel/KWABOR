@@ -68,6 +68,12 @@ data class EmailSignUpRequest(
     val onboarding: OnboardingProfileInput,
 )
 
+data class EmailOtpProfileRequest(
+    val email: String,
+    val otpCode: String,
+    val onboarding: OnboardingProfileInput,
+)
+
 data class SocialSignInRequest(
     val provider: SocialAuthProvider,
     val idToken: String,

@@ -227,6 +227,13 @@ class ExplorePresenterTest {
 
         assertFalse(updatedState.hasError)
         assertEquals(strings.signInRequiredForInteraction, updatedState.interactionMessage)
+        assertEquals(
+            PendingExploreAuthInteraction(
+                listingId = "listing-1",
+                kind = ExploreInteractionKind.Favorite,
+            ),
+            updatedState.pendingAuthInteraction,
+        )
         assertFalse(updatedState.listings.single().favorited)
         assertFalse(updatedState.hasQueuedInteractions)
     }
