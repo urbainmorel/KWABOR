@@ -62,10 +62,11 @@ Fondations techniques et organisation staff senior.
 - PR EXPLORE-001 `#16` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
 - AUTH-001A implémentée sur branche : mur souple Explore relié à une bottom sheet email OTP, création de profil minimal avec acceptations légales, badge session invité/connecté et reprise de l'action Like/Favori après authentification.
 - Tests `commonTest` ajoutés pour `AuthPresenter`, vérification OTP + profil dans `DataAuthRepository` et interaction Explore en attente d'authentification.
+- PR AUTH-001A `#17` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
 
 ## Tâche en cours
 
-AUTH-001A — finalisation PR du parcours email OTP minimal déclenché par le mur souple Explore.
+AUTH-001B — acquisition Google/Apple native Android/iOS, surface SwiftUI iOS minimale et finalisation session/profil multi-plateforme.
 
 ## Blocages / limites
 
@@ -84,4 +85,4 @@ AUTH-001A — finalisation PR du parcours email OTP minimal déclenché par le m
 
 ## Prochaine tâche logique
 
-Finaliser la PR AUTH-001A, vérifier `quality` et `iOS simulator build`, puis lancer AUTH-001B : acquisition Google/Apple native Android/iOS et surface SwiftUI iOS minimale.
+Démarrer AUTH-001B sur une branche dédiée : acquisition Google/Apple native Android/iOS, écran SwiftUI iOS minimal et cohérence session/profil avec le shared.
