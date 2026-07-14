@@ -4,13 +4,16 @@
     <application
         android:name=".KwaborApplication"
         android:allowBackup="false"
-        android:label="Kwabor"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="false"
         android:theme="@style/KwaborTheme">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/KwaborTheme.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

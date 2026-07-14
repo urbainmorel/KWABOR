@@ -3,6 +3,13 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#0E0E10</item>
+        <item name="android:colorAccent">@color/kwabor_icon_background</item>
+    </style>
+
+    <style name="KwaborTheme.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/kwabor_icon_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_kwabor_mark</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/KwaborTheme</item>
     </style>
 </resources>

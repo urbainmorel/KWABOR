@@ -19,6 +19,12 @@ Toute autre valeur est rejetée par le build Android et par la composition root 
 | `KWABOR_ENVIRONMENT` | Publique | `kwabor.environment` | `KWABOR_ENVIRONMENT` | Variable |
 | `KWABOR_SUPABASE_URL` | Publique | `kwabor.supabase.url` | `KWABOR_SUPABASE_URL` | Variable |
 | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Publique | `kwabor.supabase.publishableKey` | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable |
+| `KWABOR_VERSION_CODE` | Publique | `kwabor.versionCode` | — | Entrée du workflow Android |
+| `KWABOR_VERSION_NAME` | Publique | `kwabor.versionName` | — | Entrée du workflow Android |
+| `KWABOR_ANDROID_KEYSTORE_BASE64` | Secret | — | — | Secret production |
+| `KWABOR_ANDROID_KEYSTORE_PASSWORD` | Secret | `kwabor.android.signing.storePassword` | — | Secret production |
+| `KWABOR_ANDROID_KEY_ALIAS` | Secret | `kwabor.android.signing.keyAlias` | — | Secret production |
+| `KWABOR_ANDROID_KEY_PASSWORD` | Secret | `kwabor.android.signing.keyPassword` | — | Secret production |
 | `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64` | Configuration d'intégrité | fichier généré par workflow | — | Secret |
 | `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Configuration d'intégrité | — | fichier généré par workflow | Secret |
 
@@ -31,10 +37,12 @@ Les secrets serveur — service role Supabase, Firebase Admin, FedaPay, OpenAI, 
 ### Android
 
 1. Copier `local.properties.example` vers `local.properties`.
-2. Renseigner les trois clés `kwabor.*`.
+2. Renseigner le tier et ses valeurs Supabase publiques.
 3. Ne jamais versionner `local.properties` ni `androidApp/google-services.json`.
 
-Sans URL et clé publishable, l'application affiche son état d'indisponibilité sûr. Une valeur d'environnement inconnue bloque le build.
+Les clés génériques `kwabor.supabase.*` ne sont reprises que par le tier déclaré dans `kwabor.environment`. Les clés qualifiées `kwabor.development.supabase.*`, `kwabor.staging.supabase.*` et `kwabor.production.supabase.*` permettent de valider plusieurs variants sans réutilisation croisée. Une valeur d'environnement inconnue bloque le build.
+
+La matrice exacte des variants, la signature et la génération d'artefacts sont documentées dans [Release Android](android-release.md).
 
 ### iOS
 
@@ -86,3 +94,4 @@ Avant activation des SDK dans `OBS-001`, vérifier pour chaque environnement :
 - Les variables/secrets GitHub existent dans le bon environnement.
 - Un build staging ne référence aucun project ref production, et réciproquement.
 - Aucun fichier de configuration fournisseur, token, mot de passe ou clé serveur n'est suivi par Git.
+- La clé d'upload Android appartient au propriétaire, est sauvegardée hors dépôt et ses quatre secrets GitHub production sont complets.

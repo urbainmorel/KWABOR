@@ -104,10 +104,19 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - GitHub Environments `staging` et `production` créés : branches protégées seulement ; production exige l'approbation `urbainmorel`, interdit le bypass administrateur ; variable `KWABOR_ENVIRONMENT` renseignée dans chacun.
 - Validation ciblée ENV-001A : tests Android host, Detekt commonMain/commonTest, compilation Android et compilation Kotlin iOS simulateur verts en 1 min 56 s.
 - Validation globale ENV-001A : `check`, APK debug et compilation Kotlin iOS simulateur verts en 3 min 01 s ; lint, Spotless, Detekt et `git diff --check` verts ; valeur Android `preview` correctement rejetée au build.
+- PR ENV-001A `#25` mergée dans `main` au commit `aa74969`, avec `quality`/pgTAP verts en 4 min 17 s et `iOS simulator build` vert en 5 min 47 s.
+- ANDROID-REL-001 implémentée sur branche : variants `debug`/`staging`/`release` strictement reliés aux tiers development/staging/production, versionnement injecté et séparation des configurations Supabase par environnement.
+- Les variants staging/release activent R8 et le shrink de ressources ; le mapping est conservé. La production refuse tout artefact sans les quatre credentials de la clé d'upload, sans générer de certificat factice.
+- Icône adaptive monochrome, splash Android 12+ et identité visible par variant ajoutés conformément au design Kwabor.
+- Workflow manuel `Android release artifact` ajouté : exécution depuis `main`, GitHub Environment ciblé, approbation production, validation de la configuration distante, injection temporaire du keystore, gate `check`, checksum et artefacts bornés.
+- Runbook `docs/android-release.md` ajouté avec versionnement, Play App Signing, secrets, commandes et contrôles avant téléversement.
+- Validation ciblée ANDROID-REL-001 : APK staging minifié produit en 7 min 27 s, environnement `staging`, version `0.1.0-staging`, label attendu, signature debug vérifiée et mapping R8 présent ; release sans signature et signature partielle correctement rejetées.
+- Validation globale ANDROID-REL-001 : `check`, APK debug, APK staging R8 et compilation Kotlin iOS simulateur verts en 10 min ; 100 tests partagés et 16 tests JVM Android sans échec, Detekt/Spotless/lint verts. Une configuration Supabase générique production reste absente du BuildConfig staging et n'alimente que release.
+- PR ANDROID-REL-001 `#26` mergée dans `main`, avec `quality`/pgTAP verts en 3 min 46 s et `iOS simulator build` vert en 3 min 04 s.
 
 ## Tâche en cours
 
-PR-ENV-001A — terminer la validation globale puis merger les contrats d'environnements après CI distante complète.
+IOS-REL-001 — auditer le projet Xcode puis livrer configurations, entitlements, Privacy Manifest, assets et contrat de signature sans certificat factice.
 
 ## Blocages / limites
 
@@ -123,9 +132,10 @@ PR-ENV-001A — terminer la validation globale puis merger les contrats d'enviro
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le flux email OTP Android s'appuie sur les états/presenters partagés et l'UI Compose propre à `androidApp`, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
+- La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Après merge d'ENV-001A et CI distante verte, poursuivre les fondations release Android sans valeur fournisseur ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
+Après merge de la fondation release iOS et CI distante verte, poursuivre `OBS-001` ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.

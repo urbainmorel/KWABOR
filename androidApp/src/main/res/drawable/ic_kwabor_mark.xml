@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/kwabor_icon_foreground"
+        android:pathData="M31,25 L44,25 L44,47 L63,25 L78,25 L53,52 L80,83 L64,83 L44,58 L44,83 L31,83 Z" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M36,79 C48,68 45,57 58,49 C68,43 68,34 74,28"
+        android:strokeColor="@color/kwabor_icon_background"
+        android:strokeLineCap="round"
+        android:strokeWidth="5" />
+</vector>
