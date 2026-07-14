@@ -89,10 +89,17 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Un état utilisateur sûr remplace le shell vide lorsque la configuration distante obligatoire est absente, sans exposer de détail technique.
 - Tests ARCH-003 ajoutés pour sélection d'onglet, auth requise, poursuite invité, reprise Like authentifiée, OTP, conservation de saisie pendant la restauration de session et effet d'authentification.
 - Validation locale ARCH-003 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 4 min 53 s ; 100 tests partagés et 16 tests JVM Android sans échec ; Detekt application/tests et KMP vert.
+- PR ARCH-003 `#23` mergée dans `main` au commit `6cff9d1`, avec `quality`/pgTAP verts en 3 min 24 s et `iOS simulator build` vert en 5 min 23 s.
+- NAV-001 implémentée sur branche : Android utilise Navigation Compose 2.9.8 avec cinq routes sérialisées, restauration des back stacks et mur souple invité unifié ; `MainActivity` ingère les intents `singleTop` sans rejouer un lien consommé.
+- iOS utilise désormais une `TabView` SwiftUI et un `NavigationStack` par racine ; le schéma `kwabor` est déclaré dans un Info.plist versionné sans valeur sensible.
+- Le contrat partagé définit les cinq destinations et valide strictement `kwabor://app/<destination>` ; les liens universels/App Links restent différés jusqu'à disponibilité d'un domaine vérifiable.
+- ADR-0015 accepte la navigation native et remplace le shell Compose partagé de l'ADR-0008.
+- Tests NAV-001 ajoutés pour toutes les destinations et les rejets scheme/host/chemin/query/fragment ; la restauration de session est explicitement attendue avant de traiter un deep link Android.
+- Validation locale NAV-001 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 5 min 17 s ; Detekt application/tests et KMP, lint et `git diff --check` verts.
 
 ## Tâche en cours
 
-PR-ARCH-003 — terminer la validation globale puis publier et merger l'UDF Auth/Explore après CI distante complète.
+PR-NAV-001 — publier et merger la navigation mobile native après validation locale globale et CI distante complète.
 
 ## Blocages / limites
 
@@ -112,4 +119,4 @@ PR-ARCH-003 — terminer la validation globale puis publier et merger l'UDF Auth
 
 ## Prochaine tâche logique
 
-Après merge d'ARCH-003 et CI distante verte, démarrer NAV-001 sur une branche dédiée : navigation Android/SwiftUI native avec routes et deep links typés.
+Après merge de NAV-001 et CI distante verte, démarrer ENV-001 sur une branche dédiée : contrats staging/production, GitHub Environments et injection de configuration sans secret versionné.

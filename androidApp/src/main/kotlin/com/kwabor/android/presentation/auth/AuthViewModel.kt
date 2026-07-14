@@ -52,6 +52,9 @@ internal class AuthViewModel(
     private val mutableState = MutableStateFlow(initialAuthUiState())
     val state: StateFlow<AuthUiState> = mutableState.asStateFlow()
 
+    private val mutableSessionRestoreComplete = MutableStateFlow(false)
+    val isSessionRestoreComplete: StateFlow<Boolean> = mutableSessionRestoreComplete.asStateFlow()
+
     private val effectChannel = Channel<AuthEffect>(capacity = Channel.BUFFERED)
     val effects: Flow<AuthEffect> = effectChannel.receiveAsFlow()
 
@@ -88,13 +91,17 @@ internal class AuthViewModel(
 
     private fun loadCurrentSession() {
         coroutineScope.launch {
-            val sessionState = presenter.loadCurrentSession(initialAuthUiState(), strings)
-            val currentState = mutableState.value
-            mutableState.value = currentState.copy(
-                currentSession = sessionState.currentSession,
-                errorMessage = currentState.errorMessage ?: sessionState.errorMessage,
-                noticeMessage = currentState.noticeMessage ?: sessionState.noticeMessage,
-            )
+            try {
+                val sessionState = presenter.loadCurrentSession(initialAuthUiState(), strings)
+                val currentState = mutableState.value
+                mutableState.value = currentState.copy(
+                    currentSession = sessionState.currentSession,
+                    errorMessage = currentState.errorMessage ?: sessionState.errorMessage,
+                    noticeMessage = currentState.noticeMessage ?: sessionState.noticeMessage,
+                )
+            } finally {
+                mutableSessionRestoreComplete.value = true
+            }
         }
     }
 

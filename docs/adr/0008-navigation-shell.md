@@ -1,6 +1,6 @@
 # 0008 — Poser une navigation racine plate à cinq entrées
 
-- **Statut** : accepté
+- **Statut** : remplacé par [ADR-0015](0015-native-mobile-navigation.md)
 - **Date** : 2026-07-02
 - **Décideurs** : Équipe
 - **Remplace** : —

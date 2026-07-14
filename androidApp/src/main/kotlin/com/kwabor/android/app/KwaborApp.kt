@@ -16,10 +16,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.kwabor.android.design.KwaborTheme
 import com.kwabor.android.presentation.auth.AuthEffect
 import com.kwabor.android.presentation.auth.AuthIntent
@@ -35,35 +43,78 @@ import com.kwabor.android.ui.screens.explore.ExploreScreenActions
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.auth.AuthUiState
+import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
+import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
+import com.kwabor.shared.presentation.navigation.RootNavigationDestination
+import com.kwabor.shared.presentation.navigation.label
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
-internal fun KwaborApp(exploreViewModel: ExploreViewModel, authViewModel: AuthViewModel) {
-    val strings = stringsFor(AppLocale.French)
+internal fun KwaborApp(
+    exploreViewModel: ExploreViewModel,
+    authViewModel: AuthViewModel,
+    pendingDeepLink: StateFlow<String?>,
+    onDeepLinkConsumed: () -> Unit,
+) {
+    val authState by authViewModel.state.collectAsStateWithLifecycle()
+    val isSessionRestoreComplete by authViewModel.isSessionRestoreComplete.collectAsStateWithLifecycle()
+    val deepLink by pendingDeepLink.collectAsStateWithLifecycle()
 
     KwaborTheme {
-        var selectedDestination by remember { mutableStateOf(RootDestination.Home) }
+        KwaborAppContent(
+            exploreViewModel = exploreViewModel,
+            authViewModel = authViewModel,
+            authState = authState,
+            deepLink = deepLink.takeIf { isSessionRestoreComplete },
+            onDeepLinkConsumed = onDeepLinkConsumed,
+        )
+    }
+}
 
-        Scaffold(
-            bottomBar = {
-                KwaborBottomNavigation(selectedDestination, strings) { destination ->
-                    selectedDestination = destination
-                }
-            },
-        ) { paddingValues ->
-            when (selectedDestination) {
-                RootDestination.Home -> ExploreRoute(
-                    exploreViewModel = exploreViewModel,
-                    authViewModel = authViewModel,
-                    strings = strings,
-                    modifier = Modifier.padding(paddingValues),
-                )
-                else -> KwaborRootContent(
-                    paddingValues = paddingValues,
-                    title = selectedDestination.label(strings),
-                    status = strings.foundationStatus,
-                )
-            }
-        }
+@Composable
+private fun KwaborAppContent(
+    exploreViewModel: ExploreViewModel,
+    authViewModel: AuthViewModel,
+    authState: AuthUiState,
+    deepLink: String?,
+    onDeepLinkConsumed: () -> Unit,
+) {
+    val strings = stringsFor(AppLocale.French)
+    val navController = rememberNavController()
+    var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val requestDestination = rootDestinationRequester(
+        navController = navController,
+        isAuthenticated = authState.isAuthenticated,
+        authViewModel = authViewModel,
+        onAuthenticationRequired = { destination -> pendingDestinationKey = destination.routeKey },
+    )
+
+    RootEffectHandlers(
+        deepLink = deepLink,
+        pendingDestinationKey = pendingDestinationKey,
+        authViewModel = authViewModel,
+        exploreViewModel = exploreViewModel,
+        actions = RootEffectActions(
+            onDestinationRequested = requestDestination,
+            onAuthenticatedDestinationRequested = navController::navigateToRoot,
+            onDestinationResolved = { pendingDestinationKey = null },
+            onDeepLinkConsumed = onDeepLinkConsumed,
+        ),
+    )
+    KwaborNavigationShell(
+        navController = navController,
+        strings = strings,
+        exploreViewModel = exploreViewModel,
+        isGuestSession = !authState.isAuthenticated,
+        onDestinationSelected = requestDestination,
+    )
+    if (authState.isVisible) {
+        AuthSheet(
+            state = authState,
+            strings = strings,
+            actions = remember(authViewModel) { authViewModel.sheetActions() },
+        )
     }
 }
 
@@ -82,13 +133,153 @@ internal fun KwaborUnavailableApp() {
 }
 
 @Composable
-private fun KwaborBottomNavigation(
-    selectedDestination: RootDestination,
+private fun KwaborNavigationShell(
+    navController: NavHostController,
     strings: KwaborStrings,
-    onDestinationSelected: (RootDestination) -> Unit,
+    exploreViewModel: ExploreViewModel,
+    isGuestSession: Boolean,
+    onDestinationSelected: (RootNavigationDestination) -> Unit,
+) {
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val selectedDestination = backStackEntry?.destination?.toRootDestination() ?: RootNavigationDestination.Home
+
+    Scaffold(
+        bottomBar = {
+            KwaborBottomNavigation(
+                selectedDestination = selectedDestination,
+                strings = strings,
+                onDestinationSelected = onDestinationSelected,
+            )
+        },
+    ) { paddingValues ->
+        KwaborRootNavHost(
+            navController = navController,
+            paddingValues = paddingValues,
+            exploreViewModel = exploreViewModel,
+            strings = strings,
+            isGuestSession = isGuestSession,
+        )
+    }
+}
+
+@Composable
+private fun KwaborRootNavHost(
+    navController: NavHostController,
+    paddingValues: PaddingValues,
+    exploreViewModel: ExploreViewModel,
+    strings: KwaborStrings,
+    isGuestSession: Boolean,
+) {
+    NavHost(navController = navController, startDestination = HomeRoute) {
+        composable<HomeRoute> {
+            ExploreRoute(
+                exploreViewModel = exploreViewModel,
+                strings = strings,
+                isGuestSession = isGuestSession,
+                modifier = Modifier.padding(paddingValues),
+            )
+        }
+        rootAnchorRoutes(paddingValues = paddingValues, strings = strings)
+    }
+}
+
+private fun NavGraphBuilder.rootAnchorRoutes(paddingValues: PaddingValues, strings: KwaborStrings) {
+    rootAnchor<SocialRoute>(RootNavigationDestination.Social, paddingValues, strings)
+    rootAnchor<AddRoute>(RootNavigationDestination.Add, paddingValues, strings)
+    rootAnchor<NotificationsRoute>(RootNavigationDestination.Notifications, paddingValues, strings)
+    rootAnchor<ProfileRoute>(RootNavigationDestination.Profile, paddingValues, strings)
+}
+
+private inline fun <reified Route : Any> NavGraphBuilder.rootAnchor(
+    destination: RootNavigationDestination,
+    paddingValues: PaddingValues,
+    strings: KwaborStrings,
+) {
+    composable<Route> {
+        KwaborRootContent(
+            modifier = Modifier.padding(paddingValues),
+            destination = destination,
+            strings = strings,
+        )
+    }
+}
+
+@Composable
+private fun RootEffectHandlers(
+    deepLink: String?,
+    pendingDestinationKey: String?,
+    authViewModel: AuthViewModel,
+    exploreViewModel: ExploreViewModel,
+    actions: RootEffectActions,
+) {
+    val currentPendingDestinationKey by rememberUpdatedState(pendingDestinationKey)
+    val currentActions by rememberUpdatedState(actions)
+
+    LaunchedEffect(deepLink) {
+        val currentDeepLink = deepLink ?: return@LaunchedEffect
+        when (val result = RootDeepLinkParser.parse(currentDeepLink)) {
+            is RootDeepLinkResult.Accepted -> currentActions.onDestinationRequested(result.destination)
+            is RootDeepLinkResult.Rejected -> Unit
+        }
+        currentActions.onDeepLinkConsumed()
+    }
+    LaunchedEffect(exploreViewModel, authViewModel) {
+        exploreViewModel.effects.collect { effect ->
+            when (effect) {
+                ExploreEffect.AuthenticationRequired -> authViewModel.onIntent(AuthIntent.Open)
+            }
+        }
+    }
+    LaunchedEffect(authViewModel, exploreViewModel) {
+        authViewModel.effects.collect { effect ->
+            when (effect) {
+                AuthEffect.AuthenticationCompleted -> {
+                    val destination = currentPendingDestinationKey?.let(RootNavigationDestination::fromRouteKey)
+                    if (destination == null) {
+                        exploreViewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
+                    } else {
+                        currentActions.onAuthenticatedDestinationRequested(destination)
+                    }
+                    currentActions.onDestinationResolved()
+                }
+                AuthEffect.GuestContinuationSelected -> {
+                    currentActions.onDestinationResolved()
+                    exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
+                }
+            }
+        }
+    }
+}
+
+private data class RootEffectActions(
+    val onDestinationRequested: (RootNavigationDestination) -> Unit,
+    val onAuthenticatedDestinationRequested: (RootNavigationDestination) -> Unit,
+    val onDestinationResolved: () -> Unit,
+    val onDeepLinkConsumed: () -> Unit,
+)
+
+private fun rootDestinationRequester(
+    navController: NavHostController,
+    isAuthenticated: Boolean,
+    authViewModel: AuthViewModel,
+    onAuthenticationRequired: (RootNavigationDestination) -> Unit,
+): (RootNavigationDestination) -> Unit = { destination ->
+    if (destination == RootNavigationDestination.Home || isAuthenticated) {
+        navController.navigateToRoot(destination)
+    } else {
+        onAuthenticationRequired(destination)
+        authViewModel.onIntent(AuthIntent.Open)
+    }
+}
+
+@Composable
+private fun KwaborBottomNavigation(
+    selectedDestination: RootNavigationDestination,
+    strings: KwaborStrings,
+    onDestinationSelected: (RootNavigationDestination) -> Unit,
 ) {
     NavigationBar {
-        RootDestination.entries.forEach { destination ->
+        RootNavigationDestination.entries.forEach { destination ->
             NavigationBarItem(
                 selected = selectedDestination == destination,
                 onClick = { onDestinationSelected(destination) },
@@ -102,45 +293,19 @@ private fun KwaborBottomNavigation(
 @Composable
 private fun ExploreRoute(
     exploreViewModel: ExploreViewModel,
-    authViewModel: AuthViewModel,
     strings: KwaborStrings,
+    isGuestSession: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val exploreState by exploreViewModel.state.collectAsStateWithLifecycle()
-    val authState by authViewModel.state.collectAsStateWithLifecycle()
-
-    LaunchedEffect(exploreViewModel, authViewModel) {
-        exploreViewModel.effects.collect { effect ->
-            when (effect) {
-                ExploreEffect.AuthenticationRequired -> authViewModel.onIntent(AuthIntent.Open)
-            }
-        }
-    }
-    LaunchedEffect(exploreViewModel, authViewModel) {
-        authViewModel.effects.collect { effect ->
-            when (effect) {
-                AuthEffect.AuthenticationCompleted -> {
-                    exploreViewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
-                }
-                AuthEffect.GuestContinuationSelected -> exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
-            }
-        }
-    }
 
     ExploreScreen(
         state = exploreState,
         strings = strings,
-        isGuestSession = !authState.isAuthenticated,
+        isGuestSession = isGuestSession,
         modifier = modifier,
         actions = remember(exploreViewModel) { exploreViewModel.screenActions() },
     )
-    if (authState.isVisible) {
-        AuthSheet(
-            state = authState,
-            strings = strings,
-            actions = remember(authViewModel) { authViewModel.sheetActions() },
-        )
-    }
 }
 
 private fun ExploreViewModel.screenActions(): ExploreScreenActions = ExploreScreenActions(
@@ -164,20 +329,20 @@ private fun AuthViewModel.sheetActions(): AuthSheetActions = AuthSheetActions(
 )
 
 @Composable
-private fun KwaborRootContent(paddingValues: PaddingValues, title: String, status: String) {
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-    ) {
+private fun KwaborRootContent(
+    destination: RootNavigationDestination,
+    strings: KwaborStrings,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(all = 24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(text = title)
-            Text(text = status)
+            Text(text = destination.label(strings))
+            Text(text = strings.foundationStatus)
         }
     }
 }
