@@ -34,9 +34,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView(
-        bridge: KwaborSharedBridge(
-            supabaseUrl: nil,
-            supabasePublishableKey: nil
-        )
+        bridge: KwaborSharedBridge()
     )
 }

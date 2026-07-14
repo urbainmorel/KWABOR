@@ -1,9 +1,6 @@
 package com.kwabor.shared.data.auth
 
 import cnames.structs.__CFData
-import com.kwabor.shared.data.config.KwaborEnvironment
-import com.kwabor.shared.data.config.createAuthRepository
-import com.kwabor.shared.domain.auth.AuthRepository
 import io.github.jan.supabase.auth.SessionManager
 import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.CPointer
@@ -49,11 +46,6 @@ import platform.Security.kSecValueData
 
 fun createIosSecureAuthSessionManager(): SessionManager = KwaborSessionManager(
     store = IosKeychainSecureStringStore(),
-)
-
-fun createIosAuthRepository(environment: KwaborEnvironment): AuthRepository = createAuthRepository(
-    environment = environment,
-    authSessionManager = createIosSecureAuthSessionManager(),
 )
 
 @OptIn(ExperimentalForeignApi::class)
