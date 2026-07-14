@@ -5,6 +5,8 @@ import com.kwabor.shared.data.auth.KwaborSessionManager
 import com.kwabor.shared.data.auth.SecureStringStore
 import com.kwabor.shared.data.catalog.DataCatalogRepository
 import com.kwabor.shared.data.organization.DataOrganizationRepository
+import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.explore.ExplorePresenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -66,7 +68,9 @@ class KwaborCompositionRootTest {
         try {
             assertIs<DataCatalogRepository>(root.catalogRepository)
             assertIs<DataOrganizationRepository>(root.organizationRepository)
+            assertIs<ExplorePresenter>(root.explorePresenter)
             assertNull(root.authRepository)
+            assertNull(root.authPresenter)
             assertTrue(root.clockProvider.nowEpochMilliseconds() > 0L)
         } finally {
             root.close()
@@ -85,6 +89,7 @@ class KwaborCompositionRootTest {
 
         try {
             assertIs<DataAuthRepository>(root.authRepository)
+            assertIs<AuthPresenter>(root.authPresenter)
         } finally {
             root.close()
         }

@@ -16,42 +16,32 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kwabor.android.design.KwaborTheme
+import com.kwabor.android.presentation.auth.AuthEffect
+import com.kwabor.android.presentation.auth.AuthIntent
+import com.kwabor.android.presentation.auth.AuthViewModel
+import com.kwabor.android.presentation.explore.ExploreEffect
+import com.kwabor.android.presentation.explore.ExploreIntent
+import com.kwabor.android.presentation.explore.ExploreViewModel
+import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.AuthSheetActions
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
-import com.kwabor.shared.domain.auth.AuthRepository
-import com.kwabor.shared.domain.catalog.CatalogRepository
-import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
-import com.kwabor.shared.presentation.auth.AuthPresenter
-import com.kwabor.shared.presentation.auth.AuthUiState
-import com.kwabor.shared.presentation.auth.initialAuthUiState
-import com.kwabor.shared.presentation.explore.ExploreInteractionKind
-import com.kwabor.shared.presentation.explore.ExploreLoadRequest
-import com.kwabor.shared.presentation.explore.ExplorePresenter
-import com.kwabor.shared.presentation.explore.ExploreUiState
-import com.kwabor.shared.presentation.explore.initialExploreUiState
-import com.kwabor.shared.presentation.explore.loadingExploreUiState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 @Composable
-fun KwaborApp(
-    catalogRepository: CatalogRepository? = null,
-    clockProvider: ClockProvider? = null,
-    authRepository: AuthRepository? = null,
-) {
+internal fun KwaborApp(exploreViewModel: ExploreViewModel, authViewModel: AuthViewModel) {
+    val strings = stringsFor(AppLocale.French)
+
     KwaborTheme {
         var selectedDestination by remember { mutableStateOf(RootDestination.Home) }
-        val strings = stringsFor(AppLocale.French)
 
         Scaffold(
             bottomBar = {
@@ -62,9 +52,8 @@ fun KwaborApp(
         ) { paddingValues ->
             when (selectedDestination) {
                 RootDestination.Home -> ExploreRoute(
-                    catalogRepository = catalogRepository,
-                    clockProvider = clockProvider,
-                    authRepository = authRepository,
+                    exploreViewModel = exploreViewModel,
+                    authViewModel = authViewModel,
                     strings = strings,
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -74,6 +63,20 @@ fun KwaborApp(
                     status = strings.foundationStatus,
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun KwaborUnavailableApp() {
+    val strings = stringsFor(AppLocale.French)
+    KwaborTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            KwaborStateMessage(
+                title = strings.errorStateTitle,
+                supportingText = strings.configurationUnavailable,
+                modifier = Modifier.padding(24.dp),
+            )
         }
     }
 }
@@ -98,150 +101,67 @@ private fun KwaborBottomNavigation(
 
 @Composable
 private fun ExploreRoute(
-    catalogRepository: CatalogRepository?,
-    clockProvider: ClockProvider?,
-    authRepository: AuthRepository?,
+    exploreViewModel: ExploreViewModel,
+    authViewModel: AuthViewModel,
     strings: KwaborStrings,
     modifier: Modifier = Modifier,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val presenter = remember(catalogRepository, clockProvider) {
-        if (catalogRepository != null && clockProvider != null) {
-            ExplorePresenter(
-                catalogRepository = catalogRepository,
-                clockProvider = clockProvider,
-            )
-        } else {
-            null
+    val exploreState by exploreViewModel.state.collectAsStateWithLifecycle()
+    val authState by authViewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(exploreViewModel, authViewModel) {
+        exploreViewModel.effects.collect { effect ->
+            when (effect) {
+                ExploreEffect.AuthenticationRequired -> authViewModel.onIntent(AuthIntent.Open)
+            }
         }
     }
-    val authPresenter = remember(authRepository) {
-        authRepository?.let(::AuthPresenter)
-    }
-    val controller = remember(presenter, authPresenter, strings, coroutineScope) {
-        ExploreRouteController(presenter, authPresenter, strings, coroutineScope)
-    }
-
-    LaunchedEffect(presenter, controller.request, controller.reloadTrigger, strings) {
-        controller.loadExplore()
-    }
-    LaunchedEffect(authPresenter, strings) {
-        controller.loadAuthSession()
-    }
-
-    ExploreScreen(
-        state = controller.exploreState,
-        strings = strings,
-        isGuestSession = !controller.authState.isAuthenticated,
-        modifier = modifier,
-        actions = controller.exploreActions(),
-    )
-    if (controller.showAuthSheet && authPresenter != null) {
-        AuthSheet(
-            state = controller.authState,
-            strings = strings,
-            actions = controller.authActions(),
-        )
-    }
-}
-
-private class ExploreRouteController(
-    private val explorePresenter: ExplorePresenter?,
-    private val authPresenter: AuthPresenter?,
-    private val strings: KwaborStrings,
-    private val coroutineScope: CoroutineScope,
-) {
-    var request by mutableStateOf(ExploreLoadRequest())
-    var reloadTrigger by mutableStateOf(0)
-    var exploreState by mutableStateOf(initialExploreUiState(strings, request))
-    var authState by mutableStateOf(initialAuthUiState())
-    var showAuthSheet by mutableStateOf(false)
-
-    suspend fun loadExplore() {
-        val presenter = explorePresenter
-        exploreState = if (presenter == null) {
-            initialExploreUiState(strings, request)
-        } else {
-            exploreState = loadingExploreUiState(strings, request)
-            presenter.load(request, strings)
-        }
-    }
-
-    suspend fun loadAuthSession() {
-        authPresenter?.let { presenter -> authState = presenter.loadCurrentSession(authState, strings) }
-    }
-
-    fun exploreActions(): ExploreScreenActions = ExploreScreenActions(
-        onTabSelected = { selectedTab -> request = ExploreLoadRequest(selectedTab = selectedTab) },
-        onChipSelected = { selectedChip -> request = request.copy(selectedChipId = selectedChip.id) },
-        onRetry = { reloadTrigger += 1 },
-        onLikeClick = { listingId -> toggleInteraction(listingId, ExploreInteractionKind.Like) },
-        onFavoriteClick = { listingId -> toggleInteraction(listingId, ExploreInteractionKind.Favorite) },
-    )
-
-    fun authActions(): AuthSheetActions = AuthSheetActions(
-        onDismiss = { showAuthSheet = false },
-        onEmailChange = { email -> updateAuthState { presenter, state -> presenter.updateEmail(state, email) } },
-        onFirstNameChange = { name -> updateAuthState { presenter, state -> presenter.updateFirstName(state, name) } },
-        onLastNameChange = { name -> updateAuthState { presenter, state -> presenter.updateLastName(state, name) } },
-        onOtpCodeChange = { code -> updateAuthState { presenter, state -> presenter.updateOtpCode(state, code) } },
-        onLegalAcceptedChange = { accepted ->
-            updateAuthState { presenter, state -> presenter.updateLegalAccepted(state, accepted) }
-        },
-        onRequestOtp = ::requestOtp,
-        onVerifyOtp = ::verifyOtp,
-        onContinueAsGuest = ::continueAsGuest,
-    )
-
-    private fun toggleInteraction(listingId: String, kind: ExploreInteractionKind) {
-        val presenter = explorePresenter ?: return
-        coroutineScope.launch {
-            exploreState = presenter.toggle(exploreState, listingId, strings, kind)
-            showAuthSheet = exploreState.pendingAuthInteraction != null && authPresenter != null
-        }
-    }
-
-    private fun requestOtp() {
-        val presenter = authPresenter ?: return
-        coroutineScope.launch { authState = presenter.requestEmailOtp(authState, strings) }
-    }
-
-    private fun verifyOtp() {
-        val presenter = authPresenter ?: return
-        coroutineScope.launch {
-            authState = presenter.verifyEmailOtpWithProfile(authState, strings)
-            if (authState.isAuthenticated) {
-                showAuthSheet = false
-                replayPendingInteraction()
+    LaunchedEffect(exploreViewModel, authViewModel) {
+        authViewModel.effects.collect { effect ->
+            when (effect) {
+                AuthEffect.AuthenticationCompleted -> {
+                    exploreViewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
+                }
+                AuthEffect.GuestContinuationSelected -> exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
             }
         }
     }
 
-    private fun replayPendingInteraction() {
-        val pending = exploreState.pendingAuthInteraction ?: return
-        toggleInteraction(pending.listingId, pending.kind)
-    }
-
-    private fun continueAsGuest() {
-        showAuthSheet = false
-        exploreState = exploreState.copy(pendingAuthInteraction = null, interactionMessage = null)
-    }
-
-    private fun updateAuthState(transform: (AuthPresenter, AuthUiState) -> AuthUiState) {
-        val presenter = authPresenter ?: return
-        authState = transform(presenter, authState)
+    ExploreScreen(
+        state = exploreState,
+        strings = strings,
+        isGuestSession = !authState.isAuthenticated,
+        modifier = modifier,
+        actions = remember(exploreViewModel) { exploreViewModel.screenActions() },
+    )
+    if (authState.isVisible) {
+        AuthSheet(
+            state = authState,
+            strings = strings,
+            actions = remember(authViewModel) { authViewModel.sheetActions() },
+        )
     }
 }
 
-private suspend fun ExplorePresenter.toggle(
-    state: ExploreUiState,
-    listingId: String,
-    strings: KwaborStrings,
-    kind: ExploreInteractionKind,
-): ExploreUiState = when (kind) {
-    ExploreInteractionKind.Like -> toggleLike(state, listingId, strings)
-    ExploreInteractionKind.Favorite -> toggleFavorite(state, listingId, strings)
-}
+private fun ExploreViewModel.screenActions(): ExploreScreenActions = ExploreScreenActions(
+    onTabSelected = { tab -> onIntent(ExploreIntent.SelectTab(tab)) },
+    onChipSelected = { chip -> onIntent(ExploreIntent.SelectChip(chip)) },
+    onRetry = { onIntent(ExploreIntent.Retry) },
+    onLikeClick = { listingId -> onIntent(ExploreIntent.ToggleLike(listingId)) },
+    onFavoriteClick = { listingId -> onIntent(ExploreIntent.ToggleFavorite(listingId)) },
+)
+
+private fun AuthViewModel.sheetActions(): AuthSheetActions = AuthSheetActions(
+    onDismiss = { onIntent(AuthIntent.Dismiss) },
+    onEmailChange = { email -> onIntent(AuthIntent.ChangeEmail(email)) },
+    onFirstNameChange = { firstName -> onIntent(AuthIntent.ChangeFirstName(firstName)) },
+    onLastNameChange = { lastName -> onIntent(AuthIntent.ChangeLastName(lastName)) },
+    onOtpCodeChange = { code -> onIntent(AuthIntent.ChangeOtpCode(code)) },
+    onLegalAcceptedChange = { accepted -> onIntent(AuthIntent.ChangeLegalAccepted(accepted)) },
+    onRequestOtp = { onIntent(AuthIntent.RequestOtp) },
+    onVerifyOtp = { onIntent(AuthIntent.VerifyOtp) },
+    onContinueAsGuest = { onIntent(AuthIntent.ContinueAsGuest) },
+)
 
 @Composable
 private fun KwaborRootContent(paddingValues: PaddingValues, title: String, status: String) {
