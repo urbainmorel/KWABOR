@@ -4,11 +4,18 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.core.PageRequest
 import com.kwabor.shared.domain.core.PageResult
 
-interface OrganizationRepository {
+interface OrganizationRepository :
+    OrganizationDirectoryRepository,
+    OrganizationTeamRepository,
+    OrganizationBudgetRepository
+
+interface OrganizationDirectoryRepository {
     suspend fun listOrganizations(page: PageRequest = PageRequest()): DomainResult<PageResult<Organization>>
 
     suspend fun getOrganization(organizationId: String): DomainResult<Organization>
+}
 
+interface OrganizationTeamRepository {
     suspend fun listMembers(organizationId: String): DomainResult<List<OrganizationMember>>
 
     suspend fun inviteMember(request: OrganizationInviteRequest): DomainResult<OrganizationInvite>
@@ -22,7 +29,9 @@ interface OrganizationRepository {
     suspend fun updateMemberRole(request: OrganizationMemberRoleUpdate): DomainResult<OrganizationMember>
 
     suspend fun suspendMember(organizationId: String, memberId: String): DomainResult<OrganizationMember>
+}
 
+interface OrganizationBudgetRepository {
     suspend fun listMemberAdBudgets(
         organizationId: String,
         page: PageRequest = PageRequest(),

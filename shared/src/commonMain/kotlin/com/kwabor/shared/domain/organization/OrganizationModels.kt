@@ -26,12 +26,17 @@ enum class OrganizationRole {
     Owner,
 }
 
+private const val MODERATOR_ROLE_RANK = 10
+private const val EDITOR_ROLE_RANK = 20
+private const val MANAGER_ROLE_RANK = 30
+private const val OWNER_ROLE_RANK = 40
+
 val OrganizationRole.rank: Int
     get() = when (this) {
-        OrganizationRole.Moderator -> 10
-        OrganizationRole.Editor -> 20
-        OrganizationRole.Manager -> 30
-        OrganizationRole.Owner -> 40
+        OrganizationRole.Moderator -> MODERATOR_ROLE_RANK
+        OrganizationRole.Editor -> EDITOR_ROLE_RANK
+        OrganizationRole.Manager -> MANAGER_ROLE_RANK
+        OrganizationRole.Owner -> OWNER_ROLE_RANK
     }
 
 fun OrganizationRole.includes(requiredRole: OrganizationRole): Boolean = rank >= requiredRole.rank
@@ -122,6 +127,15 @@ data class MemberAdBudget(
     val spentXof: MoneyXof,
 )
 
+data class OrganizationInviteValues(
+    val organizationId: String,
+    val invitedByMemberId: String,
+    val email: String,
+    val proposedRole: OrganizationRole,
+    val expiresAtEpochMilliseconds: Long,
+    val nowEpochMilliseconds: Long,
+)
+
 class OrganizationInviteRequest private constructor(
     val organizationId: String,
     val invitedByMemberId: String,
@@ -130,38 +144,31 @@ class OrganizationInviteRequest private constructor(
     val expiresAtEpochMilliseconds: Long,
 ) {
     companion object {
-        fun create(
-            organizationId: String,
-            invitedByMemberId: String,
-            email: String,
-            proposedRole: OrganizationRole,
-            expiresAtEpochMilliseconds: Long,
-            nowEpochMilliseconds: Long,
-        ): DomainResult<OrganizationInviteRequest> {
-            if (organizationId.isBlank() || invitedByMemberId.isBlank()) {
+        fun create(values: OrganizationInviteValues): DomainResult<OrganizationInviteRequest> {
+            if (values.organizationId.isBlank() || values.invitedByMemberId.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.member_required"))
             }
 
-            val normalizedEmail = email.trim().lowercase()
+            val normalizedEmail = values.email.trim().lowercase()
             if (!normalizedEmail.looksLikeEmail()) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.invite_email_invalid"))
             }
 
-            if (proposedRole == OrganizationRole.Owner) {
+            if (values.proposedRole == OrganizationRole.Owner) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.owner_invite_forbidden"))
             }
 
-            if (expiresAtEpochMilliseconds <= nowEpochMilliseconds) {
+            if (values.expiresAtEpochMilliseconds <= values.nowEpochMilliseconds) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.invite_expired"))
             }
 
             return DomainResult.Success(
                 OrganizationInviteRequest(
-                    organizationId = organizationId,
-                    invitedByMemberId = invitedByMemberId,
+                    organizationId = values.organizationId,
+                    invitedByMemberId = values.invitedByMemberId,
                     email = normalizedEmail,
-                    proposedRole = proposedRole,
-                    expiresAtEpochMilliseconds = expiresAtEpochMilliseconds,
+                    proposedRole = values.proposedRole,
+                    expiresAtEpochMilliseconds = values.expiresAtEpochMilliseconds,
                 ),
             )
         }
@@ -233,7 +240,7 @@ class OrganizationMemberRoleUpdate private constructor(
         "OrganizationMemberRoleUpdate(organizationId=$organizationId, memberId=$memberId, newRole=$newRole)"
 }
 
-class MemberAdBudgetAllocationRequest private constructor(
+data class MemberAdBudgetAllocationValues(
     val organizationId: String,
     val memberId: String,
     val allocatedByMemberId: String,
@@ -241,50 +248,44 @@ class MemberAdBudgetAllocationRequest private constructor(
     val periodStartEpochDay: Int,
     val periodEndEpochDay: Int,
     val allocatedXof: MoneyXof,
+)
+
+class MemberAdBudgetAllocationRequest private constructor(
+    private val values: MemberAdBudgetAllocationValues,
 ) {
+    val organizationId: String get() = values.organizationId
+    val memberId: String get() = values.memberId
+    val allocatedByMemberId: String get() = values.allocatedByMemberId
+    val memberRole: OrganizationRole get() = values.memberRole
+    val periodStartEpochDay: Int get() = values.periodStartEpochDay
+    val periodEndEpochDay: Int get() = values.periodEndEpochDay
+    val allocatedXof: MoneyXof get() = values.allocatedXof
+
     companion object {
-        fun create(
-            organizationId: String,
-            memberId: String,
-            allocatedByMemberId: String,
-            memberRole: OrganizationRole,
-            periodStartEpochDay: Int,
-            periodEndEpochDay: Int,
-            allocatedXof: MoneyXof,
-        ): DomainResult<MemberAdBudgetAllocationRequest> {
-            if (organizationId.isBlank() || memberId.isBlank() || allocatedByMemberId.isBlank()) {
+        fun create(values: MemberAdBudgetAllocationValues): DomainResult<MemberAdBudgetAllocationRequest> {
+            if (values.organizationId.isBlank() || values.memberId.isBlank() || values.allocatedByMemberId.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.member_required"))
             }
 
-            if (memberId == allocatedByMemberId) {
+            if (values.memberId == values.allocatedByMemberId) {
                 return DomainResult.Failure(
                     DomainError.Validation("error.organization.budget_self_allocation_forbidden"),
                 )
             }
 
-            if (memberRole == OrganizationRole.Moderator || memberRole == OrganizationRole.Owner) {
+            if (values.memberRole == OrganizationRole.Moderator || values.memberRole == OrganizationRole.Owner) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.budget_role_forbidden"))
             }
 
-            if (periodEndEpochDay < periodStartEpochDay) {
+            if (values.periodEndEpochDay < values.periodStartEpochDay) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.budget_period_invalid"))
             }
 
-            if (allocatedXof.amount <= 0) {
+            if (values.allocatedXof.amount <= 0) {
                 return DomainResult.Failure(DomainError.Validation("error.organization.budget_positive_required"))
             }
 
-            return DomainResult.Success(
-                MemberAdBudgetAllocationRequest(
-                    organizationId = organizationId,
-                    memberId = memberId,
-                    allocatedByMemberId = allocatedByMemberId,
-                    memberRole = memberRole,
-                    periodStartEpochDay = periodStartEpochDay,
-                    periodEndEpochDay = periodEndEpochDay,
-                    allocatedXof = allocatedXof,
-                ),
-            )
+            return DomainResult.Success(MemberAdBudgetAllocationRequest(values))
         }
     }
 

@@ -276,7 +276,11 @@ private fun String.toPriceUnit(): PriceUnit = when (this) {
 private fun String.toAppLocale(): AppLocale = AppLocale.entries.firstOrNull { locale -> locale.tag == this }
     ?: invalidDatabaseValue("listings.content_lang", this)
 
-private fun String.toEpochMilliseconds(): Long = Instant.parse(this).toEpochMilliseconds()
+private fun String.toEpochMilliseconds(): Long = try {
+    Instant.parse(this).toEpochMilliseconds()
+} catch (exception: IllegalArgumentException) {
+    throw CatalogDataException.Unexpected(exception)
+}
 
 private fun Long.toNonNegativeMoney(fieldName: String): MoneyXof = when (val result = MoneyXof.fromAmount(this)) {
     is DomainResult.Success -> result.value
@@ -292,5 +296,7 @@ private fun Int.toNonNegativeCount(fieldName: String): Int {
 }
 
 private fun invalidDatabaseValue(fieldName: String, value: String): Nothing {
-    error("Invalid database value for $fieldName: $value")
+    throw CatalogDataException.Unexpected(
+        IllegalStateException("Invalid database value for $fieldName: $value"),
+    )
 }

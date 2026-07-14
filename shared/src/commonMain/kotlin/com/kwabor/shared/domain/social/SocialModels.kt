@@ -37,6 +37,15 @@ data class SocialPost(
     val createdAtEpochMilliseconds: Long,
 )
 
+data class SocialPostDraftValues(
+    val authorId: String,
+    val listingId: String,
+    val mediaType: SocialMediaType,
+    val caption: String?,
+    val contentLocale: AppLocale,
+    val media: List<SocialMediaAsset>,
+)
+
 class SocialPostDraft private constructor(
     val authorId: String,
     val listingId: String,
@@ -46,34 +55,27 @@ class SocialPostDraft private constructor(
     val media: List<SocialMediaAsset>,
 ) {
     companion object {
-        fun create(
-            authorId: String,
-            listingId: String,
-            mediaType: SocialMediaType,
-            caption: String?,
-            contentLocale: AppLocale,
-            media: List<SocialMediaAsset>,
-        ): DomainResult<SocialPostDraft> {
-            if (authorId.isBlank()) {
+        fun create(values: SocialPostDraftValues): DomainResult<SocialPostDraft> {
+            if (values.authorId.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.social.author_required"))
             }
 
-            if (listingId.isBlank()) {
+            if (values.listingId.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.social.listing_required"))
             }
 
-            if (media.isEmpty()) {
+            if (values.media.isEmpty()) {
                 return DomainResult.Failure(DomainError.Validation("error.social.media_required"))
             }
 
             return DomainResult.Success(
                 SocialPostDraft(
-                    authorId = authorId,
-                    listingId = listingId,
-                    mediaType = mediaType,
-                    caption = caption,
-                    contentLocale = contentLocale,
-                    media = media.sortedBy { asset -> asset.order },
+                    authorId = values.authorId,
+                    listingId = values.listingId,
+                    mediaType = values.mediaType,
+                    caption = values.caption,
+                    contentLocale = values.contentLocale,
+                    media = values.media.sortedBy { asset -> asset.order },
                 ),
             )
         }

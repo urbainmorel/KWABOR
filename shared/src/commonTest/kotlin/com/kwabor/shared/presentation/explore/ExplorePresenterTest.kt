@@ -34,14 +34,18 @@ class ExplorePresenterTest {
     @Test
     fun load_mapsPublishedCatalogListingsToReadOnlyExploreState() = runSuspendTest {
         val repository = FakeCatalogRepository(
-            listings = listOf(
-                listingSummary(
-                    id = "ouidah-gate",
-                    name = "Porte du non-retour",
-                    cityId = "ouidah",
-                    coverImageUrl = "https://example.invalid/cover.jpg",
-                    ratingAverage = 4.74,
-                    sponsoredUntilEpochMilliseconds = 2_000L,
+            FakeCatalogScenario(
+                listings = listOf(
+                    listingSummary(
+                        ListingSummaryFixture(
+                            id = "ouidah-gate",
+                            name = "Porte du non-retour",
+                            cityId = "ouidah",
+                            coverImageUrl = "https://example.invalid/cover.jpg",
+                            ratingAverage = 4.74,
+                            sponsoredUntilEpochMilliseconds = 2_000L,
+                        ),
+                    ),
                 ),
             ),
         )
@@ -85,7 +89,9 @@ class ExplorePresenterTest {
 
     @Test
     fun load_returnsOfflineErrorStateForNetworkFailure() = runSuspendTest {
-        val repository = FakeCatalogRepository(listingsError = DomainError.NetworkUnavailable())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(listingsError = DomainError.NetworkUnavailable()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
@@ -99,8 +105,10 @@ class ExplorePresenterTest {
     @Test
     fun load_marksExpiredCampaignAsNotSponsored() = runSuspendTest {
         val repository = FakeCatalogRepository(
-            listings = listOf(
-                listingSummary(sponsoredUntilEpochMilliseconds = 500L),
+            FakeCatalogScenario(
+                listings = listOf(
+                    listingSummary(ListingSummaryFixture(sponsoredUntilEpochMilliseconds = 500L)),
+                ),
             ),
         )
         val presenter = ExplorePresenter(repository, clockProvider)
@@ -113,13 +121,15 @@ class ExplorePresenterTest {
     @Test
     fun load_appliesViewerInteractionsWhenSessionAllowsIt() = runSuspendTest {
         val repository = FakeCatalogRepository(
-            listings = listOf(listingSummary(id = "listing-1", likesCount = 12)),
-            viewerInteractions = listOf(
-                ListingViewerInteraction(
-                    listingId = "listing-1",
-                    likedByViewer = true,
-                    favoritedByViewer = true,
-                    likesCount = 13,
+            FakeCatalogScenario(
+                listings = listOf(listingSummary(ListingSummaryFixture(id = "listing-1", likesCount = 12))),
+                viewerInteractions = listOf(
+                    ListingViewerInteraction(
+                        listingId = "listing-1",
+                        likedByViewer = true,
+                        favoritedByViewer = true,
+                        likesCount = 13,
+                    ),
                 ),
             ),
         )
@@ -136,7 +146,9 @@ class ExplorePresenterTest {
 
     @Test
     fun load_keepsListingsWhenViewerInteractionsRequireAuth() = runSuspendTest {
-        val repository = FakeCatalogRepository(interactionError = DomainError.AuthenticationRequired())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
@@ -150,11 +162,13 @@ class ExplorePresenterTest {
     @Test
     fun toggleLike_updatesListingFromRepositoryInteraction() = runSuspendTest {
         val repository = FakeCatalogRepository(
-            interactionResult = ListingViewerInteraction(
-                listingId = "listing-1",
-                likedByViewer = true,
-                favoritedByViewer = false,
-                likesCount = 13,
+            FakeCatalogScenario(
+                interactionResult = ListingViewerInteraction(
+                    listingId = "listing-1",
+                    likedByViewer = true,
+                    favoritedByViewer = false,
+                    likesCount = 13,
+                ),
             ),
         )
         val presenter = ExplorePresenter(repository, clockProvider)
@@ -180,11 +194,13 @@ class ExplorePresenterTest {
     @Test
     fun toggleLike_whenAlreadyLikedDelegatesUnlike() = runSuspendTest {
         val repository = FakeCatalogRepository(
-            interactionResult = ListingViewerInteraction(
-                listingId = "listing-1",
-                likedByViewer = false,
-                favoritedByViewer = true,
-                likesCount = 12,
+            FakeCatalogScenario(
+                interactionResult = ListingViewerInteraction(
+                    listingId = "listing-1",
+                    likedByViewer = false,
+                    favoritedByViewer = true,
+                    likesCount = 12,
+                ),
             ),
         )
         val presenter = ExplorePresenter(repository, clockProvider)
@@ -211,7 +227,9 @@ class ExplorePresenterTest {
 
     @Test
     fun toggleFavorite_authRequiredShowsSoftWallWithoutBlockingListings() = runSuspendTest {
-        val repository = FakeCatalogRepository(interactionError = DomainError.AuthenticationRequired())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
@@ -240,7 +258,9 @@ class ExplorePresenterTest {
 
     @Test
     fun toggleLike_networkFailureQueuesOptimisticInteraction() = runSuspendTest {
-        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
@@ -272,7 +292,9 @@ class ExplorePresenterTest {
 
     @Test
     fun toggleFavorite_networkFailureQueuesOptimisticInteraction() = runSuspendTest {
-        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
@@ -294,7 +316,9 @@ class ExplorePresenterTest {
 
     @Test
     fun queuedInteraction_replacesPreviousActionForSameListingAndKind() = runSuspendTest {
-        val repository = FakeCatalogRepository(interactionError = DomainError.NetworkUnavailable())
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
+        )
         val presenter = ExplorePresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
@@ -327,12 +351,12 @@ class ExplorePresenterTest {
     }
 }
 
-private class FakeCatalogRepository(
-    private val cities: List<City> = listOf(
+private data class FakeCatalogScenario(
+    val cities: List<City> = listOf(
         City(id = "cotonou", name = "Cotonou"),
         City(id = "ouidah", name = "Ouidah"),
     ),
-    private val categories: List<Category> = listOf(
+    val categories: List<Category> = listOf(
         Category(
             id = "heritage-historique",
             nameKey = "category.heritage.historique",
@@ -346,31 +370,35 @@ private class FakeCatalogRepository(
             defaultListingClass = ListingClass.Commercial,
         ),
     ),
-    private val listings: List<ListingSummary> = listOf(listingSummary()),
-    private val listingsError: DomainError? = null,
-    private val viewerInteractions: List<ListingViewerInteraction> = emptyList(),
-    private val interactionResult: ListingViewerInteraction = ListingViewerInteraction(
+    val listings: List<ListingSummary> = listOf(listingSummary()),
+    val listingsError: DomainError? = null,
+    val viewerInteractions: List<ListingViewerInteraction> = emptyList(),
+    val interactionResult: ListingViewerInteraction = ListingViewerInteraction(
         listingId = "listing-1",
         likedByViewer = false,
         favoritedByViewer = false,
         likesCount = 0,
     ),
-    private val interactionError: DomainError? = null,
+    val interactionError: DomainError? = null,
+)
+
+private class FakeCatalogRepository(
+    private val scenario: FakeCatalogScenario = FakeCatalogScenario(),
 ) : CatalogRepository {
     var lastFilters: ListingFilters? = null
     var lastInteractionAction: String? = null
 
-    override suspend fun listCities(): DomainResult<List<City>> = DomainResult.Success(cities)
+    override suspend fun listCities(): DomainResult<List<City>> = DomainResult.Success(scenario.cities)
 
-    override suspend fun listCategories(): DomainResult<List<Category>> = DomainResult.Success(categories)
+    override suspend fun listCategories(): DomainResult<List<Category>> = DomainResult.Success(scenario.categories)
 
     override suspend fun listListings(
         filters: ListingFilters,
         page: PageRequest,
     ): DomainResult<PageResult<ListingSummary>> {
         lastFilters = filters
-        return listingsError?.let { error -> DomainResult.Failure(error) }
-            ?: DomainResult.Success(PageResult(items = listings, nextOffset = null))
+        return scenario.listingsError?.let { error -> DomainResult.Failure(error) }
+            ?: DomainResult.Success(PageResult(items = scenario.listings, nextOffset = null))
     }
 
     override suspend fun searchListings(
@@ -382,7 +410,7 @@ private class FakeCatalogRepository(
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = DomainResult.Success(
         ListingDetail(
-            summary = listingSummary(id = listingId),
+            summary = listingSummary(ListingSummaryFixture(id = listingId)),
             slug = listingId,
             description = "Description",
             contentLocale = AppLocale.French,
@@ -401,13 +429,16 @@ private class FakeCatalogRepository(
     )
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
-        interactionError?.let { error -> DomainResult.Failure(error) }
-            ?: DomainResult.Success(interactionResult.copy(listingId = listingId))
+        scenario.interactionError?.let { error -> DomainResult.Failure(error) }
+            ?: DomainResult.Success(scenario.interactionResult.copy(listingId = listingId))
 
     override suspend fun listListingViewerInteractions(
         listingIds: List<String>,
-    ): DomainResult<List<ListingViewerInteraction>> = interactionError?.let { error -> DomainResult.Failure(error) }
-        ?: DomainResult.Success(viewerInteractions.filter { interaction -> interaction.listingId in listingIds })
+    ): DomainResult<List<ListingViewerInteraction>> =
+        scenario.interactionError?.let { error -> DomainResult.Failure(error) }
+            ?: DomainResult.Success(
+                scenario.viewerInteractions.filter { interaction -> interaction.listingId in listingIds },
+            )
 
     override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> {
         lastInteractionAction = "like"
@@ -434,30 +465,32 @@ private class FixedClockProvider(private val nowEpochMilliseconds: Long) : Clock
     override fun nowEpochMilliseconds(): Long = nowEpochMilliseconds
 }
 
-private fun listingSummary(
-    id: String = "listing-1",
-    name: String = "Listing test",
-    cityId: String = "cotonou",
-    coverImageUrl: String? = null,
-    ratingAverage: Double? = null,
-    likesCount: Int = 12,
-    sponsoredUntilEpochMilliseconds: Long? = null,
-): ListingSummary {
+private data class ListingSummaryFixture(
+    val id: String = "listing-1",
+    val name: String = "Listing test",
+    val cityId: String = "cotonou",
+    val coverImageUrl: String? = null,
+    val ratingAverage: Double? = null,
+    val likesCount: Int = 12,
+    val sponsoredUntilEpochMilliseconds: Long? = null,
+)
+
+private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixture()): ListingSummary {
     val price = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(5_000)).value
     return ListingSummary(
-        id = id,
+        id = fixture.id,
         type = ListingType.Place,
         listingClass = ListingClass.Heritage,
         status = ListingStatus.Published,
-        name = name,
-        cityId = cityId,
+        name = fixture.name,
+        cityId = fixture.cityId,
         categoryId = "heritage-historique",
-        coverImageUrl = coverImageUrl,
+        coverImageUrl = fixture.coverImageUrl,
         priceFromXof = price,
-        ratingAverage = ratingAverage,
-        likesCount = likesCount,
+        ratingAverage = fixture.ratingAverage,
+        likesCount = fixture.likesCount,
         verified = true,
-        sponsoredUntilEpochMilliseconds = sponsoredUntilEpochMilliseconds,
+        sponsoredUntilEpochMilliseconds = fixture.sponsoredUntilEpochMilliseconds,
     )
 }
 

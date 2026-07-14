@@ -9,6 +9,9 @@ import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 
+private const val MINIMUM_PASSWORD_LENGTH = 8
+private const val MINIMUM_OTP_LENGTH = 6
+
 class DataAuthRepository internal constructor(
     private val dataSource: AuthDataSource,
 ) : AuthRepository {
@@ -73,12 +76,6 @@ private inline fun <T> runAuthCall(block: () -> T): DomainResult<T> = try {
     DomainResult.Success(block())
 } catch (exception: AuthDataException) {
     DomainResult.Failure(exception.domainError)
-} catch (exception: IllegalArgumentException) {
-    DomainResult.Failure(DomainError.Validation(exception.message ?: "error.auth.invalid_request"))
-} catch (exception: IllegalStateException) {
-    DomainResult.Failure(DomainError.Unexpected())
-} catch (exception: Exception) {
-    DomainResult.Failure(DomainError.Unexpected())
 }
 
 private fun AuthSessionDto.toDomain(): AuthSession = AuthSession(
@@ -88,13 +85,19 @@ private fun AuthSessionDto.toDomain(): AuthSession = AuthSession(
 )
 
 private fun requireValidEmail(email: String) {
-    require(email.isNotBlank() && "@" in email) { "error.auth.email_invalid" }
+    if (email.isBlank() || "@" !in email) {
+        throw AuthDataException.Validation("error.auth.email_invalid")
+    }
 }
 
 private fun requirePassword(password: String) {
-    require(password.length >= 8) { "error.auth.password_too_short" }
+    if (password.length < MINIMUM_PASSWORD_LENGTH) {
+        throw AuthDataException.Validation("error.auth.password_too_short")
+    }
 }
 
 private fun requireOtpCode(otpCode: String) {
-    require(otpCode.trim().length >= 6) { "error.auth.otp_invalid" }
+    if (otpCode.trim().length < MINIMUM_OTP_LENGTH) {
+        throw AuthDataException.Validation("error.auth.otp_invalid")
+    }
 }

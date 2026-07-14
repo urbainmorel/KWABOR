@@ -104,6 +104,10 @@ exceptions:
 coroutines:
   GlobalCoroutineUsage:
     active: true                  # interdit GlobalScope
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable'] # Compose impose PascalCase aux fonctions UI
 ```
 
 > Les seuils (40, 400, 12, 4…) sont un point de départ senior sain. Ce sont **tes** seuils : durcis-les si besoin.
@@ -165,6 +169,31 @@ subprojects {
     }
 }
 ```
+
+### 3.1 Gate Detekt Kotlin Multiplatform
+
+Avec Detekt 1.23.x, la tâche agrégée `detekt` ne couvre pas automatiquement les source sets KMP avec résolution de types. Le module `shared` doit donc relier explicitement les tâches générées représentatives à la gate :
+
+```kotlin
+// shared/build.gradle.kts
+val detektCommonTest by tasks.registering(Detekt::class) {
+    description = "Runs Detekt on shared common tests."
+    setSource(fileTree("src/commonTest/kotlin") { include("**/*.kt") })
+}
+
+tasks.named("detekt") {
+    dependsOn(
+        detektCommonTest,
+        "detektMetadataCommonMain",
+        "detektAndroidMain",
+        "detektMetadataIosMain",
+        "detektAndroidHostTest",
+        "detektIosSimulatorArm64Test",
+    )
+}
+```
+
+Cette sélection analyse le code commun, les implémentations Android/iOS et les tests partagés. Les tâches de tests plateforme sont conservées dans la gate et s'activent dès que leurs source sets contiennent du code. La convention `@Composable` est configurée au niveau de la règle `FunctionNaming` ; aucune baseline ni suppression locale n'est nécessaire.
 
 > **Versions** : `6.25.0` (Spotless) et `1.23.7` (Detekt) sont stables et fonctionnelles ; vérifie les dernières sur le Gradle Plugin Portal et bumpe si tu veux. La version de ktlint est celle par défaut de Spotless — inutile de la figer.
 

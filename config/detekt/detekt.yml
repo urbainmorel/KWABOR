@@ -39,3 +39,7 @@ exceptions:
 coroutines:
   GlobalCoroutineUsage:
     active: true
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ["Composable"]

@@ -23,7 +23,7 @@ class PriceTagFormatterTest {
         val label = formatPriceTag(
             price = money(25_000),
             strings = strings,
-            mode = PriceTagMode.Compact,
+            options = PriceTagOptions(mode = PriceTagMode.Compact),
         )
 
         assertEquals("25 k FCFA", label)
@@ -34,7 +34,7 @@ class PriceTagFormatterTest {
         val label = formatPriceTag(
             price = money(5_000),
             strings = strings,
-            mode = PriceTagMode.Compact,
+            options = PriceTagOptions(mode = PriceTagMode.Compact),
         )
 
         assertEquals("5 000 FCFA", label)
@@ -45,9 +45,11 @@ class PriceTagFormatterTest {
         val label = formatPriceTag(
             price = money(5_000),
             strings = strings,
-            currency = KwaborCurrency.Eur,
-            convertedAmount = 7.62,
-            transactional = true,
+            options = PriceTagOptions(
+                currency = KwaborCurrency.Eur,
+                convertedAmount = 7.62,
+                transactional = true,
+            ),
         )
 
         assertEquals("≈ 7,62 €", label)
@@ -58,8 +60,10 @@ class PriceTagFormatterTest {
         val label = formatPriceTag(
             price = money(30_000),
             strings = strings,
-            mode = PriceTagMode.Compact,
-            transactional = true,
+            options = PriceTagOptions(
+                mode = PriceTagMode.Compact,
+                transactional = true,
+            ),
         )
 
         assertEquals("30 000 FCFA", label)

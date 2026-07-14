@@ -1,3 +1,4 @@
+import io.gitlab.arturbosch.detekt.Detekt
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -67,4 +68,20 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
     }
+}
+
+val detektCommonTest by tasks.registering(Detekt::class) {
+    description = "Runs Detekt on shared common tests."
+    setSource(fileTree("src/commonTest/kotlin") { include("**/*.kt") })
+}
+
+tasks.named("detekt") {
+    dependsOn(
+        detektCommonTest,
+        "detektMetadataCommonMain",
+        "detektAndroidMain",
+        "detektMetadataIosMain",
+        "detektAndroidHostTest",
+        "detektIosSimulatorArm64Test",
+    )
 }

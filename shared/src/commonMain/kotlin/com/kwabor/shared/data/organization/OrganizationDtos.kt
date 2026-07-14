@@ -264,10 +264,18 @@ private fun String.toOrganizationInviteStatus(): OrganizationInviteStatus = when
     else -> invalidDatabaseValue("organization_invites.status", this)
 }
 
-private fun String.toEpochMilliseconds(): Long = Instant.parse(this).toEpochMilliseconds()
+private fun String.toEpochMilliseconds(): Long = try {
+    Instant.parse(this).toEpochMilliseconds()
+} catch (exception: IllegalArgumentException) {
+    throw OrganizationDataException.Unexpected(exception)
+}
 
 private fun String.toEpochDay(): Int {
-    val epochDay = LocalDate.parse(this).toEpochDays()
+    val epochDay = try {
+        LocalDate.parse(this).toEpochDays()
+    } catch (exception: IllegalArgumentException) {
+        throw OrganizationDataException.Unexpected(exception)
+    }
     if (epochDay !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
         invalidDatabaseValue("date", this)
     }
@@ -287,5 +295,7 @@ private fun Long.toNonNegativeMoney(fieldName: String): MoneyXof = when (val res
 }
 
 private fun invalidDatabaseValue(fieldName: String, value: String): Nothing {
-    error("Invalid database value for $fieldName: $value")
+    throw OrganizationDataException.Unexpected(
+        IllegalStateException("Invalid database value for $fieldName: $value"),
+    )
 }

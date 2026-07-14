@@ -5,7 +5,9 @@ import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.PageRequest
 
-internal interface CatalogDataSource {
+internal interface CatalogDataSource : CatalogQueryDataSource, CatalogInteractionDataSource
+
+internal interface CatalogQueryDataSource {
     suspend fun listCities(): List<CityDto>
 
     suspend fun listCategories(): List<CategoryDto>
@@ -15,7 +17,9 @@ internal interface CatalogDataSource {
     suspend fun searchListings(query: ListingSearchQuery, page: PageRequest): List<ListingSummaryDto>
 
     suspend fun getListingDetail(listingId: String): ListingDetailDto
+}
 
+internal interface CatalogInteractionDataSource {
     suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto
 
     suspend fun listListingViewerInteractions(listingIds: List<String>): List<ListingViewerInteractionDto>
@@ -31,22 +35,28 @@ internal interface CatalogDataSource {
 
 internal sealed class CatalogDataException(
     val domainError: DomainError,
-) : RuntimeException(domainError.messageKey) {
+    cause: Throwable? = null,
+) : RuntimeException(domainError.messageKey, cause) {
     class NotFound(
         messageKey: String = "error.catalog.listing_not_found",
-    ) : CatalogDataException(DomainError.NotFound(messageKey))
+        cause: Throwable? = null,
+    ) : CatalogDataException(DomainError.NotFound(messageKey), cause)
 
     class PermissionDenied(
         messageKey: String = "error.catalog.permission_denied",
-    ) : CatalogDataException(DomainError.PermissionDenied(messageKey))
+        cause: Throwable? = null,
+    ) : CatalogDataException(DomainError.PermissionDenied(messageKey), cause)
 
-    class AuthenticationRequired : CatalogDataException(DomainError.AuthenticationRequired())
+    class AuthenticationRequired(cause: Throwable? = null) :
+        CatalogDataException(DomainError.AuthenticationRequired(), cause)
 
     class Validation(
         messageKey: String = "error.catalog.invalid_request",
-    ) : CatalogDataException(DomainError.Validation(messageKey))
+        cause: Throwable? = null,
+    ) : CatalogDataException(DomainError.Validation(messageKey), cause)
 
-    class NetworkUnavailable : CatalogDataException(DomainError.NetworkUnavailable())
+    class NetworkUnavailable(cause: Throwable? = null) :
+        CatalogDataException(DomainError.NetworkUnavailable(), cause)
 
-    class Unexpected : CatalogDataException(DomainError.Unexpected())
+    class Unexpected(cause: Throwable? = null) : CatalogDataException(DomainError.Unexpected(), cause)
 }

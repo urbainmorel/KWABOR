@@ -11,6 +11,13 @@ import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
 
+private const val HTTP_BAD_REQUEST = 400
+private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_NOT_FOUND = 404
+private const val HTTP_CONFLICT = 409
+private const val HTTP_UNPROCESSABLE_CONTENT = 422
+
 internal class SupabaseCatalogDataSource(
     private val postgrest: Postgrest,
 ) : CatalogDataSource {
@@ -191,26 +198,29 @@ private suspend fun <T> runPostgrest(block: suspend () -> T): T = try {
 } catch (exception: RestException) {
     throw exception.toCatalogDataException()
 } catch (exception: HttpRequestTimeoutException) {
-    throw CatalogDataException.NetworkUnavailable()
+    throw CatalogDataException.NetworkUnavailable(exception)
 } catch (exception: HttpRequestException) {
-    throw CatalogDataException.NetworkUnavailable()
+    throw CatalogDataException.NetworkUnavailable(exception)
 }
 
 private fun RestException.toCatalogDataException(): CatalogDataException {
     if (this is PostgrestRestException) {
         when (code) {
-            "P0002", "PGRST116" -> return CatalogDataException.NotFound()
-            "42501" -> return CatalogDataException.AuthenticationRequired()
-            "22023", "23503", "23505", "23514" -> return CatalogDataException.Validation()
+            "P0002", "PGRST116" -> return CatalogDataException.NotFound(cause = this)
+            "42501" -> return CatalogDataException.AuthenticationRequired(this)
+            "22023", "23503", "23505", "23514" -> return CatalogDataException.Validation(cause = this)
         }
     }
 
     return when (statusCode) {
-        401 -> CatalogDataException.AuthenticationRequired()
-        403 -> CatalogDataException.PermissionDenied()
-        404 -> CatalogDataException.NotFound()
-        400, 409, 422 -> CatalogDataException.Validation()
-        else -> CatalogDataException.Unexpected()
+        HTTP_UNAUTHORIZED -> CatalogDataException.AuthenticationRequired(this)
+        HTTP_FORBIDDEN -> CatalogDataException.PermissionDenied(cause = this)
+        HTTP_NOT_FOUND -> CatalogDataException.NotFound(cause = this)
+        HTTP_BAD_REQUEST,
+        HTTP_CONFLICT,
+        HTTP_UNPROCESSABLE_CONTENT,
+        -> CatalogDataException.Validation(cause = this)
+        else -> CatalogDataException.Unexpected(this)
     }
 }
 

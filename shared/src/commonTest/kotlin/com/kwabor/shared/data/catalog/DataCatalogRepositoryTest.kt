@@ -242,7 +242,7 @@ private class FakeCatalogDataSource(
         }
 
         return ListingDetailDto(
-            listing = listingDto(id = listingId),
+            listing = listingDto(ListingDtoFixture(id = listingId)),
             media = listOf(
                 ListingMediaDto(
                     url = "https://cdn.kwabor.test/cover.jpg",
@@ -282,6 +282,6 @@ private class FakeCatalogDataSource(
 
 private fun listingSummaryDto(id: String = "listing-1", type: String = "etablissement"): ListingSummaryDto =
     ListingSummaryDto(
-        listing = listingDto(id = id, type = type),
+        listing = listingDto(ListingDtoFixture(id = id, type = type)),
         coverImageUrl = "https://cdn.kwabor.test/cover.jpg",
     )

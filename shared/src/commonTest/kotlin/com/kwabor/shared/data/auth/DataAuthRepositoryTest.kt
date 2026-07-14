@@ -4,6 +4,7 @@ import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
 import com.kwabor.shared.domain.auth.EmailSignUpRequest
 import com.kwabor.shared.domain.auth.OnboardingProfileInput
+import com.kwabor.shared.domain.auth.OnboardingProfileValues
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
@@ -204,13 +205,15 @@ private fun authSessionDto(): AuthSessionDto = AuthSessionDto(
 
 private fun onboardingInput(): OnboardingProfileInput = assertIs<DomainResult.Success<OnboardingProfileInput>>(
     OnboardingProfileInput.create(
-        firstName = "Afi",
-        lastName = "Kwabor",
-        cityId = "cotonou",
-        preferredLocale = AppLocale.French,
-        preferredCurrency = KwaborCurrency.Xof,
-        termsAccepted = true,
-        privacyPolicyAccepted = true,
-        ugcLicenseAccepted = true,
+        OnboardingProfileValues(
+            firstName = "Afi",
+            lastName = "Kwabor",
+            cityId = "cotonou",
+            preferredLocale = AppLocale.French,
+            preferredCurrency = KwaborCurrency.Xof,
+            termsAccepted = true,
+            privacyPolicyAccepted = true,
+            ugcLicenseAccepted = true,
+        ),
     ),
 ).value
