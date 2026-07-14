@@ -1,3 +1,22 @@
 kwabor.environment=development
+
+# Generic values apply only to the tier selected above.
 kwabor.supabase.url=
 kwabor.supabase.publishableKey=
+
+# Optional per-tier values are useful when validating multiple Android variants.
+kwabor.development.supabase.url=
+kwabor.development.supabase.publishableKey=
+kwabor.staging.supabase.url=
+kwabor.staging.supabase.publishableKey=
+kwabor.production.supabase.url=
+kwabor.production.supabase.publishableKey=
+
+kwabor.versionCode=1
+kwabor.versionName=0.1.0
+
+# Supply all four values together only for a production AAB build.
+kwabor.android.signing.storePath=
+kwabor.android.signing.storePassword=
+kwabor.android.signing.keyAlias=
+kwabor.android.signing.keyPassword=
