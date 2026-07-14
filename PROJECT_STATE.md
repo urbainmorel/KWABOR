@@ -65,10 +65,12 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - PR AUTH-001A `#17` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
 - V1-GOV-001 implémentée sur branche : feuille de route `docs/v1-production-delivery.md`, backlog exhaustif et ADR Room KMP, IA multi-provider, Firebase et FedaPay.
 - Protection de `main` activée : passage par PR, conversations résolues, admins inclus, force-push/suppression interdits, checks `quality` et `iOS simulator build` requis.
+- PR V1-GOV-001 `#18` mergée dans `main` au commit `d7f0e09`, avec `quality`, pgTAP et `iOS simulator build` verts.
+- CI-004 implémentée sur branche : checkout `v7.0.0`, setup-java `v5.5.0` et setup-gradle `v6.2.0`, tous compatibles Node 24.
 
 ## Tâche en cours
 
-PR-V1-GOV-001 — valider et merger la gouvernance V1 avant la première tranche d'architecture.
+PR-CI-004 — valider puis merger la modernisation Node 24 des actions GitHub sans modifier les gates.
 
 ## Blocages / limites
 
@@ -88,4 +90,4 @@ PR-V1-GOV-001 — valider et merger la gouvernance V1 avant la première tranche
 
 ## Prochaine tâche logique
 
-Après merge de V1-GOV-001 et CI distante verte, démarrer ARCH-001 sur une branche dédiée : modules Koin par feature et composition roots Android/iOS sans service locator.
+Après merge de CI-004 et CI distante verte, démarrer ARCH-001 sur une branche dédiée : modules Koin par feature et composition roots Android/iOS sans service locator.
