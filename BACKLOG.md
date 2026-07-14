@@ -39,7 +39,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ### Architecture et environnements
 
-- [ ] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.
+- [x] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.
 - [ ] ARCH-001 — Remplacer la construction manuelle par des modules Koin et composition roots Android/iOS.
 - [ ] ARCH-002 — Déplacer l'UI Compose et les tokens Android de `shared` vers `androidApp` sans régression visuelle.
 - [ ] ARCH-003 — Introduire les ViewModels par feature, `StateFlow` immuable, intents exhaustifs et effets ponctuels.

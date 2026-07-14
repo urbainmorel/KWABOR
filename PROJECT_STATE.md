@@ -66,10 +66,11 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - V1-GOV-001 implémentée sur branche : feuille de route `docs/v1-production-delivery.md`, backlog exhaustif et ADR Room KMP, IA multi-provider, Firebase et FedaPay.
 - Protection de `main` activée : passage par PR, conversations résolues, admins inclus, force-push/suppression interdits, checks `quality` et `iOS simulator build` requis.
 - PR V1-GOV-001 `#18` mergée dans `main` au commit `d7f0e09`, avec `quality`, pgTAP et `iOS simulator build` verts.
+- CI-004 implémentée sur branche : checkout `v7.0.0`, setup-java `v5.5.0` et setup-gradle `v6.2.0`, tous compatibles Node 24.
 
 ## Tâche en cours
 
-CI-004 — supprimer l'avertissement GitHub Actions Node 20 avec des versions compatibles Node 24, sans modifier les gates.
+PR-CI-004 — valider puis merger la modernisation Node 24 des actions GitHub sans modifier les gates.
 
 ## Blocages / limites
 
