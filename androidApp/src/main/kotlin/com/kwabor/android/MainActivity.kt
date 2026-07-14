@@ -3,7 +3,7 @@ package com.kwabor.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.kwabor.shared.app.KwaborApp
+import com.kwabor.android.app.KwaborApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
