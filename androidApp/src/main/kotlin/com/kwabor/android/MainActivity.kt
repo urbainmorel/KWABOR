@@ -1,5 +1,6 @@
 package com.kwabor.android
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,10 +16,14 @@ import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
+    private val pendingDeepLink = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        acceptDeepLink(intent)
         val compositionRoot = (application as KwaborApplication).compositionRoot
         val authPresenter = compositionRoot?.authPresenter
         if (compositionRoot == null || authPresenter == null) {
@@ -60,7 +65,20 @@ class MainActivity : ComponentActivity() {
             KwaborApp(
                 exploreViewModel = exploreViewModel,
                 authViewModel = authViewModel,
+                pendingDeepLink = pendingDeepLink,
+                onDeepLinkConsumed = { pendingDeepLink.value = null },
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptDeepLink(intent)
+    }
+
+    private fun acceptDeepLink(sourceIntent: Intent) {
+        pendingDeepLink.value = sourceIntent.dataString
+        sourceIntent.data = null
     }
 }

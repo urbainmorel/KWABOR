@@ -50,6 +50,7 @@ class AuthViewModelTest {
         val repository = ViewModelAuthRepository(sessionGate = sessionGate)
         val viewModel = AuthViewModel(AuthPresenter(repository), strings, this)
 
+        assertFalse(viewModel.isSessionRestoreComplete.value)
         viewModel.onIntent(AuthIntent.Open)
         viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
         sessionGate.complete(Unit)
@@ -57,6 +58,7 @@ class AuthViewModelTest {
 
         assertTrue(viewModel.state.value.isVisible)
         assertEquals(TEST_EMAIL, viewModel.state.value.email)
+        assertTrue(viewModel.isSessionRestoreComplete.value)
     }
 
     @Test

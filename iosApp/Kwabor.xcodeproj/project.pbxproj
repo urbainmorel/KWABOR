@@ -12,6 +12,7 @@
 		1A0000010000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000006 /* Assets.xcassets */; };
 		1A0000010000000000000007 /* Shared.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000008 /* Shared.xcframework */; };
 		1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000029 /* KwaborDesignTokens.swift */; };
+		1A0000010000000000000030 /* RootNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000031 /* RootNavigation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +22,8 @@
 		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = ../shared/build/XCFrameworks/debug/Shared.xcframework; sourceTree = "<group>"; };
 		1A0000010000000000000009 /* Kwabor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kwabor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000010000000000000029 /* KwaborDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborDesignTokens.swift; sourceTree = "<group>"; };
+		1A0000010000000000000031 /* RootNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootNavigation.swift; sourceTree = "<group>"; };
+		1A0000010000000000000032 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +78,7 @@
 				1A0000010000000000000002 /* KwaborApp.swift */,
 				1A0000010000000000000004 /* ContentView.swift */,
 				1A0000010000000000000029 /* KwaborDesignTokens.swift */,
+				1A0000010000000000000031 /* RootNavigation.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -83,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				1A0000010000000000000006 /* Assets.xcassets */,
+				1A0000010000000000000032 /* Info.plist */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -160,6 +165,7 @@
 				1A0000010000000000000001 /* KwaborApp.swift in Sources */,
 				1A0000010000000000000003 /* ContentView.swift in Sources */,
 				1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */,
+				1A0000010000000000000030 /* RootNavigation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,11 +298,8 @@
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/XCFrameworks/debug",
 				);
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Kwabor;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Kwabor/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -326,11 +329,8 @@
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/XCFrameworks/debug",
 				);
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Kwabor;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Kwabor/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
