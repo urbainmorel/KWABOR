@@ -8,6 +8,7 @@ enum class AuthStep {
 }
 
 data class AuthUiState(
+    val isVisible: Boolean = false,
     val email: String = "",
     val otpCode: String = "",
     val firstName: String = "",

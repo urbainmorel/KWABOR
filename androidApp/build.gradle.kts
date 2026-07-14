@@ -82,9 +82,12 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.runtime)
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.10.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0")
     testImplementation(kotlin("test-junit"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
 
 val detektUnitTest by tasks.registering(Detekt::class) {

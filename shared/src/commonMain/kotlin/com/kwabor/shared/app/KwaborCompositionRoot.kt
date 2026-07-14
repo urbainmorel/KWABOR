@@ -9,6 +9,10 @@ import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.organization.OrganizationRepository
+import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.authPresentationModule
+import com.kwabor.shared.presentation.explore.ExplorePresenter
+import com.kwabor.shared.presentation.explore.explorePresentationModule
 import io.github.jan.supabase.auth.SessionManager
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
@@ -21,7 +25,9 @@ class KwaborCompositionRoot internal constructor(
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
+    val explorePresenter: ExplorePresenter = application.koin.get()
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
+    val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
 
     fun close() {
         application.close()
@@ -50,10 +56,11 @@ internal fun createKwaborCompositionRootOrNull(
                 authSessionManager = authSessionManager,
             ),
             catalogDataModule,
+            explorePresentationModule,
             organizationDataModule,
         )
         if (authSessionManager != null) {
-            includes(authDataModule)
+            includes(authDataModule, authPresentationModule)
         }
     }
     val application = koinApplication {

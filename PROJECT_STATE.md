@@ -82,10 +82,17 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Compose et Coil ont été retirés du module `shared` ; l'image catalogue Android est désormais un composable Android normal et l'ancien placeholder Compose iOS a été supprimé.
 - Les tests des tokens et du formatage de prix ont été transférés vers les tests JVM de `androidApp` ; la gate Detekt Android couvre explicitement aussi ces tests.
 - Validation locale ARCH-002 : `check`, APK debug et compilation Kotlin iOS simulateur verts ; 100 tests partagés et neuf tests JVM Android sans échec ; Detekt application/tests et KMP vert.
+- PR ARCH-002 `#22` mergée dans `main` au commit `6c0464f`, avec `quality`/pgTAP verts en 3 min 32 s et `iOS simulator build` vert en 4 min 56 s.
+- ARCH-003 implémentée sur branche : `ExploreViewModel` et `AuthViewModel` Android Lifecycle par feature, sans base générique, exposent des `StateFlow` en lecture seule et des `Intent`/`Effect` scellés.
+- `KwaborApp` ne construit plus de presenter et ne détient plus l'état Auth/Explore ; la route observe les flux avec le lifecycle et coordonne les effets auth/reprise d'interaction.
+- Les presenters Auth/Explore sont fournis par des modules Koin dédiés ; chaque ViewModel reçoit un scope principal créé par la composition root, remplacé par un `TestScope` dans les tests.
+- Un état utilisateur sûr remplace le shell vide lorsque la configuration distante obligatoire est absente, sans exposer de détail technique.
+- Tests ARCH-003 ajoutés pour sélection d'onglet, auth requise, poursuite invité, reprise Like authentifiée, OTP, conservation de saisie pendant la restauration de session et effet d'authentification.
+- Validation locale ARCH-003 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 4 min 53 s ; 100 tests partagés et 16 tests JVM Android sans échec ; Detekt application/tests et KMP vert.
 
 ## Tâche en cours
 
-PR-ARCH-002 — publier puis merger la séparation de l'UI Android après validation locale et CI distante complète.
+PR-ARCH-003 — terminer la validation globale puis publier et merger l'UDF Auth/Explore après CI distante complète.
 
 ## Blocages / limites
 
@@ -105,4 +112,4 @@ PR-ARCH-002 — publier puis merger la séparation de l'UI Android après valida
 
 ## Prochaine tâche logique
 
-Après merge d'ARCH-002 et CI distante verte, démarrer ARCH-003 sur une branche dédiée : introduire des ViewModels par feature avec `StateFlow` immuable, intents exhaustifs et effets ponctuels.
+Après merge d'ARCH-003 et CI distante verte, démarrer NAV-001 sur une branche dédiée : navigation Android/SwiftUI native avec routes et deep links typés.

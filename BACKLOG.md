@@ -45,8 +45,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] CI-005 — Rendre Detekt effectif sur les source sets KMP et traiter la convention Compose sans baseline ni `@Suppress`.
 - [x] PR-CI-005 — PR `#21` mergée après `quality`, pgTAP, tests communs et `iOS simulator build` verts.
 - [x] ARCH-002 — Déplacer l'UI Compose et les tokens Android de `shared` vers `androidApp` sans régression visuelle.
-- [ ] PR-ARCH-002 — Merger la séparation UI Android après tests JVM, `quality`, pgTAP et `iOS simulator build` verts.
-- [ ] ARCH-003 — Introduire les ViewModels par feature, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
+- [x] PR-ARCH-002 — PR `#22` mergée après tests JVM, `quality`, pgTAP et `iOS simulator build` verts.
+- [x] ARCH-003 — Introduire les ViewModels Auth/Explore, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
+- [ ] PR-ARCH-003 — Merger l'UDF Auth/Explore après tests de flux, `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
 - [ ] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
