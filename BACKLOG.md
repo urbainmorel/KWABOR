@@ -58,6 +58,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [x] PR-IOS-REL-001 — PR `#27` mergée après `quality`, pgTAP et les trois configurations simulateur vertes.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
+  - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
+  - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et Remote Config sur appareils avec consentement.
+- [x] PR-OBS-001A — PR `#28` livrée après tests ciblés, `quality`, pgTAP et les trois configurations iOS simulateur vertes.
 
 ### Auth et onboarding
 

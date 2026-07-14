@@ -2,7 +2,7 @@
 
 ## Phase actuelle
 
-Livraison V1 production — gouvernance et architecture avant verticales produit.
+Livraison V1 production — socle production livré, verticales produit actives.
 
 ## Dernière tâche terminée
 
@@ -122,10 +122,18 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - La CI macOS construit désormais les XCFrameworks debug/release puis les configurations simulateur Debug/Staging/Release sans signature.
 - Validation locale IOS-REL-001 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 59 s ; Detekt/Spotless/lint verts. JSON assets, XML/plists, PNG/dimensions/opacité, déterminisme et unicité des objets PBX validés ; workflows conformes au parseur Prettier YAML.
 - PR IOS-REL-001 `#27` mergée dans `main` après `quality`/pgTAP et compilation macOS des trois configurations simulateur vertes.
+- OBS-001A livrée : Firebase Analytics, Crashlytics, Performance et Remote Config sont intégrés nativement sur Android et iOS, sans imposer de SDK Firebase au domaine partagé.
+- La collecte Analytics/Crashlytics/Performance et le fetch Remote Config sont refusés par défaut sur les deux plateformes ; accorder ou révoquer les trois consentements applique immédiatement les états SDK et réinitialise les données/configurations concernées.
+- Le contrat partagé expose le catalogue fermé des événements PRD, des diagnostics et des traces ; le contexte analytique refuse les identifiants non opaques afin d'éviter noms, emails, texte libre et autres PII.
+- Android active Google Services uniquement en présence du fichier injecté et les workflows release valident projet/bundle avant tout build ; iOS sélectionne uniquement un plist au bundle ID exact et verrouille Firebase 12.16.0 avec ses dépendances SwiftPM.
+- Le cache Remote Config de l'intro ne retient qu'une URL HTTPS sûre, un SHA-256 valide et une révision positive ; toute configuration absente, invalide ou révoquée revient aux valeurs embarquées sûres.
+- Privacy Manifest, Info.plist, AndroidManifest et runbook `docs/observability.md` documentent les collectes, le consentement, l'injection, la vérification appareil et les responsabilités propriétaire.
+- Validation locale OBS-001A : tests communs et Android ciblés, Detekt/Spotless, `check`, lint, APK debug, compilation Kotlin iOS simulateur, chemin Android configuré et `git diff --check` verts ; XML/plists, YAML et verrou SwiftPM validés.
+- PR OBS-001A `#28` mergée dans `main` après `quality`/pgTAP verts en 4 min 00 s et compilation macOS des configurations simulateur Debug/Staging/Release verte en 19 min 41 s.
 
 ## Tâche en cours
 
-OBS-001 — intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement et configuration injectée.
+AUTH-002 — livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
 
 ## Blocages / limites
 
@@ -141,10 +149,11 @@ OBS-001 — intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performa
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le flux email OTP Android s'appuie sur les états/presenters partagés et l'UI Compose propre à `androidApp`, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
+- OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Après merge d'OBS-001 et CI distante verte, poursuivre `AUTH-002` ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
+Poursuivre `AUTH-002` ; finaliser ENV-001B/OBS-001B dès que le propriétaire a choisi l'organisation Supabase, réauthentifié Firebase et provisionné les environnements distants.
