@@ -8,7 +8,6 @@ import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
-import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.core.PageRequest
 import com.kwabor.shared.domain.core.PageResult
@@ -83,14 +82,6 @@ private inline fun <T> runDataCall(block: () -> T): DomainResult<T> = try {
     DomainResult.Success(block())
 } catch (exception: CatalogDataException) {
     DomainResult.Failure(exception.domainError)
-} catch (exception: NoSuchElementException) {
-    DomainResult.Failure(DomainError.NotFound("error.catalog.listing_not_found"))
-} catch (exception: IllegalArgumentException) {
-    DomainResult.Failure(DomainError.Unexpected())
-} catch (exception: IllegalStateException) {
-    DomainResult.Failure(DomainError.Unexpected())
-} catch (exception: Exception) {
-    DomainResult.Failure(DomainError.Unexpected())
 }
 
 private fun <T> List<T>.toPageResult(page: PageRequest): PageResult<T> = PageResult(

@@ -3,6 +3,7 @@ package com.kwabor.shared.presentation.auth
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
 import com.kwabor.shared.domain.auth.OnboardingProfileInput
+import com.kwabor.shared.domain.auth.OnboardingProfileValues
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.core.DomainError
@@ -55,18 +56,7 @@ class AuthPresenter(
     }
 
     suspend fun verifyEmailOtpWithProfile(state: AuthUiState, strings: KwaborStrings): AuthUiState {
-        val onboarding = when (
-            val result = OnboardingProfileInput.create(
-                firstName = state.firstName.trim(),
-                lastName = state.lastName.trim(),
-                cityId = null,
-                preferredLocale = AppLocale.French,
-                preferredCurrency = KwaborCurrency.Xof,
-                termsAccepted = state.legalAccepted,
-                privacyPolicyAccepted = state.legalAccepted,
-                ugcLicenseAccepted = state.legalAccepted,
-            )
-        ) {
+        val onboarding = when (val result = state.toOnboardingProfileInput()) {
             is DomainResult.Success -> result.value
             is DomainResult.Failure -> return state.copy(
                 isLoading = false,
@@ -74,16 +64,17 @@ class AuthPresenter(
             )
         }
 
+        return verifyEmailOtp(state = state, onboarding = onboarding, strings = strings)
+    }
+
+    private suspend fun verifyEmailOtp(
+        state: AuthUiState,
+        onboarding: OnboardingProfileInput,
+        strings: KwaborStrings,
+    ): AuthUiState {
         val loadingState = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
-        return when (
-            val result = authRepository.verifyEmailOtpWithProfile(
-                EmailOtpProfileRequest(
-                    email = state.email,
-                    otpCode = state.otpCode,
-                    onboarding = onboarding,
-                ),
-            )
-        ) {
+        val request = EmailOtpProfileRequest(email = state.email, otpCode = state.otpCode, onboarding = onboarding)
+        return when (val result = authRepository.verifyEmailOtpWithProfile(request)) {
             is DomainResult.Success -> loadingState.copy(
                 isLoading = false,
                 currentSession = result.value,
@@ -95,6 +86,20 @@ class AuthPresenter(
             )
         }
     }
+
+    private fun AuthUiState.toOnboardingProfileInput(): DomainResult<OnboardingProfileInput> =
+        OnboardingProfileInput.create(
+            OnboardingProfileValues(
+                firstName = firstName.trim(),
+                lastName = lastName.trim(),
+                cityId = null,
+                preferredLocale = AppLocale.French,
+                preferredCurrency = KwaborCurrency.Xof,
+                termsAccepted = legalAccepted,
+                privacyPolicyAccepted = legalAccepted,
+                ugcLicenseAccepted = legalAccepted,
+            ),
+        )
 
     suspend fun signInWithSocialIdToken(
         state: AuthUiState,

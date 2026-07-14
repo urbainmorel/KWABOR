@@ -34,9 +34,11 @@ class CatalogDtoMappingTest {
     fun listingSummaryDto_mapsMoneyStatusAndSponsorDate() {
         val summary = ListingSummaryDto(
             listing = listingDto(
-                status = "publie",
-                priceFromXof = 15_000,
-                sponsoredUntil = "2026-07-03T10:15:30Z",
+                ListingDtoFixture(
+                    status = "publie",
+                    priceFromXof = 15_000,
+                    sponsoredUntil = "2026-07-03T10:15:30Z",
+                ),
             ),
             coverImageUrl = "https://cdn.kwabor.test/cover.jpg",
         ).toDomain()
@@ -51,10 +53,12 @@ class CatalogDtoMappingTest {
     fun listingDetailDto_mapsLocaleGeoPointContactAndSortedMedia() {
         val detail = ListingDetailDto(
             listing = listingDto(
-                contentLang = "fr",
-                latitude = 6.370293,
-                longitude = 2.391236,
-                publishedAt = "2026-07-03T10:15:30Z",
+                ListingDtoFixture(
+                    contentLang = "fr",
+                    latitude = 6.370293,
+                    longitude = 2.391236,
+                    publishedAt = "2026-07-03T10:15:30Z",
+                ),
             ),
             media = listOf(
                 ListingMediaDto(
@@ -83,11 +87,11 @@ class CatalogDtoMappingTest {
     @Test
     fun listingDto_rejectsInvalidDatabaseEnum() {
         val dto = ListingSummaryDto(
-            listing = listingDto(type = "invalid"),
+            listing = listingDto(ListingDtoFixture(type = "invalid")),
             coverImageUrl = null,
         )
 
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<CatalogDataException.Unexpected> {
             dto.toDomain()
         }
     }
@@ -110,7 +114,7 @@ class CatalogDtoMappingTest {
     fun listingViewerInteractionDto_rejectsNegativeCount() {
         val dto = listingViewerInteractionDto(likesCount = -1)
 
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<CatalogDataException.Unexpected> {
             dto.toDomain()
         }
     }
@@ -126,46 +130,48 @@ class CatalogDtoMappingTest {
     }
 }
 
-internal fun listingDto(
-    id: String = "listing-1",
-    type: String = "etablissement",
-    listingClass: String = "commercial",
-    status: String = "publie",
-    contentLang: String = "fr",
-    latitude: Double? = null,
-    longitude: Double? = null,
-    priceFromXof: Long? = null,
-    sponsoredUntil: String? = null,
-    publishedAt: String? = null,
-): ListingDto = ListingDto(
-    id = id,
-    type = type,
-    listingClass = listingClass,
+internal data class ListingDtoFixture(
+    val id: String = "listing-1",
+    val type: String = "etablissement",
+    val listingClass: String = "commercial",
+    val status: String = "publie",
+    val contentLang: String = "fr",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val priceFromXof: Long? = null,
+    val sponsoredUntil: String? = null,
+    val publishedAt: String? = null,
+)
+
+internal fun listingDto(fixture: ListingDtoFixture = ListingDtoFixture()): ListingDto = ListingDto(
+    id = fixture.id,
+    type = fixture.type,
+    listingClass = fixture.listingClass,
     categoryId = "restaurants",
     ownerId = "owner-1",
     stewardId = null,
-    status = status,
+    status = fixture.status,
     name = "Restaurant Kwabor",
     slug = "restaurant-kwabor",
     description = "Restaurant de test pour verifier le mapping catalogue.",
-    contentLang = contentLang,
+    contentLang = fixture.contentLang,
     cityId = "cotonou",
     district = "Ganhi",
     address = "Rue de test",
-    latitude = latitude,
-    longitude = longitude,
-    priceFromXof = priceFromXof,
-    priceUnit = if (priceFromXof == null) "aucune" else "consommation",
+    latitude = fixture.latitude,
+    longitude = fixture.longitude,
+    priceFromXof = fixture.priceFromXof,
+    priceUnit = if (fixture.priceFromXof == null) "aucune" else "consommation",
     contactPhone = "+2290100000000",
     contactWhatsapp = "+2290100000000",
     externalUrl = "https://kwabor.test",
     email = "contact@kwabor.test",
     tags = listOf("benin", "restaurant"),
     verified = true,
-    sponsoredUntil = sponsoredUntil,
+    sponsoredUntil = fixture.sponsoredUntil,
     ratingAverage = 4.5,
     likesCount = 12,
-    publishedAt = publishedAt,
+    publishedAt = fixture.publishedAt,
 )
 
 internal fun listingViewerInteractionDto(

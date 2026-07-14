@@ -10,12 +10,14 @@ class SocialPostDraftTest {
     @Test
     fun create_requiresAttachedListing() {
         val result = SocialPostDraft.create(
-            authorId = "user-1",
-            listingId = "",
-            mediaType = SocialMediaType.Photo,
-            caption = null,
-            contentLocale = AppLocale.French,
-            media = listOf(sampleMediaAsset()),
+            SocialPostDraftValues(
+                authorId = "user-1",
+                listingId = "",
+                mediaType = SocialMediaType.Photo,
+                caption = null,
+                contentLocale = AppLocale.French,
+                media = listOf(sampleMediaAsset()),
+            ),
         )
 
         assertIs<DomainResult.Failure>(result)
@@ -24,14 +26,16 @@ class SocialPostDraftTest {
     @Test
     fun create_sortsMediaByOrder() {
         val result = SocialPostDraft.create(
-            authorId = "user-1",
-            listingId = "listing-1",
-            mediaType = SocialMediaType.Slideshow,
-            caption = "Week-end à Ouidah",
-            contentLocale = AppLocale.French,
-            media = listOf(
-                sampleMediaAsset(order = 2),
-                sampleMediaAsset(order = 1),
+            SocialPostDraftValues(
+                authorId = "user-1",
+                listingId = "listing-1",
+                mediaType = SocialMediaType.Slideshow,
+                caption = "Week-end à Ouidah",
+                contentLocale = AppLocale.French,
+                media = listOf(
+                    sampleMediaAsset(order = 2),
+                    sampleMediaAsset(order = 1),
+                ),
             ),
         )
 

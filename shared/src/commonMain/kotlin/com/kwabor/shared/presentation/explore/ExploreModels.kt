@@ -6,6 +6,9 @@ import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
 
+private const val SAMPLE_MAIN_PRICE_XOF = 25_000L
+private const val SAMPLE_SECONDARY_PRICE_XOF = 5_000L
+
 enum class ExploreTab {
     Places,
     Events,
@@ -127,44 +130,46 @@ fun sampleExploreUiState(strings: KwaborStrings): ExploreUiState = ExploreUiStat
     selectedTab = ExploreTab.Places,
     selectedChipId = "history",
     chips = ExploreTab.Places.defaultChips(strings),
-    listings = listOf(
-        ExploreListingItem(
-            id = "ganhihouse",
-            title = "Maison Ganhi",
-            cityLabel = "Cotonou",
-            coverImageUrl = null,
-            price = money(25_000),
-            ratingLabel = "4,7",
-            sponsored = true,
-            liked = true,
-            favorited = true,
-        ),
-        ExploreListingItem(
-            id = "ouidahmuseum",
-            title = "Musée de Ouidah",
-            cityLabel = "Ouidah",
-            coverImageUrl = null,
-            price = null,
-            ratingLabel = "4,5",
-        ),
-        ExploreListingItem(
-            id = "ganvie",
-            title = "Ganvié",
-            cityLabel = "Abomey-Calavi",
-            coverImageUrl = null,
-            price = money(5_000),
-            ratingLabel = "4,8",
-            liked = true,
-        ),
-        ExploreListingItem(
-            id = "fidjrosse",
-            title = "Plage de Fidjrossè",
-            cityLabel = "Cotonou",
-            coverImageUrl = null,
-            price = null,
-            ratingLabel = "4,4",
-            favorited = true,
-        ),
+    listings = sampleExploreListings(),
+)
+
+private fun sampleExploreListings(): List<ExploreListingItem> = listOf(
+    ExploreListingItem(
+        id = "ganhihouse",
+        title = "Maison Ganhi",
+        cityLabel = "Cotonou",
+        coverImageUrl = null,
+        price = money(SAMPLE_MAIN_PRICE_XOF),
+        ratingLabel = "4,7",
+        sponsored = true,
+        liked = true,
+        favorited = true,
+    ),
+    ExploreListingItem(
+        id = "ouidahmuseum",
+        title = "Musée de Ouidah",
+        cityLabel = "Ouidah",
+        coverImageUrl = null,
+        price = null,
+        ratingLabel = "4,5",
+    ),
+    ExploreListingItem(
+        id = "ganvie",
+        title = "Ganvié",
+        cityLabel = "Abomey-Calavi",
+        coverImageUrl = null,
+        price = money(SAMPLE_SECONDARY_PRICE_XOF),
+        ratingLabel = "4,8",
+        liked = true,
+    ),
+    ExploreListingItem(
+        id = "fidjrosse",
+        title = "Plage de Fidjrossè",
+        cityLabel = "Cotonou",
+        coverImageUrl = null,
+        price = null,
+        ratingLabel = "4,4",
+        favorited = true,
     ),
 )
 

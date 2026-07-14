@@ -25,6 +25,12 @@ import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.serialization.json.put
 
+private const val HTTP_BAD_REQUEST = 400
+private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_CONFLICT = 409
+private const val HTTP_UNPROCESSABLE_CONTENT = 422
+
 internal class SupabaseAuthDataSource(
     private val auth: Auth,
 ) : AuthDataSource {
@@ -100,17 +106,17 @@ private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T = try {
 } catch (exception: AuthDataException) {
     throw exception
 } catch (exception: AuthWeakPasswordException) {
-    throw AuthDataException.Validation("error.auth.password_too_weak")
+    throw AuthDataException.Validation("error.auth.password_too_weak", exception)
 } catch (exception: AuthSessionMissingException) {
-    throw AuthDataException.AuthenticationRequired()
+    throw AuthDataException.AuthenticationRequired(cause = exception)
 } catch (exception: AuthRestException) {
     throw exception.toAuthDataException()
 } catch (exception: RestException) {
     throw exception.toAuthDataException()
 } catch (exception: HttpRequestTimeoutException) {
-    throw AuthDataException.NetworkUnavailable()
+    throw AuthDataException.NetworkUnavailable(exception)
 } catch (exception: HttpRequestException) {
-    throw AuthDataException.NetworkUnavailable()
+    throw AuthDataException.NetworkUnavailable(exception)
 }
 
 private fun RestException.toAuthDataException(): AuthDataException {
@@ -121,23 +127,26 @@ private fun RestException.toAuthDataException(): AuthDataException {
             "ProviderDisabled",
             "ProviderEmailNeedsVerification",
             "InvalidCredentials",
-            -> return AuthDataException.Validation()
+            -> return AuthDataException.Validation(cause = this)
 
             "OtpExpired",
             "BadJwt",
             "SessionExpired",
             "SessionNotFound",
-            -> return AuthDataException.AuthenticationRequired()
+            -> return AuthDataException.AuthenticationRequired(cause = this)
 
-            "WeakPassword" -> return AuthDataException.Validation("error.auth.password_too_weak")
+            "WeakPassword" -> return AuthDataException.Validation("error.auth.password_too_weak", this)
         }
     }
 
     return when (statusCode) {
-        400, 409, 422 -> AuthDataException.Validation()
-        401 -> AuthDataException.AuthenticationRequired()
-        403 -> AuthDataException.PermissionDenied()
-        else -> AuthDataException.Unexpected()
+        HTTP_BAD_REQUEST,
+        HTTP_CONFLICT,
+        HTTP_UNPROCESSABLE_CONTENT,
+        -> AuthDataException.Validation(cause = this)
+        HTTP_UNAUTHORIZED -> AuthDataException.AuthenticationRequired(cause = this)
+        HTTP_FORBIDDEN -> AuthDataException.PermissionDenied(cause = this)
+        else -> AuthDataException.Unexpected(this)
     }
 }
 

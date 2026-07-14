@@ -16,7 +16,7 @@ data class AuthSession(
     val expiresAtEpochMilliseconds: Long,
 )
 
-class OnboardingProfileInput private constructor(
+data class OnboardingProfileValues(
     val firstName: String,
     val lastName: String,
     val cityId: String?,
@@ -25,38 +25,31 @@ class OnboardingProfileInput private constructor(
     val termsAccepted: Boolean,
     val privacyPolicyAccepted: Boolean,
     val ugcLicenseAccepted: Boolean,
+)
+
+class OnboardingProfileInput private constructor(
+    private val values: OnboardingProfileValues,
 ) {
+    val firstName: String get() = values.firstName
+    val lastName: String get() = values.lastName
+    val cityId: String? get() = values.cityId
+    val preferredLocale: AppLocale get() = values.preferredLocale
+    val preferredCurrency: KwaborCurrency get() = values.preferredCurrency
+    val termsAccepted: Boolean get() = values.termsAccepted
+    val privacyPolicyAccepted: Boolean get() = values.privacyPolicyAccepted
+    val ugcLicenseAccepted: Boolean get() = values.ugcLicenseAccepted
+
     companion object {
-        fun create(
-            firstName: String,
-            lastName: String,
-            cityId: String?,
-            preferredLocale: AppLocale,
-            preferredCurrency: KwaborCurrency,
-            termsAccepted: Boolean,
-            privacyPolicyAccepted: Boolean,
-            ugcLicenseAccepted: Boolean,
-        ): DomainResult<OnboardingProfileInput> {
-            if (firstName.isBlank() || lastName.isBlank()) {
+        fun create(values: OnboardingProfileValues): DomainResult<OnboardingProfileInput> {
+            if (values.firstName.isBlank() || values.lastName.isBlank()) {
                 return DomainResult.Failure(DomainError.Validation("error.auth.name_required"))
             }
 
-            if (!termsAccepted || !privacyPolicyAccepted || !ugcLicenseAccepted) {
+            if (!values.termsAccepted || !values.privacyPolicyAccepted || !values.ugcLicenseAccepted) {
                 return DomainResult.Failure(DomainError.Validation("error.auth.legal_acceptance_required"))
             }
 
-            return DomainResult.Success(
-                OnboardingProfileInput(
-                    firstName = firstName,
-                    lastName = lastName,
-                    cityId = cityId,
-                    preferredLocale = preferredLocale,
-                    preferredCurrency = preferredCurrency,
-                    termsAccepted = termsAccepted,
-                    privacyPolicyAccepted = privacyPolicyAccepted,
-                    ugcLicenseAccepted = ugcLicenseAccepted,
-                ),
-            )
+            return DomainResult.Success(OnboardingProfileInput(values))
         }
     }
 }

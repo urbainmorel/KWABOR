@@ -3,7 +3,9 @@ package com.kwabor.shared.data.organization
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationRequest
+import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationValues
 import com.kwabor.shared.domain.organization.OrganizationInviteRequest
+import com.kwabor.shared.domain.organization.OrganizationInviteValues
 import com.kwabor.shared.domain.organization.OrganizationMemberRoleUpdate
 import com.kwabor.shared.domain.organization.OrganizationRole
 import com.kwabor.shared.domain.organization.OrganizationType
@@ -82,7 +84,7 @@ class OrganizationDtoMappingTest {
             spentXof = 50_001,
         )
 
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<OrganizationDataException.Unexpected> {
             dto.toDomain()
         }
     }
@@ -91,12 +93,14 @@ class OrganizationDtoMappingTest {
     fun inviteRpcDto_serializesRoleAndExpiryForSupabase() {
         val request = assertIs<DomainResult.Success<OrganizationInviteRequest>>(
             OrganizationInviteRequest.create(
-                organizationId = "organization-1",
-                invitedByMemberId = "member-owner",
-                email = "editor@kwabor.test",
-                proposedRole = OrganizationRole.Editor,
-                expiresAtEpochMilliseconds = 1_783_073_730_000,
-                nowEpochMilliseconds = 1_783_070_000_000,
+                OrganizationInviteValues(
+                    organizationId = "organization-1",
+                    invitedByMemberId = "member-owner",
+                    email = "editor@kwabor.test",
+                    proposedRole = OrganizationRole.Editor,
+                    expiresAtEpochMilliseconds = 1_783_073_730_000,
+                    nowEpochMilliseconds = 1_783_070_000_000,
+                ),
             ),
         ).value
 
@@ -129,13 +133,15 @@ class OrganizationDtoMappingTest {
         val money = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(50_000)).value
         val request = assertIs<DomainResult.Success<MemberAdBudgetAllocationRequest>>(
             MemberAdBudgetAllocationRequest.create(
-                organizationId = "organization-1",
-                memberId = "member-editor",
-                allocatedByMemberId = "member-manager",
-                memberRole = OrganizationRole.Editor,
-                periodStartEpochDay = 20_635,
-                periodEndEpochDay = 20_665,
-                allocatedXof = money,
+                MemberAdBudgetAllocationValues(
+                    organizationId = "organization-1",
+                    memberId = "member-editor",
+                    allocatedByMemberId = "member-manager",
+                    memberRole = OrganizationRole.Editor,
+                    periodStartEpochDay = 20_635,
+                    periodEndEpochDay = 20_665,
+                    allocatedXof = money,
+                ),
             ),
         ).value
 

@@ -31,20 +31,24 @@ internal data class AuthSessionDto(
 
 internal sealed class AuthDataException(
     val domainError: DomainError,
-) : RuntimeException(domainError.messageKey) {
+    cause: Throwable? = null,
+) : RuntimeException(domainError.messageKey, cause) {
     class AuthenticationRequired(
         messageKey: String = "error.auth.session_required",
-    ) : AuthDataException(DomainError.AuthenticationRequired(messageKey))
+        cause: Throwable? = null,
+    ) : AuthDataException(DomainError.AuthenticationRequired(messageKey), cause)
 
     class PermissionDenied(
         messageKey: String = "error.auth.permission_denied",
-    ) : AuthDataException(DomainError.PermissionDenied(messageKey))
+        cause: Throwable? = null,
+    ) : AuthDataException(DomainError.PermissionDenied(messageKey), cause)
 
     class Validation(
         messageKey: String = "error.auth.invalid_request",
-    ) : AuthDataException(DomainError.Validation(messageKey))
+        cause: Throwable? = null,
+    ) : AuthDataException(DomainError.Validation(messageKey), cause)
 
-    class NetworkUnavailable : AuthDataException(DomainError.NetworkUnavailable())
+    class NetworkUnavailable(cause: Throwable? = null) : AuthDataException(DomainError.NetworkUnavailable(), cause)
 
-    class Unexpected : AuthDataException(DomainError.Unexpected())
+    class Unexpected(cause: Throwable? = null) : AuthDataException(DomainError.Unexpected(), cause)
 }

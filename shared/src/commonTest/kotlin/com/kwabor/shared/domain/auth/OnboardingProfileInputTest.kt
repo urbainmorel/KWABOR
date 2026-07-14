@@ -10,14 +10,16 @@ class OnboardingProfileInputTest {
     @Test
     fun create_requiresLegalAcceptance() {
         val result = OnboardingProfileInput.create(
-            firstName = "Awa",
-            lastName = "Soglo",
-            cityId = "cotonou",
-            preferredLocale = AppLocale.French,
-            preferredCurrency = KwaborCurrency.Xof,
-            termsAccepted = true,
-            privacyPolicyAccepted = true,
-            ugcLicenseAccepted = false,
+            OnboardingProfileValues(
+                firstName = "Awa",
+                lastName = "Soglo",
+                cityId = "cotonou",
+                preferredLocale = AppLocale.French,
+                preferredCurrency = KwaborCurrency.Xof,
+                termsAccepted = true,
+                privacyPolicyAccepted = true,
+                ugcLicenseAccepted = false,
+            ),
         )
 
         assertIs<DomainResult.Failure>(result)
@@ -26,14 +28,16 @@ class OnboardingProfileInputTest {
     @Test
     fun create_acceptsCompleteOnboardingProfile() {
         val result = OnboardingProfileInput.create(
-            firstName = "Awa",
-            lastName = "Soglo",
-            cityId = "cotonou",
-            preferredLocale = AppLocale.French,
-            preferredCurrency = KwaborCurrency.Xof,
-            termsAccepted = true,
-            privacyPolicyAccepted = true,
-            ugcLicenseAccepted = true,
+            OnboardingProfileValues(
+                firstName = "Awa",
+                lastName = "Soglo",
+                cityId = "cotonou",
+                preferredLocale = AppLocale.French,
+                preferredCurrency = KwaborCurrency.Xof,
+                termsAccepted = true,
+                privacyPolicyAccepted = true,
+                ugcLicenseAccepted = true,
+            ),
         )
 
         assertIs<DomainResult.Success<OnboardingProfileInput>>(result)

@@ -7,9 +7,11 @@ import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.domain.organization.MemberAdBudget
 import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationRequest
+import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationValues
 import com.kwabor.shared.domain.organization.Organization
 import com.kwabor.shared.domain.organization.OrganizationInvite
 import com.kwabor.shared.domain.organization.OrganizationInviteRequest
+import com.kwabor.shared.domain.organization.OrganizationInviteValues
 import com.kwabor.shared.domain.organization.OrganizationMemberRoleUpdate
 import com.kwabor.shared.domain.organization.OrganizationRole
 import kotlinx.coroutines.test.runTest
@@ -89,12 +91,14 @@ class DataOrganizationRepositoryTest {
 
     private fun inviteRequest(): OrganizationInviteRequest = assertIs<DomainResult.Success<OrganizationInviteRequest>>(
         OrganizationInviteRequest.create(
-            organizationId = "organization-1",
-            invitedByMemberId = "member-owner",
-            email = "editor@kwabor.test",
-            proposedRole = OrganizationRole.Editor,
-            expiresAtEpochMilliseconds = 1_783_073_730_000,
-            nowEpochMilliseconds = 1_783_070_000_000,
+            OrganizationInviteValues(
+                organizationId = "organization-1",
+                invitedByMemberId = "member-owner",
+                email = "editor@kwabor.test",
+                proposedRole = OrganizationRole.Editor,
+                expiresAtEpochMilliseconds = 1_783_073_730_000,
+                nowEpochMilliseconds = 1_783_070_000_000,
+            ),
         ),
     ).value
 
@@ -102,13 +106,15 @@ class DataOrganizationRepositoryTest {
         val money = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(50_000)).value
         return assertIs<DomainResult.Success<MemberAdBudgetAllocationRequest>>(
             MemberAdBudgetAllocationRequest.create(
-                organizationId = "organization-1",
-                memberId = "member-editor",
-                allocatedByMemberId = "member-manager",
-                memberRole = OrganizationRole.Editor,
-                periodStartEpochDay = 20_635,
-                periodEndEpochDay = 20_665,
-                allocatedXof = money,
+                MemberAdBudgetAllocationValues(
+                    organizationId = "organization-1",
+                    memberId = "member-editor",
+                    allocatedByMemberId = "member-manager",
+                    memberRole = OrganizationRole.Editor,
+                    periodStartEpochDay = 20_635,
+                    periodEndEpochDay = 20_665,
+                    allocatedXof = money,
+                ),
             ),
         ).value
     }
@@ -127,7 +133,7 @@ private class FakeOrganizationDataSource(
 
     override suspend fun getOrganization(organizationId: String): OrganizationDto {
         if (throwOnGetOrganization) {
-            throw NoSuchElementException()
+            throw OrganizationDataException.NotFound()
         }
         return organizations.first()
     }

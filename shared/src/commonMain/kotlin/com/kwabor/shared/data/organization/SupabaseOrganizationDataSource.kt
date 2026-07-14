@@ -12,6 +12,13 @@ import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
 
+private const val HTTP_BAD_REQUEST = 400
+private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_NOT_FOUND = 404
+private const val HTTP_CONFLICT = 409
+private const val HTTP_UNPROCESSABLE_CONTENT = 422
+
 internal class SupabaseOrganizationDataSource(
     private val postgrest: Postgrest,
 ) : OrganizationDataSource {
@@ -142,24 +149,27 @@ private suspend fun <T> runPostgrest(block: suspend () -> T): T = try {
 } catch (exception: RestException) {
     throw exception.toOrganizationDataException()
 } catch (exception: HttpRequestTimeoutException) {
-    throw OrganizationDataException.NetworkUnavailable()
+    throw OrganizationDataException.NetworkUnavailable(exception)
 } catch (exception: HttpRequestException) {
-    throw OrganizationDataException.NetworkUnavailable()
+    throw OrganizationDataException.NetworkUnavailable(exception)
 }
 
 private fun RestException.toOrganizationDataException(): OrganizationDataException {
     if (this is PostgrestRestException) {
         when (code) {
-            "P0002", "PGRST116" -> return OrganizationDataException.NotFound()
-            "42501" -> return OrganizationDataException.PermissionDenied()
-            "22023", "23503", "23505", "23514" -> return OrganizationDataException.Validation()
+            "P0002", "PGRST116" -> return OrganizationDataException.NotFound(cause = this)
+            "42501" -> return OrganizationDataException.PermissionDenied(cause = this)
+            "22023", "23503", "23505", "23514" -> return OrganizationDataException.Validation(cause = this)
         }
     }
 
     return when (statusCode) {
-        401, 403 -> OrganizationDataException.PermissionDenied()
-        404 -> OrganizationDataException.NotFound()
-        400, 409, 422 -> OrganizationDataException.Validation()
-        else -> OrganizationDataException.Unexpected()
+        HTTP_UNAUTHORIZED, HTTP_FORBIDDEN -> OrganizationDataException.PermissionDenied(cause = this)
+        HTTP_NOT_FOUND -> OrganizationDataException.NotFound(cause = this)
+        HTTP_BAD_REQUEST,
+        HTTP_CONFLICT,
+        HTTP_UNPROCESSABLE_CONTENT,
+        -> OrganizationDataException.Validation(cause = this)
+        else -> OrganizationDataException.Unexpected(this)
     }
 }

@@ -41,8 +41,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 - [x] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.
 - [x] ARCH-001 — Remplacer la construction manuelle par des modules Koin et composition roots Android/iOS.
-- [ ] PR-ARCH-001 — Merger la tranche Koin après `quality`, tests du graphe et `iOS simulator build` verts.
-- [ ] CI-005 — Rendre Detekt effectif sur les source sets KMP et traiter la convention Compose sans baseline ni `@Suppress`.
+- [x] PR-ARCH-001 — PR `#20` mergée après `quality`, tests du graphe et `iOS simulator build` verts.
+- [x] CI-005 — Rendre Detekt effectif sur les source sets KMP et traiter la convention Compose sans baseline ni `@Suppress`.
+- [ ] PR-CI-005 — Merger la gate Detekt KMP après `quality`, tests communs et `iOS simulator build` verts.
 - [ ] ARCH-002 — Déplacer l'UI Compose et les tokens Android de `shared` vers `androidApp` sans régression visuelle.
 - [ ] ARCH-003 — Introduire les ViewModels par feature, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
 - [ ] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.

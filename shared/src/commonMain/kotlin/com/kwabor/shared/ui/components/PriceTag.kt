@@ -15,22 +15,23 @@ import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
 
+private const val COMPACT_AMOUNT_THRESHOLD = 10_000L
+private const val ONE_THOUSAND = 1_000L
+private const val ONE_MILLION = 1_000_000L
+private const val ONE_MILLION_DECIMAL = 1_000_000.0
+private const val ONE_DECIMAL_SCALE = 10.0
+private const val ONE_DECIMAL_DIVISOR = 10L
+private const val TWO_DECIMAL_SCALE = 100.0
+private const val TWO_DECIMAL_DIVISOR = 100L
+private const val DECIMAL_WIDTH = 2
+private const val WHOLE_NUMBER_GROUP_SIZE = 3
+
 @Composable
-fun PriceTag(
-    price: MoneyXof?,
-    strings: KwaborStrings,
-    currency: KwaborCurrency = KwaborCurrency.Xof,
-    mode: PriceTagMode = PriceTagMode.Full,
-    convertedAmount: Double? = null,
-    transactional: Boolean = false,
-) {
+fun PriceTag(price: MoneyXof?, strings: KwaborStrings, options: PriceTagOptions = PriceTagOptions()) {
     val label = formatPriceTag(
         price = price,
         strings = strings,
-        currency = currency,
-        mode = mode,
-        convertedAmount = convertedAmount,
-        transactional = transactional,
+        options = options,
     )
 
     Text(
@@ -50,23 +51,28 @@ enum class PriceTagMode {
     Full,
 }
 
+data class PriceTagOptions(
+    val currency: KwaborCurrency = KwaborCurrency.Xof,
+    val mode: PriceTagMode = PriceTagMode.Full,
+    val convertedAmount: Double? = null,
+    val transactional: Boolean = false,
+)
+
 internal fun formatPriceTag(
     price: MoneyXof?,
     strings: KwaborStrings,
-    currency: KwaborCurrency = KwaborCurrency.Xof,
-    mode: PriceTagMode = PriceTagMode.Full,
-    convertedAmount: Double? = null,
-    transactional: Boolean = false,
+    options: PriceTagOptions = PriceTagOptions(),
 ): String {
     if (price == null || price.amount == 0L) {
         return strings.free
     }
 
-    if (currency != KwaborCurrency.Xof && convertedAmount != null) {
-        return "≈ ${formatConvertedAmount(convertedAmount, currency, transactional)} ${currency.symbol}"
+    if (options.currency != KwaborCurrency.Xof && options.convertedAmount != null) {
+        return "≈ ${formatConvertedAmount(options.convertedAmount, options.currency, options.transactional)} " +
+            options.currency.symbol
     }
 
-    val effectiveMode = if (transactional) PriceTagMode.Full else mode
+    val effectiveMode = if (options.transactional) PriceTagMode.Full else options.mode
     return when (effectiveMode) {
         PriceTagMode.Compact -> formatCompactXof(price.amount)
         PriceTagMode.Full -> "${price.amount.formatWholeNumber()} ${KwaborCurrency.Xof.symbol}"
@@ -74,17 +80,17 @@ internal fun formatPriceTag(
 }
 
 private fun formatCompactXof(amount: Long): String {
-    if (amount < 10_000L) {
+    if (amount < COMPACT_AMOUNT_THRESHOLD) {
         return "${amount.formatWholeNumber()} ${KwaborCurrency.Xof.symbol}"
     }
 
-    if (amount < 1_000_000L) {
-        return "${amount / 1_000L} k ${KwaborCurrency.Xof.symbol}"
+    if (amount < ONE_MILLION) {
+        return "${amount / ONE_THOUSAND} k ${KwaborCurrency.Xof.symbol}"
     }
 
-    val millions = amount.toDouble() / 1_000_000.0
-    val formatted = if (amount % 1_000_000L == 0L) {
-        (amount / 1_000_000L).toString()
+    val millions = amount.toDouble() / ONE_MILLION_DECIMAL
+    val formatted = if (amount % ONE_MILLION == 0L) {
+        (amount / ONE_MILLION).toString()
     } else {
         millions.formatOneDecimal()
     }
@@ -100,19 +106,19 @@ private fun formatConvertedAmount(amount: Double, currency: KwaborCurrency, tran
 
 private fun Long.formatWholeNumber(): String = toString()
     .reversed()
-    .chunked(size = 3)
+    .chunked(size = WHOLE_NUMBER_GROUP_SIZE)
     .joinToString(separator = " ")
     .reversed()
 
 private fun Double.formatOneDecimal(): String {
-    val value = (this * 10).roundToLong()
-    return "${value / 10},${value % 10}"
+    val value = (this * ONE_DECIMAL_SCALE).roundToLong()
+    return "${value / ONE_DECIMAL_DIVISOR},${value % ONE_DECIMAL_DIVISOR}"
 }
 
 private fun Double.formatTwoDecimals(): String {
-    val value = (this * 100).roundToLong()
-    val cents = (value % 100).toString().padStart(length = 2, padChar = '0')
-    return "${value / 100},$cents"
+    val value = (this * TWO_DECIMAL_SCALE).roundToLong()
+    val cents = (value % TWO_DECIMAL_DIVISOR).toString().padStart(length = DECIMAL_WIDTH, padChar = '0')
+    return "${value / TWO_DECIMAL_DIVISOR},$cents"
 }
 
 private fun Double.roundToLong(): Long = kotlin.math.round(this).toLong()

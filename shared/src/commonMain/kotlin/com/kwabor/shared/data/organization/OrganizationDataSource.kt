@@ -6,11 +6,18 @@ import com.kwabor.shared.domain.organization.MemberAdBudgetAllocationRequest
 import com.kwabor.shared.domain.organization.OrganizationInviteRequest
 import com.kwabor.shared.domain.organization.OrganizationMemberRoleUpdate
 
-internal interface OrganizationDataSource {
+internal interface OrganizationDataSource :
+    OrganizationDirectoryDataSource,
+    OrganizationTeamDataSource,
+    OrganizationBudgetDataSource
+
+internal interface OrganizationDirectoryDataSource {
     suspend fun listOrganizations(page: PageRequest): List<OrganizationDto>
 
     suspend fun getOrganization(organizationId: String): OrganizationDto
+}
 
+internal interface OrganizationTeamDataSource {
     suspend fun listMembers(organizationId: String): List<OrganizationMemberDto>
 
     suspend fun createInvite(request: OrganizationInviteRequest): OrganizationInviteDto
@@ -24,7 +31,9 @@ internal interface OrganizationDataSource {
     suspend fun updateMemberRole(request: OrganizationMemberRoleUpdate): OrganizationMemberDto
 
     suspend fun suspendMember(organizationId: String, memberId: String): OrganizationMemberDto
+}
 
+internal interface OrganizationBudgetDataSource {
     suspend fun listMemberAdBudgets(organizationId: String, page: PageRequest): List<MemberAdBudgetDto>
 
     suspend fun allocateMemberAdBudget(request: MemberAdBudgetAllocationRequest): MemberAdBudgetDto
@@ -32,20 +41,25 @@ internal interface OrganizationDataSource {
 
 internal sealed class OrganizationDataException(
     val domainError: DomainError,
-) : RuntimeException(domainError.messageKey) {
+    cause: Throwable? = null,
+) : RuntimeException(domainError.messageKey, cause) {
     class NotFound(
         messageKey: String = "error.organization.not_found",
-    ) : OrganizationDataException(DomainError.NotFound(messageKey))
+        cause: Throwable? = null,
+    ) : OrganizationDataException(DomainError.NotFound(messageKey), cause)
 
     class PermissionDenied(
         messageKey: String = "error.organization.permission_denied",
-    ) : OrganizationDataException(DomainError.PermissionDenied(messageKey))
+        cause: Throwable? = null,
+    ) : OrganizationDataException(DomainError.PermissionDenied(messageKey), cause)
 
     class Validation(
         messageKey: String = "error.organization.invalid_request",
-    ) : OrganizationDataException(DomainError.Validation(messageKey))
+        cause: Throwable? = null,
+    ) : OrganizationDataException(DomainError.Validation(messageKey), cause)
 
-    class NetworkUnavailable : OrganizationDataException(DomainError.NetworkUnavailable())
+    class NetworkUnavailable(cause: Throwable? = null) :
+        OrganizationDataException(DomainError.NetworkUnavailable(), cause)
 
-    class Unexpected : OrganizationDataException(DomainError.Unexpected())
+    class Unexpected(cause: Throwable? = null) : OrganizationDataException(DomainError.Unexpected(), cause)
 }

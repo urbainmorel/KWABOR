@@ -22,8 +22,13 @@ import com.kwabor.shared.ui.components.ListingCardState
 import com.kwabor.shared.ui.components.OfflineBanner
 import com.kwabor.shared.ui.components.PriceTag
 import com.kwabor.shared.ui.components.PriceTagMode
+import com.kwabor.shared.ui.components.PriceTagOptions
 import com.kwabor.shared.ui.components.SponsoredBadge
 import org.jetbrains.compose.ui.tooling.preview.Preview
+
+private const val PREVIEW_PRIMARY_PRICE = 25_000L
+private const val PREVIEW_SECONDARY_PRICE = 5_000L
+private const val PREVIEW_CONVERTED_PRICE = 7.62
 
 @Preview
 @Composable
@@ -34,14 +39,20 @@ fun PriceTagPreview() {
             modifier = Modifier.padding(KwaborSpacing.Lg),
             horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
         ) {
-            PriceTag(price = money(25_000), strings = strings, mode = PriceTagMode.Compact)
-            PriceTag(price = money(5_000), strings = strings, mode = PriceTagMode.Full)
             PriceTag(
-                price = money(5_000),
+                price = money(PREVIEW_PRIMARY_PRICE),
                 strings = strings,
-                currency = KwaborCurrency.Eur,
-                convertedAmount = 7.62,
-                transactional = true,
+                options = PriceTagOptions(mode = PriceTagMode.Compact),
+            )
+            PriceTag(price = money(PREVIEW_SECONDARY_PRICE), strings = strings)
+            PriceTag(
+                price = money(PREVIEW_SECONDARY_PRICE),
+                strings = strings,
+                options = PriceTagOptions(
+                    currency = KwaborCurrency.Eur,
+                    convertedAmount = PREVIEW_CONVERTED_PRICE,
+                    transactional = true,
+                ),
             )
         }
     }
@@ -108,7 +119,7 @@ fun FoundationStatesDarkPreview() {
 private fun previewListingState(): ListingCardState = ListingCardState(
     title = "Maison Ganhi",
     cityLabel = "Cotonou",
-    price = money(25_000),
+    price = money(PREVIEW_PRIMARY_PRICE),
     ratingLabel = "4,7",
     sponsored = true,
     liked = true,
