@@ -25,6 +25,10 @@ Toute autre valeur est rejetée par le build Android et par la composition root 
 | `KWABOR_ANDROID_KEYSTORE_PASSWORD` | Secret | `kwabor.android.signing.storePassword` | — | Secret production |
 | `KWABOR_ANDROID_KEY_ALIAS` | Secret | `kwabor.android.signing.keyAlias` | — | Secret production |
 | `KWABOR_ANDROID_KEY_PASSWORD` | Secret | `kwabor.android.signing.keyPassword` | — | Secret production |
+| `KWABOR_IOS_DEVELOPMENT_TEAM` | Publique | — | `KWABOR_DEVELOPMENT_TEAM` | Variable staging/production |
+| `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Secret | — | — | Secret staging/production |
+| `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Secret | — | — | Secret staging/production |
+| `KWABOR_IOS_PROVISIONING_PROFILE_BASE64` | Secret | — | — | Secret staging/production |
 | `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64` | Configuration d'intégrité | fichier généré par workflow | — | Secret |
 | `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Configuration d'intégrité | — | fichier généré par workflow | Secret |
 
@@ -47,10 +51,10 @@ La matrice exacte des variants, la signature et la génération d'artefacts sont
 ### iOS
 
 1. Copier `iosApp/Kwabor/Config/Local.xcconfig.example` vers `iosApp/Kwabor/Config/Local.xcconfig`.
-2. Renseigner les trois valeurs.
+2. Renseigner les valeurs communes et les paires Supabase qualifiées development/staging/production nécessaires.
 3. Ne jamais versionner ce fichier ni `GoogleService-Info.plist`.
 
-`Base.xcconfig` est versionné, ne contient aucune valeur distante et charge le fichier local optionnel. Les mêmes clés peuvent être injectées par `xcodebuild` dans la CI.
+`Debug.xcconfig`, `Staging.xcconfig` et `Release.xcconfig` chargent les valeurs communes puis le fichier local optionnel, et remappent uniquement les clés du tier attendu. Les mêmes clés génériques peuvent être injectées par `xcodebuild` dans la CI, où la configuration Xcode fixe le tier.
 
 Dans un fichier `.xcconfig`, `//` ouvre un commentaire. Une URL HTTPS doit donc être écrite sous la forme `https:/$()/project-ref.supabase.co`, que Xcode résout en `https://project-ref.supabase.co`.
 
@@ -95,3 +99,4 @@ Avant activation des SDK dans `OBS-001`, vérifier pour chaque environnement :
 - Un build staging ne référence aucun project ref production, et réciproquement.
 - Aucun fichier de configuration fournisseur, token, mot de passe ou clé serveur n'est suivi par Git.
 - La clé d'upload Android appartient au propriétaire, est sauvegardée hors dépôt et ses quatre secrets GitHub production sont complets.
+- L'App ID `com.kwabor.ios` active APNs et Sign in with Apple ; les profils de distribution correspondants sont régénérés puis injectés dans chacun des deux GitHub Environments.

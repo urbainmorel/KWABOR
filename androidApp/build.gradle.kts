@@ -138,11 +138,17 @@ require(Regex(versionNamePattern).matches(kwaborVersionName)) {
 
 val releaseArtifactRequested =
     gradle.startParameter.taskNames.any { taskName ->
-        val simpleTaskName = taskName.substringAfterLast(':').lowercase()
-        simpleTaskName in aggregateArtifactTaskNames ||
+        val taskPathSegments = taskName.trim(':').split(':')
+        val simpleTaskName = taskPathSegments.last().lowercase()
+        val targetsAndroidApp =
+            taskPathSegments.size == 1 || taskPathSegments.dropLast(1).lastOrNull() == "androidApp"
+        targetsAndroidApp &&
             (
-                "release" in simpleTaskName &&
-                    releaseArtifactTaskPrefixes.any(simpleTaskName::startsWith)
+                simpleTaskName in aggregateArtifactTaskNames ||
+                    (
+                        "release" in simpleTaskName &&
+                            releaseArtifactTaskPrefixes.any(simpleTaskName::startsWith)
+                    )
             )
     }
 require(!releaseArtifactRequested || releaseSigningCredentials != null) {
