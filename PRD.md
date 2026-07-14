@@ -638,18 +638,18 @@ Chaque événement porte : `ville`, `type_entite`, `entite_id`, `source_session`
 - **Cible V1 mobile-only** : Android + iOS ; aucune autre cible applicative dans la roadmap active.
 - **Architecture UI mobile** : Android Compose Multiplatform ; iOS SwiftUI ; `shared` KMP limité au métier/data/contrats/états partagés.
 - **Rôles d'équipe vérifiée** : Propriétaire > Gestionnaire > Éditeur > Modérateur, droits cumulatifs et budgets contrôlés.
+- **Vérification Promoteur/Guide/Institution** : score automatique de confiance, publication/quarantaine selon seuil, recours et escalade humaine ; aucun rôle Admin ni transfert critique n'est accordé automatiquement.
+- **Modération V1** : validation déterministe puis modération texte/image automatique ; indisponibilité du service = quarantaine, jamais auto-approbation ; cas ambigus opérés via Supabase Dashboard et RPC sécurisés.
+- **Notifications sponsorisées — valeurs initiales** : maximum 1 par 24 h, 3 par semaine et silence local de 21 h à 8 h ; valeurs configurables côté serveur.
+- **Taux de change** : synchronisation quotidienne via Open Exchange Rates, dernier taux valide conservé 7 jours, puis repli XOF.
+- **Paiement promotion V1** : FedaPay primaire pour MTN MoMo et Moov Money Bénin ; validation serveur, idempotence, signature webhook, anti-replay et rapprochement obligatoires.
+- **IA de découverte** : orchestration serveur OpenAI direct → Gemini direct → OpenRouter en dernier repli, modèles configurables côté serveur, embeddings canoniques `text-embedding-3-small` et réponses limitées aux fiches publiées revalidées.
 
 **Questions résiduelles (Finance / partenaires) :**
-1. Vérification Promoteur/Guide/Institution : manuelle (Kwabor) ou semi-automatisée dès le MVP ?
-2. Budget d'acquisition pour atteindre 25 000 MAU à 6 mois ?
-3. Stratégie exacte de signature Apple Developer pour TestFlight/App Store : certificats, provisioning profiles, rotation et ownership des secrets ?
-4. Politique exacte de fréquence/plafond des notifications sponsorisées ?
-5. Source et fréquence du taux de change (API tierce vs taux fixe paramétré) ?
-6. Liste définitive des opérateurs/agrégateurs Mobile Money à intégrer.
-7. Référentiels contrôlés à figer (communes BJ, sous-catégories, services/amenities, **langues/spécialités de guide**) — propriétaire de la maintenance ?
-8. Proxy mesurable retenu pour le KPI « belle app » (taux de partage ? complétion d'onboarding ?).
-9. Seuil de passage du mur souple : l'ouverture d'une fiche reste-t-elle libre, ou compte-t-elle comme action engageante ? *(décidé : libre)*
-10. Modération de l'UGC : automatique seule au MVP, ou file humaine dédiée dès le lancement ?
+1. Budget d'acquisition pour atteindre 25 000 MAU à 6 mois ?
+2. Stratégie exacte de signature Apple Developer pour TestFlight/App Store : certificats, provisioning profiles, rotation et ownership des secrets ?
+3. Référentiels contrôlés à figer (communes BJ, sous-catégories, services/amenities, **langues/spécialités de guide**) — propriétaire de la maintenance ?
+4. Proxy mesurable retenu pour le KPI « belle app » (taux de partage ? complétion d'onboarding ?).
 
 ---
 

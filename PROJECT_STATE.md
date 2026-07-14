@@ -2,7 +2,7 @@
 
 ## Phase actuelle
 
-Fondations techniques et organisation staff senior.
+Livraison V1 production — gouvernance et architecture avant verticales produit.
 
 ## Dernière tâche terminée
 
@@ -63,14 +63,15 @@ Fondations techniques et organisation staff senior.
 - AUTH-001A implémentée sur branche : mur souple Explore relié à une bottom sheet email OTP, création de profil minimal avec acceptations légales, badge session invité/connecté et reprise de l'action Like/Favori après authentification.
 - Tests `commonTest` ajoutés pour `AuthPresenter`, vérification OTP + profil dans `DataAuthRepository` et interaction Explore en attente d'authentification.
 - PR AUTH-001A `#17` mergée dans `main` avec `quality` verte et `iOS simulator build` vert sur GitHub Actions macOS.
+- V1-GOV-001 implémentée sur branche : feuille de route `docs/v1-production-delivery.md`, backlog exhaustif et ADR Room KMP, IA multi-provider, Firebase et FedaPay.
+- Protection de `main` activée : passage par PR, conversations résolues, admins inclus, force-push/suppression interdits, checks `quality` et `iOS simulator build` requis.
 
 ## Tâche en cours
 
-AUTH-001B — acquisition Google/Apple native Android/iOS, surface SwiftUI iOS minimale et finalisation session/profil multi-plateforme.
+PR-V1-GOV-001 — valider et merger la gouvernance V1 avant la première tranche d'architecture.
 
 ## Blocages / limites
 
-- La protection de branche GitHub `main` doit être reconfigurée maintenant que le dépôt est public.
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
 - La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
@@ -82,7 +83,9 @@ AUTH-001B — acquisition Google/Apple native Android/iOS, surface SwiftUI iOS m
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le flux email OTP Android est préparé côté shared/Compose, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
+- Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
+- La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Démarrer AUTH-001B sur une branche dédiée : acquisition Google/Apple native Android/iOS, écran SwiftUI iOS minimal et cohérence session/profil avec le shared.
+Après merge de V1-GOV-001 et CI distante verte, démarrer ARCH-001 sur une branche dédiée : modules Koin par feature et composition roots Android/iOS sans service locator.
