@@ -47,15 +47,17 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
-      - name: Build shared iOS XCFramework
-        run: ./gradlew :shared:assembleSharedDebugXCFramework
+      - name: Build shared iOS XCFrameworks
+        run: ./gradlew :shared:assembleSharedDebugXCFramework :shared:assembleSharedReleaseXCFramework
 
-      - name: Build iOS simulator app
+      - name: Build every iOS simulator configuration
         run: |
-          xcodebuild \
-            -project iosApp/Kwabor.xcodeproj \
-            -scheme Kwabor \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+          for configuration in Debug Staging Release; do
+            xcodebuild \
+              -project iosApp/Kwabor.xcodeproj \
+              -scheme Kwabor \
+              -configuration "$configuration" \
+              -destination 'generic/platform=iOS Simulator' \
+              CODE_SIGNING_ALLOWED=NO \
+              build
+          done

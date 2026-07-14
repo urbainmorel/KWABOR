@@ -113,16 +113,24 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Validation ciblée ANDROID-REL-001 : APK staging minifié produit en 7 min 27 s, environnement `staging`, version `0.1.0-staging`, label attendu, signature debug vérifiée et mapping R8 présent ; release sans signature et signature partielle correctement rejetées.
 - Validation globale ANDROID-REL-001 : `check`, APK debug, APK staging R8 et compilation Kotlin iOS simulateur verts en 10 min ; 100 tests partagés et 16 tests JVM Android sans échec, Detekt/Spotless/lint verts. Une configuration Supabase générique production reste absente du BuildConfig staging et n'alimente que release.
 - PR ANDROID-REL-001 `#26` mergée dans `main`, avec `quality`/pgTAP verts en 3 min 46 s et `iOS simulator build` vert en 3 min 04 s.
+- IOS-REL-001 implémentée sur branche : configurations Xcode `Debug`, `Staging` et `Release` reliées respectivement aux tiers development/staging/production et aux XCFrameworks KMP debug/release attendus.
+- Version, Team ID, profil et paramètres Supabase iOS sont injectés via xcconfig ou build settings ; aucune valeur fournisseur réelle ni certificat n'est versionné.
+- Entitlements APNs et Sign in with Apple ajoutés avec valeurs development/production par configuration ; leur validité finale reste contrôlée par l'App ID et le provisioning profile Apple du propriétaire.
+- Privacy Manifest initial ajouté comme ressource de cible, sans tracking, collecte propre à l'hôte ni Required Reason API déclarée à ce stade ; réaudit obligatoire à chaque SDK/feature collectrice.
+- Icône iOS 1024 opaque et launch screen natif ink/mark ajoutés ; les PNG sont générés de façon déterministe depuis le mark Kwabor par un script Windows versionné.
+- Workflow manuel `iOS archive artifact` ajouté : protection `main`, GitHub Environment, version Apple stricte, keychain/profil temporaires, validation équipe/bundle/capacités, archive signée, dSYM, manifest, signature, checksum et nettoyage après échec.
+- La CI macOS construit désormais les XCFrameworks debug/release puis les configurations simulateur Debug/Staging/Release sans signature.
+- Validation locale IOS-REL-001 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 59 s ; Detekt/Spotless/lint verts. JSON assets, XML/plists, PNG/dimensions/opacité, déterminisme et unicité des objets PBX validés ; workflows conformes au parseur Prettier YAML.
 
 ## Tâche en cours
 
-IOS-REL-001 — auditer le projet Xcode puis livrer configurations, entitlements, Privacy Manifest, assets et contrat de signature sans certificat factice.
+PR-IOS-REL-001 — valider le projet sur macOS, puis merger uniquement après `quality`, pgTAP et les trois configurations iOS vertes.
 
 ## Blocages / limites
 
 - Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
 - La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
-- La signature TestFlight/App Store reste hors scope jusqu'à disponibilité du compte Apple Developer, certificats, profils et secrets GitHub.
+- Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
