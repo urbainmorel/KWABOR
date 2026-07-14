@@ -35,10 +35,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 ## Livraison V1 active
 
 - [x] V1-GOV-001 — Transformer `PRD.md` §5.1 en feuille de route traçable, accepter les ADR Room/IA/Firebase/FedaPay et protéger `main`.
-- [ ] PR-V1-GOV-001 — Merger `codex/v1-governance` après `quality` et `iOS simulator build` verts.
+- [x] PR-V1-GOV-001 — PR `#18` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 
 ### Architecture et environnements
 
+- [ ] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.
 - [ ] ARCH-001 — Remplacer la construction manuelle par des modules Koin et composition roots Android/iOS.
 - [ ] ARCH-002 — Déplacer l'UI Compose et les tokens Android de `shared` vers `androidApp` sans régression visuelle.
 - [ ] ARCH-003 — Introduire les ViewModels par feature, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
