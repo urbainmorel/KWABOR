@@ -5,20 +5,11 @@ package com.kwabor.shared.data.auth
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.kwabor.shared.data.config.KwaborEnvironment
-import com.kwabor.shared.data.config.createAuthRepository
-import com.kwabor.shared.domain.auth.AuthRepository
 import io.github.jan.supabase.auth.SessionManager
 
 fun createAndroidSecureAuthSessionManager(context: Context): SessionManager = KwaborSessionManager(
     store = AndroidSecureStringStore(context.applicationContext),
 )
-
-fun createAndroidAuthRepository(environment: KwaborEnvironment, context: Context): AuthRepository =
-    createAuthRepository(
-        environment = environment,
-        authSessionManager = createAndroidSecureAuthSessionManager(context),
-    )
 
 private class AndroidSecureStringStore(
     context: Context,

@@ -4,14 +4,14 @@ import SwiftUI
 
 @main
 struct KwaborApp: App {
-    private let bridge = KwaborSharedBridge(
+    private let compositionRoot = IosKwaborCompositionRoot(
         supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),
         supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
     )
 
     var body: some Scene {
         WindowGroup {
-            ContentView(bridge: bridge)
+            ContentView(bridge: compositionRoot.bridge)
         }
     }
 }

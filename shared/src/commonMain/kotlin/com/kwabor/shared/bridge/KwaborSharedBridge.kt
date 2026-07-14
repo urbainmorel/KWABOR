@@ -1,18 +1,14 @@
 package com.kwabor.shared.bridge
 
-import com.kwabor.shared.app.KwaborRuntimeDependencies
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 
-class KwaborSharedBridge(
-    supabaseUrl: String? = null,
-    supabasePublishableKey: String? = null,
+class KwaborSharedBridge internal constructor(
+    private val hasCatalogConfiguration: Boolean,
 ) {
+    constructor() : this(hasCatalogConfiguration = false)
+
     private val strings = stringsFor(AppLocale.French)
-    private val runtimeDependencies = KwaborRuntimeDependencies.createOrNull(
-        supabaseUrl = supabaseUrl,
-        supabasePublishableKey = supabasePublishableKey,
-    )
 
     fun appName(): String = strings.appName
 
@@ -20,5 +16,5 @@ class KwaborSharedBridge(
 
     fun foundationStatus(): String = strings.foundationStatus
 
-    fun hasCatalogConfiguration(): Boolean = runtimeDependencies != null
+    fun hasCatalogConfiguration(): Boolean = hasCatalogConfiguration
 }

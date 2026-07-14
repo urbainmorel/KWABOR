@@ -67,10 +67,15 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Protection de `main` activée : passage par PR, conversations résolues, admins inclus, force-push/suppression interdits, checks `quality` et `iOS simulator build` requis.
 - PR V1-GOV-001 `#18` mergée dans `main` au commit `d7f0e09`, avec `quality`, pgTAP et `iOS simulator build` verts.
 - CI-004 implémentée sur branche : checkout `v7.0.0`, setup-java `v5.5.0` et setup-gradle `v6.2.0`, tous compatibles Node 24.
+- PR CI-004 `#19` mergée dans `main` au commit `c05c5fb`, avec `quality`, pgTAP et `iOS simulator build` verts sans avertissement Node 20.
+- ARCH-001 implémentée sur branche : modules Koin isolés `core`, `catalog`, `auth` et `organization`, graphe strict sans override et client Supabase partagé par racine.
+- Android initialise le graphe au niveau `Application` puis injecte explicitement les contrats dans Compose ; iOS conserve une racine Koin dédiée et fournit son bridge à SwiftUI.
+- Les factories manuelles `KwaborRuntimeDependencies` et repositories ont été supprimées ; aucun appel Koin ni type Supabase ne fuit dans l'UI ou le domaine.
+- Tests du graphe ajoutés pour configuration absente, URL non HTTPS, modules publics et Auth avec session sécurisée.
 
 ## Tâche en cours
 
-PR-CI-004 — valider puis merger la modernisation Node 24 des actions GitHub sans modifier les gates.
+PR-ARCH-001 — valider puis merger les modules Koin et les composition roots Android/iOS.
 
 ## Blocages / limites
 
@@ -85,9 +90,10 @@ PR-CI-004 — valider puis merger la modernisation Node 24 des actions GitHub sa
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le flux email OTP Android est préparé côté shared/Compose, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
+- La tâche agrégée `:shared:detekt` est actuellement `NO-SOURCE` ; la tâche typée `detektAndroidMain` révèle un écart préexistant `FunctionNaming` sur un composable. CI-005 doit rendre l'analyse KMP réellement bloquante sans baseline ni suppression locale.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Après merge de CI-004 et CI distante verte, démarrer ARCH-001 sur une branche dédiée : modules Koin par feature et composition roots Android/iOS sans service locator.
+Après merge de ARCH-001 et CI distante verte, démarrer CI-005 sur une branche dédiée : rendre Detekt effectif sur les source sets KMP avant de poursuivre ARCH-002.
