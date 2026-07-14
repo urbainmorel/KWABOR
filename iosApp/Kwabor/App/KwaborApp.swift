@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct KwaborApp: App {
+    private let observability = FirebaseObservability()
     private let compositionRoot = IosKwaborCompositionRoot(
         environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
         supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),

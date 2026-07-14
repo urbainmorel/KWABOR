@@ -27,7 +27,7 @@ jobs:
   archive:
     name: Build ${{ inputs.environment }} archive
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: ${{ inputs.environment }}
     permissions:
       contents: read
@@ -35,6 +35,7 @@ jobs:
       KWABOR_ENVIRONMENT: ${{ inputs.environment }}
       KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
       KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
+      KWABOR_FIREBASE_PROJECT_ID: ${{ vars.KWABOR_FIREBASE_PROJECT_ID }}
       KWABOR_IOS_DEVELOPMENT_TEAM: ${{ vars.KWABOR_IOS_DEVELOPMENT_TEAM }}
       KWABOR_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
       KWABOR_IOS_VERSION_NAME: ${{ inputs.version_name }}
@@ -73,6 +74,26 @@ jobs:
             echo "The iOS version name must contain exactly three period-separated integers." >&2
             exit 1
           fi
+
+      - name: Inject Firebase iOS configuration
+        shell: bash
+        env:
+          FIREBASE_CONFIG_BASE64: ${{ secrets.KWABOR_FIREBASE_IOS_CONFIG_BASE64 }}
+        run: |
+          if [[ -z "$FIREBASE_CONFIG_BASE64" ]]; then
+            echo "The selected GitHub Environment is missing its Firebase iOS configuration." >&2
+            exit 1
+          fi
+          config_path="$RUNNER_TEMP/GoogleService-Info.plist"
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > "$config_path"
+          chmod 600 "$config_path"
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$config_path" 2>/dev/null || true)"
+          project_id="$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' "$config_path" 2>/dev/null || true)"
+          if [[ -z "$KWABOR_FIREBASE_PROJECT_ID" || "$project_id" != "$KWABOR_FIREBASE_PROJECT_ID" || "$bundle_id" != "com.kwabor.ios" ]]; then
+            echo "The Firebase iOS configuration is invalid or targets another environment/application." >&2
+            exit 1
+          fi
+          echo "KWABOR_FIREBASE_IOS_CONFIG_PATH=$config_path" >> "$GITHUB_ENV"
 
       - name: Install signing assets
         shell: bash
@@ -136,6 +157,13 @@ jobs:
       - name: Build release XCFramework
         run: ./gradlew :shared:assembleSharedReleaseXCFramework
 
+      - name: Resolve pinned iOS packages
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project iosApp/Kwabor.xcodeproj \
+            -scheme Kwabor
+
       - name: Archive signed app
         shell: bash
         run: |
@@ -151,6 +179,7 @@ jobs:
             -configuration "$configuration" \
             -destination 'generic/platform=iOS' \
             -archivePath "$archive_path" \
+            -disableAutomaticPackageResolution \
             KWABOR_ENVIRONMENT="$KWABOR_ENVIRONMENT" \
             KWABOR_SUPABASE_URL="$KWABOR_SUPABASE_URL" \
             KWABOR_SUPABASE_PUBLISHABLE_KEY="$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
@@ -171,6 +200,7 @@ jobs:
           entitlements_plist="$RUNNER_TEMP/kwabor-archive-entitlements.plist"
 
           test -f "$app_path/PrivacyInfo.xcprivacy"
+          test -f "$app_path/GoogleService-Info.plist"
           test -f "$app_path/Assets.car"
           test -d "$KWABOR_IOS_ARCHIVE_PATH/dSYMs/Kwabor.app.dSYM"
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")" == "com.kwabor.ios" ]]
@@ -213,4 +243,5 @@ jobs:
           rm -f "$RUNNER_TEMP/kwabor-distribution.p12" \
             "$RUNNER_TEMP/kwabor.mobileprovision" \
             "$RUNNER_TEMP/kwabor-profile.plist" \
-            "$RUNNER_TEMP/kwabor-archive-entitlements.plist"
+            "$RUNNER_TEMP/kwabor-archive-entitlements.plist" \
+            "$RUNNER_TEMP/GoogleService-Info.plist"

@@ -31,6 +31,14 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>
+	<false/>
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<false/>
+	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key>
+	<false/>
+	<key>GOOGLE_ANALYTICS_IDFV_COLLECTION_ENABLED</key>
+	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.travel</string>
 	<key>KWABOR_ENVIRONMENT</key>
@@ -39,6 +47,8 @@
 	<string>$(KWABOR_SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>KWABOR_SUPABASE_URL</key>
 	<string>$(KWABOR_SUPABASE_URL)</string>
+	<key>firebase_performance_collection_enabled</key>
+	<false/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
