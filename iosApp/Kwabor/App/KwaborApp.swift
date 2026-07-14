@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct KwaborApp: App {
     private let compositionRoot = IosKwaborCompositionRoot(
+        environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
         supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),
         supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
     )

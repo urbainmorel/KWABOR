@@ -24,6 +24,8 @@
 		1A0000010000000000000029 /* KwaborDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborDesignTokens.swift; sourceTree = "<group>"; };
 		1A0000010000000000000031 /* RootNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootNavigation.swift; sourceTree = "<group>"; };
 		1A0000010000000000000032 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A0000010000000000000033 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		1A0000010000000000000034 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig.example; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +53,7 @@
 			isa = PBXGroup;
 			children = (
 				1A0000010000000000000015 /* App */,
+				1A0000010000000000000035 /* Config */,
 				1A0000010000000000000016 /* Resources */,
 			);
 			path = Kwabor;
@@ -90,6 +93,15 @@
 				1A0000010000000000000032 /* Info.plist */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		1A0000010000000000000035 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000010000000000000033 /* Base.xcconfig */,
+				1A0000010000000000000034 /* Local.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -289,6 +301,7 @@
 		};
 		1A0000010000000000000026 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000010000000000000033 /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -320,6 +333,7 @@
 		};
 		1A0000010000000000000027 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000010000000000000033 /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

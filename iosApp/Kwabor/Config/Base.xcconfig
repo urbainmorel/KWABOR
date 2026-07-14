@@ -1,0 +1,5 @@
+KWABOR_ENVIRONMENT = development
+KWABOR_SUPABASE_URL =
+KWABOR_SUPABASE_PUBLISHABLE_KEY =
+
+#include? "Local.xcconfig"

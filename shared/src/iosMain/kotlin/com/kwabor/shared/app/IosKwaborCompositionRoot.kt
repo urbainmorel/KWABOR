@@ -4,12 +4,14 @@ import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
 
 class IosKwaborCompositionRoot(
+    environmentName: String?,
     supabaseUrl: String?,
     supabasePublishableKey: String?,
 ) {
     private val sharedRoot = createKwaborCompositionRootOrNull(
         supabaseUrl = supabaseUrl,
         supabasePublishableKey = supabasePublishableKey,
+        environmentName = environmentName,
         authSessionManager = createIosSecureAuthSessionManager(),
     )
 

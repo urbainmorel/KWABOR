@@ -2,7 +2,7 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.data.auth.authDataModule
 import com.kwabor.shared.data.catalog.catalogDataModule
-import com.kwabor.shared.data.config.KwaborEnvironment
+import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -37,18 +37,14 @@ class KwaborCompositionRoot internal constructor(
 internal fun createKwaborCompositionRootOrNull(
     supabaseUrl: String?,
     supabasePublishableKey: String?,
+    environmentName: String? = DEFAULT_ENVIRONMENT_NAME,
     authSessionManager: SessionManager? = null,
 ): KwaborCompositionRoot? {
-    val safeUrl = supabaseUrl?.trim().orEmpty()
-    val safePublishableKey = supabasePublishableKey?.trim().orEmpty()
-    if (safeUrl.isBlank() || safePublishableKey.isBlank() || !safeUrl.startsWith(HTTPS_PREFIX)) {
-        return null
-    }
-
-    val environment = KwaborEnvironment(
-        supabaseUrl = safeUrl,
-        supabasePublishableKey = safePublishableKey,
-    )
+    val environment = createKwaborEnvironmentOrNull(
+        environmentName = environmentName,
+        supabaseUrl = supabaseUrl,
+        supabasePublishableKey = supabasePublishableKey,
+    ) ?: return null
     val rootModule = module {
         includes(
             coreDataModule(
@@ -74,4 +70,4 @@ internal fun createKwaborCompositionRootOrNull(
     )
 }
 
-private const val HTTPS_PREFIX = "https://"
+private const val DEFAULT_ENVIRONMENT_NAME = "development"

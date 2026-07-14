@@ -33,6 +33,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.travel</string>
+	<key>KWABOR_ENVIRONMENT</key>
+	<string>$(KWABOR_ENVIRONMENT)</string>
+	<key>KWABOR_SUPABASE_PUBLISHABLE_KEY</key>
+	<string>$(KWABOR_SUPABASE_PUBLISHABLE_KEY)</string>
+	<key>KWABOR_SUPABASE_URL</key>
+	<string>$(KWABOR_SUPABASE_URL)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

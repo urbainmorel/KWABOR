@@ -96,10 +96,18 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - ADR-0015 accepte la navigation native et remplace le shell Compose partagé de l'ADR-0008.
 - Tests NAV-001 ajoutés pour toutes les destinations et les rejets scheme/host/chemin/query/fragment ; la restauration de session est explicitement attendue avant de traiter un deep link Android.
 - Validation locale NAV-001 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 5 min 17 s ; Detekt application/tests et KMP, lint et `git diff --check` verts.
+- PR NAV-001 `#24` mergée dans `main` au commit `8152d0e`, avec `quality`/pgTAP verts en 3 min 29 s après relance d'un conflit de port runner et `iOS simulator build` vert en 6 min 36 s.
+- ENV-001A implémentée sur branche : le runtime partagé accepte uniquement `development`, `staging` ou `production`, et les composition roots Android/iOS reçoivent explicitement cet environnement.
+- Android injecte le tier via `BuildConfig` et `local.properties`; iOS utilise un `Base.xcconfig` versionné et un `Local.xcconfig` ignoré, avec substitution sûre dans Info.plist.
+- Exemples `.env`, `local.properties` et `.xcconfig` ajoutés sans valeur distante ; fichiers Firebase générés et logs CLI exclus de Git.
+- Runbook `docs/environment-configuration.md` ajouté avec matrice des variables/secrets, séparation stricte des projets et procédures propriétaire Supabase/Firebase.
+- GitHub Environments `staging` et `production` créés : branches protégées seulement ; production exige l'approbation `urbainmorel`, interdit le bypass administrateur ; variable `KWABOR_ENVIRONMENT` renseignée dans chacun.
+- Validation ciblée ENV-001A : tests Android host, Detekt commonMain/commonTest, compilation Android et compilation Kotlin iOS simulateur verts en 1 min 56 s.
+- Validation globale ENV-001A : `check`, APK debug et compilation Kotlin iOS simulateur verts en 3 min 01 s ; lint, Spotless, Detekt et `git diff --check` verts ; valeur Android `preview` correctement rejetée au build.
 
 ## Tâche en cours
 
-PR-NAV-001 — publier et merger la navigation mobile native après validation locale globale et CI distante complète.
+PR-ENV-001A — terminer la validation globale puis merger les contrats d'environnements après CI distante complète.
 
 ## Blocages / limites
 
@@ -114,9 +122,10 @@ PR-NAV-001 — publier et merger la navigation mobile native après validation l
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le flux email OTP Android s'appuie sur les états/presenters partagés et l'UI Compose propre à `androidApp`, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
+- ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Après merge de NAV-001 et CI distante verte, démarrer ENV-001 sur une branche dédiée : contrats staging/production, GitHub Environments et injection de configuration sans secret versionné.
+Après merge d'ENV-001A et CI distante verte, poursuivre les fondations release Android sans valeur fournisseur ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.

@@ -27,6 +27,16 @@ fun kwaborConfig(
 
 fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+val kwaborEnvironment =
+    kwaborConfig(
+        localKey = "kwabor.environment",
+        environmentKey = "KWABOR_ENVIRONMENT",
+    ).ifBlank { "development" }
+
+require(kwaborEnvironment in setOf("development", "staging", "production")) {
+    "kwabor.environment must be development, staging, or production."
+}
+
 android {
     namespace = "com.kwabor.android"
     compileSdk = 36
@@ -37,6 +47,11 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField(
+            type = "String",
+            name = "KWABOR_ENVIRONMENT",
+            value = kwaborEnvironment.asBuildConfigString(),
+        )
         buildConfigField(
             type = "String",
             name = "KWABOR_SUPABASE_URL",

@@ -8,9 +8,10 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 internal fun coreDataModule(environment: KwaborEnvironment, authSessionManager: SessionManager?): Module = module {
+    single { environment }
     single {
         createKwaborSupabaseClient(
-            environment = environment,
+            environment = get(),
             authSessionManager = authSessionManager,
         )
     }
