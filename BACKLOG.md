@@ -49,8 +49,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] ARCH-003 — Introduire les ViewModels Auth/Explore, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
 - [x] PR-ARCH-003 — PR `#23` mergée après tests de flux, `quality`, pgTAP et `iOS simulator build` verts.
 - [x] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.
-- [ ] PR-NAV-001 — Merger la navigation native après `quality`, pgTAP et `iOS simulator build` verts.
+- [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
+  - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
+  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations.
 - [ ] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [ ] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.

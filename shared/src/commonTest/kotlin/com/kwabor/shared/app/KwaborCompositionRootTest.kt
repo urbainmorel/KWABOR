@@ -54,6 +54,13 @@ class KwaborCompositionRootTest {
                 supabasePublishableKey = "publishable-key",
             ),
         )
+        assertNull(
+            createKwaborCompositionRootOrNull(
+                supabaseUrl = "https://example.invalid",
+                supabasePublishableKey = "publishable-key",
+                environmentName = "preview",
+            ),
+        )
     }
 
     @Test

@@ -22,7 +22,9 @@ Configuration locale Supabase, sans secret commité :
 - `KWABOR_SUPABASE_URL`
 - `KWABOR_SUPABASE_PUBLISHABLE_KEY`
 
-Ces valeurs peuvent être définies comme variables d'environnement du scheme Xcode ou comme clés Info.plist locales.
+Copier `Kwabor/Config/Local.xcconfig.example` vers `Kwabor/Config/Local.xcconfig`, puis renseigner ces valeurs et `KWABOR_ENVIRONMENT`. Le fichier local est ignoré par Git. La CI peut fournir les mêmes clés comme build settings `xcodebuild`.
+
+Le contrat complet et le runbook de provisionnement sont décrits dans [`docs/environment-configuration.md`](../docs/environment-configuration.md).
 
 Suite logique :
 
