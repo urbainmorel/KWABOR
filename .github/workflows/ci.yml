@@ -57,14 +57,6 @@ jobs:
             -project iosApp/Kwabor.xcodeproj \
             -scheme Kwabor
 
-      - name: Capture resolved iOS package lock
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: kwabor-ios-package-lock-${{ github.sha }}
-          path: iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Build every iOS simulator configuration
         run: |
           for configuration in Debug Staging Release; do

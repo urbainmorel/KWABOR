@@ -73,11 +73,15 @@ final class FirebaseObservability {
     }
 
     func recordDiagnostic(_ code: DiagnosticCode) {
+        recordDiagnostic(wireName: code.wireName)
+    }
+
+    private func recordDiagnostic(wireName: String) {
         guard isConfigured, consent.diagnosticsAllowed else { return }
         let error = NSError(
             domain: diagnosticDomain,
             code: diagnosticErrorCode,
-            userInfo: [NSLocalizedDescriptionKey: code.wireName]
+            userInfo: [NSLocalizedDescriptionKey: wireName]
         )
         Crashlytics.crashlytics().record(error: error)
     }
@@ -86,7 +90,9 @@ final class FirebaseObservability {
         guard isConfigured, consent.diagnosticsAllowed else {
             return nil
         }
-        let trace = Performance.startTrace(name: name.wireName)
+        guard let trace = Performance.startTrace(name: name.wireName) else {
+            return nil
+        }
         return FirebasePerformanceTrace(trace: trace)
     }
 
@@ -96,7 +102,7 @@ final class FirebaseObservability {
             Task { @MainActor in
                 guard let self else { return }
                 guard error == nil else {
-                    self.recordDiagnostic(.remoteConfigurationFetchFailed)
+                    self.recordDiagnostic(wireName: remoteConfigFetchFailureCode)
                     return
                 }
                 self.remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
@@ -159,8 +165,8 @@ struct FirebaseRemoteFeatureConfiguration: Equatable {
 
     fileprivate init(remoteConfig: RemoteConfig) {
         let enabled = remoteConfig[introVideoEnabledKey].boolValue
-        let urlValue = remoteConfig[introVideoURLKey].stringValue ?? ""
-        let hashValue = remoteConfig[introVideoSHA256Key].stringValue?.lowercased() ?? ""
+        let urlValue = remoteConfig[introVideoURLKey].stringValue
+        let hashValue = remoteConfig[introVideoSHA256Key].stringValue.lowercased()
         let revision = remoteConfig[introVideoRevisionKey].numberValue.int64Value
         introVideo = FirebaseRemoteIntroVideo.create(
             enabled: enabled,
@@ -235,6 +241,7 @@ private let sha256Pattern = "^[a-f0-9]{64}$"
 private let notApplicable = "not_applicable"
 private let diagnosticDomain = "com.kwabor.observability"
 private let diagnosticErrorCode = 1
+private let remoteConfigFetchFailureCode = "remote_config_fetch_failed"
 private let analyticsAllowedKey = "kwabor.observability.analytics_allowed"
 private let diagnosticsAllowedKey = "kwabor.observability.diagnostics_allowed"
 private let remoteConfigurationAllowedKey = "kwabor.observability.remote_configuration_allowed"
