@@ -54,7 +54,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
   - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
-- [ ] PR-ANDROID-REL-001 — Merger la fondation release Android après `quality`, pgTAP et `iOS simulator build` verts.
+- [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
 

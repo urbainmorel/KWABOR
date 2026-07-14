@@ -112,10 +112,11 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Runbook `docs/android-release.md` ajouté avec versionnement, Play App Signing, secrets, commandes et contrôles avant téléversement.
 - Validation ciblée ANDROID-REL-001 : APK staging minifié produit en 7 min 27 s, environnement `staging`, version `0.1.0-staging`, label attendu, signature debug vérifiée et mapping R8 présent ; release sans signature et signature partielle correctement rejetées.
 - Validation globale ANDROID-REL-001 : `check`, APK debug, APK staging R8 et compilation Kotlin iOS simulateur verts en 10 min ; 100 tests partagés et 16 tests JVM Android sans échec, Detekt/Spotless/lint verts. Une configuration Supabase générique production reste absente du BuildConfig staging et n'alimente que release.
+- PR ANDROID-REL-001 `#26` mergée dans `main`, avec `quality`/pgTAP verts en 3 min 46 s et `iOS simulator build` vert en 3 min 04 s.
 
 ## Tâche en cours
 
-PR-ANDROID-REL-001 — terminer la gate globale, ouvrir la PR puis attendre `quality`, pgTAP et le build iOS distant.
+IOS-REL-001 — auditer le projet Xcode puis livrer configurations, entitlements, Privacy Manifest, assets et contrat de signature sans certificat factice.
 
 ## Blocages / limites
 
@@ -137,4 +138,4 @@ PR-ANDROID-REL-001 — terminer la gate globale, ouvrir la PR puis attendre `qua
 
 ## Prochaine tâche logique
 
-Après merge de la fondation release Android et CI distante verte, poursuivre `IOS-REL-001` sans certificat factice ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
+Après merge de la fondation release iOS et CI distante verte, poursuivre `OBS-001` ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
