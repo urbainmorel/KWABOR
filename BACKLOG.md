@@ -56,7 +56,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
-- [ ] PR-IOS-REL-001 — Merger la fondation release iOS après `quality`, pgTAP et les trois configurations simulateur vertes.
+- [x] PR-IOS-REL-001 — PR `#27` mergée après `quality`, pgTAP et les trois configurations simulateur vertes.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
 
 ### Auth et onboarding

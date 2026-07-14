@@ -121,10 +121,11 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Workflow manuel `iOS archive artifact` ajouté : protection `main`, GitHub Environment, version Apple stricte, keychain/profil temporaires, validation équipe/bundle/capacités, archive signée, dSYM, manifest, signature, checksum et nettoyage après échec.
 - La CI macOS construit désormais les XCFrameworks debug/release puis les configurations simulateur Debug/Staging/Release sans signature.
 - Validation locale IOS-REL-001 : `check`, APK debug et compilation Kotlin iOS simulateur verts en 59 s ; Detekt/Spotless/lint verts. JSON assets, XML/plists, PNG/dimensions/opacité, déterminisme et unicité des objets PBX validés ; workflows conformes au parseur Prettier YAML.
+- PR IOS-REL-001 `#27` mergée dans `main` après `quality`/pgTAP et compilation macOS des trois configurations simulateur vertes.
 
 ## Tâche en cours
 
-PR-IOS-REL-001 — valider le projet sur macOS, puis merger uniquement après `quality`, pgTAP et les trois configurations iOS vertes.
+OBS-001 — intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement et configuration injectée.
 
 ## Blocages / limites
 
@@ -146,4 +147,4 @@ PR-IOS-REL-001 — valider le projet sur macOS, puis merger uniquement après `q
 
 ## Prochaine tâche logique
 
-Après merge de la fondation release iOS et CI distante verte, poursuivre `OBS-001` ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
+Après merge d'OBS-001 et CI distante verte, poursuivre `AUTH-002` ; finaliser ENV-001B dès que le propriétaire a choisi l'organisation Supabase et réauthentifié Firebase.
