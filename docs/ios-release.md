@@ -36,9 +36,9 @@ Les PNG sont déterministes et régénérables sur Windows avec :
 
 ## Privacy Manifest
 
-`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation actuelle : aucun tracking, aucune collecte propre à l'hôte iOS et aucune Required Reason API utilisée directement.
+`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation : aucun tracking ni Required Reason API utilisée directement ; les événements produit et l'ID opaque de ville sont déclarés pour Analytics, sans liaison à l'identité.
 
-Ce fichier doit être réaudité dès qu'une feature collecte une donnée ou qu'un SDK est ajouté. Firebase et chaque SDK tiers gardent leur propre manifest ; le manifest applicatif ne doit pas recopier leur déclaration. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les ressources et rejette les clés invalides : [Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files), [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk).
+Ce fichier doit être réaudité dès qu'une feature collecte une donnée ou qu'un SDK est mis à jour. Firebase et chaque SDK tiers gardent leur propre manifest pour leurs collectes internes ; le manifest applicatif ne recopie que les données définies par l'hôte. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les ressources et rejette les clés invalides : [Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files), [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk). Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
 
 Avant chaque release candidate : générer le Privacy Report Xcode, rapprocher le résultat du code et des SDK présents, puis mettre à jour les formulaires App Store Connect.
 

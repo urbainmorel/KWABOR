@@ -4,9 +4,16 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("com.google.firebase.crashlytics")
+    id("com.google.firebase.firebase-perf")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+val firebaseConfigFile = layout.projectDirectory.file("google-services.json").asFile
+if (firebaseConfigFile.isFile) {
+    pluginManager.apply("com.google.gms.google-services")
 }
 
 val aggregateArtifactTaskNames = setOf("assemble", "bundle", "build")
@@ -233,6 +240,7 @@ kotlin {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
     implementation(compose.foundation)
     implementation(compose.components.uiToolingPreview)
     implementation(compose.materialIconsExtended)
@@ -243,9 +251,14 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.10.0")
     implementation("androidx.navigation:navigation-compose:2.9.8")
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-config")
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-perf")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation(kotlin("test-junit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }

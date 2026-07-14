@@ -50,6 +50,13 @@ jobs:
       - name: Build shared iOS XCFrameworks
         run: ./gradlew :shared:assembleSharedDebugXCFramework :shared:assembleSharedReleaseXCFramework
 
+      - name: Resolve pinned iOS packages
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project iosApp/Kwabor.xcodeproj \
+            -scheme Kwabor
+
       - name: Build every iOS simulator configuration
         run: |
           for configuration in Debug Staging Release; do
@@ -58,6 +65,7 @@ jobs:
               -scheme Kwabor \
               -configuration "$configuration" \
               -destination 'generic/platform=iOS Simulator' \
+              -disableAutomaticPackageResolution \
               CODE_SIGNING_ALLOWED=NO \
               build
           done

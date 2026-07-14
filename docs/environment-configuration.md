@@ -31,6 +31,8 @@ Toute autre valeur est rejetée par le build Android et par la composition root 
 | `KWABOR_IOS_PROVISIONING_PROFILE_BASE64` | Secret | — | — | Secret staging/production |
 | `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64` | Configuration d'intégrité | fichier généré par workflow | — | Secret |
 | `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Configuration d'intégrité | — | fichier généré par workflow | Secret |
+| `KWABOR_FIREBASE_PROJECT_ID` | Publique | vérification workflow | vérification workflow | Variable staging/production |
+| `KWABOR_FIREBASE_IOS_CONFIG_PATH_*` | Chemin local non versionné | — | `Local.xcconfig` | — |
 
 La clé Supabase publishable et les fichiers de configuration Firebase identifient un client, mais ne donnent aucun privilège serveur. La sécurité métier reste assurée par RLS. Ils ne doivent néanmoins pas être versionnés afin d'éviter les mélanges d'environnements et de permettre leur rotation.
 
@@ -52,7 +54,8 @@ La matrice exacte des variants, la signature et la génération d'artefacts sont
 
 1. Copier `iosApp/Kwabor/Config/Local.xcconfig.example` vers `iosApp/Kwabor/Config/Local.xcconfig`.
 2. Renseigner les valeurs communes et les paires Supabase qualifiées development/staging/production nécessaires.
-3. Ne jamais versionner ce fichier ni `GoogleService-Info.plist`.
+3. Renseigner pour chaque tier utilisé un chemin absolu `KWABOR_FIREBASE_IOS_CONFIG_PATH_*` vers son `GoogleService-Info.plist`, conservé hors dépôt.
+4. Ne jamais versionner ce fichier ni `GoogleService-Info.plist`.
 
 `Debug.xcconfig`, `Staging.xcconfig` et `Release.xcconfig` chargent les valeurs communes puis le fichier local optionnel, et remappent uniquement les clés du tier attendu. Les mêmes clés génériques peuvent être injectées par `xcodebuild` dans la CI, où la configuration Xcode fixe le tier.
 
@@ -90,6 +93,8 @@ Avant activation des SDK dans `OBS-001`, vérifier pour chaque environnement :
 - aucun compte de service Firebase Admin dans les clients ;
 - fichiers encodés et stockés dans les secrets GitHub du bon environnement ;
 - Analytics/Crashlytics/Performance/Remote Config soumis au consentement et aux règles de confidentialité.
+
+L'intégration `OBS-001A` est prête côté code et workflows. Les releases exigent désormais les configurations Firebase encodées en base64, valident le bundle/package cible et détruisent les fichiers injectés à la fin du job. La procédure détaillée, les valeurs sûres et le contrat de consentement sont décrits dans [Observabilité mobile](observability.md).
 
 ## Gate avant release
 
