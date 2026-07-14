@@ -77,10 +77,15 @@ Livraison V1 production — gouvernance et architecture avant verticales produit
 - Les 97 alertes préexistantes révélées ont été traitées sans baseline, `@Suppress` ni affaiblissement de seuil : contrats repositories scindés par responsabilité, causes d'erreurs data conservées, valeurs de validation regroupées et composables/presenters découpés.
 - La convention Compose officielle est déclarée via `FunctionNaming.ignoreAnnotated = ["Composable"]`; les actions UI sont regroupées par feature et la route Explore utilise un contrôleur dédié.
 - Validation locale CI-005 : `check` vert, 109 tests Android host verts, Detekt `commonMain`/Android/iOS/`commonTest` vert et compilation Kotlin iOS simulateur verte.
+- PR CI-005 `#21` mergée dans `main` au commit `fad25f3`, avec `quality`, pgTAP et `iOS simulator build` verts.
+- ARCH-002 implémentée sur branche : shell, navigation racine, design system, composants, écrans et previews Compose déplacés de `shared` vers `androidApp`.
+- Compose et Coil ont été retirés du module `shared` ; l'image catalogue Android est désormais un composable Android normal et l'ancien placeholder Compose iOS a été supprimé.
+- Les tests des tokens et du formatage de prix ont été transférés vers les tests JVM de `androidApp` ; la gate Detekt Android couvre explicitement aussi ces tests.
+- Validation locale ARCH-002 : `check`, APK debug et compilation Kotlin iOS simulateur verts ; 100 tests partagés et neuf tests JVM Android sans échec ; Detekt application/tests et KMP vert.
 
 ## Tâche en cours
 
-PR-CI-005 — publier puis merger la gate Detekt KMP après CI distante complète.
+PR-ARCH-002 — publier puis merger la séparation de l'UI Android après validation locale et CI distante complète.
 
 ## Blocages / limites
 
@@ -92,12 +97,12 @@ PR-CI-005 — publier puis merger la gate Detekt KMP après CI distante complèt
 - Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
 - L'activation promoteur par invite reste bloquée côté client tant que le RPC serveur dédié n'existe pas.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
-- L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'actual iOS de `ListingCoverImage` reste un placeholder parce que l'UI iOS n'utilise pas les cartes Compose partagées.
+- L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
-- Le flux email OTP Android est préparé côté shared/Compose, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
+- Le flux email OTP Android s'appuie sur les états/presenters partagés et l'UI Compose propre à `androidApp`, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Après merge de CI-005 et CI distante verte, démarrer ARCH-002 sur une branche dédiée : déplacer l'UI Compose et les tokens Android hors de `shared` sans régression visuelle.
+Après merge d'ARCH-002 et CI distante verte, démarrer ARCH-003 sur une branche dédiée : introduire des ViewModels par feature avec `StateFlow` immuable, intents exhaustifs et effets ponctuels.

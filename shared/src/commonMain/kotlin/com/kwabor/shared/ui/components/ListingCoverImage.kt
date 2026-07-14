@@ -1,7 +1,0 @@
-package com.kwabor.shared.ui.components
-
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-
-@Composable
-internal expect fun ListingCoverImage(imageUrl: String?, modifier: Modifier = Modifier)

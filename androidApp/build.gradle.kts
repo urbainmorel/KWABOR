@@ -1,3 +1,4 @@
+import io.gitlab.arturbosch.detekt.Detekt
 import java.util.Properties
 
 plugins {
@@ -76,7 +77,21 @@ kotlin {
 dependencies {
     implementation(project(":shared"))
     implementation(compose.foundation)
+    implementation(compose.components.uiToolingPreview)
+    implementation(compose.materialIconsExtended)
     implementation(compose.material3)
     implementation(compose.runtime)
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0")
+    testImplementation(kotlin("test-junit"))
+}
+
+val detektUnitTest by tasks.registering(Detekt::class) {
+    description = "Runs Detekt on Android application unit tests."
+    setSource(fileTree("src/test/kotlin") { include("**/*.kt") })
+}
+
+tasks.named("detekt") {
+    dependsOn(detektUnitTest)
 }
