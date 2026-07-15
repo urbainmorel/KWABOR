@@ -1,6 +1,5 @@
 package com.kwabor.android.app
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,18 +54,21 @@ import com.kwabor.shared.presentation.navigation.label
 import com.kwabor.shared.presentation.onboarding.OnboardingEntry
 import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
 import kotlinx.coroutines.flow.StateFlow
-import java.io.File
 
 @Composable
 internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: KwaborAppRuntimeState) {
     val state = collectKwaborAppState(dependencies = dependencies, runtimeState = runtimeState)
     val strings = stringsFor(AppLocale.French)
-    val entry = OnboardingEntryResolver.resolve(
-        firstLaunchCompleted = !state.onboarding.isIntroRequired,
-        sessionRestoreCompleted = state.isSessionRestoreComplete,
-        isAuthenticated = state.auth.isAuthenticated,
-        guestAccessGranted = state.onboarding.isGuestSession,
-    )
+    val entry = if (state.onboarding.isLaunchDecisionComplete) {
+        OnboardingEntryResolver.resolve(
+            firstLaunchCompleted = !state.onboarding.isIntroRequired,
+            sessionRestoreCompleted = state.isSessionRestoreComplete,
+            isAuthenticated = state.auth.isAuthenticated,
+            guestAccessGranted = state.onboarding.isGuestSession,
+        )
+    } else {
+        OnboardingEntry.RestoringSession
+    }
 
     OnboardingEffectHandler(dependencies = dependencies)
 
@@ -95,7 +97,6 @@ internal data class KwaborAppDependencies(
 )
 
 internal data class KwaborAppRuntimeState(
-    val remoteIntroVideoFile: StateFlow<File?>,
     val pendingDeepLink: StateFlow<String?>,
     val onDeepLinkConsumed: () -> Unit,
 )
@@ -104,7 +105,6 @@ private data class KwaborCollectedState(
     val auth: AuthUiState,
     val onboarding: OnboardingUiState,
     val isSessionRestoreComplete: Boolean,
-    val introVideoUri: Uri?,
     val deepLink: String?,
 )
 
@@ -116,13 +116,11 @@ private fun collectKwaborAppState(
     val authState by dependencies.authViewModel.state.collectAsStateWithLifecycle()
     val restoreComplete by dependencies.authViewModel.isSessionRestoreComplete.collectAsStateWithLifecycle()
     val onboardingState by dependencies.onboardingViewModel.state.collectAsStateWithLifecycle()
-    val introVideoFile by runtimeState.remoteIntroVideoFile.collectAsStateWithLifecycle()
     val deepLink by runtimeState.pendingDeepLink.collectAsStateWithLifecycle()
     return KwaborCollectedState(
         auth = authState,
         onboarding = onboardingState,
         isSessionRestoreComplete = restoreComplete,
-        introVideoUri = introVideoFile?.let(Uri::fromFile),
         deepLink = deepLink,
     )
 }
@@ -150,7 +148,7 @@ private fun KwaborEntryContent(
         OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
         OnboardingEntry.Intro -> KwaborIntroRoute(
             strings = strings,
-            videoUri = state.introVideoUri,
+            mediaSource = state.onboarding.introMediaSource,
             viewModel = dependencies.onboardingViewModel,
         )
         OnboardingEntry.Authentication -> KwaborLandingRoute(

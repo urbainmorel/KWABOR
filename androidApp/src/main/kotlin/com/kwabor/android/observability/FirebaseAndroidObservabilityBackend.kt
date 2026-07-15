@@ -6,7 +6,11 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.perf.FirebasePerformance
+import com.google.firebase.remoteconfig.ConfigUpdate
+import com.google.firebase.remoteconfig.ConfigUpdateListener
+import com.google.firebase.remoteconfig.ConfigUpdateListenerRegistration
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
@@ -21,6 +25,8 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
     private val performance: FirebasePerformance?,
     private val remoteConfig: FirebaseRemoteConfig?,
 ) : AndroidObservabilityBackend {
+    private var configUpdateRegistration: ConfigUpdateListenerRegistration? = null
+
     override val isConfigured: Boolean = analytics != null
 
     override fun applyConsent(consent: ObservabilityConsent) {
@@ -65,6 +71,30 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
     }
 
     override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = remoteConfig?.toDomainConfiguration()
+
+    override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+        val config = remoteConfig ?: return
+        if (configUpdateRegistration != null) return
+        configUpdateRegistration = config.addOnConfigUpdateListener(
+            object : ConfigUpdateListener {
+                override fun onUpdate(configUpdate: ConfigUpdate) {
+                    if (!configUpdate.updatedKeys.containsIntroVideoRemoteKey()) return
+                    config.activate().addOnCompleteListener { task ->
+                        onResult(config.toDomainConfiguration().takeIf { task.isSuccessful })
+                    }
+                }
+
+                override fun onError(error: FirebaseRemoteConfigException) {
+                    onResult(null)
+                }
+            },
+        )
+    }
+
+    override fun stopRemoteConfigurationUpdates() {
+        configUpdateRegistration?.remove()
+        configUpdateRegistration = null
+    }
 
     companion object {
         fun create(context: Context): FirebaseAndroidObservabilityBackend {
@@ -120,6 +150,14 @@ private const val INTRO_VIDEO_URL_KEY = "intro_video_url"
 private const val INTRO_VIDEO_SHA256_KEY = "intro_video_sha256"
 private const val INTRO_VIDEO_REVISION_KEY = "intro_video_revision"
 private const val NOT_APPLICABLE = "not_applicable"
+private val INTRO_VIDEO_REMOTE_KEYS = setOf(
+    INTRO_VIDEO_ENABLED_KEY,
+    INTRO_VIDEO_URL_KEY,
+    INTRO_VIDEO_SHA256_KEY,
+    INTRO_VIDEO_REVISION_KEY,
+)
+internal fun Set<String>.containsIntroVideoRemoteKey(): Boolean = any(INTRO_VIDEO_REMOTE_KEYS::contains)
+
 private val REMOTE_CONFIG_DEFAULTS: Map<String, Any> = mapOf(
     INTRO_VIDEO_ENABLED_KEY to false,
     INTRO_VIDEO_URL_KEY to "",

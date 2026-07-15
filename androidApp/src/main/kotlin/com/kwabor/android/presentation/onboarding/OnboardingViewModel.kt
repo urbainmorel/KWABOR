@@ -2,6 +2,8 @@ package com.kwabor.android.presentation.onboarding
 
 import androidx.lifecycle.ViewModel
 import com.kwabor.android.onboarding.FirstLaunchStore
+import com.kwabor.android.onboarding.IntroLaunchDecision
+import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import kotlinx.coroutines.CoroutineScope
@@ -15,7 +17,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 internal data class OnboardingUiState(
+    val isLaunchDecisionComplete: Boolean,
     val isIntroRequired: Boolean,
+    val introMediaSource: IntroMediaSource,
     val isGuestDisclosureVisible: Boolean = false,
     val isGuestSession: Boolean = false,
 )
@@ -44,18 +48,27 @@ internal sealed interface OnboardingEffect {
 
 internal class OnboardingViewModel(
     private val firstLaunchStore: FirstLaunchStore,
+    launchDecision: StateFlow<IntroLaunchDecision>,
     private val track: (AnalyticsEvent) -> Unit,
     private val coroutineScope: CoroutineScope,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(
-        OnboardingUiState(isIntroRequired = firstLaunchStore.isIntroRequired()),
-    )
+    private val mutableState = MutableStateFlow(launchDecision.value.toUiState())
     val state: StateFlow<OnboardingUiState> = mutableState.asStateFlow()
 
     private val effectChannel = Channel<OnboardingEffect>(capacity = Channel.BUFFERED)
     val effects: Flow<OnboardingEffect> = effectChannel.receiveAsFlow()
 
     private var introDisplayTracked = false
+
+    init {
+        coroutineScope.launch {
+            launchDecision.collect { decision ->
+                if (!mutableState.value.isLaunchDecisionComplete) {
+                    mutableState.value = decision.toUiState()
+                }
+            }
+        }
+    }
 
     fun onIntent(intent: OnboardingIntent) {
         when (intent) {
@@ -87,7 +100,10 @@ internal class OnboardingViewModel(
 
     private fun completeIntro(skipped: Boolean) {
         if (!mutableState.value.isIntroRequired) return
-        firstLaunchStore.markIntroSeen()
+        when (val mediaSource = mutableState.value.introMediaSource) {
+            IntroMediaSource.Bundled -> firstLaunchStore.markBundledIntroSeen()
+            is IntroMediaSource.Remote -> firstLaunchStore.markRemoteIntroPresented(mediaSource.revision)
+        }
         mutableState.value = mutableState.value.copy(isIntroRequired = false)
         if (skipped) {
             track(AnalyticsEvent(name = AnalyticsEventName.IntroVideoSkipped))
@@ -103,4 +119,13 @@ internal class OnboardingViewModel(
     private fun updateState(transform: (OnboardingUiState) -> OnboardingUiState) {
         mutableState.value = transform(mutableState.value)
     }
+}
+
+private fun IntroLaunchDecision.toUiState(): OnboardingUiState {
+    val launchRequest = request
+    return OnboardingUiState(
+        isLaunchDecisionComplete = isComplete,
+        isIntroRequired = launchRequest?.isRequired ?: false,
+        introMediaSource = launchRequest?.mediaSource ?: IntroMediaSource.Bundled,
+    )
 }

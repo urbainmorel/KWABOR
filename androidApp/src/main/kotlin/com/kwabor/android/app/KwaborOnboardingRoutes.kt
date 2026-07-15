@@ -1,8 +1,8 @@
 package com.kwabor.android.app
 
 import android.animation.ValueAnimator
-import android.net.Uri
 import androidx.compose.runtime.Composable
+import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.android.presentation.onboarding.OnboardingIntent
 import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
@@ -13,10 +13,10 @@ import com.kwabor.android.ui.screens.onboarding.OnboardingLandingScreen
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
-internal fun KwaborIntroRoute(strings: KwaborStrings, videoUri: Uri?, viewModel: OnboardingViewModel) {
+internal fun KwaborIntroRoute(strings: KwaborStrings, mediaSource: IntroMediaSource, viewModel: OnboardingViewModel) {
     IntroScreen(
         strings = strings,
-        remoteVideoUri = videoUri,
+        mediaSource = mediaSource,
         reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
         actions = IntroScreenActions(
             onDisplayed = { viewModel.onIntent(OnboardingIntent.IntroDisplayed) },

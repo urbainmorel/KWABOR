@@ -10,6 +10,7 @@ import Shared
 final class FirebaseObservability {
     private let consentStore: FirebaseConsentStore
     private var remoteConfig: RemoteConfig?
+    private var remoteConfigUpdateRegistration: ConfigUpdateListenerRegistration?
     private var performance: Performance?
     private var remoteConfigurationObserver: ((FirebaseRemoteFeatureConfiguration, ObservabilityConsent) -> Void)?
 
@@ -40,6 +41,7 @@ final class FirebaseObservability {
         }
         applyConsent(consent)
         if consent.remoteConfigurationAllowed {
+            startRemoteConfigurationUpdates()
             refreshRemoteConfiguration()
         }
     }
@@ -51,6 +53,7 @@ final class FirebaseObservability {
         applyConsent(updatedConsent)
 
         if !updatedConsent.remoteConfigurationAllowed {
+            stopRemoteConfigurationUpdates()
             remoteConfiguration = .safeDefaults
             notifyRemoteConfigurationObserver()
         } else if !remoteConfigurationWasAllowed {
@@ -58,6 +61,7 @@ final class FirebaseObservability {
                 remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
                 notifyRemoteConfigurationObserver()
             }
+            startRemoteConfigurationUpdates()
             refreshRemoteConfiguration()
         }
     }
@@ -117,6 +121,7 @@ final class FirebaseObservability {
         remoteConfig.fetchAndActivate { [weak self] _, error in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                guard self.consent.remoteConfigurationAllowed else { return }
                 guard error == nil else {
                     self.recordDiagnostic(wireName: remoteConfigFetchFailureCode)
                     return
@@ -126,6 +131,61 @@ final class FirebaseObservability {
                 self.notifyRemoteConfigurationObserver()
             }
         }
+    }
+
+    private func startRemoteConfigurationUpdates() {
+        guard isConfigured, consent.remoteConfigurationAllowed,
+              remoteConfigUpdateRegistration == nil,
+              let remoteConfig else {
+            return
+        }
+        remoteConfigUpdateRegistration = remoteConfig.addOnConfigUpdateListener {
+            [weak self] update, error in
+            let updatedKeys = update?.updatedKeys
+            let updateFailed = error != nil || updatedKeys == nil
+            Task { @MainActor [weak self] in
+                self?.handleRemoteConfigurationUpdate(
+                    updatedKeys: updatedKeys,
+                    failed: updateFailed
+                )
+            }
+        }
+    }
+
+    private func handleRemoteConfigurationUpdate(
+        updatedKeys: Set<String>?,
+        failed: Bool
+    ) {
+        guard consent.remoteConfigurationAllowed else { return }
+        guard !failed, let updatedKeys else {
+            recordDiagnostic(wireName: remoteConfigFetchFailureCode)
+            return
+        }
+        guard !introRemoteConfigKeys.isDisjoint(with: updatedKeys), let remoteConfig else {
+            return
+        }
+        remoteConfig.activate { [weak self] _, error in
+            let activationFailed = error != nil
+            Task { @MainActor [weak self] in
+                self?.completeRemoteConfigurationActivation(failed: activationFailed)
+            }
+        }
+    }
+
+    private func completeRemoteConfigurationActivation(failed: Bool) {
+        guard consent.remoteConfigurationAllowed else { return }
+        guard !failed else {
+            recordDiagnostic(wireName: remoteConfigFetchFailureCode)
+            return
+        }
+        guard let remoteConfig else { return }
+        remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
+        notifyRemoteConfigurationObserver()
+    }
+
+    private func stopRemoteConfigurationUpdates() {
+        remoteConfigUpdateRegistration?.remove()
+        remoteConfigUpdateRegistration = nil
     }
 
     private func notifyRemoteConfigurationObserver() {
@@ -259,6 +319,12 @@ private let introVideoEnabledKey = "intro_video_enabled"
 private let introVideoURLKey = "intro_video_url"
 private let introVideoSHA256Key = "intro_video_sha256"
 private let introVideoRevisionKey = "intro_video_revision"
+private let introRemoteConfigKeys: Set<String> = [
+    introVideoEnabledKey,
+    introVideoURLKey,
+    introVideoSHA256Key,
+    introVideoRevisionKey,
+]
 private let sha256Pattern = "^[a-f0-9]{64}$"
 private let notApplicable = "not_applicable"
 private let diagnosticDomain = "com.kwabor.observability"

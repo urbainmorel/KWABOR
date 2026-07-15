@@ -20,8 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -30,20 +32,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.kwabor.android.R
 import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborSpacing
+import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
 internal fun IntroScreen(
     strings: KwaborStrings,
-    remoteVideoUri: Uri?,
+    mediaSource: IntroMediaSource,
     reducedMotion: Boolean,
     actions: IntroScreenActions,
 ) {
@@ -59,7 +61,7 @@ internal fun IntroScreen(
     ) {
         IntroPrimaryContent(
             strings = strings,
-            remoteVideoUri = remoteVideoUri,
+            mediaSource = mediaSource,
             reducedMotion = reducedMotion,
             onCompleted = actions.onCompleted,
         )
@@ -70,7 +72,7 @@ internal fun IntroScreen(
 @Composable
 private fun BoxScope.IntroPrimaryContent(
     strings: KwaborStrings,
-    remoteVideoUri: Uri?,
+    mediaSource: IntroMediaSource,
     reducedMotion: Boolean,
     onCompleted: () -> Unit,
 ) {
@@ -91,7 +93,7 @@ private fun BoxScope.IntroPrimaryContent(
         }
     } else {
         IntroVideo(
-            remoteVideoUri = remoteVideoUri,
+            mediaSource = mediaSource,
             bundledVideoResource = R.raw.kwabor_intro,
             onCompleted = onCompleted,
             modifier = Modifier.fillMaxSize(),
@@ -122,53 +124,76 @@ internal data class IntroScreenActions(
 
 @Composable
 private fun IntroVideo(
-    remoteVideoUri: Uri?,
+    mediaSource: IntroMediaSource,
     @RawRes bundledVideoResource: Int,
     onCompleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val mediaUri = remoteVideoUri ?: Uri.Builder()
+    val bundledMediaUri = Uri.Builder()
         .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
         .authority(context.packageName)
         .appendPath(bundledVideoResource.toString())
         .build()
+    var playbackSource by remember(mediaSource) { mutableStateOf(mediaSource) }
+    val sourceForPlayer = playbackSource
+    val mediaUri = when (sourceForPlayer) {
+        IntroMediaSource.Bundled -> bundledMediaUri
+        is IntroMediaSource.Remote -> Uri.fromFile(sourceForPlayer.file)
+    }
     val player = rememberIntroPlayer(mediaUri)
-    BindIntroPlayerLifecycle(player = player, onCompleted = onCompleted)
+    BindIntroPlayerLifecycle(
+        player = player,
+        mediaUri = mediaUri,
+        onCompleted = onCompleted,
+        onFailure = {
+            when (sourceForPlayer.failureAction()) {
+                IntroPlaybackFailureAction.UseBundled -> playbackSource = IntroMediaSource.Bundled
+                IntroPlaybackFailureAction.CompleteIntro -> onCompleted()
+            }
+        },
+    )
     IntroPlayerSurface(player = player, modifier = modifier)
 }
 
 @Composable
 private fun rememberIntroPlayer(mediaUri: Uri): ExoPlayer {
     val context = LocalContext.current
-    return remember(mediaUri) {
-        ExoPlayer.Builder(context).build().apply {
-            volume = 0f
-            repeatMode = Player.REPEAT_MODE_OFF
-            setMediaItem(MediaItem.fromUri(mediaUri))
-            prepare()
-            playWhenReady = true
+    return remember(context, mediaUri) { ExoPlayer.Builder(context).build() }
+}
+
+@Composable
+private fun BindIntroPlayerLifecycle(
+    player: ExoPlayer,
+    mediaUri: Uri,
+    onCompleted: () -> Unit,
+    onFailure: () -> Unit,
+) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val currentOnCompleted by rememberUpdatedState(onCompleted)
+    val currentOnFailure by rememberUpdatedState(onFailure)
+    DisposableEffect(player, mediaUri, lifecycle) {
+        val binding = IntroPlayerLifecycleBinding(
+            player = player,
+            lifecycle = lifecycle,
+            onCompleted = { currentOnCompleted() },
+            onFailure = { currentOnFailure() },
+        )
+        binding.start(mediaUri)
+        onDispose {
+            binding.close()
         }
     }
 }
 
-@Composable
-private fun BindIntroPlayerLifecycle(player: ExoPlayer, onCompleted: () -> Unit) {
-    val currentOnCompleted by rememberUpdatedState(onCompleted)
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    currentOnCompleted()
-                }
-            }
-        }
-        player.addListener(listener)
-        onDispose {
-            player.removeListener(listener)
-            player.release()
-        }
-    }
+internal enum class IntroPlaybackFailureAction {
+    UseBundled,
+    CompleteIntro,
+}
+
+internal fun IntroMediaSource.failureAction(): IntroPlaybackFailureAction = when (this) {
+    IntroMediaSource.Bundled -> IntroPlaybackFailureAction.CompleteIntro
+    is IntroMediaSource.Remote -> IntroPlaybackFailureAction.UseBundled
 }
 
 @Composable
@@ -186,6 +211,7 @@ private fun IntroPlayerSurface(player: ExoPlayer, modifier: Modifier) {
                 this.player = player
             }
         },
+        update = { playerView -> playerView.player = player },
         modifier = modifier,
     )
 }

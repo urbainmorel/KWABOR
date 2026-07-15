@@ -464,8 +464,8 @@ Interactions : **tap → `DetailSheet`** (deep link selon le type) ; **swipe →
 
 ### Groupe E — Intro, compte & mur souple
 
-**E1. Écran d'intro vidéo** *(premier lancement uniquement)*
-Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). **Analytics : taux de skip.** *(Lancements suivants : pas de vidéo → E3 si déconnecté, Accueil si connecté.)*
+**E1. Écran d'intro vidéo** *(premier lancement, puis une fois par nouvelle révision distante)*
+Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). Une révision distante est validée et précachée après consentement, reste figée pendant la lecture et n'est présentée qu'une fois au lancement suivant ; elle ne surgit jamais en cours de session. **Analytics : taux de skip.** *(Lancements sans nouvelle révision : E3 si déconnecté, Accueil si connecté.)*
 
 **E2. Langue — détection automatique** *(pas d'écran dans le cas courant)*
 **Principe : respecter la langue système, sans intervention.** Aucun sélecteur imposé — un écran de choix bloquant serait une friction inutile (au MVP, mono-langue FR).

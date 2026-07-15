@@ -4,6 +4,8 @@ import android.app.Application
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.onboarding.AndroidIntroMediaManager
 import com.kwabor.android.onboarding.AndroidIntroVideoCache
+import com.kwabor.android.onboarding.FirstLaunchStore
+import com.kwabor.android.onboarding.SharedPreferencesFirstLaunchStore
 import com.kwabor.shared.app.createAndroidKwaborCompositionRootOrNull
 import com.kwabor.shared.domain.core.DefaultDispatcherProvider
 
@@ -12,18 +14,22 @@ class KwaborApplication : Application() {
         private set
     lateinit var introMediaManager: AndroidIntroMediaManager
         private set
+    internal lateinit var firstLaunchStore: FirstLaunchStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
         observability = AndroidObservabilityController.create(applicationContext)
         observability.start()
         val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
+        firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)
         introMediaManager = AndroidIntroMediaManager(
             observability = observability,
             cache = AndroidIntroVideoCache(
                 context = applicationContext,
                 dispatcherProvider = dispatcherProvider,
             ),
+            firstLaunchStore = firstLaunchStore,
             dispatcherProvider = dispatcherProvider,
         )
         introMediaManager.start()
@@ -31,6 +37,7 @@ class KwaborApplication : Application() {
 
     override fun onTerminate() {
         introMediaManager.close()
+        observability.close()
         compositionRoot?.close()
         super.onTerminate()
     }

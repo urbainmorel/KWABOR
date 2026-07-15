@@ -12,7 +12,6 @@ import com.kwabor.android.app.KwaborApp
 import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
 import com.kwabor.android.app.KwaborUnavailableApp
-import com.kwabor.android.onboarding.SharedPreferencesFirstLaunchStore
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.explore.ExploreViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
@@ -56,7 +55,6 @@ class MainActivity : ComponentActivity() {
             KwaborApp(
                 dependencies = dependencies,
                 runtimeState = KwaborAppRuntimeState(
-                    remoteIntroVideoFile = applicationState.introMediaManager.remoteVideoFile,
                     pendingDeepLink = pendingDeepLink,
                     onDeepLinkConsumed = { pendingDeepLink.value = null },
                 ),
@@ -105,7 +103,8 @@ class MainActivity : ComponentActivity() {
         factory = viewModelFactory {
             initializer {
                 OnboardingViewModel(
-                    firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext),
+                    firstLaunchStore = applicationState.firstLaunchStore,
+                    launchDecision = applicationState.introMediaManager.launchDecision,
                     track = applicationState.observability::track,
                     coroutineScope = newViewModelScope(dispatcherProvider),
                 )

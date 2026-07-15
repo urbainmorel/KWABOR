@@ -39,9 +39,11 @@ private struct IntroView: View {
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
-            if !reducedMotion, let videoURL {
+            if !reducedMotion, let videoURL = coordinator.introVideoURL {
                 IntroVideoPlayer(url: videoURL) {
                     coordinator.completeIntro(skipped: false)
+                } onFailed: {
+                    coordinator.introPlaybackFailed()
                 }
                 .id(videoURL)
                 .accessibilityHidden(true)
@@ -57,7 +59,7 @@ private struct IntroView: View {
                     .tint(KwaborDesignTokens.ColorToken.ink950)
                 }
                 Spacer()
-                if reducedMotion || videoURL == nil {
+                if reducedMotion || coordinator.introVideoURL == nil {
                     Button(coordinator.strings.introContinue) {
                         coordinator.completeIntro(skipped: false)
                     }
@@ -68,13 +70,6 @@ private struct IntroView: View {
             .padding(KwaborDesignTokens.Spacing.xxl)
         }
         .onAppear { coordinator.introDisplayed() }
-    }
-
-    private var videoURL: URL? {
-        coordinator.remoteIntroVideoURL ?? Bundle.main.url(
-            forResource: "KwaborIntro",
-            withExtension: "mp4"
-        )
     }
 }
 

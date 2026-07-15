@@ -1,6 +1,8 @@
 package com.kwabor.android.onboarding
 
 import android.content.Context
+import android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline
+import android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileMain
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -20,9 +22,11 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 internal interface IntroVideoCache {
-    suspend fun resolve(source: RemoteIntroVideo): File?
+    suspend fun resolve(source: RemoteIntroVideo, protectedFile: File?): File?
 
-    suspend fun clear()
+    suspend fun findCached(pending: PendingRemoteIntro): File?
+
+    suspend fun clear(protectedFile: File? = null)
 }
 
 internal class AndroidIntroVideoCache(
@@ -31,25 +35,38 @@ internal class AndroidIntroVideoCache(
 ) : IntroVideoCache {
     private val directory = File(context.filesDir, DIRECTORY_NAME)
 
-    override suspend fun resolve(source: RemoteIntroVideo): File? = withContext(dispatcherProvider.io) {
-        directory.mkdirs()
-        val target = cachedFile(source)
-        if (target.isFile && target.hasSha256(source.sha256) && target.isSupportedIntroVideo()) {
-            return@withContext target
+    override suspend fun resolve(source: RemoteIntroVideo, protectedFile: File?): File? =
+        withContext(dispatcherProvider.io) {
+            directory.mkdirs()
+            val target = cachedFile(source)
+            if (target.isFile && target.hasSha256(source.sha256) && target.isSupportedIntroVideo()) {
+                return@withContext target
+            }
+            target.delete()
+            downloadAndValidate(source = source, target = target, protectedFile = protectedFile)
         }
-        target.delete()
-        downloadAndValidate(source = source, target = target)
+
+    override suspend fun findCached(pending: PendingRemoteIntro): File? = withContext(dispatcherProvider.io) {
+        val candidate = File(directory, pending.fileName)
+        candidate.takeIf {
+            it.isFile &&
+                it.parentFile == directory &&
+                it.name == pending.fileName &&
+                it.extension.equals(MP4_EXTENSION, ignoreCase = true) &&
+                it.hasSha256(pending.sha256) &&
+                it.isSupportedIntroVideo()
+        }
     }
 
-    override suspend fun clear() = withContext(dispatcherProvider.io) {
+    override suspend fun clear(protectedFile: File?) = withContext(dispatcherProvider.io) {
         directory.listFiles().orEmpty().forEach { file ->
-            if (file.isFile && file.parentFile == directory) {
+            if (file.isFile && file.parentFile == directory && file != protectedFile) {
                 file.delete()
             }
         }
     }
 
-    private suspend fun downloadAndValidate(source: RemoteIntroVideo, target: File): File? {
+    private suspend fun downloadAndValidate(source: RemoteIntroVideo, target: File, protectedFile: File?): File? {
         val temporary = File(directory, "${target.name}.part")
         temporary.delete()
         val connection = openConnection(source.url) ?: return null
@@ -60,6 +77,7 @@ internal class AndroidIntroVideoCache(
                 source = source,
                 temporary = temporary,
                 target = target,
+                protectedFile = protectedFile,
             )
         } finally {
             connection.disconnect()
@@ -72,6 +90,7 @@ internal class AndroidIntroVideoCache(
         source: RemoteIntroVideo,
         temporary: File,
         target: File,
+        protectedFile: File?,
     ): File? {
         if (!connection.isSuccessfulMp4Response()) return null
         val actualSha256 = connection.copyBodyTo(temporary) ?: return null
@@ -79,7 +98,7 @@ internal class AndroidIntroVideoCache(
         val isValid = actualSha256 == source.sha256 && temporary.isSupportedIntroVideo()
         if (!isValid) return null
         publishAtomically(temporary = temporary, target = target)
-        removeOldVersions(except = target)
+        removeOldVersions(except = setOfNotNull(target, protectedFile))
         return target
     }
 
@@ -164,9 +183,9 @@ internal class AndroidIntroVideoCache(
         }
     }
 
-    private fun removeOldVersions(except: File) {
+    private fun removeOldVersions(except: Set<File>) {
         directory.listFiles().orEmpty().forEach { file ->
-            if (file.isFile && file != except && file.extension == MP4_EXTENSION) {
+            if (file.isFile && file !in except && file.extension == MP4_EXTENSION) {
                 file.delete()
             }
         }
@@ -199,17 +218,37 @@ private fun File.isSupportedIntroVideo(): Boolean = runCatching {
     val extractor = MediaExtractor()
     try {
         extractor.setDataSource(absolutePath)
-        (0 until extractor.trackCount).any { index ->
+        (0 until extractor.trackCount).map { index ->
             val format = extractor.getTrackFormat(index)
-            val mimeType = format.getString(MediaFormat.KEY_MIME)
-            val width = format.getIntegerOrNull(MediaFormat.KEY_WIDTH)
-            val height = format.getIntegerOrNull(MediaFormat.KEY_HEIGHT)
-            mimeType == H264_MIME_TYPE && width != null && height != null && height > width
-        }
+            IntroVideoTrackMetadata(
+                mimeType = format.getString(MediaFormat.KEY_MIME),
+                width = format.getIntegerOrNull(MediaFormat.KEY_WIDTH),
+                height = format.getIntegerOrNull(MediaFormat.KEY_HEIGHT),
+                avcProfile = format.getIntegerOrNull(MediaFormat.KEY_PROFILE),
+            )
+        }.isSupportedIntroVideoTracks()
     } finally {
         extractor.release()
     }
 }.getOrDefault(false)
+
+internal data class IntroVideoTrackMetadata(
+    val mimeType: String?,
+    val width: Int? = null,
+    val height: Int? = null,
+    val avcProfile: Int? = null,
+)
+
+internal fun List<IntroVideoTrackMetadata>.isSupportedIntroVideoTracks(): Boolean {
+    if (any { track -> track.mimeType?.startsWith(AUDIO_MIME_PREFIX) == true }) return false
+    val videoTracks = filter { track -> track.mimeType?.startsWith(VIDEO_MIME_PREFIX) == true }
+    val videoTrack = videoTracks.singleOrNull() ?: return false
+    val isPortrait = videoTrack.width != null &&
+        videoTrack.height != null &&
+        videoTrack.height > videoTrack.width
+    val hasSupportedProfile = videoTrack.avcProfile == null || videoTrack.avcProfile in SUPPORTED_AVC_PROFILES
+    return videoTrack.mimeType == H264_MIME_TYPE && isPortrait && hasSupportedProfile
+}
 
 private fun MediaFormat.getIntegerOrNull(key: String): Int? = if (containsKey(key)) getInteger(key) else null
 
@@ -222,7 +261,7 @@ private const val H264_MIME_TYPE = "video/avc"
 private const val SHA256_ALGORITHM = "SHA-256"
 private const val HASH_FILE_PREFIX_LENGTH = 12
 private const val DOWNLOAD_BUFFER_SIZE = 8_192
-private const val MAX_VIDEO_BYTES = 5L * 1_024L * 1_024L
+private const val MAX_VIDEO_BYTES = 3L * 1_024L * 1_024L
 private const val MIN_VIDEO_DURATION_MILLIS = 15_000L
 private const val MAX_VIDEO_DURATION_MILLIS = 25_500L
 private const val CONNECT_TIMEOUT_MILLIS = 10_000
@@ -230,3 +269,6 @@ private const val READ_TIMEOUT_MILLIS = 20_000
 private const val HTTP_SUCCESS_MIN = 200
 private const val HTTP_SUCCESS_MAX = 299
 private const val END_OF_STREAM = -1
+private const val AUDIO_MIME_PREFIX = "audio/"
+private const val VIDEO_MIME_PREFIX = "video/"
+private val SUPPORTED_AVC_PROFILES = setOf(AVCProfileBaseline, AVCProfileMain)

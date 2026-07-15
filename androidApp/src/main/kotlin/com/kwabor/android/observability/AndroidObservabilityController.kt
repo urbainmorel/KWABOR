@@ -30,6 +30,7 @@ class AndroidObservabilityController internal constructor(
                 mutableRemoteConfiguration.value = configuration
             }
             refreshRemoteConfiguration()
+            backend.startRemoteConfigurationUpdates(::publishRemoteConfiguration)
         }
     }
 
@@ -40,12 +41,14 @@ class AndroidObservabilityController internal constructor(
         backend.applyConsent(updatedConsent)
 
         if (!updatedConsent.remoteConfigurationAllowed) {
+            backend.stopRemoteConfigurationUpdates()
             mutableRemoteConfiguration.value = RemoteFeatureConfiguration.SafeDefaults
         } else if (!previousConsent.remoteConfigurationAllowed) {
             backend.readCachedRemoteConfiguration()?.let { configuration ->
                 mutableRemoteConfiguration.value = configuration
             }
             refreshRemoteConfiguration()
+            backend.startRemoteConfigurationUpdates(::publishRemoteConfiguration)
         }
     }
 
@@ -73,12 +76,21 @@ class AndroidObservabilityController internal constructor(
             return
         }
         backend.fetchRemoteConfiguration { configuration ->
-            if (configuration == null) {
-                recordDiagnostic(DiagnosticCode.RemoteConfigurationFetchFailed)
-                return@fetchRemoteConfiguration
-            }
-            mutableRemoteConfiguration.value = configuration
+            publishRemoteConfiguration(configuration)
         }
+    }
+
+    fun close() {
+        backend.stopRemoteConfigurationUpdates()
+    }
+
+    private fun publishRemoteConfiguration(configuration: RemoteFeatureConfiguration?) {
+        if (!mutableConsent.value.remoteConfigurationAllowed) return
+        if (configuration == null) {
+            recordDiagnostic(DiagnosticCode.RemoteConfigurationFetchFailed)
+            return
+        }
+        mutableRemoteConfiguration.value = configuration
     }
 
     companion object {
@@ -103,6 +115,10 @@ internal interface AndroidObservabilityBackend {
     fun fetchRemoteConfiguration(onResult: (RemoteFeatureConfiguration?) -> Unit)
 
     fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration?
+
+    fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit)
+
+    fun stopRemoteConfigurationUpdates()
 }
 
 internal interface ObservabilityConsentStore {

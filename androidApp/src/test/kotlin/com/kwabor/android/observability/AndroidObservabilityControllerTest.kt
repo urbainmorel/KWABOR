@@ -14,6 +14,12 @@ import kotlin.test.assertSame
 
 class AndroidObservabilityControllerTest {
     @Test
+    fun realtimeListenerOnlyAcceptsIntroVideoKeys() {
+        assertFalse(setOf("unrelated_feature").containsIntroVideoRemoteKey())
+        assertEquals(true, setOf("intro_video_revision").containsIntroVideoRemoteKey())
+    }
+
+    @Test
     fun start_keepsAllCollectionDisabledWithoutStoredConsent() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(backend, InMemoryConsentStore())
@@ -26,6 +32,7 @@ class AndroidObservabilityControllerTest {
         assertEquals(emptyList(), backend.events)
         assertEquals(emptyList(), backend.diagnostics)
         assertFalse(backend.remoteConfigurationFetched)
+        assertFalse(backend.remoteUpdatesStarted)
     }
 
     @Test
@@ -50,6 +57,7 @@ class AndroidObservabilityControllerTest {
         assertEquals(listOf(DiagnosticCode.UnexpectedApplicationState), backend.diagnostics)
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
         assertEquals(REMOTE_CONFIGURATION, controller.remoteConfiguration.value)
+        assertEquals(1, backend.remoteUpdateStartCount)
     }
 
     @Test
@@ -74,6 +82,41 @@ class AndroidObservabilityControllerTest {
         assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
         assertEquals(emptyList(), backend.events)
         assertEquals(emptyList(), backend.diagnostics)
+        assertEquals(1, backend.remoteUpdateStopCount)
+    }
+
+    @Test
+    fun realtimeRemoteConfigUpdateIsPublishedOnlyWhileConsentRemainsGranted() {
+        val backend = FakeObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+        )
+        controller.start()
+
+        backend.emitRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
+
+        assertEquals(NEWER_REMOTE_CONFIGURATION, controller.remoteConfiguration.value)
+
+        controller.updateConsent(ObservabilityConsent())
+        backend.emitRemoteUpdate(REMOTE_CONFIGURATION)
+
+        assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
+        assertEquals(1, backend.remoteUpdateStopCount)
+    }
+
+    @Test
+    fun closeRemovesRealtimeRemoteConfigListener() {
+        val backend = FakeObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+        )
+        controller.start()
+
+        controller.close()
+
+        assertEquals(1, backend.remoteUpdateStopCount)
     }
 }
 
@@ -94,6 +137,10 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
     val diagnostics = mutableListOf<DiagnosticCode>()
     val traces = mutableListOf<PerformanceTraceName>()
     var remoteConfigurationFetched = false
+    var remoteUpdateStartCount = 0
+    var remoteUpdateStopCount = 0
+    var remoteUpdateCallback: ((RemoteFeatureConfiguration?) -> Unit)? = null
+    val remoteUpdatesStarted: Boolean get() = remoteUpdateCallback != null
 
     override fun applyConsent(consent: ObservabilityConsent) {
         appliedConsent = consent
@@ -125,6 +172,20 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
     }
 
     override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = null
+
+    override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+        remoteUpdateStartCount += 1
+        remoteUpdateCallback = onResult
+    }
+
+    override fun stopRemoteConfigurationUpdates() {
+        remoteUpdateStopCount += 1
+        remoteUpdateCallback = null
+    }
+
+    fun emitRemoteUpdate(configuration: RemoteFeatureConfiguration?) {
+        remoteUpdateCallback?.invoke(configuration)
+    }
 }
 
 private val REMOTE_CONFIGURATION = RemoteFeatureConfiguration(
@@ -132,5 +193,12 @@ private val REMOTE_CONFIGURATION = RemoteFeatureConfiguration(
         url = "https://cdn.kwabor.example/intro.mp4",
         sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         revision = 1,
+    ),
+)
+private val NEWER_REMOTE_CONFIGURATION = RemoteFeatureConfiguration(
+    introVideo = RemoteIntroVideo(
+        url = "https://cdn.kwabor.example/intro-v2.mp4",
+        sha256 = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        revision = 2,
     ),
 )
