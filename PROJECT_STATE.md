@@ -130,15 +130,21 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - Privacy Manifest, Info.plist, AndroidManifest et runbook `docs/observability.md` documentent les collectes, le consentement, l'injection, la vérification appareil et les responsabilités propriétaire.
 - Validation locale OBS-001A : tests communs et Android ciblés, Detekt/Spotless, `check`, lint, APK debug, compilation Kotlin iOS simulateur, chemin Android configuré et `git diff --check` verts ; XML/plists, YAML et verrou SwiftPM validés.
 - PR OBS-001A `#28` mergée dans `main` après `quality`/pgTAP verts en 4 min 00 s et compilation macOS des configurations simulateur Debug/Staging/Release verte en 19 min 41 s.
+- AUTH-002 implémentée sur branche : intro native Android Compose et iOS SwiftUI avec MP4 portrait H.264 embarqué, silencieux et disponible hors connexion dès la première installation, reduced-motion, passage manuel et poursuite en invité.
+- Une révision distante validée peut remplacer l'intro sans recompilation : écoute Firebase Remote Config temps réel après consentement, téléchargement en attente sans interrompre la session, puis lecture unique au lancement suivant. La révocation purge le média distant et le fallback embarqué reste toujours disponible.
+- Le cache d'intro refuse les redirections, protocoles non HTTPS, SHA-256 incohérents, médias de plus de 3 Mio, codecs non H.264, dimensions non portrait, durées hors bornes et toute piste audio ; Android et iOS figent la source choisie pendant une lecture.
+- La navigation invitée native protège les destinations authentifiées par un mur souple sans créer de session persistante ; iOS dispose désormais du flux OTP minimal équivalent pour s'authentifier depuis une destination protégée.
+- ADR-0016, `PRD.md`, `DESIGN.md` et les runbooks onboarding/observabilité documentent le premier lancement embarqué, les révisions distantes, le consentement, la désactivation et le rollback super-admin.
+- Validation locale AUTH-002 : validateur média/ffprobe, tests Android et partagés, Spotless, Detekt, lint, `check`, APK debug, contenu MP4 de l'APK, `git diff --check` et 66 tests pgTAP verts.
+- La première CI complète de la PR `#29` a passé la vérification média, `quality` et pgTAP en 4 min 35 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release en 16 min 26 s.
 
 ## Tâche en cours
 
-AUTH-002 — livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
+Clôturer AUTH-002 — faire repasser les gates sur le commit de clôture puis fusionner la PR `#29` avant toute implémentation AUTH-003.
 
 ## Blocages / limites
 
-- Le service Supabase Storage local complet a échoué une fois sur Windows ; la validation FND-005 utilise `supabase db start`, `supabase db reset` et `supabase test db`.
-- La compilation iOS complète ne peut pas être exécutée sur ce poste Windows ; elle doit être confirmée par GitHub Actions macOS.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-002 ont été confirmées par GitHub Actions macOS.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
@@ -147,7 +153,9 @@ AUTH-002 — livrer intro vidéo, reduced-motion, cache Remote Config et navigat
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
-- Le flux email OTP Android s'appuie sur les états/presenters partagés et l'UI Compose propre à `androidApp`, mais les acquisitions Google/Apple natives, l'écran Auth SwiftUI iOS et la persistance/retry offline complète restent à livrer dans les tranches Auth suivantes.
+- Le flux OTP minimal existe sur Android et iOS via le contrôleur partagé ; le mot de passe, l'identité complète, la ville/GPS, la devise, les consentements versionnés, Google/Apple et les parcours de récupération restent à livrer dans AUTH-003 à AUTH-005.
+- Aucun appareil Android n'était connecté et le projet ne possède pas encore de cible XCTest : l'autoplay silencieux, reduced-motion, lifecycle/fallback et Remote Config réel sont compilés ou testés par politique, mais leur validation perceptuelle sur appareils demeure obligatoire avant bêta.
+- Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B, l'activation de Firebase Remote Config Realtime API et le branchement du consentement observabilité dans AUTH-003.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
@@ -156,4 +164,4 @@ AUTH-002 — livrer intro vidéo, reduced-motion, cache Remote Config et navigat
 
 ## Prochaine tâche logique
 
-Poursuivre `AUTH-002` ; finaliser ENV-001B/OBS-001B dès que le propriétaire a choisi l'organisation Supabase, réauthentifié Firebase et provisionné les environnements distants.
+Après la fusion vérifiée de la PR `#29`, démarrer `AUTH-003` : terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements sur Android/iOS ; finaliser ENV-001B/OBS-001B dès que le propriétaire a choisi l'organisation Supabase, réauthentifié Firebase et provisionné les environnements distants.

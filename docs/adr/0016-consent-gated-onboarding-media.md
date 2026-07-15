@@ -43,7 +43,7 @@ L'état « première intro déjà vue » et la dernière révision distante pré
 
 **Négatives / compromis assumés**
 
-- La vidéo embarquée augmente la taille binaire d'environ 0,4 Mio et l'image d'environ 2,1 Mio.
+- La vidéo embarquée augmente la taille binaire d'environ 1,1 Mio et l'image d'environ 2,1 Mio.
 - Une campagne distante ne peut pas remplacer l'intro lors d'une toute première installation avant recueil du consentement.
 - Une mise à jour distante nécessite que l'appareil soit en ligne, consenti et que l'application s'exécute au moins une fois pour précharger la révision ; le fallback embarqué reste l'unique garantie hors ligne.
 - Le consentement complet reste à livrer avec AUTH-003 ; jusque-là, les valeurs refusées par défaut maintiennent uniquement le fallback local.
