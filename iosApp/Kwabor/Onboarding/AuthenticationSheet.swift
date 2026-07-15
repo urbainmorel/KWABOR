@@ -140,11 +140,6 @@ private struct AuthenticationForm: View {
     }
 
     private func submit() {
-        switch state.step {
-        case .email:
-            controller.requestEmailOtp()
-        case .otp:
-            controller.verifyEmailOtp()
-        }
+        controller.submit()
     }
 }

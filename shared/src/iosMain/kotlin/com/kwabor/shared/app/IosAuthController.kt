@@ -4,6 +4,7 @@ import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.AuthStep
 import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +61,13 @@ class IosAuthController internal constructor(
 
     fun updateLegalAccepted(accepted: Boolean) = updateState { currentState ->
         presenter?.updateLegalAccepted(currentState, accepted) ?: currentState
+    }
+
+    fun submit() {
+        when (state.step) {
+            AuthStep.Email -> requestEmailOtp()
+            AuthStep.Otp -> verifyEmailOtp()
+        }
     }
 
     fun requestEmailOtp() {
