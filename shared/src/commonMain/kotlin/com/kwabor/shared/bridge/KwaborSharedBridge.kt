@@ -1,8 +1,6 @@
 package com.kwabor.shared.bridge
 
 import com.kwabor.shared.domain.i18n.AppLocale
-import com.kwabor.shared.domain.observability.AnalyticsEvent
-import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.i18n.OnboardingStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.i18n.toOnboardingStrings
@@ -54,7 +52,5 @@ class KwaborSharedBridge internal constructor(
         guestAccessGranted = guestAccessGranted,
     ).routeKey
 
-    fun introVideoShownEvent(): AnalyticsEvent = AnalyticsEvent(name = AnalyticsEventName.IntroVideoShown)
-
-    fun introVideoSkippedEvent(): AnalyticsEvent = AnalyticsEvent(name = AnalyticsEventName.IntroVideoSkipped)
+    fun onboardingTelemetry(): OnboardingTelemetry = OnboardingTelemetry()
 }

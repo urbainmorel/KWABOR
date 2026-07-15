@@ -54,27 +54,27 @@ private struct AuthenticationForm: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
-                    .disabled(state.isLoading)
+                    .disabled(authInputDisabled)
                 if state.step == .otp {
                     TextField(strings.authFirstName, text: firstNameBinding)
                         .textContentType(.givenName)
-                        .disabled(state.isLoading)
+                        .disabled(authInputDisabled)
                     TextField(strings.authLastName, text: lastNameBinding)
                         .textContentType(.familyName)
-                        .disabled(state.isLoading)
+                        .disabled(authInputDisabled)
                     TextField(strings.authOtpCode, text: otpBinding)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
-                        .disabled(state.isLoading)
+                        .disabled(authInputDisabled)
                     Toggle(strings.authLegalAcceptance, isOn: legalBinding)
-                        .disabled(state.isLoading)
+                        .disabled(authInputDisabled)
                 }
             }
             Section {
                 Button(actionLabel) {
                     submit()
                 }
-                .disabled(state.isLoading)
+                .disabled(authInputDisabled)
                 .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
 
                 Button(strings.authContinueAsGuest, action: onContinueAsGuest)
@@ -95,6 +95,11 @@ private struct AuthenticationForm: View {
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
                 .accessibilityLabel(error)
         }
+        if !controller.isConfigured {
+            Text(strings.authUnavailable)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                .accessibilityLabel(strings.authUnavailable)
+        }
         if state.isLoading {
             ProgressView()
         }
@@ -102,6 +107,10 @@ private struct AuthenticationForm: View {
 
     private var actionLabel: String {
         state.step == .email ? strings.authRequestOtp : strings.authVerifyOtp
+    }
+
+    private var authInputDisabled: Bool {
+        state.isLoading || !controller.isConfigured
     }
 
     private var emailBinding: Binding<String> {

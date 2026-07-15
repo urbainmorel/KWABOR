@@ -115,12 +115,13 @@ final class FirebaseObservability {
     func refreshRemoteConfiguration() {
         guard isConfigured, consent.remoteConfigurationAllowed, let remoteConfig else { return }
         remoteConfig.fetchAndActivate { [weak self] _, error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 guard error == nil else {
                     self.recordDiagnostic(wireName: remoteConfigFetchFailureCode)
                     return
                 }
+                guard let remoteConfig = self.remoteConfig else { return }
                 self.remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
                 self.notifyRemoteConfigurationObserver()
             }

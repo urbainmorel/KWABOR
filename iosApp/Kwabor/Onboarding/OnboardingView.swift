@@ -37,11 +37,14 @@ private struct IntroView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
             if !reducedMotion, let videoURL {
                 IntroVideoPlayer(url: videoURL) {
                     coordinator.completeIntro(skipped: false)
                 }
+                .id(videoURL)
+                .accessibilityHidden(true)
             }
 
             VStack {
@@ -64,7 +67,6 @@ private struct IntroView: View {
             }
             .padding(KwaborDesignTokens.Spacing.xxl)
         }
-        .accessibilityLabel(coordinator.strings.introAccessibilityLabel)
         .onAppear { coordinator.introDisplayed() }
     }
 
@@ -85,9 +87,11 @@ private struct OnboardingLandingView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
             KwaborDesignTokens.ColorToken.ink950
                 .opacity(KwaborDesignTokens.Alpha.scrimHigh)
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
             VStack {
                 HStack {

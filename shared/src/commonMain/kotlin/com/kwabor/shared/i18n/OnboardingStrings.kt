@@ -23,6 +23,7 @@ data class OnboardingStrings(
     val authVerifyOtp: String,
     val authLegalAcceptance: String,
     val authContinueAsGuest: String,
+    val authUnavailable: String,
 )
 
 internal fun KwaborStrings.toOnboardingStrings(): OnboardingStrings = OnboardingStrings(
@@ -48,4 +49,5 @@ internal fun KwaborStrings.toOnboardingStrings(): OnboardingStrings = Onboarding
     authVerifyOtp = authVerifyOtp,
     authLegalAcceptance = authLegalAcceptance,
     authContinueAsGuest = authContinueAsGuest,
+    authUnavailable = configurationUnavailable,
 )

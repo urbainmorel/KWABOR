@@ -27,6 +27,7 @@ final class OnboardingCoordinator: ObservableObject {
 
     private let observability: FirebaseObservability
     private let cache: IntroVideoCache
+    private let telemetry: OnboardingTelemetry
     private let userDefaults: UserDefaults
     private var firstLaunchCompleted: Bool
     private var sessionRestoreCompleted = false
@@ -46,6 +47,7 @@ final class OnboardingCoordinator: ObservableObject {
         self.authController = authController
         self.observability = observability
         self.cache = cache
+        telemetry = bridge.onboardingTelemetry()
         self.userDefaults = userDefaults
         let storedFirstLaunchCompleted = userDefaults.bool(forKey: introSeenKey)
         firstLaunchCompleted = storedFirstLaunchCompleted
@@ -72,7 +74,7 @@ final class OnboardingCoordinator: ObservableObject {
     func introDisplayed() {
         guard !introDisplayTracked else { return }
         introDisplayTracked = true
-        observability.track(bridge.introVideoShownEvent())
+        observability.track(telemetry.shownEvent)
     }
 
     func completeIntro(skipped: Bool) {
@@ -80,7 +82,7 @@ final class OnboardingCoordinator: ObservableObject {
         firstLaunchCompleted = true
         userDefaults.set(true, forKey: introSeenKey)
         if skipped {
-            observability.track(bridge.introVideoSkippedEvent())
+            observability.track(telemetry.skippedEvent)
         }
         resolveRoute()
     }
@@ -143,7 +145,7 @@ final class OnboardingCoordinator: ObservableObject {
             let resolvedURL = await cache.resolve(source: source)
             guard !Task.isCancelled else { return }
             if resolvedURL == nil {
-                observability.recordDiagnostic(.introVideoIntegrityFailed)
+                observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
             }
             remoteIntroVideoURL = resolvedURL
         }
