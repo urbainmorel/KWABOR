@@ -28,4 +28,12 @@ enum KwaborDesignTokens {
         static let sheet: CGFloat = 28
         static let pill: CGFloat = 999
     }
+
+    enum Sizing {
+        static let touchTarget: CGFloat = 44
+    }
+
+    enum Alpha {
+        static let scrimHigh = 0.72
+    }
 }

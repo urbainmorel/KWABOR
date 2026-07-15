@@ -11,6 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
 
+      - name: Ensure ffprobe is available
+        shell: bash
+        run: |
+          if ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends ffmpeg
+          fi
+
+      - name: Verify embedded onboarding media
+        run: python3 tools/verify-onboarding-media.py
+
       - uses: actions/setup-java@v5.5.0
         with:
           distribution: temurin

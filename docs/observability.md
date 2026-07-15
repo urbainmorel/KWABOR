@@ -43,7 +43,11 @@ Les seules clés autorisées par cette fondation concernent le remplacement de l
 | `intro_video_sha256` | vide | exactement 64 caractères hexadécimaux |
 | `intro_video_revision` | `0` | entier strictement positif |
 
-Une seule valeur absente ou invalide rejette l'ensemble distant et conserve l'asset embarqué. La fréquence de fetch production est de douze heures. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
+Une seule valeur absente ou invalide rejette l'ensemble distant et conserve l'asset embarqué. Après consentement, un listener Remote Config temps réel détecte les nouvelles publications et active seulement les changements qui touchent ces quatre clés. Le fetch production de douze heures reste le mécanisme de rattrapage ; aucun polling agressif n'est ajouté. Le listener est retiré à la révocation du consentement. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
+
+Le projet Firebase doit avoir l'API **Firebase Remote Config Realtime** activée. Le super-admin publie une révision strictement croissante depuis la console Firebase avec l'URL CDN et le SHA-256 du média. Les clients préchargent la révision validée puis la présentent une seule fois au lancement suivant ; une publication ne peut jamais interrompre une session en cours.
+
+Le téléchargement, la validation codec/durée/taille et la révocation du média sont détaillés dans le [runbook onboarding](onboarding.md) et l'[ADR-0016](adr/0016-consent-gated-onboarding-media.md).
 
 ## Configuration des builds
 

@@ -20,6 +20,7 @@ object KwaborRadius {
 }
 
 object KwaborSizing {
+    val Hairline = 1.dp
     val TouchTarget = 44.dp
     val BottomNavigationHeight = 76.dp
     val FloatingActionButton = 56.dp

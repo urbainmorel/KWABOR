@@ -64,7 +64,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ### Auth et onboarding
 
-- [ ] AUTH-002 — Livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
+- [x] AUTH-002 — Livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
 - [ ] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [ ] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [ ] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.

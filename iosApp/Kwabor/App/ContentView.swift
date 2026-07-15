@@ -3,10 +3,22 @@ import SwiftUI
 
 struct ContentView: View {
     let bridge: KwaborSharedBridge
+    let isGuestSession: Bool
+    let onProtectedDestinationSelected: () -> Void
     @State private var selectedDestination = RootDestination.home
 
+    init(
+        bridge: KwaborSharedBridge,
+        isGuestSession: Bool = false,
+        onProtectedDestinationSelected: @escaping () -> Void = {}
+    ) {
+        self.bridge = bridge
+        self.isGuestSession = isGuestSession
+        self.onProtectedDestinationSelected = onProtectedDestinationSelected
+    }
+
     var body: some View {
-        TabView(selection: $selectedDestination) {
+        TabView(selection: destinationBinding) {
             ForEach(RootDestination.allCases) { destination in
                 NavigationStack {
                     RootDestinationContent(destination: destination, bridge: bridge)
@@ -22,8 +34,23 @@ struct ContentView: View {
                   let destination = RootDestination(rawValue: routeKey) else {
                 return
             }
-            selectedDestination = destination
+            requestDestination(destination)
         }
+    }
+
+    private var destinationBinding: Binding<RootDestination> {
+        Binding(
+            get: { selectedDestination },
+            set: requestDestination
+        )
+    }
+
+    private func requestDestination(_ destination: RootDestination) {
+        guard destination == .home || !isGuestSession else {
+            onProtectedDestinationSelected()
+            return
+        }
+        selectedDestination = destination
     }
 }
 

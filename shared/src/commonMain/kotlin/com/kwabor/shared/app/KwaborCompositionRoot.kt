@@ -8,6 +8,7 @@ import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
+import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.authPresentationModule
@@ -24,6 +25,7 @@ class KwaborCompositionRoot internal constructor(
 ) {
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
+    val dispatcherProvider: DispatcherProvider = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
     val explorePresenter: ExplorePresenter = application.koin.get()
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
