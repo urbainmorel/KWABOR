@@ -64,6 +64,8 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
         }
     }
 
+    override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = remoteConfig?.toDomainConfiguration()
+
     companion object {
         fun create(context: Context): FirebaseAndroidObservabilityBackend {
             val firebaseApp = FirebaseApp.initializeApp(context) ?: return unconfigured()

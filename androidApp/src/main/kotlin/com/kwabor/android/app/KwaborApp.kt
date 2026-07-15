@@ -1,5 +1,6 @@
 package com.kwabor.android.app
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,6 +36,9 @@ import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.explore.ExploreEffect
 import com.kwabor.android.presentation.explore.ExploreIntent
 import com.kwabor.android.presentation.explore.ExploreViewModel
+import com.kwabor.android.presentation.onboarding.OnboardingEffect
+import com.kwabor.android.presentation.onboarding.OnboardingUiState
+import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.AuthSheetActions
@@ -48,26 +52,129 @@ import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
 import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
 import com.kwabor.shared.presentation.navigation.label
+import com.kwabor.shared.presentation.onboarding.OnboardingEntry
+import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 
 @Composable
-internal fun KwaborApp(
-    exploreViewModel: ExploreViewModel,
-    authViewModel: AuthViewModel,
-    pendingDeepLink: StateFlow<String?>,
-    onDeepLinkConsumed: () -> Unit,
-) {
-    val authState by authViewModel.state.collectAsStateWithLifecycle()
-    val isSessionRestoreComplete by authViewModel.isSessionRestoreComplete.collectAsStateWithLifecycle()
-    val deepLink by pendingDeepLink.collectAsStateWithLifecycle()
+internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: KwaborAppRuntimeState) {
+    val state = collectKwaborAppState(dependencies = dependencies, runtimeState = runtimeState)
+    val strings = stringsFor(AppLocale.French)
+    val entry = OnboardingEntryResolver.resolve(
+        firstLaunchCompleted = !state.onboarding.isIntroRequired,
+        sessionRestoreCompleted = state.isSessionRestoreComplete,
+        isAuthenticated = state.auth.isAuthenticated,
+        guestAccessGranted = state.onboarding.isGuestSession,
+    )
+
+    OnboardingEffectHandler(dependencies = dependencies)
 
     KwaborTheme {
-        KwaborAppContent(
-            exploreViewModel = exploreViewModel,
-            authViewModel = authViewModel,
-            authState = authState,
-            deepLink = deepLink.takeIf { isSessionRestoreComplete },
+        KwaborEntryContent(
+            entry = entry,
+            state = state,
+            strings = strings,
+            dependencies = dependencies,
+            onDeepLinkConsumed = runtimeState.onDeepLinkConsumed,
+        )
+        if (state.auth.isVisible) {
+            AuthSheet(
+                state = state.auth,
+                strings = strings,
+                actions = remember(dependencies.authViewModel) { dependencies.authViewModel.sheetActions() },
+            )
+        }
+    }
+}
+
+internal data class KwaborAppDependencies(
+    val exploreViewModel: ExploreViewModel,
+    val authViewModel: AuthViewModel,
+    val onboardingViewModel: OnboardingViewModel,
+)
+
+internal data class KwaborAppRuntimeState(
+    val remoteIntroVideoFile: StateFlow<File?>,
+    val pendingDeepLink: StateFlow<String?>,
+    val onDeepLinkConsumed: () -> Unit,
+)
+
+private data class KwaborCollectedState(
+    val auth: AuthUiState,
+    val onboarding: OnboardingUiState,
+    val isSessionRestoreComplete: Boolean,
+    val introVideoUri: Uri?,
+    val deepLink: String?,
+)
+
+@Composable
+private fun collectKwaborAppState(
+    dependencies: KwaborAppDependencies,
+    runtimeState: KwaborAppRuntimeState,
+): KwaborCollectedState {
+    val authState by dependencies.authViewModel.state.collectAsStateWithLifecycle()
+    val restoreComplete by dependencies.authViewModel.isSessionRestoreComplete.collectAsStateWithLifecycle()
+    val onboardingState by dependencies.onboardingViewModel.state.collectAsStateWithLifecycle()
+    val introVideoFile by runtimeState.remoteIntroVideoFile.collectAsStateWithLifecycle()
+    val deepLink by runtimeState.pendingDeepLink.collectAsStateWithLifecycle()
+    return KwaborCollectedState(
+        auth = authState,
+        onboarding = onboardingState,
+        isSessionRestoreComplete = restoreComplete,
+        introVideoUri = introVideoFile?.let(Uri::fromFile),
+        deepLink = deepLink,
+    )
+}
+
+@Composable
+private fun OnboardingEffectHandler(dependencies: KwaborAppDependencies) {
+    LaunchedEffect(dependencies.onboardingViewModel, dependencies.authViewModel) {
+        dependencies.onboardingViewModel.effects.collect { effect ->
+            when (effect) {
+                OnboardingEffect.OpenAuthentication -> dependencies.authViewModel.onIntent(AuthIntent.Open)
+            }
+        }
+    }
+}
+
+@Composable
+private fun KwaborEntryContent(
+    entry: OnboardingEntry,
+    state: KwaborCollectedState,
+    strings: KwaborStrings,
+    dependencies: KwaborAppDependencies,
+    onDeepLinkConsumed: () -> Unit,
+) {
+    when (entry) {
+        OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
+        OnboardingEntry.Intro -> KwaborIntroRoute(
+            strings = strings,
+            videoUri = state.introVideoUri,
+            viewModel = dependencies.onboardingViewModel,
+        )
+        OnboardingEntry.Authentication -> KwaborLandingRoute(
+            strings = strings,
+            state = state.onboarding,
+            viewModel = dependencies.onboardingViewModel,
+        )
+        OnboardingEntry.Home -> KwaborAppContent(
+            exploreViewModel = dependencies.exploreViewModel,
+            authViewModel = dependencies.authViewModel,
+            authState = state.auth,
+            deepLink = state.deepLink.takeIf { state.isSessionRestoreComplete },
             onDeepLinkConsumed = onDeepLinkConsumed,
+        )
+    }
+}
+
+@Composable
+private fun SessionRestoreScreen(strings: KwaborStrings) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        KwaborStateMessage(
+            title = strings.appName,
+            supportingText = strings.loading,
+            modifier = Modifier.padding(24.dp),
         )
     }
 }
@@ -109,13 +216,6 @@ private fun KwaborAppContent(
         isGuestSession = !authState.isAuthenticated,
         onDestinationSelected = requestDestination,
     )
-    if (authState.isVisible) {
-        AuthSheet(
-            state = authState,
-            strings = strings,
-            actions = remember(authViewModel) { authViewModel.sheetActions() },
-        )
-    }
 }
 
 @Composable

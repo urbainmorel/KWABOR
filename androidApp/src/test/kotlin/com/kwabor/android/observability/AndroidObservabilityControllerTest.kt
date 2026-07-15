@@ -123,6 +123,8 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
         remoteConfigurationFetched = true
         onResult(REMOTE_CONFIGURATION)
     }
+
+    override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = null
 }
 
 private val REMOTE_CONFIGURATION = RemoteFeatureConfiguration(

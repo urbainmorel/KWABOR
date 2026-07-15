@@ -4,16 +4,30 @@ import SwiftUI
 
 @main
 struct KwaborApp: App {
-    private let observability = FirebaseObservability()
-    private let compositionRoot = IosKwaborCompositionRoot(
-        environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
-        supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),
-        supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
-    )
+    private let compositionRoot: IosKwaborCompositionRoot
+    @StateObject private var coordinator: OnboardingCoordinator
+
+    @MainActor
+    init() {
+        let observability = FirebaseObservability()
+        let compositionRoot = IosKwaborCompositionRoot(
+            environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
+            supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),
+            supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
+        )
+        self.compositionRoot = compositionRoot
+        _coordinator = StateObject(
+            wrappedValue: OnboardingCoordinator(
+                bridge: compositionRoot.bridge,
+                authController: compositionRoot.authController,
+                observability: observability
+            )
+        )
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView(bridge: compositionRoot.bridge)
+            OnboardingView(coordinator: coordinator)
         }
     }
 }

@@ -3,6 +3,8 @@ package com.kwabor.shared.data.core
 import com.kwabor.shared.data.config.KwaborEnvironment
 import com.kwabor.shared.data.config.createKwaborSupabaseClient
 import com.kwabor.shared.domain.core.ClockProvider
+import com.kwabor.shared.domain.core.DefaultDispatcherProvider
+import com.kwabor.shared.domain.core.DispatcherProvider
 import io.github.jan.supabase.auth.SessionManager
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -16,4 +18,5 @@ internal fun coreDataModule(environment: KwaborEnvironment, authSessionManager: 
         )
     }
     single<ClockProvider> { SystemClockProvider() }
+    single<DispatcherProvider> { DefaultDispatcherProvider() }
 }

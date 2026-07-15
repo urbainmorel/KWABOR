@@ -13,6 +13,12 @@ class KwaborSharedBridgeTest {
         assertEquals("Kwabor", bridge.appName())
         assertEquals("Découvrez le Bénin", bridge.homeTitle())
         assertEquals("Socle applicatif en place", bridge.foundationStatus())
+        val onboardingStrings = bridge.onboardingStrings()
+        assertEquals("Passer", onboardingStrings.introSkip)
+        assertEquals("Découvrez le Bénin", onboardingStrings.title)
+        assertEquals("S'inscrire", onboardingStrings.signUp)
+        assertEquals("Recevoir le code", onboardingStrings.authRequestOtp)
+        assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
         assertFalse(bridge.hasCatalogConfiguration())
     }
 

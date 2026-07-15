@@ -11,6 +11,7 @@ final class FirebaseObservability {
     private let consentStore: FirebaseConsentStore
     private var remoteConfig: RemoteConfig?
     private var performance: Performance?
+    private var remoteConfigurationObserver: ((FirebaseRemoteFeatureConfiguration, ObservabilityConsent) -> Void)?
 
     private(set) var consent: ObservabilityConsent
     private(set) var isConfigured = false
@@ -34,6 +35,9 @@ final class FirebaseObservability {
         remoteConfig = configureRemoteConfig()
         performance = Performance.sharedInstance()
         isConfigured = true
+        if consent.remoteConfigurationAllowed, let remoteConfig {
+            remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
+        }
         applyConsent(consent)
         if consent.remoteConfigurationAllowed {
             refreshRemoteConfiguration()
@@ -48,9 +52,21 @@ final class FirebaseObservability {
 
         if !updatedConsent.remoteConfigurationAllowed {
             remoteConfiguration = .safeDefaults
+            notifyRemoteConfigurationObserver()
         } else if !remoteConfigurationWasAllowed {
+            if let remoteConfig {
+                remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
+                notifyRemoteConfigurationObserver()
+            }
             refreshRemoteConfiguration()
         }
+    }
+
+    func observeRemoteConfiguration(
+        _ observer: @escaping (FirebaseRemoteFeatureConfiguration, ObservabilityConsent) -> Void
+    ) {
+        remoteConfigurationObserver = observer
+        notifyRemoteConfigurationObserver()
     }
 
     func track(_ event: AnalyticsEvent) {
@@ -106,8 +122,13 @@ final class FirebaseObservability {
                     return
                 }
                 self.remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
+                self.notifyRemoteConfigurationObserver()
             }
         }
+    }
+
+    private func notifyRemoteConfigurationObserver() {
+        remoteConfigurationObserver?(remoteConfiguration, consent)
     }
 
     private func applyConsent(_ consent: ObservabilityConsent) {

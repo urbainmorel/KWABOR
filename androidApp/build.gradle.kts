@@ -250,6 +250,8 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.10.0")
+    implementation("androidx.media3:media3-exoplayer:1.10.1")
+    implementation("androidx.media3:media3-ui:1.10.1")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-config")

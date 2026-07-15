@@ -45,6 +45,8 @@ Les seules clés autorisées par cette fondation concernent le remplacement de l
 
 Une seule valeur absente ou invalide rejette l'ensemble distant et conserve l'asset embarqué. La fréquence de fetch production est de douze heures. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
 
+Le téléchargement, la validation codec/durée/taille et la révocation du média sont détaillés dans le [runbook onboarding](onboarding.md) et l'[ADR-0016](adr/0016-consent-gated-onboarding-media.md).
+
 ## Configuration des builds
 
 Les dépendances sont verrouillées à Firebase Android BoM `34.15.0`, plugins Google Services `4.5.0`, Crashlytics `3.0.7`, Performance `2.0.2` et Firebase Apple SDK `12.16.0` via Swift Package Manager.
