@@ -143,15 +143,16 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - Le primer notifications est persistant par installation et repris après un arrêt entre la RPC et l'accueil ; consentements, annulation post-OTP et demande système sont protégés contre les doubles actions et les échecs de persistance locale.
 - Le logo de lancement Android/iOS utilise le master opaque `kwabor_icone_app.png` sans recoloration. La zone sûre Android a été ajustée après capture sur émulateur afin de conserver la silhouette complète malgré le masque circulaire natif ; 14 assets sont déterministes.
 - La revue croisée AUTH-003 garantit aussi le primer après une session OTP déjà complète, rend la demande de localisation Android single-flight, masque les secrets des requêtes sociales/promoteur, distingue un OTP expiré et remplace le rectangle GPS par un polygone local du Bénin excluant notamment Lomé et Lagos.
-- Validation locale AUTH-003 : 60 tests Android et 128 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation Kotlin iOS Simulator verts en 8 min 13 s ; vidéo embarquée H.264 portrait silencieuse/faststart validée et 167 assertions pgTAP vertes. La compilation SwiftUI/Xcode des trois configurations iOS reste à confirmer par la CI macOS.
+- Validation locale AUTH-003 : 60 tests Android et 129 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation Kotlin iOS Simulator verts en 8 min 13 s ; vidéo embarquée H.264 portrait silencieuse/faststart validée et 167 assertions pgTAP vertes.
+- La CI du commit `8f10fc9` a passé `quality` et pgTAP en 4 min 01 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release sous Xcode 16.4 en 20 min 14 s. Les ponts Swift/KMP de session, d'état et de consentement juridique sont ainsi validés nativement.
 
 ## Tâche en cours
 
-Clôturer AUTH-003 — auto-revue finale, commit/PR atomique, puis faire passer `quality`, pgTAP et les trois configurations `iOS simulator build` avant fusion.
+Fusionner la PR AUTH-003 `#30` après la dernière CI du commit de clôture documentaire.
 
 ## Blocages / limites
 
-- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-002 ont été confirmées par GitHub Actions macOS.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-003 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
@@ -161,8 +162,8 @@ Clôturer AUTH-003 — auto-revue finale, commit/PR atomique, puis faire passer 
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - Le parcours de création OTP, mot de passe initial, identité, ville/GPS, devise et consentements versionnés est livré sur Android/iOS ; la connexion par mot de passe, la récupération et Google/Apple restent à livrer dans AUTH-004/AUTH-005.
-- Aucun appareil Android n'était connecté et le projet ne possède pas encore de cible XCTest : l'autoplay silencieux, reduced-motion, lifecycle/fallback et Remote Config réel sont compilés ou testés par politique, mais leur validation perceptuelle sur appareils demeure obligatoire avant bêta.
-- Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B, l'activation de Firebase Remote Config Realtime API et le branchement du consentement observabilité dans AUTH-003.
+- La capture sur émulateur Android confirme la fidélité du logo natif ; le projet ne possède pas encore de cible XCTest et la validation perceptuelle de l'autoplay silencieux, reduced-motion, lifecycle/fallback et Remote Config réel sur appareils physiques demeure obligatoire avant bêta.
+- Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B et l'activation de Firebase Remote Config Realtime API ; le consentement observabilité est désormais branché dans AUTH-003.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
