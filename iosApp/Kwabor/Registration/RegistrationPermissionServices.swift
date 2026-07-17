@@ -67,7 +67,7 @@ final class CoreLocationRegistrationService: NSObject, RegistrationLocationProvi
     }
 }
 
-extension CoreLocationRegistrationService: CLLocationManagerDelegate {
+extension CoreLocationRegistrationService: @preconcurrency CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         guard continuation != nil else { return }
         switch manager.authorizationStatus {

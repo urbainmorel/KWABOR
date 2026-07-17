@@ -58,9 +58,8 @@ final class OnboardingCoordinator: ObservableObject {
         authController: IosAuthController,
         registrationController: IosRegistrationController,
         observability: FirebaseObservability,
-        registrationLocationProvider: RegistrationLocationProviding = CoreLocationRegistrationService(),
-        registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting =
-            UserNotificationRegistrationService(),
+        registrationLocationProvider: RegistrationLocationProviding? = nil,
+        registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting? = nil,
         registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
         cache: IntroVideoCache = IntroVideoCache(),
         userDefaults: UserDefaults = .standard,
@@ -71,8 +70,9 @@ final class OnboardingCoordinator: ObservableObject {
         self.authController = authController
         self.registrationController = registrationController
         self.observability = observability
-        self.registrationLocationProvider = registrationLocationProvider
-        self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester
+        self.registrationLocationProvider = registrationLocationProvider ?? CoreLocationRegistrationService()
+        self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester ??
+            UserNotificationRegistrationService()
         self.registrationNotificationPrimingStore = registrationNotificationPrimingStore ??
             UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
         self.cache = cache
