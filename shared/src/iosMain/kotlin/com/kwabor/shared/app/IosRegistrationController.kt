@@ -36,11 +36,6 @@ data class IosRegistrationSelectCityIntent(val cityId: String) : IosRegistration
 
 data class IosRegistrationSelectCurrencyIntent(val currency: KwaborCurrency) : IosRegistrationFieldIntent
 
-data class IosRegistrationUpdateLegalAcceptanceIntent(
-    val type: LegalDocumentType,
-    val accepted: Boolean,
-) : IosRegistrationFieldIntent
-
 data class IosRegistrationUpdateObservabilityConsentIntent(
     val consent: ObservabilityConsent,
 ) : IosRegistrationFieldIntent
@@ -79,6 +74,22 @@ data object IosRegistrationFinishNotificationPrimingIntent : IosRegistrationNavi
 
 data object IosRegistrationGoBackIntent : IosRegistrationNavigationIntent
 
+class IosLegalAcceptanceController internal constructor(
+    private val updateAcceptance: (LegalDocumentType, Boolean) -> Unit,
+) {
+    fun updateTerms(accepted: Boolean) {
+        updateAcceptance(LegalDocumentType.Terms, accepted)
+    }
+
+    fun updatePrivacy(accepted: Boolean) {
+        updateAcceptance(LegalDocumentType.PrivacyPolicy, accepted)
+    }
+
+    fun updateUgc(accepted: Boolean) {
+        updateAcceptance(LegalDocumentType.UgcLicense, accepted)
+    }
+}
+
 class IosRegistrationController internal constructor(
     private val presenter: RegistrationPresenter?,
     dispatcherProvider: DispatcherProvider,
@@ -88,6 +99,12 @@ class IosRegistrationController internal constructor(
     private var observer: ((RegistrationUiState) -> Unit)? = null
     private var operationJob: Job? = null
     private var state = initialRegistrationUiState()
+        set(value) {
+            field = value
+            observer?.invoke(value)
+        }
+
+    val legalAcceptance = IosLegalAcceptanceController(::updateLegalAcceptance)
 
     val isConfigured: Boolean get() = presenter != null
 
@@ -105,14 +122,12 @@ class IosRegistrationController internal constructor(
             email = session.email.orEmpty(),
             currentSession = session,
         )
-        publish()
     }
 
     fun reset() {
         operationJob?.cancel()
         operationJob = null
         state = initialRegistrationUiState()
-        publish()
     }
 
     fun dispatch(intent: IosRegistrationIntent) {
@@ -131,6 +146,10 @@ class IosRegistrationController internal constructor(
 
     private fun reduce(intent: RegistrationIntent) = updateState { currentState ->
         presenter?.reducer?.reduce(currentState, intent, strings) ?: currentState
+    }
+
+    private fun updateLegalAcceptance(type: LegalDocumentType, accepted: Boolean) {
+        reduce(RegistrationIntent.UpdateLegalAcceptance(type, accepted))
     }
 
     private fun selectNearestCity(intent: IosRegistrationSelectNearestCityIntent) = updateState { currentState ->
@@ -186,21 +205,14 @@ class IosRegistrationController internal constructor(
         if (state.isLoading) return
         operationJob?.cancel()
         state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
-        publish()
         operationJob = scope.launch {
             state = operation(currentPresenter, state).copy(isLoading = false)
-            publish()
         }
     }
 
     private fun updateState(transform: (RegistrationUiState) -> RegistrationUiState) {
         if (state.isLoading) return
         state = transform(state)
-        publish()
-    }
-
-    private fun publish() {
-        observer?.invoke(state)
     }
 }
 
@@ -210,7 +222,6 @@ private fun IosRegistrationFieldIntent.toSharedIntent(): RegistrationIntent.Fiel
     is IosRegistrationUpdateLastNameIntent -> RegistrationIntent.UpdateLastName(lastName)
     is IosRegistrationSelectCityIntent -> RegistrationIntent.SelectCity(cityId)
     is IosRegistrationSelectCurrencyIntent -> RegistrationIntent.SelectCurrency(currency)
-    is IosRegistrationUpdateLegalAcceptanceIntent -> RegistrationIntent.UpdateLegalAcceptance(type, accepted)
     is IosRegistrationUpdateObservabilityConsentIntent -> RegistrationIntent.UpdateObservabilityConsent(consent)
 }
 

@@ -367,19 +367,19 @@ private struct RegistrationStepContent: View {
                 document: state.termsDocument,
                 title: store.strings.registrationTermsAcceptance,
                 isAccepted: state.termsAccepted,
-                type: .terms
+                onAcceptedChange: store.updateTermsAcceptance
             )
             legalAcceptance(
                 document: state.privacyDocument,
                 title: store.strings.registrationPrivacyAcceptance,
                 isAccepted: state.privacyAccepted,
-                type: .privacyPolicy
+                onAcceptedChange: store.updatePrivacyAcceptance
             )
             legalAcceptance(
                 document: state.ugcDocument,
                 title: store.strings.registrationUgcAcceptance,
                 isAccepted: state.ugcAccepted,
-                type: .ugcLicense
+                onAcceptedChange: store.updateUgcAcceptance
             )
         } header: {
             EmptyView()
@@ -572,16 +572,14 @@ private struct RegistrationStepContent: View {
         document: LegalDocumentRevision?,
         title: String,
         isAccepted: Bool,
-        type: LegalDocumentType
+        onAcceptedChange: @escaping (Bool) -> Void
     ) -> LegalAcceptanceRow {
         LegalAcceptanceRow(
             document: document,
             title: title,
             isAccepted: isAccepted,
             unavailableMessage: store.strings.registrationLegalUnavailable,
-            onAcceptedChange: { accepted in
-                store.updateLegalAcceptance(type, accepted: accepted)
-            }
+            onAcceptedChange: onAcceptedChange
         )
     }
 }
