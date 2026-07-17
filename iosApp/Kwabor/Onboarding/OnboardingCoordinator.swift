@@ -251,7 +251,7 @@ final class OnboardingCoordinator: ObservableObject {
         authController.signOut { [weak self] completed in
             guard let self else { return }
             isCancellingRegistration = false
-            if completed {
+            if completed.boolValue {
                 completedRegistrationSession = nil
                 registrationController.reset()
                 isRegistrationPresented = false

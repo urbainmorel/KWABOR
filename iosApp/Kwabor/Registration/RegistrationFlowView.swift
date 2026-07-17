@@ -381,6 +381,10 @@ private struct RegistrationStepContent: View {
                 isAccepted: state.ugcAccepted,
                 type: .ugcLicense
             )
+        } header: {
+            EmptyView()
+        } footer: {
+            EmptyView()
         }
     }
 
