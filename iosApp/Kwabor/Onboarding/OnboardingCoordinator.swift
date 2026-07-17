@@ -8,21 +8,30 @@ final class OnboardingCoordinator: ObservableObject {
         case intro
         case restoringSession
         case authentication
+        case notificationPriming
         case home
     }
 
     @Published private(set) var route: Route
     @Published private(set) var authState: AuthUiState?
     @Published private(set) var introVideoURL: URL?
+    @Published private(set) var registrationCancellationErrorMessage: String?
     @Published var isAuthenticationPresented = false
+    @Published var isRegistrationPresented = false
     @Published var isGuestDisclosurePresented = false
+    @Published private(set) var isCancellingRegistration = false
+    @Published private(set) var isRequestingNotificationsAfterSessionRestore = false
 
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
     let authController: IosAuthController
+    let registrationController: IosRegistrationController
+    let registrationLocationProvider: RegistrationLocationProviding
+    let registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting
+    let registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting
 
     var isGuestSession: Bool {
-        guestAccessGranted && !(authState?.isAuthenticated ?? false)
+        guestAccessGranted && !hasCompleteAccount
     }
 
     private let observability: FirebaseObservability
@@ -41,11 +50,18 @@ final class OnboardingCoordinator: ObservableObject {
     private var deferredRemoteMedia: DeferredRemoteMedia?
     private var remoteMediaTask: Task<Void, Never>?
     private var remoteMediaRevisionInFlight: Int64?
+    private var completedRegistrationSession: AuthSession?
+    private var shouldPresentRegistrationAfterAuthenticationDismissal = false
 
     init(
         bridge: KwaborSharedBridge,
         authController: IosAuthController,
+        registrationController: IosRegistrationController,
         observability: FirebaseObservability,
+        registrationLocationProvider: RegistrationLocationProviding = CoreLocationRegistrationService(),
+        registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting =
+            UserNotificationRegistrationService(),
+        registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
         cache: IntroVideoCache = IntroVideoCache(),
         userDefaults: UserDefaults = .standard,
         bundle: Bundle = .main
@@ -53,7 +69,12 @@ final class OnboardingCoordinator: ObservableObject {
         self.bridge = bridge
         strings = bridge.onboardingStrings()
         self.authController = authController
+        self.registrationController = registrationController
         self.observability = observability
+        self.registrationLocationProvider = registrationLocationProvider
+        self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester
+        self.registrationNotificationPrimingStore = registrationNotificationPrimingStore ??
+            UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
         self.cache = cache
         telemetry = bridge.onboardingTelemetry()
         let bundledIntroVideoURL = bundle.url(
@@ -96,8 +117,22 @@ final class OnboardingCoordinator: ObservableObject {
         authController.observe { [weak self] state in
             guard let self else { return }
             authState = state
-            if state.isAuthenticated {
-                isAuthenticationPresented = false
+            if !state.isLoading {
+                if state.isAuthenticated {
+                    completedRegistrationSession = state.currentSession
+                    isAuthenticationPresented = false
+                    isRegistrationPresented = false
+                } else if state.hasSession, let session = state.currentSession {
+                    completedRegistrationSession = nil
+                    guestAccessGranted = false
+                    isAuthenticationPresented = false
+                    registrationController.resumeIncompleteSession(session: session)
+                    if launchIntroDecisionCompleted, !shouldPresentLaunchIntro {
+                        isRegistrationPresented = true
+                    }
+                } else {
+                    completedRegistrationSession = nil
+                }
             }
             resolveRoute()
         }
@@ -148,6 +183,7 @@ final class OnboardingCoordinator: ObservableObject {
             observability.track(telemetry.skippedEvent)
         }
         resolveRoute()
+        presentIncompleteRegistrationIfPossible()
         processDeferredRemoteMediaIfPossible()
     }
 
@@ -167,6 +203,70 @@ final class OnboardingCoordinator: ObservableObject {
         isAuthenticationPresented = true
     }
 
+    func presentRegistration() {
+        registrationCancellationErrorMessage = nil
+        if authState?.hasSession != true {
+            registrationController.reset()
+        }
+        isRegistrationPresented = true
+    }
+
+    func presentRegistrationFromAuthentication() {
+        guard !shouldPresentRegistrationAfterAuthenticationDismissal else { return }
+        shouldPresentRegistrationAfterAuthenticationDismissal = true
+        isAuthenticationPresented = false
+    }
+
+    func authenticationPresentationDismissed() {
+        guard shouldPresentRegistrationAfterAuthenticationDismissal else { return }
+        shouldPresentRegistrationAfterAuthenticationDismissal = false
+        presentRegistration()
+    }
+
+    func applyRegistrationObservabilityConsent(_ consent: ObservabilityConsent) {
+        observability.updateConsent(consent)
+    }
+
+    func completeRegistration(_ session: AuthSession) {
+        registrationCancellationErrorMessage = nil
+        completedRegistrationSession = session
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        registrationController.reset()
+        resolveRoute()
+        authController.restoreSession { _ in }
+    }
+
+    func cancelRegistration(requiresSignOut: Bool) {
+        guard !isCancellingRegistration else { return }
+        registrationCancellationErrorMessage = nil
+        guard requiresSignOut else {
+            registrationController.reset()
+            isRegistrationPresented = false
+            resolveRoute()
+            return
+        }
+        isCancellingRegistration = true
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            isCancellingRegistration = false
+            if completed {
+                completedRegistrationSession = nil
+                registrationController.reset()
+                isRegistrationPresented = false
+                resolveRoute()
+            } else {
+                registrationCancellationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
+            }
+        }
+    }
+
+    func registrationPresentationDismissed() {
+        guard !isRegistrationPresented, authState?.hasSession != true else { return }
+        registrationController.reset()
+    }
+
     func requestGuestAccess() {
         isGuestDisclosurePresented = true
     }
@@ -182,12 +282,39 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func dismissAuthentication() {
+        shouldPresentRegistrationAfterAuthenticationDismissal = false
         isAuthenticationPresented = false
+    }
+
+    func enableNotificationsAfterSessionRestore() {
+        guard route == .notificationPriming,
+              !isRequestingNotificationsAfterSessionRestore else {
+            return
+        }
+        isRequestingNotificationsAfterSessionRestore = true
+        let requester = registrationNotificationPermissionRequester
+        Task { [weak self, requester] in
+            _ = await requester.requestPermission()
+            guard let self else { return }
+            completeNotificationsAfterSessionRestore()
+        }
+    }
+
+    func skipNotificationsAfterSessionRestore() {
+        guard route == .notificationPriming,
+              !isRequestingNotificationsAfterSessionRestore else {
+            return
+        }
+        completeNotificationsAfterSessionRestore()
     }
 
     private var shouldPresentLaunchIntro: Bool {
         guard launchIntroDecisionCompleted, !launchIntroCompleted else { return false }
         return !firstLaunchCompleted || launchIntroRevision != nil
+    }
+
+    private var hasCompleteAccount: Bool {
+        (authState?.isAuthenticated ?? false) || completedRegistrationSession != nil
     }
 
     private func resolveRoute() {
@@ -199,11 +326,17 @@ final class OnboardingCoordinator: ObservableObject {
             route = .intro
             return
         }
+        if sessionRestoreCompleted,
+           hasCompleteAccount,
+           !registrationNotificationPrimingStore.isResolved {
+            route = .notificationPriming
+            return
+        }
 
         let routeKey = bridge.onboardingEntryKey(
             firstLaunchCompleted: firstLaunchCompleted,
             sessionRestoreCompleted: sessionRestoreCompleted,
-            isAuthenticated: authState?.isAuthenticated ?? false,
+            isAuthenticated: hasCompleteAccount,
             guestAccessGranted: guestAccessGranted
         )
         switch routeKey {
@@ -216,6 +349,12 @@ final class OnboardingCoordinator: ObservableObject {
         default:
             route = .authentication
         }
+    }
+
+    private func completeNotificationsAfterSessionRestore() {
+        registrationNotificationPrimingStore.markResolved()
+        isRequestingNotificationsAfterSessionRestore = false
+        resolveRoute()
     }
 
     private func finishLaunchIntroDecision(
@@ -234,6 +373,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         launchIntroDecisionCompleted = true
         resolveRoute()
+        presentIncompleteRegistrationIfPossible()
         processDeferredRemoteMediaIfPossible()
     }
 
@@ -308,6 +448,20 @@ final class OnboardingCoordinator: ObservableObject {
         remoteMediaTask = Task { [cache] in
             await cache.clear()
         }
+    }
+
+    private func presentIncompleteRegistrationIfPossible() {
+        guard launchIntroDecisionCompleted,
+              !shouldPresentLaunchIntro,
+              authState?.isLoading == false,
+              authState?.isAuthenticated == false,
+              let session = authState?.currentSession else {
+            return
+        }
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        registrationController.resumeIncompleteSession(session: session)
+        isRegistrationPresented = true
     }
 }
 

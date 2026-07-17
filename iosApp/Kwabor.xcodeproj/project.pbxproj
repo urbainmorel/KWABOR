@@ -26,6 +26,9 @@
 		1A0000010000000000000066 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000067 /* OnboardingView.swift */; };
 		1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000069 /* AuthenticationSheet.swift */; };
 		1A000001000000000000006A /* KwaborIntro.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000006B /* KwaborIntro.mp4 */; };
+		1A0000010000000000000070 /* RegistrationPermissionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000071 /* RegistrationPermissionServices.swift */; };
+		1A0000010000000000000072 /* RegistrationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000073 /* RegistrationStore.swift */; };
+		1A0000010000000000000074 /* RegistrationFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000075 /* RegistrationFlowView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +54,9 @@
 		1A0000010000000000000067 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		1A0000010000000000000069 /* AuthenticationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationSheet.swift; sourceTree = "<group>"; };
 		1A000001000000000000006B /* KwaborIntro.mp4 */ = {isa = PBXFileReference; lastKnownFileType = video.mp4; path = KwaborIntro.mp4; sourceTree = "<group>"; };
+		1A0000010000000000000071 /* RegistrationPermissionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationPermissionServices.swift; sourceTree = "<group>"; };
+		1A0000010000000000000073 /* RegistrationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationStore.swift; sourceTree = "<group>"; };
+		1A0000010000000000000075 /* RegistrationFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationFlowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,6 +92,7 @@
 				1A0000010000000000000035 /* Config */,
 				1A000001000000000000006C /* Onboarding */,
 				1A0000010000000000000046 /* Observability */,
+				1A0000010000000000000076 /* Registration */,
 				1A0000010000000000000016 /* Resources */,
 			);
 			path = Kwabor;
@@ -160,6 +167,16 @@
 				1A0000010000000000000069 /* AuthenticationSheet.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		1A0000010000000000000076 /* Registration */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000010000000000000071 /* RegistrationPermissionServices.swift */,
+				1A0000010000000000000073 /* RegistrationStore.swift */,
+				1A0000010000000000000075 /* RegistrationFlowView.swift */,
+			);
+			path = Registration;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -305,6 +322,9 @@
 				1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */,
 				1A0000010000000000000066 /* OnboardingView.swift in Sources */,
 				1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */,
+				1A0000010000000000000070 /* RegistrationPermissionServices.swift in Sources */,
+				1A0000010000000000000072 /* RegistrationStore.swift in Sources */,
+				1A0000010000000000000074 /* RegistrationFlowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

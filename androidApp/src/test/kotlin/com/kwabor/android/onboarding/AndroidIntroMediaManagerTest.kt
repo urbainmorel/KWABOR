@@ -279,8 +279,9 @@ private class FakeConsentStore(initialConsent: ObservabilityConsent) : Observabi
 
     override fun read(): ObservabilityConsent = consent
 
-    override fun write(consent: ObservabilityConsent) {
+    override fun write(consent: ObservabilityConsent): Boolean {
         this.consent = consent
+        return true
     }
 }
 

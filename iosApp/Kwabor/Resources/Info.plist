@@ -41,6 +41,8 @@
 	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.travel</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Kwabor utilise votre position une seule fois pour proposer la ville la plus proche. Vous pouvez aussi choisir votre ville manuellement.</string>
 	<key>KWABOR_ENVIRONMENT</key>
 	<string>$(KWABOR_ENVIRONMENT)</string>
 	<key>KWABOR_SUPABASE_PUBLISHABLE_KEY</key>

@@ -128,6 +128,21 @@ VALUES
     now()
   );
 
+INSERT INTO public.profiles (
+  user_id,
+  first_name,
+  last_name,
+  city_id,
+  onboarding_completed_at
+)
+VALUES
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'Proprietaire', 'Test', 'cotonou', now()),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', 'Gestionnaire', 'Test', 'cotonou', now()),
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'Editeur', 'Test', 'cotonou', now()),
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddd4', 'Moderateur', 'Test', 'cotonou', now()),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', 'Externe', 'Test', 'cotonou', now()),
+  ('ffffffff-ffff-4fff-8fff-fffffffffff6', 'Admin', 'Equipe', 'cotonou', now());
+
 INSERT INTO public.user_roles (user_id, role, verification_status)
 VALUES
   ('ffffffff-ffff-4fff-8fff-fffffffffff6', 'admin', 'verified');

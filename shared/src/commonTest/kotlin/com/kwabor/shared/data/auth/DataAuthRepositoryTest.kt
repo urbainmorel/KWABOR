@@ -1,10 +1,11 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
-import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
-import com.kwabor.shared.domain.auth.EmailSignUpRequest
-import com.kwabor.shared.domain.auth.OnboardingProfileInput
-import com.kwabor.shared.domain.auth.OnboardingProfileValues
+import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
+import com.kwabor.shared.domain.auth.CompleteOnboardingValues
+import com.kwabor.shared.domain.auth.LegalDocumentRevision
+import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
@@ -19,95 +20,75 @@ import kotlin.test.assertIs
 
 class DataAuthRepositoryTest {
     @Test
-    fun getCurrentSession_mapsDtoWithoutTokens() = runTest {
-        val repository = DataAuthRepository(FakeAuthDataSource(session = authSessionDto()))
+    fun getCurrentSession_mapsIncompleteServerStatusWithoutTokens() = runTest {
+        val repository = DataAuthRepository(FakeAuthDataSource(session = authSessionDto(onboardingCompleted = false)))
 
         val result = repository.getCurrentSession()
 
         val session = assertIs<DomainResult.Success<AuthSession?>>(result).value
         assertEquals("user-1", session?.userId)
-        assertEquals("user@kwabor.test", session?.email)
-        assertEquals(1_783_080_000_000, session?.expiresAtEpochMilliseconds)
+        assertEquals(AccountSetupStatus.OnboardingRequired, session?.accountSetupStatus)
     }
 
     @Test
-    fun requestEmailOtp_rejectsInvalidEmailBeforeDataSourceCall() = runTest {
+    fun verifyEmailOtp_requiresExactlySixDigits() = runTest {
         val dataSource = FakeAuthDataSource()
         val repository = DataAuthRepository(dataSource)
 
-        val result = repository.requestEmailOtp("invalid")
+        listOf("12345", "1234567", "12A456").forEach { otp ->
+            val result = repository.verifyEmailOtp("user@kwabor.test", otp)
+            assertIs<DomainResult.Failure>(result)
+        }
+
+        assertEquals(0, dataSource.emailOtpVerifications)
+    }
+
+    @Test
+    fun verifyEmailOtp_trimsInputAndReturnsIncompleteSession() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.verifyEmailOtp(" user@kwabor.test ", " 123456 ")
+
+        val session = assertIs<DomainResult.Success<AuthSession>>(result).value
+        assertEquals("user@kwabor.test", dataSource.lastVerifiedEmail)
+        assertEquals("123456", dataSource.lastOtpCode)
+        assertEquals(AccountSetupStatus.OnboardingRequired, session.accountSetupStatus)
+    }
+
+    @Test
+    fun setInitialPassword_rejectsPasswordShorterThanEightCharacters() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.setInitialPassword("short")
+
+        assertIs<DomainResult.Failure>(result)
+        assertEquals(null, dataSource.lastInitialPassword)
+    }
+
+    @Test
+    fun listActiveLegalDocuments_returnsTypedNotFoundWhenEnvironmentHasNone() = runTest {
+        val repository = DataAuthRepository(FakeAuthDataSource(legalDocuments = emptyList()))
+
+        val result = repository.listActiveLegalDocuments(AppLocale.French)
 
         val failure = assertIs<DomainResult.Failure>(result)
-        assertIs<DomainError.Validation>(failure.error)
-        assertEquals(0, dataSource.emailOtpRequests)
+        assertIs<DomainError.NotFound>(failure.error)
+        assertEquals("error.auth.legal_documents_unavailable", failure.error.messageKey)
     }
 
     @Test
-    fun signInWithEmail_delegatesAndMapsSession() = runTest {
+    fun completeOnboarding_mapsCompletedServerSession() = runTest {
         val dataSource = FakeAuthDataSource()
         val repository = DataAuthRepository(dataSource)
+        val request = completeRequest()
 
-        val result = repository.signInWithEmail(email = " user@kwabor.test ", password = "password123")
+        val result = repository.completeOnboarding(request)
 
         val session = assertIs<DomainResult.Success<AuthSession>>(result).value
-        assertEquals("user@kwabor.test", dataSource.lastEmailSignIn)
-        assertEquals("user-1", session.userId)
-    }
-
-    @Test
-    fun signUpWithEmail_requiresOtpAndMapsSession() = runTest {
-        val dataSource = FakeAuthDataSource()
-        val repository = DataAuthRepository(dataSource)
-        val request = EmailSignUpRequest(
-            email = " user@kwabor.test ",
-            password = "password123",
-            otpCode = " 123456 ",
-            onboarding = onboardingInput(),
-        )
-
-        val result = repository.signUpWithEmail(request)
-
-        val session = assertIs<DomainResult.Success<AuthSession>>(result).value
-        assertEquals("user@kwabor.test", dataSource.lastEmailSignUp?.email)
-        assertEquals("123456", dataSource.lastEmailSignUp?.otpCode)
-        assertEquals("user-1", session.userId)
-    }
-
-    @Test
-    fun verifyEmailOtpWithProfile_trimsInputAndMapsSession() = runTest {
-        val dataSource = FakeAuthDataSource()
-        val repository = DataAuthRepository(dataSource)
-
-        val result = repository.verifyEmailOtpWithProfile(
-            EmailOtpProfileRequest(
-                email = " user@kwabor.test ",
-                otpCode = " 123456 ",
-                onboarding = onboardingInput(),
-            ),
-        )
-
-        val session = assertIs<DomainResult.Success<AuthSession>>(result).value
-        assertEquals("user@kwabor.test", dataSource.lastEmailOtpProfile?.email)
-        assertEquals("123456", dataSource.lastEmailOtpProfile?.otpCode)
-        assertEquals("user-1", session.userId)
-    }
-
-    @Test
-    fun verifyEmailOtpWithProfile_rejectsInvalidOtpBeforeDataSourceCall() = runTest {
-        val dataSource = FakeAuthDataSource()
-        val repository = DataAuthRepository(dataSource)
-
-        val result = repository.verifyEmailOtpWithProfile(
-            EmailOtpProfileRequest(
-                email = "user@kwabor.test",
-                otpCode = "123",
-                onboarding = onboardingInput(),
-            ),
-        )
-
-        val failure = assertIs<DomainResult.Failure>(result)
-        assertIs<DomainError.Validation>(failure.error)
-        assertEquals(null, dataSource.lastEmailOtpProfile)
+        assertEquals(AccountSetupStatus.Complete, session.accountSetupStatus)
+        assertEquals(request, dataSource.lastCompleteRequest)
     }
 
     @Test
@@ -115,11 +96,7 @@ class DataAuthRepositoryTest {
         val repository = DataAuthRepository(FakeAuthDataSource())
 
         val result = repository.signInWithSocialProvider(
-            SocialSignInRequest(
-                provider = SocialAuthProvider.Google,
-                idToken = " ",
-                onboarding = null,
-            ),
+            SocialSignInRequest(provider = SocialAuthProvider.Google, idToken = " "),
         )
 
         val failure = assertIs<DomainResult.Failure>(result)
@@ -141,79 +118,83 @@ class DataAuthRepositoryTest {
         val failure = assertIs<DomainResult.Failure>(result)
         assertEquals("error.auth.promoter_activation_requires_server", failure.error.messageKey)
     }
-
-    @Test
-    fun dataException_mapsToAuthenticationRequired() = runTest {
-        val repository = DataAuthRepository(
-            FakeAuthDataSource(throwOnSignIn = AuthDataException.AuthenticationRequired()),
-        )
-
-        val result = repository.signInWithEmail(email = "user@kwabor.test", password = "password123")
-
-        val failure = assertIs<DomainResult.Failure>(result)
-        assertIs<DomainError.AuthenticationRequired>(failure.error)
-    }
 }
 
 private class FakeAuthDataSource(
     private val session: AuthSessionDto? = null,
-    private val throwOnSignIn: AuthDataException? = null,
+    private val legalDocuments: List<LegalDocumentRevision> = legalDocuments(),
 ) : AuthDataSource {
-    var emailOtpRequests: Int = 0
+    var emailOtpVerifications: Int = 0
         private set
-    var lastEmailSignIn: String? = null
+    var lastVerifiedEmail: String? = null
         private set
-    var lastEmailSignUp: EmailSignUpRequest? = null
+    var lastOtpCode: String? = null
         private set
-    var lastEmailOtpProfile: EmailOtpProfileRequest? = null
+    var lastInitialPassword: String? = null
+        private set
+    var lastCompleteRequest: CompleteOnboardingRequest? = null
         private set
 
     override suspend fun getCurrentSession(): AuthSessionDto? = session
 
-    override suspend fun requestEmailOtp(email: String) {
-        emailOtpRequests += 1
+    override suspend fun requestEmailOtp(email: String) = Unit
+
+    override suspend fun verifyEmailOtp(email: String, otpCode: String): AuthSessionDto {
+        emailOtpVerifications += 1
+        lastVerifiedEmail = email
+        lastOtpCode = otpCode
+        return authSessionDto(onboardingCompleted = false)
     }
 
-    override suspend fun verifyEmailOtp(email: String, otpCode: String) = Unit
-
-    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): AuthSessionDto {
-        lastEmailOtpProfile = request
-        return authSessionDto()
+    override suspend fun setInitialPassword(password: String) {
+        lastInitialPassword = password
     }
 
-    override suspend fun signUpWithEmail(request: EmailSignUpRequest): AuthSessionDto {
-        lastEmailSignUp = request
-        return authSessionDto()
+    override suspend fun listActiveLegalDocuments(locale: AppLocale): List<LegalDocumentRevision> = legalDocuments
+
+    override suspend fun completeOnboarding(request: CompleteOnboardingRequest): AuthSessionDto {
+        lastCompleteRequest = request
+        return authSessionDto(onboardingCompleted = true)
     }
 
-    override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto {
-        throwOnSignIn?.let { throw it }
-        lastEmailSignIn = email
-        return authSessionDto()
-    }
+    override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto =
+        authSessionDto(onboardingCompleted = true)
 
-    override suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto = authSessionDto()
+    override suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto =
+        authSessionDto(onboardingCompleted = true)
 
     override suspend fun signOut() = Unit
 }
 
-private fun authSessionDto(): AuthSessionDto = AuthSessionDto(
+private fun authSessionDto(onboardingCompleted: Boolean): AuthSessionDto = AuthSessionDto(
     userId = "user-1",
     email = "user@kwabor.test",
     expiresAtEpochMilliseconds = 1_783_080_000_000,
+    onboardingCompleted = onboardingCompleted,
 )
 
-private fun onboardingInput(): OnboardingProfileInput = assertIs<DomainResult.Success<OnboardingProfileInput>>(
-    OnboardingProfileInput.create(
-        OnboardingProfileValues(
+private fun completeRequest(): CompleteOnboardingRequest = assertIs<DomainResult.Success<CompleteOnboardingRequest>>(
+    CompleteOnboardingRequest.create(
+        CompleteOnboardingValues(
             firstName = "Afi",
             lastName = "Kwabor",
             cityId = "cotonou",
             preferredLocale = AppLocale.French,
             preferredCurrency = KwaborCurrency.Xof,
-            termsAccepted = true,
-            privacyPolicyAccepted = true,
-            ugcLicenseAccepted = true,
+            termsDocumentId = "terms-id",
+            privacyDocumentId = "privacy-id",
+            ugcDocumentId = "ugc-id",
         ),
     ),
 ).value
+
+private fun legalDocuments(): List<LegalDocumentRevision> = LegalDocumentType.entries.mapIndexed { index, type ->
+    LegalDocumentRevision(
+        id = "document-$index",
+        type = type,
+        version = "2026-07-15",
+        locale = AppLocale.French,
+        url = "https://legal.kwabor.test/$index",
+        effectiveAtEpochMilliseconds = 1_768_435_200_000,
+    )
+}

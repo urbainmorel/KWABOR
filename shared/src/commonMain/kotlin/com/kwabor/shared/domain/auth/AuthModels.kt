@@ -5,76 +5,111 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 
+const val MAX_ONBOARDING_NAME_LENGTH = 80
+const val AUTH_OTP_EXPIRED_ERROR_KEY = "error.auth.otp_expired"
+
 enum class SocialAuthProvider {
     Google,
     Apple,
+}
+
+enum class AccountSetupStatus {
+    OnboardingRequired,
+    Complete,
 }
 
 data class AuthSession(
     val userId: String,
     val email: String?,
     val expiresAtEpochMilliseconds: Long,
+    val accountSetupStatus: AccountSetupStatus,
 )
 
-data class OnboardingProfileValues(
+enum class LegalDocumentType {
+    Terms,
+    PrivacyPolicy,
+    UgcLicense,
+}
+
+data class LegalDocumentRevision(
+    val id: String,
+    val type: LegalDocumentType,
+    val version: String,
+    val locale: AppLocale,
+    val url: String,
+    val effectiveAtEpochMilliseconds: Long,
+)
+
+data class CompleteOnboardingValues(
     val firstName: String,
     val lastName: String,
-    val cityId: String?,
+    val cityId: String,
     val preferredLocale: AppLocale,
     val preferredCurrency: KwaborCurrency,
-    val termsAccepted: Boolean,
-    val privacyPolicyAccepted: Boolean,
-    val ugcLicenseAccepted: Boolean,
+    val termsDocumentId: String,
+    val privacyDocumentId: String,
+    val ugcDocumentId: String,
 )
 
-class OnboardingProfileInput private constructor(
-    private val values: OnboardingProfileValues,
+class CompleteOnboardingRequest private constructor(
+    private val values: CompleteOnboardingValues,
 ) {
     val firstName: String get() = values.firstName
     val lastName: String get() = values.lastName
-    val cityId: String? get() = values.cityId
+    val cityId: String get() = values.cityId
     val preferredLocale: AppLocale get() = values.preferredLocale
     val preferredCurrency: KwaborCurrency get() = values.preferredCurrency
-    val termsAccepted: Boolean get() = values.termsAccepted
-    val privacyPolicyAccepted: Boolean get() = values.privacyPolicyAccepted
-    val ugcLicenseAccepted: Boolean get() = values.ugcLicenseAccepted
+    val termsDocumentId: String get() = values.termsDocumentId
+    val privacyDocumentId: String get() = values.privacyDocumentId
+    val ugcDocumentId: String get() = values.ugcDocumentId
 
     companion object {
-        fun create(values: OnboardingProfileValues): DomainResult<OnboardingProfileInput> {
-            if (values.firstName.isBlank() || values.lastName.isBlank()) {
-                return DomainResult.Failure(DomainError.Validation("error.auth.name_required"))
+        fun create(values: CompleteOnboardingValues): DomainResult<CompleteOnboardingRequest> {
+            val normalizedValues = values.normalized()
+            val validationError = normalizedValues.validationError()
+            return if (validationError == null) {
+                DomainResult.Success(CompleteOnboardingRequest(normalizedValues))
+            } else {
+                DomainResult.Failure(validationError)
             }
-
-            if (!values.termsAccepted || !values.privacyPolicyAccepted || !values.ugcLicenseAccepted) {
-                return DomainResult.Failure(DomainError.Validation("error.auth.legal_acceptance_required"))
-            }
-
-            return DomainResult.Success(OnboardingProfileInput(values))
         }
     }
 }
 
-data class EmailSignUpRequest(
-    val email: String,
-    val password: String,
-    val otpCode: String,
-    val onboarding: OnboardingProfileInput,
+private fun CompleteOnboardingValues.normalized(): CompleteOnboardingValues = copy(
+    firstName = firstName.trim(),
+    lastName = lastName.trim(),
+    cityId = cityId.trim(),
+    termsDocumentId = termsDocumentId.trim(),
+    privacyDocumentId = privacyDocumentId.trim(),
+    ugcDocumentId = ugcDocumentId.trim(),
 )
 
-data class EmailOtpProfileRequest(
-    val email: String,
-    val otpCode: String,
-    val onboarding: OnboardingProfileInput,
-)
+private fun CompleteOnboardingValues.validationError(): DomainError.Validation? {
+    val legalDocumentIds = listOf(termsDocumentId, privacyDocumentId, ugcDocumentId)
+    return when {
+        firstName.isBlank() || lastName.isBlank() -> DomainError.Validation("error.auth.name_required")
+        firstName.length > MAX_ONBOARDING_NAME_LENGTH || lastName.length > MAX_ONBOARDING_NAME_LENGTH ->
+            DomainError.Validation("error.auth.name_too_long")
+        cityId.isBlank() -> DomainError.Validation("error.auth.city_required")
+        legalDocumentIds.any(String::isBlank) || legalDocumentIds.toSet().size != legalDocumentIds.size ->
+            DomainError.Validation("error.auth.legal_acceptance_required")
+        else -> null
+    }
+}
 
-data class SocialSignInRequest(
+class SocialSignInRequest(
     val provider: SocialAuthProvider,
     val idToken: String,
-    val onboarding: OnboardingProfileInput?,
-)
+) {
+    override fun toString(): String = "SocialSignInRequest(provider=$provider, idToken=<redacted>)"
+}
 
-data class PromoterActivationRequest(
+class PromoterActivationRequest(
     val inviteToken: String,
     val password: String?,
     val socialSignInRequest: SocialSignInRequest?,
-)
+) {
+    override fun toString(): String =
+        "PromoterActivationRequest(inviteToken=<redacted>, password=<redacted>, socialSignInRequest=<redacted>)"
+}

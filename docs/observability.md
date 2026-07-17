@@ -13,7 +13,7 @@ Toute collecte est désactivée au premier lancement :
 - un retrait remet immédiatement la configuration distante aux valeurs sûres, suspend la collecte et supprime les rapports de crash non envoyés ;
 - aucun user ID Firebase, email, nom, téléphone, texte de recherche ou contenu libre n'est accepté par le contrat Analytics.
 
-Les trois consentements persistés sont indépendants : mesure d'usage, diagnostics et configuration distante. L'écran de consentement et le réglage utilisateur seront raccordés dans `AUTH-003` et `PROF-002`; tant qu'ils ne le sont pas, les valeurs restent toutes à `false`.
+Les trois consentements persistés sont indépendants : mesure d'usage, diagnostics et configuration distante. L'écran d'inscription les raccorde dans `AUTH-003` au moment où l'utilisateur confirme ses choix, juste avant la finalisation atomique du compte ; le réglage utilisateur reste à livrer dans `PROF-002`. Tant qu'un choix explicite n'a pas été validé, les valeurs restent toutes à `false`.
 
 ## Contrat Analytics
 
@@ -68,6 +68,6 @@ Les erreurs non fatales acceptent seulement un `DiagnosticCode` fermé. Aucun me
 
 ## Déclarations stores à valider
 
-Le Privacy Manifest hôte déclare la ville agrégée comme localisation approximative et les événements comme interactions produit, non liés et sans tracking. Les manifests embarqués des SDK Firebase couvrent leurs collectes propres; les formulaires App Store et Play Data safety doivent néanmoins reprendre le comportement effectif Analytics, Crashlytics, Performance et Remote Config après consentement.
+Le Privacy Manifest hôte déclare la ville de profil comme localisation approximative liée au compte, pour la fonctionnalité applicative et, après consentement, Analytics. Les événements d'interaction produit restent non liés et sans tracking. Les coordonnées ponctuelles utilisées pour proposer une ville restent sur l'appareil. Les manifests embarqués des SDK Firebase couvrent leurs collectes propres; les formulaires App Store et Play Data safety doivent néanmoins reprendre le comportement effectif Analytics, Crashlytics, Performance et Remote Config après consentement.
 
 Avant la release candidate, le propriétaire doit valider la politique de confidentialité, les libellés de consentement, la durée de conservation, la région Analytics, les réglages de partage Google et les réponses exactes des deux stores. La référence Firebase à réauditer à chaque montée de version est [Prepare for Apple's App Store data disclosure requirements](https://firebase.google.com/docs/ios/app-store-data-collection).

@@ -1,16 +1,18 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
-import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
-import com.kwabor.shared.domain.auth.EmailSignUpRequest
+import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
+import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.i18n.AppLocale
 
 private const val MINIMUM_PASSWORD_LENGTH = 8
-private const val MINIMUM_OTP_LENGTH = 6
+private val OTP_PATTERN = Regex(pattern = "^[0-9]{6}$")
 
 class DataAuthRepository internal constructor(
     private val dataSource: AuthDataSource,
@@ -24,31 +26,30 @@ class DataAuthRepository internal constructor(
         dataSource.requestEmailOtp(email.trim())
     }
 
-    override suspend fun verifyEmailOtp(email: String, otpCode: String): DomainResult<Unit> = runAuthCall {
+    override suspend fun verifyEmailOtp(email: String, otpCode: String): DomainResult<AuthSession> = runAuthCall {
         requireValidEmail(email)
         requireOtpCode(otpCode)
-        dataSource.verifyEmailOtp(email = email.trim(), otpCode = otpCode.trim())
+        dataSource.verifyEmailOtp(email = email.trim(), otpCode = otpCode.trim()).toDomain()
     }
 
-    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): DomainResult<AuthSession> =
+    override suspend fun setInitialPassword(password: String): DomainResult<Unit> = runAuthCall {
+        requirePassword(password)
+        dataSource.setInitialPassword(password)
+    }
+
+    override suspend fun listActiveLegalDocuments(locale: AppLocale): DomainResult<List<LegalDocumentRevision>> =
         runAuthCall {
-            requireValidEmail(request.email)
-            requireOtpCode(request.otpCode)
-            dataSource.verifyEmailOtpWithProfile(
-                request.copy(
-                    email = request.email.trim(),
-                    otpCode = request.otpCode.trim(),
-                ),
-            ).toDomain()
+            val revisions = dataSource.listActiveLegalDocuments(locale)
+            if (revisions.isEmpty()) {
+                throw AuthDataException.LegalDocumentsUnavailable()
+            }
+            revisions
         }
 
-    override suspend fun signUpWithEmail(request: EmailSignUpRequest): DomainResult<AuthSession> = runAuthCall {
-        requireValidEmail(request.email)
-        requirePassword(request.password)
-        requireOtpCode(request.otpCode)
-        dataSource.signUpWithEmail(request.copy(email = request.email.trim(), otpCode = request.otpCode.trim()))
-            .toDomain()
-    }
+    override suspend fun completeOnboarding(request: CompleteOnboardingRequest): DomainResult<AuthSession> =
+        runAuthCall {
+            dataSource.completeOnboarding(request).toDomain()
+        }
 
     override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> = runAuthCall {
         requireValidEmail(email)
@@ -61,7 +62,12 @@ class DataAuthRepository internal constructor(
             if (request.idToken.isBlank()) {
                 throw AuthDataException.Validation("error.auth.id_token_required")
             }
-            dataSource.signInWithSocialProvider(request.copy(idToken = request.idToken.trim())).toDomain()
+            dataSource.signInWithSocialProvider(
+                SocialSignInRequest(
+                    provider = request.provider,
+                    idToken = request.idToken.trim(),
+                ),
+            ).toDomain()
         }
 
     override suspend fun activatePromoterInvite(request: PromoterActivationRequest): DomainResult<AuthSession> =
@@ -82,6 +88,11 @@ private fun AuthSessionDto.toDomain(): AuthSession = AuthSession(
     userId = userId,
     email = email,
     expiresAtEpochMilliseconds = expiresAtEpochMilliseconds,
+    accountSetupStatus = if (onboardingCompleted) {
+        AccountSetupStatus.Complete
+    } else {
+        AccountSetupStatus.OnboardingRequired
+    },
 )
 
 private fun requireValidEmail(email: String) {
@@ -97,7 +108,7 @@ private fun requirePassword(password: String) {
 }
 
 private fun requireOtpCode(otpCode: String) {
-    if (otpCode.trim().length < MINIMUM_OTP_LENGTH) {
+    if (!OTP_PATTERN.matches(otpCode.trim())) {
         throw AuthDataException.Validation("error.auth.otp_invalid")
     }
 }

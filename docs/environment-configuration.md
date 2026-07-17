@@ -77,10 +77,26 @@ Pour chaque projet :
 2. lier explicitement le checkout avec `supabase link --project-ref <ref>` sans versionner le mot de passe de base ;
 3. appliquer les migrations sur staging et exécuter `supabase test db` ;
 4. vérifier les grants/RLS négatifs avant de reproduire la migration en production ;
-5. renseigner les variables GitHub de l'environnement correspondant ;
-6. délier ou relier explicitement avant toute commande distante suivante afin d'éviter une erreur de cible.
+5. configurer Auth avec un mot de passe minimal de 8 caractères, un OTP email de 6 chiffres et un délai minimal de 30 secondes entre deux envois ;
+6. publier le template OTP français avec la variable Supabase `{{ .Token }}` et brancher un SMTP de production vérifié ;
+7. provisionner les trois révisions juridiques actives décrites ci-dessous ;
+8. renseigner les variables GitHub de l'environnement correspondant ;
+9. délier ou relier explicitement avant toute commande distante suivante afin d'éviter une erreur de cible.
 
 La production ne doit jamais être utilisée comme environnement de test ou comme source de seed de développement.
+
+### Révisions juridiques requises par l'inscription
+
+L'inscription ne peut être finalisée que si Supabase expose exactement une révision française active et déjà effective pour chacun des types `terms`, `privacy_policy` et `ugc_license`. Le propriétaire fournit pour chaque révision une version approuvée, une URL HTTPS publique, le SHA-256 du contenu et sa date d'effet. Aucun texte ou hash de démonstration ne doit être copié depuis les tests vers staging ou production.
+
+Une révision créée est immuable : son type, sa version, sa langue, son URL, son hash et sa date d'effet ne peuvent plus être modifiés ou supprimés, y compris par une opération d'administration ordinaire. Seul le drapeau `active` peut changer. Pour publier une nouvelle version sans fenêtre incohérente :
+
+1. insérer la nouvelle révision inactive ;
+2. dans une même transaction, désactiver l'ancienne puis activer la nouvelle ;
+3. vérifier qu'un client anonyme lit trois documents effectifs et qu'un client authentifié ne peut ni les modifier ni écrire directement son profil ou son rôle ;
+4. exécuter un parcours d'inscription staging et contrôler les trois lignes `user_legal_acceptances` associées à l'utilisateur.
+
+La RPC `complete_user_onboarding` est l'unique voie de finalisation. Elle écrit atomiquement le profil, le rôle utilisateur de base, les trois preuves d'acceptation et `onboarding_completed_at`. Le client ne doit recevoir aucun droit direct d'écriture sur ce timestamp ou sur les preuves juridiques.
 
 ## Provisionnement Firebase propriétaire
 

@@ -34,10 +34,10 @@ class AndroidObservabilityController internal constructor(
         }
     }
 
-    fun updateConsent(updatedConsent: ObservabilityConsent) {
+    fun updateConsent(updatedConsent: ObservabilityConsent): Boolean {
+        if (!consentStore.write(updatedConsent)) return false
         val previousConsent = mutableConsent.value
         mutableConsent.value = updatedConsent
-        consentStore.write(updatedConsent)
         backend.applyConsent(updatedConsent)
 
         if (!updatedConsent.remoteConfigurationAllowed) {
@@ -50,6 +50,7 @@ class AndroidObservabilityController internal constructor(
             refreshRemoteConfiguration()
             backend.startRemoteConfigurationUpdates(::publishRemoteConfiguration)
         }
+        return true
     }
 
     fun track(event: AnalyticsEvent) {
@@ -124,7 +125,7 @@ internal interface AndroidObservabilityBackend {
 internal interface ObservabilityConsentStore {
     fun read(): ObservabilityConsent
 
-    fun write(consent: ObservabilityConsent)
+    fun write(consent: ObservabilityConsent): Boolean
 }
 
 fun interface PerformanceTrace {

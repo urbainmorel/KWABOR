@@ -1,12 +1,33 @@
 # Onboarding mobile
 
-## Comportement livré par AUTH-002
+## Fondation livrée par AUTH-002
 
 Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Le bouton **Passer** reste immédiatement disponible. Lorsque la réduction des animations est active, l'application affiche l'image statique embarquée et un bouton **Continuer**.
 
 Après l'intro, un utilisateur non connecté peut ouvrir le flux OTP ou demander un accès invité. Avant de confirmer cet accès, l'application précise que les prix restent en FCFA et que les interactions nécessitent un compte. L'accès invité ouvre le mur Explore en lecture seule ; toucher une destination protégée conserve le mur souple d'authentification.
 
 L'intro embarquée n'est affichée qu'une fois par installation. Chaque nouvelle révision distante validée peut ensuite être affichée une seule fois, au lancement suivant son préchargement. L'accès invité n'est pas persisté : au prochain lancement sans session authentifiée, l'écran de connexion est présenté, sauf si une nouvelle révision d'intro est en attente.
+
+## Inscription livrée par AUTH-003
+
+Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
+
+1. email puis OTP de 6 chiffres, avec renvoi après 30 secondes ;
+2. mot de passe d'au moins 8 caractères, jamais conservé dans l'état UI ;
+3. prénom et nom, chacun limité à 80 caractères ;
+4. ville choisie manuellement ou estimée localement depuis une localisation approximative ponctuelle ;
+5. devise d'affichage XOF, NGN, USD ou EUR, XOF restant la devise de stockage et de paiement ;
+6. consultation et acceptation séparée des CGU, de la politique de confidentialité et de la licence UGC actives ;
+7. choix facultatifs et désactivés par défaut pour Analytics, diagnostics et Remote Config ;
+8. finalisation serveur atomique, puis écran d'explication avant la demande système de notifications.
+
+L'OTP crée une session Supabase avant la fin du profil. Cette session porte le statut `OnboardingRequired` et n'est jamais considérée comme authentifiée par la navigation. La RPC vérifie elle-même que le compte email possède désormais un mot de passe avant toute écriture : un client modifié ne peut donc pas sauter cette étape. Si l'application est interrompue après vérification, elle reprend au minimum à l'étape du mot de passe et ne peut pas ouvrir l'accueil. Quitter le parcours après OTP déclenche d'abord une déconnexion confirmée ; un échec réseau conserve l'écran ouvert et affiche seulement un message utilisateur traduit.
+
+Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.
+
+Les trois consentements observabilité sont appliqués et persistés par les adaptateurs Firebase natifs lorsque l'utilisateur confirme cette étape, juste avant `complete_user_onboarding`. Ainsi, une réponse réseau perdue après le commit serveur ne peut pas effacer son choix explicite ; chaque nouvelle confirmation réapplique la dernière valeur sélectionnée. Autoriser Remote Config rend alors opérationnel le préchargement de l'intro distante décrit ci-dessous.
+
+La permission notifications n'arrive qu'après le succès serveur et reste non bloquante, qu'elle soit acceptée, refusée ou remise à plus tard ; l'enregistrement du token est réservé à la tranche Notifications. La résolution de cet écran est persistée localement par installation avant d'ouvrir l'accueil. Si l'application est arrêtée après la finalisation serveur mais avant ce choix, une session complète restaurée reprend donc le primer au lieu de le perdre ou de le contourner. Une écriture locale Android en échec conserve l'écran avec une action de retry ; les doubles appuis ne peuvent jamais ouvrir deux demandes système.
 
 ## Média embarqué et distant
 
@@ -30,7 +51,7 @@ Le fichier n'est rendu actif qu'après validation et remplacement atomique. La s
 
 La console Firebase est l'interface opérationnelle V1 ; aucun nouveau client web n'est introduit. Pour publier une intro :
 
-> **Dépendance avant activation réelle** : cette mécanique client est provisionnée par AUTH-002, mais aucun utilisateur n'autorise encore Remote Config. Elle devient opérable uniquement après raccordement du consentement dans AUTH-003 et provisionnement Firebase staging/production dans ENV-001B/OBS-001B. Elle ne doit pas être annoncée comme active en bêta avant ces deux preuves.
+> **Dépendance avant activation réelle** : le consentement client est raccordé par AUTH-003. La mécanique ne devient néanmoins opérable qu'après provisionnement Firebase staging/production dans ENV-001B/OBS-001B et vérification sur appareils. Elle ne doit pas être annoncée comme active en bêta avant ces preuves.
 
 1. encoder et contrôler le MP4 avec les mêmes invariants que l'actif embarqué ;
 2. déposer le fichier sur le CDN HTTPS approuvé, sans redirection ;
@@ -52,3 +73,11 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 8. Révocation : cache distant supprimé et fallback local restauré.
 9. Publication d'une révision supérieure pendant une session : aucun écran interrompu ; la variante apparaît une fois au prochain lancement.
 10. Relance suivante sans nouvelle révision : la variante ne rejoue pas.
+11. OTP vérifié puis application arrêtée : reprise au mot de passe, jamais à l'accueil.
+12. Annulation après OTP avec déconnexion en échec : parcours maintenu ouvert et session incomplète inutilisable comme compte finalisé.
+13. GPS refusé, indisponible ou hors Bénin : sélection manuelle utilisable sans coordonnée transmise.
+14. Documents juridiques absents, dupliqués, inactifs ou non effectifs : finalisation bloquée sans créer de profil partiel.
+15. Consentements observabilité refusés : aucune collecte ni récupération Remote Config ; inscription toujours finalisable.
+16. Permission notifications refusée ou différée : compte finalisé et navigation débloquée sans token enregistré.
+17. Application arrêtée après la RPC mais avant le choix notifications : session restaurée sur le primer, puis résolution persistée avant l'accueil.
+18. Double appui sur « Autoriser » : une seule demande système ; échec de persistance locale Android : primer maintenu avec retry.

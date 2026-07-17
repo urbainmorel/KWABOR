@@ -138,6 +138,22 @@ VALUES
     now()
   );
 
+INSERT INTO public.profiles (
+  user_id,
+  first_name,
+  last_name,
+  city_id,
+  onboarding_completed_at
+)
+VALUES
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'Proprietaire', 'RPC', 'cotonou', now()),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', 'Gestionnaire', 'RPC', 'cotonou', now()),
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'Editeur', 'RPC', 'cotonou', now()),
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddd4', 'Moderateur', 'RPC', 'cotonou', now()),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', 'Externe', 'RPC', 'cotonou', now()),
+  ('11111111-1111-4111-8111-111111111111', 'Invite', 'RPC', 'cotonou', now()),
+  ('22222222-2222-4222-8222-222222222222', 'Mauvais', 'Invite', 'cotonou', now());
+
 INSERT INTO public.organizations (
   id,
   type,

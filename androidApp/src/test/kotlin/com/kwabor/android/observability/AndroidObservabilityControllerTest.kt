@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class AndroidObservabilityControllerTest {
     @Test
@@ -47,7 +48,7 @@ class AndroidObservabilityControllerTest {
             remoteConfigurationAllowed = true,
         )
 
-        controller.updateConsent(granted)
+        assertTrue(controller.updateConsent(granted))
         controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
         controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
         controller.startTrace(PerformanceTraceName.ExploreInitialLoad).stop()
@@ -58,6 +59,21 @@ class AndroidObservabilityControllerTest {
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
         assertEquals(REMOTE_CONFIGURATION, controller.remoteConfiguration.value)
         assertEquals(1, backend.remoteUpdateStartCount)
+    }
+
+    @Test
+    fun updateConsentDoesNotApplyOrPublishChoiceWhenDurableWriteFails() {
+        val backend = FakeObservabilityBackend()
+        val store = InMemoryConsentStore(writesSucceed = false)
+        val controller = AndroidObservabilityController(backend, store)
+        controller.start()
+        val granted = ObservabilityConsent(analyticsAllowed = true)
+
+        assertFalse(controller.updateConsent(granted))
+
+        assertEquals(ObservabilityConsent(), controller.consent.value)
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+        assertEquals(ObservabilityConsent(), store.consent)
     }
 
     @Test
@@ -122,11 +138,13 @@ class AndroidObservabilityControllerTest {
 
 private class InMemoryConsentStore(
     var consent: ObservabilityConsent = ObservabilityConsent(),
+    private val writesSucceed: Boolean = true,
 ) : ObservabilityConsentStore {
     override fun read(): ObservabilityConsent = consent
 
-    override fun write(consent: ObservabilityConsent) {
-        this.consent = consent
+    override fun write(consent: ObservabilityConsent): Boolean {
+        if (writesSucceed) this.consent = consent
+        return writesSucceed
     }
 }
 

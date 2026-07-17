@@ -12,7 +12,12 @@ import com.kwabor.android.app.KwaborApp
 import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
 import com.kwabor.android.app.KwaborUnavailableApp
+import com.kwabor.android.auth.AndroidLegalDocumentLauncher
+import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
+import com.kwabor.android.auth.AndroidRegistrationLocationService
+import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
 import com.kwabor.android.presentation.auth.AuthViewModel
+import com.kwabor.android.presentation.auth.AuthViewModelDependencies
 import com.kwabor.android.presentation.explore.ExploreViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.shared.app.KwaborCompositionRoot
@@ -21,6 +26,7 @@ import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,21 +40,33 @@ class MainActivity : ComponentActivity() {
         acceptDeepLink(intent)
         val compositionRoot = (application as KwaborApplication).compositionRoot
         val authPresenter = compositionRoot?.authPresenter
-        if (compositionRoot == null || authPresenter == null) {
+        val registrationPresenter = compositionRoot?.registrationPresenter
+        if (compositionRoot == null || authPresenter == null || registrationPresenter == null) {
             setContent { KwaborUnavailableApp() }
             return
         }
 
-        showConfiguredApp(compositionRoot, authPresenter)
+        showConfiguredApp(compositionRoot, authPresenter, registrationPresenter)
     }
 
-    private fun showConfiguredApp(compositionRoot: KwaborCompositionRoot, authPresenter: AuthPresenter) {
+    private fun showConfiguredApp(
+        compositionRoot: KwaborCompositionRoot,
+        authPresenter: AuthPresenter,
+        registrationPresenter: RegistrationPresenter,
+    ) {
         val strings = stringsFor(AppLocale.French)
         val applicationState = application as KwaborApplication
         val dependencies = KwaborAppDependencies(
             exploreViewModel = createExploreViewModel(compositionRoot, strings),
-            authViewModel = createAuthViewModel(authPresenter, strings, compositionRoot.dispatcherProvider),
+            authViewModel = createAuthViewModel(
+                compositionRoot = compositionRoot,
+                authPresenter = authPresenter,
+                registrationPresenter = registrationPresenter,
+                strings = strings,
+                applicationState = applicationState,
+            ),
             onboardingViewModel = createOnboardingViewModel(applicationState, compositionRoot.dispatcherProvider),
+            legalDocumentLauncher = AndroidLegalDocumentLauncher(applicationContext),
         )
 
         setContent {
@@ -79,17 +97,27 @@ class MainActivity : ComponentActivity() {
     )[ExploreViewModel::class.java]
 
     private fun createAuthViewModel(
+        compositionRoot: KwaborCompositionRoot,
         authPresenter: AuthPresenter,
+        registrationPresenter: RegistrationPresenter,
         strings: KwaborStrings,
-        dispatcherProvider: DispatcherProvider,
+        applicationState: KwaborApplication,
     ): AuthViewModel = ViewModelProvider(
         owner = this,
         factory = viewModelFactory {
             initializer {
                 AuthViewModel(
-                    presenter = authPresenter,
+                    dependencies = AuthViewModelDependencies(
+                        authPresenter = authPresenter,
+                        registrationPresenter = registrationPresenter,
+                        locationService = AndroidRegistrationLocationService(applicationContext),
+                        notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
+                        notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
+                        clockProvider = compositionRoot.clockProvider,
+                        applyObservabilityConsent = applicationState.observability::updateConsent,
+                    ),
                     strings = strings,
-                    coroutineScope = newViewModelScope(dispatcherProvider),
+                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
                 )
             }
         },

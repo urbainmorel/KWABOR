@@ -27,6 +27,10 @@ internal data class CityDto(
     val name: String,
     @SerialName("country_code")
     val countryCode: String = "BJ",
+    @SerialName("latitude")
+    val latitude: Double? = null,
+    @SerialName("longitude")
+    val longitude: Double? = null,
 )
 
 @Serializable
@@ -151,6 +155,8 @@ internal fun CityDto.toDomain(): City = City(
     id = id,
     name = name,
     countryCode = countryCode,
+    latitude = latitude,
+    longitude = longitude,
 )
 
 internal fun CategoryDto.toDomain(): Category = Category(

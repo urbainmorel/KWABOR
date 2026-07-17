@@ -8,7 +8,7 @@
 
     <style name="KwaborTheme.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/kwabor_icon_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_kwabor_mark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_kwabor_launch_mark</item>
         <item name="windowSplashScreenAnimationDuration">300</item>
         <item name="postSplashScreenTheme">@style/KwaborTheme</item>
     </style>
