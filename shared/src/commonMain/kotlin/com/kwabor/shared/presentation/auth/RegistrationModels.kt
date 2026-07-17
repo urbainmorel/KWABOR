@@ -76,6 +76,9 @@ data class RegistrationUiState(
     val errorMessage: String? = null,
     val noticeMessage: String? = null,
 ) {
+    val isNotificationPriming: Boolean
+        get() = step == RegistrationStep.NotificationPriming
+
     fun canResendOtp(nowEpochMilliseconds: Long): Boolean =
         resendAvailableAtEpochMilliseconds?.let { availableAt -> nowEpochMilliseconds >= availableAt } ?: true
 }

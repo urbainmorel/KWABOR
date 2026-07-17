@@ -119,7 +119,7 @@ private struct RegistrationStepContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if state.step != .notificationPriming && state.step != .completed {
+            if !state.isNotificationPriming && state.step != .completed {
                 ProgressView(value: progress, total: registrationProgressTotal)
                     .tint(KwaborDesignTokens.ColorToken.ink950)
                     .padding(.horizontal, KwaborDesignTokens.Spacing.xxl)
@@ -189,7 +189,7 @@ private struct RegistrationStepContent: View {
             legalStep
         } else if state.step == .observability {
             observabilityStep
-        } else if state.step == .notificationPriming {
+        } else if state.isNotificationPriming {
             notificationStep
         } else {
             completedStep
@@ -488,7 +488,7 @@ private struct RegistrationStepContent: View {
             store.strings.registrationLegalTitle
         } else if state.step == .observability {
             store.strings.registrationObservabilityTitle
-        } else if state.step == .notificationPriming {
+        } else if state.isNotificationPriming {
             store.strings.registrationNotificationTitle
         } else {
             store.strings.registrationComplete
@@ -506,7 +506,7 @@ private struct RegistrationStepContent: View {
     }
 
     private var showsPrimaryAction: Bool {
-        state.step != .notificationPriming && state.step != .completed
+        !state.isNotificationPriming && state.step != .completed
     }
 
     private var primaryActionDisabled: Bool {
@@ -564,13 +564,33 @@ private struct RegistrationStepContent: View {
             ?? store.strings.registrationLocationUnavailable
     }
 
-    @ViewBuilder
     private func legalAcceptance(
         document: LegalDocumentRevision?,
         title: String,
         isAccepted: Bool,
         type: LegalDocumentType
-    ) -> some View {
+    ) -> LegalAcceptanceRow {
+        LegalAcceptanceRow(
+            document: document,
+            title: title,
+            isAccepted: isAccepted,
+            unavailableMessage: store.strings.registrationLegalUnavailable,
+            onAcceptedChange: { accepted in
+                store.updateLegalAcceptance(type, accepted: accepted)
+            }
+        )
+    }
+}
+
+private struct LegalAcceptanceRow: View {
+    let document: LegalDocumentRevision?
+    let title: String
+    let isAccepted: Bool
+    let unavailableMessage: String
+    let onAcceptedChange: (Bool) -> Void
+
+    @ViewBuilder
+    var body: some View {
         if let document,
            let url = URL(string: document.url),
            url.scheme?.lowercased() == secureScheme {
@@ -587,14 +607,12 @@ private struct RegistrationStepContent: View {
                     title,
                     isOn: Binding(
                         get: { isAccepted },
-                        set: { accepted in
-                            store.updateLegalAcceptance(type, accepted: accepted)
-                        }
+                        set: onAcceptedChange
                     )
                 )
             }
         } else {
-            Text(store.strings.registrationLegalUnavailable)
+            Text(unavailableMessage)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
         }
     }

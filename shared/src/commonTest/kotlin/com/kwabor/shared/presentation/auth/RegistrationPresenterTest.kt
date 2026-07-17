@@ -37,6 +37,15 @@ class RegistrationPresenterTest {
     private val strings = stringsFor(AppLocale.French)
 
     @Test
+    fun notificationPrimingStateIsExposedWithoutDependingOnPlatformEnumNaming() {
+        assertFalse(initialRegistrationUiState().isNotificationPriming)
+        assertEquals(
+            true,
+            initialRegistrationUiState().copy(step = RegistrationStep.NotificationPriming).isNotificationPriming,
+        )
+    }
+
+    @Test
     fun requestOtp_enforcesThirtySecondCooldown() = runTest {
         val repository = FakeRegistrationAuthRepository()
         val clock = FakeClock(now = 1_000L)

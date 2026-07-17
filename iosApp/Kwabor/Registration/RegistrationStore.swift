@@ -69,7 +69,7 @@ final class RegistrationStore: ObservableObject {
     var canGoBack: Bool {
         guard let state else { return false }
         return state.step != .email &&
-            state.step != .notificationPriming &&
+            !state.isNotificationPriming &&
             state.step != .completed
     }
 
@@ -79,7 +79,7 @@ final class RegistrationStore: ObservableObject {
 
     var canCancel: Bool {
         guard let state else { return true }
-        return state.step != .notificationPriming && state.step != .completed
+        return !state.isNotificationPriming && state.step != .completed
     }
 
     var canResendOtp: Bool {
@@ -233,7 +233,7 @@ final class RegistrationStore: ObservableObject {
     }
 
     func enableNotifications() {
-        guard state?.step == .notificationPriming,
+        guard state?.isNotificationPriming == true,
               !isRequestingNotifications else {
             return
         }
@@ -252,7 +252,7 @@ final class RegistrationStore: ObservableObject {
     }
 
     func skipNotifications() {
-        guard state?.step == .notificationPriming,
+        guard state?.isNotificationPriming == true,
               !isRequestingNotifications else {
             return
         }
