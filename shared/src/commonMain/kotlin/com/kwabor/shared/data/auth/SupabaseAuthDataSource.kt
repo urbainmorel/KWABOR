@@ -1,10 +1,12 @@
 package com.kwabor.shared.data.auth
 
-import com.kwabor.shared.domain.auth.EmailOtpProfileRequest
-import com.kwabor.shared.domain.auth.EmailSignUpRequest
-import com.kwabor.shared.domain.auth.OnboardingProfileInput
+import com.kwabor.shared.domain.auth.AUTH_OTP_EXPIRED_ERROR_KEY
+import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
+import com.kwabor.shared.domain.auth.LegalDocumentRevision
+import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
+import com.kwabor.shared.domain.i18n.AppLocale
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.OtpVerifyResult
@@ -19,24 +21,32 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.providers.builtin.OTP
 import io.github.jan.supabase.auth.user.UserSession
-import io.github.jan.supabase.auth.user.UserUpdateBuilder
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.github.jan.supabase.exceptions.RestException
+import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.postgrest.exception.PostgrestRestException
+import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlin.time.Instant
 
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
+private const val HTTP_NOT_FOUND = 404
 private const val HTTP_CONFLICT = 409
 private const val HTTP_UNPROCESSABLE_CONTENT = 422
 
 internal class SupabaseAuthDataSource(
     private val auth: Auth,
+    private val postgrest: Postgrest,
 ) : AuthDataSource {
     override suspend fun getCurrentSession(): AuthSessionDto? = runAuthRequest {
         auth.awaitInitialization()
-        auth.currentSessionOrNull()?.toDto()
+        auth.currentSessionOrNull()?.toDtoWithServerStatus()
     }
 
     override suspend fun requestEmailOtp(email: String): Unit = runAuthRequest {
@@ -46,27 +56,39 @@ internal class SupabaseAuthDataSource(
         }
     }
 
-    override suspend fun verifyEmailOtp(email: String, otpCode: String): Unit = runAuthRequest {
-        auth.verifyEmailOtpForSession(email = email, otpCode = otpCode).let { }
+    override suspend fun verifyEmailOtp(email: String, otpCode: String): AuthSessionDto = runAuthRequest {
+        auth.verifyEmailOtpForSession(email = email, otpCode = otpCode).toDtoWithServerStatus()
     }
 
-    override suspend fun verifyEmailOtpWithProfile(request: EmailOtpProfileRequest): AuthSessionDto = runAuthRequest {
-        val verifiedSession = auth.verifyEmailOtpForSession(email = request.email, otpCode = request.otpCode)
-            ?: throw AuthDataException.AuthenticationRequired()
+    override suspend fun setInitialPassword(password: String): Unit = runAuthRequest {
         auth.updateUser(updateCurrentUser = true) {
-            applyOnboarding(request.onboarding)
+            this.password = password
         }
-        auth.currentSessionOrNull()?.toDto() ?: verifiedSession
     }
 
-    override suspend fun signUpWithEmail(request: EmailSignUpRequest): AuthSessionDto = runAuthRequest {
-        val verifiedSession = auth.verifyEmailOtpForSession(email = request.email, otpCode = request.otpCode)
-            ?: throw AuthDataException.AuthenticationRequired()
-        auth.updateUser(updateCurrentUser = true) {
-            password = request.password
-            applyOnboarding(request.onboarding)
+    override suspend fun listActiveLegalDocuments(locale: AppLocale): List<LegalDocumentRevision> = runAuthRequest {
+        postgrest.from(LEGAL_DOCUMENTS)
+            .select {
+                filter {
+                    eq("active", true)
+                    eq("locale", locale.tag)
+                }
+                order("document_type", Order.ASCENDING)
+            }
+            .decodeList<LegalDocumentRevisionDto>()
+            .map { revision -> revision.toDomain() }
+    }
+
+    override suspend fun completeOnboarding(request: CompleteOnboardingRequest): AuthSessionDto = runAuthRequest {
+        val completedProfile = postgrest.rpc(
+            function = COMPLETE_ONBOARDING_RPC,
+            parameters = request.toRpcDto(),
+        ).decodeSingle<OnboardingProfileStatusDto>()
+        val session = auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()
+        if (completedProfile.userId != session.user?.id || completedProfile.onboardingCompletedAt == null) {
+            throw AuthDataException.Unexpected()
         }
-        auth.currentSessionOrNull()?.toDto() ?: verifiedSession
+        session.toDto(onboardingCompleted = true)
     }
 
     override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto = runAuthRequest {
@@ -74,7 +96,7 @@ internal class SupabaseAuthDataSource(
             this.email = email
             this.password = password
         }
-        auth.currentSessionOrNull()?.toDto() ?: throw AuthDataException.AuthenticationRequired()
+        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus()
     }
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto = runAuthRequest {
@@ -82,23 +104,30 @@ internal class SupabaseAuthDataSource(
             idToken = request.idToken
             provider = request.provider.toSupabaseProvider()
         }
-        request.onboarding?.let { onboarding ->
-            auth.updateUser(updateCurrentUser = true) {
-                applyOnboarding(onboarding)
-            }
-        }
-        auth.currentSessionOrNull()?.toDto() ?: throw AuthDataException.AuthenticationRequired()
+        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus()
     }
 
     override suspend fun signOut(): Unit = runAuthRequest {
         auth.signOut(SignOutScope.LOCAL)
     }
+
+    private suspend fun UserSession.toDtoWithServerStatus(): AuthSessionDto {
+        val sessionUser = user ?: throw AuthDataException.AuthenticationRequired()
+        val profile = postgrest.from(PROFILES)
+            .select {
+                filter { eq("user_id", sessionUser.id) }
+                limit(1)
+            }
+            .decodeList<OnboardingProfileStatusDto>()
+            .firstOrNull()
+        return toDto(onboardingCompleted = profile?.onboardingCompletedAt != null)
+    }
 }
 
-private suspend fun Auth.verifyEmailOtpForSession(email: String, otpCode: String): AuthSessionDto? =
+private suspend fun Auth.verifyEmailOtpForSession(email: String, otpCode: String): UserSession =
     when (val result = verifyEmailOtp(OtpType.Email.EMAIL, email = email, token = otpCode)) {
-        is OtpVerifyResult.Authenticated -> result.session.toDto()
-        OtpVerifyResult.VerifiedNoSession -> null
+        is OtpVerifyResult.Authenticated -> result.session
+        OtpVerifyResult.VerifiedNoSession -> throw AuthDataException.AuthenticationRequired()
     }
 
 private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T = try {
@@ -111,51 +140,66 @@ private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T = try {
     throw AuthDataException.AuthenticationRequired(cause = exception)
 } catch (exception: AuthRestException) {
     throw exception.toAuthDataException()
+} catch (exception: PostgrestRestException) {
+    throw exception.toAuthDataException()
 } catch (exception: RestException) {
     throw exception.toAuthDataException()
 } catch (exception: HttpRequestTimeoutException) {
     throw AuthDataException.NetworkUnavailable(exception)
 } catch (exception: HttpRequestException) {
     throw AuthDataException.NetworkUnavailable(exception)
+} catch (exception: SerializationException) {
+    throw AuthDataException.Unexpected(exception)
 }
 
-private fun RestException.toAuthDataException(): AuthDataException {
-    if (this is AuthRestException) {
-        when (errorCode?.name) {
-            "EmailProviderDisabled",
-            "OtpDisabled",
-            "ProviderDisabled",
-            "ProviderEmailNeedsVerification",
-            "InvalidCredentials",
-            -> return AuthDataException.Validation(cause = this)
+private fun RestException.toAuthDataException(): AuthDataException =
+    (this as? AuthRestException)?.toAuthCodeDataExceptionOrNull()
+        ?: (this as? PostgrestRestException)?.toPostgrestCodeDataExceptionOrNull()
+        ?: toHttpStatusDataException()
 
-            "OtpExpired",
-            "BadJwt",
-            "SessionExpired",
-            "SessionNotFound",
-            -> return AuthDataException.AuthenticationRequired(cause = this)
+private fun AuthRestException.toAuthCodeDataExceptionOrNull(): AuthDataException? = when (errorCode?.name) {
+    "EmailProviderDisabled",
+    "OtpDisabled",
+    "ProviderDisabled",
+    "ProviderEmailNeedsVerification",
+    "InvalidCredentials",
+    -> AuthDataException.Validation(cause = this)
 
-            "WeakPassword" -> return AuthDataException.Validation("error.auth.password_too_weak", this)
-        }
-    }
+    "BadJwt",
+    "SessionExpired",
+    "SessionNotFound",
+    -> AuthDataException.AuthenticationRequired(cause = this)
 
-    return when (statusCode) {
-        HTTP_BAD_REQUEST,
-        HTTP_CONFLICT,
-        HTTP_UNPROCESSABLE_CONTENT,
-        -> AuthDataException.Validation(cause = this)
-        HTTP_UNAUTHORIZED -> AuthDataException.AuthenticationRequired(cause = this)
-        HTTP_FORBIDDEN -> AuthDataException.PermissionDenied(cause = this)
-        else -> AuthDataException.Unexpected(this)
-    }
+    "OtpExpired" -> AuthDataException.Validation(AUTH_OTP_EXPIRED_ERROR_KEY, this)
+    "WeakPassword" -> AuthDataException.Validation("error.auth.password_too_weak", this)
+    else -> null
 }
 
-private fun UserSession.toDto(): AuthSessionDto {
+private fun PostgrestRestException.toPostgrestCodeDataExceptionOrNull(): AuthDataException? = when (code) {
+    "42501" -> AuthDataException.PermissionDenied(cause = this)
+    "P0001", "22023", "23503", "23505", "23514" -> AuthDataException.Validation(cause = this)
+    "P0002", "PGRST116" -> AuthDataException.LegalDocumentsUnavailable(this)
+    else -> null
+}
+
+private fun RestException.toHttpStatusDataException(): AuthDataException = when (statusCode) {
+    HTTP_BAD_REQUEST,
+    HTTP_CONFLICT,
+    HTTP_UNPROCESSABLE_CONTENT,
+    -> AuthDataException.Validation(cause = this)
+    HTTP_UNAUTHORIZED -> AuthDataException.AuthenticationRequired(cause = this)
+    HTTP_FORBIDDEN -> AuthDataException.PermissionDenied(cause = this)
+    HTTP_NOT_FOUND -> AuthDataException.LegalDocumentsUnavailable(this)
+    else -> AuthDataException.Unexpected(this)
+}
+
+private fun UserSession.toDto(onboardingCompleted: Boolean): AuthSessionDto {
     val sessionUser = user ?: throw AuthDataException.AuthenticationRequired()
     return AuthSessionDto(
         userId = sessionUser.id,
         email = sessionUser.email,
         expiresAtEpochMilliseconds = expiresAt.toEpochMilliseconds(),
+        onboardingCompleted = onboardingCompleted,
     )
 }
 
@@ -164,15 +208,90 @@ private fun SocialAuthProvider.toSupabaseProvider(): IDTokenProvider = when (thi
     SocialAuthProvider.Apple -> Apple
 }
 
-private fun UserUpdateBuilder.applyOnboarding(onboarding: OnboardingProfileInput) {
-    data {
-        put("first_name", onboarding.firstName)
-        put("last_name", onboarding.lastName)
-        onboarding.cityId?.let { cityId -> put("city_id", cityId) }
-        put("preferred_locale", onboarding.preferredLocale.tag)
-        put("preferred_currency", onboarding.preferredCurrency.name.uppercase())
-        put("terms_accepted", onboarding.termsAccepted)
-        put("privacy_policy_accepted", onboarding.privacyPolicyAccepted)
-        put("ugc_license_accepted", onboarding.ugcLicenseAccepted)
-    }
+private fun CompleteOnboardingRequest.toRpcDto(): CompleteOnboardingRpcDto = CompleteOnboardingRpcDto(
+    firstName = firstName,
+    lastName = lastName,
+    cityId = cityId,
+    preferredLocale = preferredLocale.tag,
+    preferredCurrency = preferredCurrency.name.uppercase(),
+    termsDocumentId = termsDocumentId,
+    privacyDocumentId = privacyDocumentId,
+    ugcDocumentId = ugcDocumentId,
+)
+
+private fun LegalDocumentRevisionDto.toDomain(): LegalDocumentRevision = LegalDocumentRevision(
+    id = id,
+    type = documentType.toDomainType(),
+    version = version,
+    locale = locale.toAppLocale(),
+    url = contentUrl,
+    effectiveAtEpochMilliseconds = effectiveAt.toEpochMilliseconds(),
+)
+
+private fun String.toDomainType(): LegalDocumentType = when (this) {
+    "terms" -> LegalDocumentType.Terms
+    "privacy_policy" -> LegalDocumentType.PrivacyPolicy
+    "ugc_license" -> LegalDocumentType.UgcLicense
+    else -> invalidDatabaseValue("legal_documents.document_type", this)
 }
+
+private fun String.toAppLocale(): AppLocale = AppLocale.entries.firstOrNull { locale -> locale.tag == this }
+    ?: invalidDatabaseValue("legal_documents.locale", this)
+
+private fun String.toEpochMilliseconds(): Long = try {
+    Instant.parse(this).toEpochMilliseconds()
+} catch (exception: IllegalArgumentException) {
+    throw AuthDataException.Unexpected(exception)
+}
+
+private fun invalidDatabaseValue(fieldName: String, value: String): Nothing = throw AuthDataException.Unexpected(
+    IllegalStateException("Invalid database value for $fieldName: $value"),
+)
+
+@Serializable
+private data class OnboardingProfileStatusDto(
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("onboarding_completed_at")
+    val onboardingCompletedAt: String? = null,
+)
+
+@Serializable
+private data class LegalDocumentRevisionDto(
+    @SerialName("id")
+    val id: String,
+    @SerialName("document_type")
+    val documentType: String,
+    @SerialName("version")
+    val version: String,
+    @SerialName("locale")
+    val locale: String,
+    @SerialName("content_url")
+    val contentUrl: String,
+    @SerialName("effective_at")
+    val effectiveAt: String,
+)
+
+@Serializable
+private data class CompleteOnboardingRpcDto(
+    @SerialName("p_first_name")
+    val firstName: String,
+    @SerialName("p_last_name")
+    val lastName: String,
+    @SerialName("p_city_id")
+    val cityId: String,
+    @SerialName("p_preferred_locale")
+    val preferredLocale: String,
+    @SerialName("p_preferred_currency")
+    val preferredCurrency: String,
+    @SerialName("p_terms_document_id")
+    val termsDocumentId: String,
+    @SerialName("p_privacy_document_id")
+    val privacyDocumentId: String,
+    @SerialName("p_ugc_document_id")
+    val ugcDocumentId: String,
+)
+
+private const val PROFILES = "profiles"
+private const val LEGAL_DOCUMENTS = "legal_documents"
+private const val COMPLETE_ONBOARDING_RPC = "complete_user_onboarding"

@@ -13,6 +13,8 @@ struct OnboardingView: View {
                 SessionRestoreView(bridge: coordinator.bridge)
             case .authentication:
                 OnboardingLandingView(coordinator: coordinator)
+            case .notificationPriming:
+                RestoredSessionNotificationPrimingView(coordinator: coordinator)
             case .home:
                 ContentView(
                     bridge: coordinator.bridge,
@@ -21,8 +23,17 @@ struct OnboardingView: View {
                 )
             }
         }
-        .sheet(isPresented: $coordinator.isAuthenticationPresented) {
+        .sheet(
+            isPresented: $coordinator.isAuthenticationPresented,
+            onDismiss: coordinator.authenticationPresentationDismissed
+        ) {
             AuthenticationSheet(coordinator: coordinator)
+        }
+        .fullScreenCover(
+            isPresented: $coordinator.isRegistrationPresented,
+            onDismiss: coordinator.registrationPresentationDismissed
+        ) {
+            RegistrationFlowView(coordinator: coordinator)
         }
     }
 }
@@ -106,7 +117,7 @@ private struct OnboardingLandingView: View {
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white)
                     Button(coordinator.strings.signUp) {
-                        coordinator.presentAuthentication()
+                        coordinator.presentRegistration()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(KwaborDesignTokens.ColorToken.ink950)

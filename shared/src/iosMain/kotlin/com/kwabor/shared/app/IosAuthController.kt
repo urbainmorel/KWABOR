@@ -1,10 +1,10 @@
 package com.kwabor.shared.app
 
+import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
-import com.kwabor.shared.presentation.auth.AuthStep
 import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import kotlinx.coroutines.CoroutineScope
@@ -36,72 +36,69 @@ class IosAuthController internal constructor(
             onCompleted(false)
             return
         }
-        scope.launch {
-            state = currentPresenter.loadCurrentSession(state, strings)
+        operationJob?.cancel()
+        state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
+        publish()
+        operationJob = scope.launch {
+            state = currentPresenter.loadCurrentSession(state, strings).copy(isLoading = false)
             publish()
             onCompleted(state.isAuthenticated)
         }
     }
 
-    fun updateEmail(email: String) = updateState { currentState ->
-        presenter?.updateEmail(currentState, email) ?: currentState
-    }
-
-    fun updateFirstName(firstName: String) = updateState { currentState ->
-        presenter?.updateFirstName(currentState, firstName) ?: currentState
-    }
-
-    fun updateLastName(lastName: String) = updateState { currentState ->
-        presenter?.updateLastName(currentState, lastName) ?: currentState
-    }
-
-    fun updateOtpCode(otpCode: String) = updateState { currentState ->
-        presenter?.updateOtpCode(currentState, otpCode) ?: currentState
-    }
-
-    fun updateLegalAccepted(accepted: Boolean) = updateState { currentState ->
-        presenter?.updateLegalAccepted(currentState, accepted) ?: currentState
-    }
-
-    fun submit() {
-        when (state.step) {
-            AuthStep.Email -> requestEmailOtp()
-            AuthStep.Otp -> verifyEmailOtp()
-        }
-    }
-
-    fun requestEmailOtp() {
+    fun signInWithEmail(email: String, password: String) {
         val currentPresenter = presenter ?: return
         if (state.isLoading) return
         operationJob?.cancel()
         state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
         publish()
         operationJob = scope.launch {
-            state = currentPresenter.requestEmailOtp(state, strings)
+            state = currentPresenter.signInWithEmail(
+                state = state,
+                email = email,
+                password = password,
+                strings = strings,
+            )
             publish()
         }
     }
 
-    fun verifyEmailOtp() {
+    fun signInWithSocialIdToken(provider: SocialAuthProvider, idToken: String) {
         val currentPresenter = presenter ?: return
         if (state.isLoading) return
         operationJob?.cancel()
         state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
         publish()
         operationJob = scope.launch {
-            state = currentPresenter.verifyEmailOtpWithProfile(state, strings)
+            state = currentPresenter.signInWithSocialIdToken(
+                state = state,
+                provider = provider,
+                idToken = idToken,
+                strings = strings,
+            )
             publish()
+        }
+    }
+
+    fun signOut(onCompleted: (Boolean) -> Unit) {
+        val currentPresenter = presenter
+        if (currentPresenter == null || state.isLoading) {
+            onCompleted(false)
+            return
+        }
+        operationJob?.cancel()
+        state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
+        publish()
+        operationJob = scope.launch {
+            state = currentPresenter.signOut(state, strings).copy(isLoading = false)
+            publish()
+            onCompleted(state.currentSession == null && state.errorMessage == null)
         }
     }
 
     fun close() {
         observer = null
         scope.cancel()
-    }
-
-    private fun updateState(transform: (AuthUiState) -> AuthUiState) {
-        state = transform(state)
-        publish()
     }
 
     private fun publish() {

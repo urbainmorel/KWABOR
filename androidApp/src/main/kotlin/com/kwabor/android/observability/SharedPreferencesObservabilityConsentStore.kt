@@ -12,13 +12,11 @@ internal class SharedPreferencesObservabilityConsentStore(context: Context) : Ob
         remoteConfigurationAllowed = preferences.getBoolean(REMOTE_CONFIGURATION_ALLOWED_KEY, false),
     )
 
-    override fun write(consent: ObservabilityConsent) {
-        preferences.edit()
-            .putBoolean(ANALYTICS_ALLOWED_KEY, consent.analyticsAllowed)
-            .putBoolean(DIAGNOSTICS_ALLOWED_KEY, consent.diagnosticsAllowed)
-            .putBoolean(REMOTE_CONFIGURATION_ALLOWED_KEY, consent.remoteConfigurationAllowed)
-            .apply()
-    }
+    override fun write(consent: ObservabilityConsent): Boolean = preferences.edit()
+        .putBoolean(ANALYTICS_ALLOWED_KEY, consent.analyticsAllowed)
+        .putBoolean(DIAGNOSTICS_ALLOWED_KEY, consent.diagnosticsAllowed)
+        .putBoolean(REMOTE_CONFIGURATION_ALLOWED_KEY, consent.remoteConfigurationAllowed)
+        .commit()
 }
 
 private const val PREFERENCES_NAME = "kwabor_observability_consent"

@@ -43,7 +43,9 @@ internal sealed interface OnboardingIntent {
 }
 
 internal sealed interface OnboardingEffect {
-    data object OpenAuthentication : OnboardingEffect
+    data object OpenRegistration : OnboardingEffect
+
+    data object OpenSignIn : OnboardingEffect
 }
 
 internal class OnboardingViewModel(
@@ -75,9 +77,8 @@ internal class OnboardingViewModel(
             OnboardingIntent.IntroDisplayed -> trackIntroDisplayOnce()
             OnboardingIntent.IntroCompleted -> completeIntro(skipped = false)
             OnboardingIntent.IntroSkipped -> completeIntro(skipped = true)
-            OnboardingIntent.SignUpSelected,
-            OnboardingIntent.SignInSelected,
-            -> openAuthentication()
+            OnboardingIntent.SignUpSelected -> openAuthentication(OnboardingEffect.OpenRegistration)
+            OnboardingIntent.SignInSelected -> openAuthentication(OnboardingEffect.OpenSignIn)
             OnboardingIntent.GuestSelected -> updateState { it.copy(isGuestDisclosureVisible = true) }
             OnboardingIntent.GuestConfirmed -> updateState {
                 it.copy(isGuestDisclosureVisible = false, isGuestSession = true)
@@ -110,9 +111,9 @@ internal class OnboardingViewModel(
         }
     }
 
-    private fun openAuthentication() {
+    private fun openAuthentication(effect: OnboardingEffect) {
         coroutineScope.launch {
-            effectChannel.send(OnboardingEffect.OpenAuthentication)
+            effectChannel.send(effect)
         }
     }
 

@@ -28,9 +28,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kwabor.android.auth.LegalDocumentLauncher
 import com.kwabor.android.design.KwaborTheme
 import com.kwabor.android.presentation.auth.AuthEffect
 import com.kwabor.android.presentation.auth.AuthIntent
+import com.kwabor.android.presentation.auth.AuthPlatformUiState
+import com.kwabor.android.presentation.auth.AuthSurface
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.explore.ExploreEffect
 import com.kwabor.android.presentation.explore.ExploreIntent
@@ -40,13 +43,15 @@ import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
-import com.kwabor.android.ui.screens.auth.AuthSheetActions
+import com.kwabor.android.ui.screens.auth.RegistrationScreen
+import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthUiState
+import com.kwabor.shared.presentation.auth.RegistrationUiState
 import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
 import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
@@ -59,7 +64,60 @@ import kotlinx.coroutines.flow.StateFlow
 internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: KwaborAppRuntimeState) {
     val state = collectKwaborAppState(dependencies = dependencies, runtimeState = runtimeState)
     val strings = stringsFor(AppLocale.French)
-    val entry = if (state.onboarding.isLaunchDecisionComplete) {
+    OnboardingEffectHandler(dependencies = dependencies)
+    AuthPlatformEffectHandler(dependencies = dependencies)
+    KwaborTheme {
+        KwaborThemedContent(state, strings, dependencies, runtimeState.onDeepLinkConsumed)
+    }
+}
+
+@Composable
+private fun KwaborThemedContent(
+    state: KwaborCollectedState,
+    strings: KwaborStrings,
+    dependencies: KwaborAppDependencies,
+    onDeepLinkConsumed: () -> Unit,
+) {
+    val isAuthenticationSurface = state.authPlatform.surface == AuthSurface.Registration ||
+        state.authPlatform.surface == AuthSurface.SignIn
+    if (isAuthenticationSurface) {
+        RegistrationScreen(
+            state = RegistrationScreenState(
+                registration = state.registration,
+                surface = state.authPlatform.surface,
+                locationStatus = state.authPlatform.locationStatus,
+                locationPermissionRequestInFlight = state.authPlatform.locationPermissionRequestInFlight,
+                otpResendSecondsRemaining = state.authPlatform.otpResendSecondsRemaining,
+                legalDocumentOpenFailed = state.authPlatform.legalDocumentOpenFailed,
+                observabilityConsentPersistenceFailed =
+                state.authPlatform.observabilityConsentPersistenceFailed,
+                notificationPermissionRequestInFlight =
+                state.authPlatform.notificationPermissionRequestInFlight,
+                notificationPrimingPersistenceFailed =
+                state.authPlatform.notificationPrimingPersistenceFailed,
+            ),
+            strings = strings,
+            actions = remember(dependencies.authViewModel) { dependencies.authViewModel.registrationActions() },
+        )
+    } else {
+        KwaborEntryContent(
+            entry = resolveOnboardingEntry(state),
+            state = state,
+            strings = strings,
+            dependencies = dependencies,
+            onDeepLinkConsumed = onDeepLinkConsumed,
+        )
+    }
+    if (state.authPlatform.surface == AuthSurface.SoftWall) {
+        AuthSheet(
+            strings = strings,
+            actions = remember(dependencies.authViewModel) { dependencies.authViewModel.sheetActions() },
+        )
+    }
+}
+
+private fun resolveOnboardingEntry(state: KwaborCollectedState): OnboardingEntry =
+    if (state.onboarding.isLaunchDecisionComplete) {
         OnboardingEntryResolver.resolve(
             firstLaunchCompleted = !state.onboarding.isIntroRequired,
             sessionRestoreCompleted = state.isSessionRestoreComplete,
@@ -70,30 +128,11 @@ internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: Kwabor
         OnboardingEntry.RestoringSession
     }
 
-    OnboardingEffectHandler(dependencies = dependencies)
-
-    KwaborTheme {
-        KwaborEntryContent(
-            entry = entry,
-            state = state,
-            strings = strings,
-            dependencies = dependencies,
-            onDeepLinkConsumed = runtimeState.onDeepLinkConsumed,
-        )
-        if (state.auth.isVisible) {
-            AuthSheet(
-                state = state.auth,
-                strings = strings,
-                actions = remember(dependencies.authViewModel) { dependencies.authViewModel.sheetActions() },
-            )
-        }
-    }
-}
-
 internal data class KwaborAppDependencies(
     val exploreViewModel: ExploreViewModel,
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
+    val legalDocumentLauncher: LegalDocumentLauncher,
 )
 
 internal data class KwaborAppRuntimeState(
@@ -104,6 +143,8 @@ internal data class KwaborAppRuntimeState(
 private data class KwaborCollectedState(
     val auth: AuthUiState,
     val onboarding: OnboardingUiState,
+    val registration: RegistrationUiState,
+    val authPlatform: AuthPlatformUiState,
     val isSessionRestoreComplete: Boolean,
     val deepLink: String?,
 )
@@ -116,10 +157,14 @@ private fun collectKwaborAppState(
     val authState by dependencies.authViewModel.state.collectAsStateWithLifecycle()
     val restoreComplete by dependencies.authViewModel.isSessionRestoreComplete.collectAsStateWithLifecycle()
     val onboardingState by dependencies.onboardingViewModel.state.collectAsStateWithLifecycle()
+    val registrationState by dependencies.authViewModel.registrationState.collectAsStateWithLifecycle()
+    val authPlatformState by dependencies.authViewModel.platformState.collectAsStateWithLifecycle()
     val deepLink by runtimeState.pendingDeepLink.collectAsStateWithLifecycle()
     return KwaborCollectedState(
         auth = authState,
         onboarding = onboardingState,
+        registration = registrationState,
+        authPlatform = authPlatformState,
         isSessionRestoreComplete = restoreComplete,
         deepLink = deepLink,
     )
@@ -130,7 +175,8 @@ private fun OnboardingEffectHandler(dependencies: KwaborAppDependencies) {
     LaunchedEffect(dependencies.onboardingViewModel, dependencies.authViewModel) {
         dependencies.onboardingViewModel.effects.collect { effect ->
             when (effect) {
-                OnboardingEffect.OpenAuthentication -> dependencies.authViewModel.onIntent(AuthIntent.Open)
+                OnboardingEffect.OpenRegistration -> dependencies.authViewModel.onIntent(AuthIntent.OpenRegistration())
+                OnboardingEffect.OpenSignIn -> dependencies.authViewModel.onIntent(AuthIntent.OpenSignIn())
             }
         }
     }
@@ -324,7 +370,7 @@ private fun RootEffectHandlers(
     LaunchedEffect(exploreViewModel, authViewModel) {
         exploreViewModel.effects.collect { effect ->
             when (effect) {
-                ExploreEffect.AuthenticationRequired -> authViewModel.onIntent(AuthIntent.Open)
+                ExploreEffect.AuthenticationRequired -> authViewModel.onIntent(AuthIntent.OpenSoftWall)
             }
         }
     }
@@ -366,7 +412,7 @@ private fun rootDestinationRequester(
         navController.navigateToRoot(destination)
     } else {
         onAuthenticationRequired(destination)
-        authViewModel.onIntent(AuthIntent.Open)
+        authViewModel.onIntent(AuthIntent.OpenSoftWall)
     }
 }
 
@@ -412,18 +458,6 @@ private fun ExploreViewModel.screenActions(): ExploreScreenActions = ExploreScre
     onRetry = { onIntent(ExploreIntent.Retry) },
     onLikeClick = { listingId -> onIntent(ExploreIntent.ToggleLike(listingId)) },
     onFavoriteClick = { listingId -> onIntent(ExploreIntent.ToggleFavorite(listingId)) },
-)
-
-private fun AuthViewModel.sheetActions(): AuthSheetActions = AuthSheetActions(
-    onDismiss = { onIntent(AuthIntent.Dismiss) },
-    onEmailChange = { email -> onIntent(AuthIntent.ChangeEmail(email)) },
-    onFirstNameChange = { firstName -> onIntent(AuthIntent.ChangeFirstName(firstName)) },
-    onLastNameChange = { lastName -> onIntent(AuthIntent.ChangeLastName(lastName)) },
-    onOtpCodeChange = { code -> onIntent(AuthIntent.ChangeOtpCode(code)) },
-    onLegalAcceptedChange = { accepted -> onIntent(AuthIntent.ChangeLegalAccepted(accepted)) },
-    onRequestOtp = { onIntent(AuthIntent.RequestOtp) },
-    onVerifyOtp = { onIntent(AuthIntent.VerifyOtp) },
-    onContinueAsGuest = { onIntent(AuthIntent.ContinueAsGuest) },
 )
 
 @Composable

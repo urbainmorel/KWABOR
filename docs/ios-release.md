@@ -24,19 +24,19 @@ Le workflow reçoit ces valeurs comme entrées et les valide avant d'importer le
 
 ## Icône et lancement
 
-Le catalogue utilise une icône iOS source unique de 1024 × 1024 pixels, ink `#0E0E10` et mark blanc, sans transparence. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
+Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source canonique. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG officiel, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
 
-Le lancement natif s'appuie sur `UILaunchScreen`, une couleur ink et le mark central, sans storyboard ni logique applicative. Apple documente `UIColorName` et `UIImageName` pour ce contrat : [UILaunchScreen](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen).
+Le lancement natif s'appuie sur `UILaunchScreen`, une couleur ink et un redimensionnement opaque intégral du même master au ratio 1:1, sans détourage, seuil, matrice de couleur, storyboard ni logique applicative. Les nuances, l'ombre douce et la texture du PNG officiel restent donc présentes. Apple documente `UIColorName` et `UIImageName` pour ce contrat : [UILaunchScreen](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen).
 
 Les PNG sont déterministes et régénérables sur Windows avec :
 
 ```powershell
-.\tools\generate-ios-brand-assets.ps1
+.\tools\generate-brand-assets.ps1
 ```
 
 ## Privacy Manifest
 
-`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation : aucun tracking ni Required Reason API utilisée directement ; les événements produit et l'ID opaque de ville sont déclarés pour Analytics, sans liaison à l'identité.
+`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation : aucun tracking ni Required Reason API utilisée directement ; les événements produit restent non liés, tandis que la ville de profil est déclarée comme localisation approximative liée au compte pour la fonctionnalité et, après consentement, Analytics. La coordonnée ponctuelle utilisée pour proposer cette ville n'est ni transmise ni conservée.
 
 Ce fichier doit être réaudité dès qu'une feature collecte une donnée ou qu'un SDK est mis à jour. Firebase et chaque SDK tiers gardent leur propre manifest pour leurs collectes internes ; le manifest applicatif ne recopie que les données définies par l'hôte. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les ressources et rejette les clés invalides : [Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files), [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk). Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
 

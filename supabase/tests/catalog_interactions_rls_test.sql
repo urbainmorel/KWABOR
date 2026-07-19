@@ -116,6 +116,18 @@ VALUES
     now()
   );
 
+INSERT INTO public.profiles (
+  user_id,
+  first_name,
+  last_name,
+  city_id,
+  onboarding_completed_at
+)
+VALUES
+  ('44444444-4444-4444-8444-444444444444', 'Lecteur', 'Un', 'cotonou', now()),
+  ('55555555-5555-4555-8555-555555555555', 'Lecteur', 'Deux', 'cotonou', now()),
+  ('66666666-6666-4666-8666-666666666666', 'Admin', 'Catalogue', 'cotonou', now());
+
 INSERT INTO public.user_roles (user_id, role, verification_status)
 VALUES
   ('44444444-4444-4444-8444-444444444444', 'user', 'unverified'),

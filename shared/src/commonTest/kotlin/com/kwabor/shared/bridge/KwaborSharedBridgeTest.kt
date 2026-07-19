@@ -20,6 +20,14 @@ class KwaborSharedBridgeTest {
         assertEquals("S'inscrire", onboardingStrings.signUp)
         assertEquals("Recevoir le code", onboardingStrings.authRequestOtp)
         assertEquals("Kwabor est indisponible pour le moment. Réessayez plus tard.", onboardingStrings.authUnavailable)
+        assertEquals(
+            "Ce code a expiré. Demandez-en un nouveau.",
+            onboardingStrings.registrationOtpExpired,
+        )
+        assertEquals(
+            "Recevez les nouveautés utiles près de votre ville. Vous gardez le contrôle dans les paramètres.",
+            onboardingStrings.registrationNotificationSupport,
+        )
         assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
         val telemetry = bridge.onboardingTelemetry()
         assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)

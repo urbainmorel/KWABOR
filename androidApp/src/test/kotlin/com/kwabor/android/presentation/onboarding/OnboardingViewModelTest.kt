@@ -8,6 +8,7 @@ import com.kwabor.android.onboarding.PendingRemoteIntro
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -112,6 +113,27 @@ class OnboardingViewModelTest {
 
         assertTrue(viewModel.state.value.isLaunchDecisionComplete)
         assertFalse(viewModel.state.value.isIntroRequired)
+    }
+
+    @Test
+    fun signupAndSigninEmitDistinctEffects() = runTest {
+        val signUpViewModel = createViewModel(
+            store = FakeFirstLaunchStore(),
+            events = mutableListOf(),
+            scope = this,
+        )
+        signUpViewModel.onIntent(OnboardingIntent.SignUpSelected)
+
+        assertEquals(OnboardingEffect.OpenRegistration, signUpViewModel.effects.first())
+
+        val signInViewModel = createViewModel(
+            store = FakeFirstLaunchStore(),
+            events = mutableListOf(),
+            scope = this,
+        )
+        signInViewModel.onIntent(OnboardingIntent.SignInSelected)
+
+        assertEquals(OnboardingEffect.OpenSignIn, signInViewModel.effects.first())
     }
 
     private fun createViewModel(

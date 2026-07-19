@@ -22,9 +22,14 @@ class IosKwaborCompositionRoot(
         presenter = sharedRoot?.authPresenter,
         dispatcherProvider = dispatcherProvider,
     )
+    val registrationController = IosRegistrationController(
+        presenter = sharedRoot?.registrationPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
 
     fun close() {
         authController.close()
+        registrationController.close()
         sharedRoot?.close()
     }
 }

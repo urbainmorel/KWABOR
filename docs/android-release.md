@@ -22,6 +22,16 @@ R8 réduit les ressources, minifie et obfusque `staging` et `release`. Le fichie
 
 Le build rejette un code invalide ou un nom hors contrat avant compilation.
 
+## Identité visuelle et lancement
+
+La source canonique du symbole est `kwabor_icone_app.png` à la racine du dépôt. Le symbole n'est jamais redessiné, détouré ou recoloré : le script versionné redimensionne le bitmap officiel opaque en conservant sa silhouette, sa courbe intérieure, ses nuances et sa texture.
+
+Le splash Android 12+ et le foreground de l'icône adaptative utilisent deux assets distincts, chacun contenant le master opaque intégral, au ratio inchangé, centré à 75 % sur le même fond ink `#0E0E0D`. Ce padding est nécessaire pour garder toute la silhouette dans le masque circulaire imposé au lancement par Android, sans détourer, recolorer ni déformer le logo. Les PNG Android/iOS sont régénérables sur Windows avec :
+
+```powershell
+.\tools\generate-brand-assets.ps1
+```
+
 ## Clé d'upload production
 
 Le propriétaire génère et sauvegarde une clé d'upload dédiée hors du dépôt. Exemple à exécuter dans un emplacement privé et sauvegardé :
