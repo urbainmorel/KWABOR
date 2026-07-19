@@ -47,8 +47,15 @@ class IosAuthController internal constructor(
     }
 
     fun signInWithEmail(email: String, password: String) {
-        val currentPresenter = presenter ?: return
-        if (state.isLoading) return
+        signInWithEmail(email = email, password = password, onCompleted = {})
+    }
+
+    fun signInWithEmail(email: String, password: String, onCompleted: (Boolean) -> Unit) {
+        val currentPresenter = presenter
+        if (currentPresenter == null || state.isLoading) {
+            onCompleted(false)
+            return
+        }
         operationJob?.cancel()
         state = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
         publish()
@@ -60,6 +67,7 @@ class IosAuthController internal constructor(
                 strings = strings,
             )
             publish()
+            onCompleted(state.currentSession != null && state.errorMessage == null)
         }
     }
 

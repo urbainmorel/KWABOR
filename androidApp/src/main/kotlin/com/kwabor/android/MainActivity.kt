@@ -15,6 +15,7 @@ import com.kwabor.android.app.KwaborUnavailableApp
 import com.kwabor.android.auth.AndroidLegalDocumentLauncher
 import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
 import com.kwabor.android.auth.AndroidRegistrationLocationService
+import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
 import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
@@ -26,6 +27,7 @@ import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -38,34 +40,39 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         acceptDeepLink(intent)
-        val compositionRoot = (application as KwaborApplication).compositionRoot
-        val authPresenter = compositionRoot?.authPresenter
-        val registrationPresenter = compositionRoot?.registrationPresenter
-        if (compositionRoot == null || authPresenter == null || registrationPresenter == null) {
+        val configuredApp = configuredAppOrNull()
+        if (configuredApp == null) {
             setContent { KwaborUnavailableApp() }
             return
         }
 
-        showConfiguredApp(compositionRoot, authPresenter, registrationPresenter)
+        showConfiguredApp(configuredApp)
     }
 
-    private fun showConfiguredApp(
-        compositionRoot: KwaborCompositionRoot,
-        authPresenter: AuthPresenter,
-        registrationPresenter: RegistrationPresenter,
-    ) {
+    private fun configuredAppOrNull(): ConfiguredApp? {
+        val compositionRoot = (application as KwaborApplication).compositionRoot ?: return null
+        val authPresenters = AuthPresenters(
+            auth = compositionRoot.authPresenter ?: return null,
+            passwordRecovery = compositionRoot.passwordRecoveryPresenter ?: return null,
+            registration = compositionRoot.registrationPresenter ?: return null,
+        )
+        return ConfiguredApp(compositionRoot = compositionRoot, authPresenters = authPresenters)
+    }
+
+    private fun showConfiguredApp(configuredApp: ConfiguredApp) {
         val strings = stringsFor(AppLocale.French)
         val applicationState = application as KwaborApplication
         val dependencies = KwaborAppDependencies(
-            exploreViewModel = createExploreViewModel(compositionRoot, strings),
+            exploreViewModel = createExploreViewModel(configuredApp.compositionRoot, strings),
             authViewModel = createAuthViewModel(
-                compositionRoot = compositionRoot,
-                authPresenter = authPresenter,
-                registrationPresenter = registrationPresenter,
+                configuredApp = configuredApp,
                 strings = strings,
                 applicationState = applicationState,
             ),
-            onboardingViewModel = createOnboardingViewModel(applicationState, compositionRoot.dispatcherProvider),
+            onboardingViewModel = createOnboardingViewModel(
+                applicationState,
+                configuredApp.compositionRoot.dispatcherProvider,
+            ),
             legalDocumentLauncher = AndroidLegalDocumentLauncher(applicationContext),
         )
 
@@ -97,9 +104,7 @@ class MainActivity : ComponentActivity() {
     )[ExploreViewModel::class.java]
 
     private fun createAuthViewModel(
-        compositionRoot: KwaborCompositionRoot,
-        authPresenter: AuthPresenter,
-        registrationPresenter: RegistrationPresenter,
+        configuredApp: ConfiguredApp,
         strings: KwaborStrings,
         applicationState: KwaborApplication,
     ): AuthViewModel = ViewModelProvider(
@@ -108,16 +113,18 @@ class MainActivity : ComponentActivity() {
             initializer {
                 AuthViewModel(
                     dependencies = AuthViewModelDependencies(
-                        authPresenter = authPresenter,
-                        registrationPresenter = registrationPresenter,
+                        authPresenter = configuredApp.authPresenters.auth,
+                        passwordRecoveryPresenter = configuredApp.authPresenters.passwordRecovery,
+                        registrationPresenter = configuredApp.authPresenters.registration,
                         locationService = AndroidRegistrationLocationService(applicationContext),
                         notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
                         notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
-                        clockProvider = compositionRoot.clockProvider,
+                        authJourneyStore = SharedPreferencesAuthJourneyStore(applicationContext),
+                        clockProvider = configuredApp.compositionRoot.clockProvider,
                         applyObservabilityConsent = applicationState.observability::updateConsent,
                     ),
                     strings = strings,
-                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                    coroutineScope = newViewModelScope(configuredApp.compositionRoot.dispatcherProvider),
                 )
             }
         },
@@ -154,3 +161,14 @@ class MainActivity : ComponentActivity() {
         sourceIntent.data = null
     }
 }
+
+private data class ConfiguredApp(
+    val compositionRoot: KwaborCompositionRoot,
+    val authPresenters: AuthPresenters,
+)
+
+private data class AuthPresenters(
+    val auth: AuthPresenter,
+    val passwordRecovery: PasswordRecoveryPresenter,
+    val registration: RegistrationPresenter,
+)

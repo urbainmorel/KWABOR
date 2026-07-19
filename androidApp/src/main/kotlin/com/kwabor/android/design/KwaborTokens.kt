@@ -25,6 +25,7 @@ object KwaborSizing {
     val BottomNavigationHeight = 76.dp
     val FloatingActionButton = 56.dp
     val FloatingPill = 36.dp
+    val BrandMark = 96.dp
 }
 
 object KwaborAlpha {

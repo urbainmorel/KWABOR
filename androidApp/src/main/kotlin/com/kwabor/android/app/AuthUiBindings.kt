@@ -11,7 +11,10 @@ import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthPlatformEffect
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.ui.screens.auth.AuthSheetActions
+import com.kwabor.android.ui.screens.auth.PasswordRecoveryScreenActions
 import com.kwabor.android.ui.screens.auth.RegistrationScreenActions
+import com.kwabor.android.ui.screens.auth.SignInScreenActions
+import com.kwabor.android.ui.screens.profile.ProfileSessionScreenActions
 
 @Composable
 internal fun AuthPlatformEffectHandler(dependencies: KwaborAppDependencies) {
@@ -83,4 +86,30 @@ internal fun AuthViewModel.registrationActions(): RegistrationScreenActions = Re
     onCompleteOnboarding = { onIntent(AuthIntent.CompleteOnboarding) },
     onEnableNotifications = { onIntent(AuthIntent.EnableNotifications) },
     onSkipNotifications = { onIntent(AuthIntent.SkipNotifications) },
+)
+
+internal fun AuthViewModel.signInActions(): SignInScreenActions = SignInScreenActions(
+    onBack = { onIntent(AuthIntent.Back) },
+    onEmailChange = { email -> onIntent(AuthIntent.ChangeSignInEmail(email)) },
+    onContinueFromEmail = { onIntent(AuthIntent.ContinueFromSignInEmail) },
+    onSubmitPassword = { password -> onIntent(AuthIntent.SubmitSignInPassword(password)) },
+    onForgotPassword = { onIntent(AuthIntent.OpenPasswordRecovery) },
+    onSignUp = { onIntent(AuthIntent.OpenRegistration(platformState.value.entryPoint)) },
+)
+
+internal fun AuthViewModel.passwordRecoveryActions(): PasswordRecoveryScreenActions = PasswordRecoveryScreenActions(
+    onBack = { onIntent(AuthIntent.Back) },
+    onEmailChange = { email -> onIntent(AuthIntent.ChangeRecoveryEmail(email)) },
+    onRequestCode = { onIntent(AuthIntent.RequestRecoveryOtp) },
+    onSubmitOtp = { code -> onIntent(AuthIntent.SubmitRecoveryOtp(code)) },
+    onResendCode = { onIntent(AuthIntent.ResendRecoveryOtp) },
+    onSubmitPassword = { password, confirmation ->
+        onIntent(AuthIntent.SubmitRecoveryPassword(password, confirmation))
+    },
+)
+
+internal fun AuthViewModel.profileSessionActions(): ProfileSessionScreenActions = ProfileSessionScreenActions(
+    onRequestSignOut = { onIntent(AuthIntent.RequestSignOut) },
+    onCancelSignOut = { onIntent(AuthIntent.CancelSignOut) },
+    onConfirmSignOut = { onIntent(AuthIntent.ConfirmSignOut) },
 )

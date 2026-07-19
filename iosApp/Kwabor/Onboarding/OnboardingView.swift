@@ -19,7 +19,12 @@ struct OnboardingView: View {
                 ContentView(
                     bridge: coordinator.bridge,
                     isGuestSession: coordinator.isGuestSession,
-                    onProtectedDestinationSelected: coordinator.presentAuthentication
+                    strings: coordinator.strings,
+                    isSigningOutAccount: coordinator.isSigningOutAccount,
+                    accountSignOutErrorMessage: coordinator.accountSignOutErrorMessage,
+                    onProtectedDestinationSelected: coordinator.presentAuthentication,
+                    onSignOut: coordinator.signOutCurrentAccount,
+                    onDismissSignOutError: coordinator.clearAccountSignOutError
                 )
             }
         }
@@ -123,6 +128,7 @@ private struct OnboardingLandingView: View {
                     .tint(KwaborDesignTokens.ColorToken.ink950)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .disabled(coordinator.requiresProtectedAuthentication)
 
                     Button(coordinator.strings.signIn) {
                         coordinator.presentAuthentication()
@@ -136,6 +142,7 @@ private struct OnboardingLandingView: View {
                     }
                     .foregroundStyle(.white)
                     .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .disabled(coordinator.requiresProtectedAuthentication)
                 }
             }
             .padding(KwaborDesignTokens.Spacing.xxl)

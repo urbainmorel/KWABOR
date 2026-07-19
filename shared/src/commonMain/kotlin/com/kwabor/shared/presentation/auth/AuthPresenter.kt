@@ -1,6 +1,11 @@
 package com.kwabor.shared.presentation.auth
 
+import com.kwabor.shared.domain.auth.AUTH_EMAIL_NOT_CONFIRMED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_INVALID_CREDENTIALS_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_OTP_EXPIRED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_PASSWORD_SAME_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_PASSWORD_TOO_WEAK_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_RATE_LIMITED_ERROR_KEY
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
@@ -68,7 +73,10 @@ class AuthPresenter(
     suspend fun signOut(state: AuthUiState, strings: KwaborStrings): AuthUiState =
         when (val result = authRepository.signOut()) {
             is DomainResult.Success -> initialAuthUiState().copy(noticeMessage = strings.authSignedOut)
-            is DomainResult.Failure -> state.copy(errorMessage = result.error.toAuthMessage(strings))
+            is DomainResult.Failure -> state.copy(
+                isLoading = false,
+                errorMessage = result.error.toAuthMessage(strings),
+            )
         }
 }
 
@@ -77,10 +85,16 @@ internal fun DomainError.toAuthMessage(strings: KwaborStrings): String = when (t
     is DomainError.NetworkUnavailable -> strings.offlineBanner
     is DomainError.PermissionDenied -> strings.authPermissionDenied
     is DomainError.NotFound -> strings.registrationLegalUnavailable
-    is DomainError.Validation -> if (messageKey == AUTH_OTP_EXPIRED_ERROR_KEY) {
-        strings.registrationOtpExpired
-    } else {
-        strings.authInvalidInput
-    }
+    is DomainError.Validation -> messageKey.toAuthValidationMessage(strings)
     is DomainError.Unexpected -> strings.authInvalidInput
+}
+
+private fun String.toAuthValidationMessage(strings: KwaborStrings): String = when (this) {
+    AUTH_OTP_EXPIRED_ERROR_KEY -> strings.registrationOtpExpired
+    AUTH_INVALID_CREDENTIALS_ERROR_KEY -> strings.authInvalidCredentials
+    AUTH_EMAIL_NOT_CONFIRMED_ERROR_KEY -> strings.authEmailNotConfirmed
+    AUTH_RATE_LIMITED_ERROR_KEY -> strings.authRateLimited
+    AUTH_PASSWORD_TOO_WEAK_ERROR_KEY -> strings.authPasswordTooWeak
+    AUTH_PASSWORD_SAME_ERROR_KEY -> strings.authPasswordSame
+    else -> strings.authInvalidInput
 }

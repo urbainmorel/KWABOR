@@ -20,6 +20,10 @@ class OnboardingStrings internal constructor(
     val authTitle: String = auth.authTitle
     val authSubtitle: String = auth.authSubtitle
     val authEmail: String = auth.authEmail
+    val authPassword: String = auth.authPassword
+    val authEmailContinue: String = auth.authEmailContinue
+    val authForgotPassword: String = auth.authForgotPassword
+    val authCreateAccount: String = auth.authCreateAccount
     val authFirstName: String = auth.authFirstName
     val authLastName: String = auth.authLastName
     val authOtpCode: String = auth.authOtpCode
@@ -28,6 +32,27 @@ class OnboardingStrings internal constructor(
     val authLegalAcceptance: String = auth.authLegalAcceptance
     val authContinueAsGuest: String = auth.authContinueAsGuest
     val authUnavailable: String = auth.authUnavailable
+    val authInvalidInput: String = auth.authInvalidInput
+    val authInvalidCredentials: String = auth.authInvalidCredentials
+    val authEmailNotConfirmed: String = auth.authEmailNotConfirmed
+    val authRateLimited: String = auth.authRateLimited
+    val authAccount: String = auth.authAccount
+    val authSignOut: String = auth.authSignOut
+    val authSignOutTitle: String = auth.authSignOutTitle
+    val authSignOutConfirmation: String = auth.authSignOutConfirmation
+    val authConfirm: String = auth.authConfirm
+    val authCancel: String = auth.authCancel
+    val passwordRecoveryTitle: String = auth.passwordRecoveryTitle
+    val passwordRecoverySubtitle: String = auth.passwordRecoverySubtitle
+    val passwordRecoveryCode: String = auth.passwordRecoveryCode
+    val passwordRecoverySendCode: String = auth.passwordRecoverySendCode
+    val passwordRecoveryCodeSent: String = auth.passwordRecoveryCodeSent
+    val passwordRecoveryResendCode: String = auth.passwordRecoveryResendCode
+    val passwordRecoveryResendCountdown: String = auth.passwordRecoveryResendCountdown
+    val passwordRecoveryNewPassword: String = auth.passwordRecoveryNewPassword
+    val passwordRecoveryConfirmation: String = auth.passwordRecoveryConfirmation
+    val passwordRecoverySuccess: String = auth.passwordRecoverySuccess
+    val passwordRecoveryBackToSignIn: String = auth.passwordRecoveryBackToSignIn
     val registrationTitle: String = registration.registrationTitle
     val registrationPassword: String = registration.registrationPassword
     val registrationPasswordConfirmation: String = registration.registrationPasswordConfirmation
@@ -83,6 +108,10 @@ internal data class OnboardingAuthStrings(
     val authTitle: String,
     val authSubtitle: String,
     val authEmail: String,
+    val authPassword: String,
+    val authEmailContinue: String,
+    val authForgotPassword: String,
+    val authCreateAccount: String,
     val authFirstName: String,
     val authLastName: String,
     val authOtpCode: String,
@@ -91,6 +120,27 @@ internal data class OnboardingAuthStrings(
     val authLegalAcceptance: String,
     val authContinueAsGuest: String,
     val authUnavailable: String,
+    val authInvalidInput: String,
+    val authInvalidCredentials: String,
+    val authEmailNotConfirmed: String,
+    val authRateLimited: String,
+    val authAccount: String,
+    val authSignOut: String,
+    val authSignOutTitle: String,
+    val authSignOutConfirmation: String,
+    val authConfirm: String,
+    val authCancel: String,
+    val passwordRecoveryTitle: String,
+    val passwordRecoverySubtitle: String,
+    val passwordRecoveryCode: String,
+    val passwordRecoverySendCode: String,
+    val passwordRecoveryCodeSent: String,
+    val passwordRecoveryResendCode: String,
+    val passwordRecoveryResendCountdown: String,
+    val passwordRecoveryNewPassword: String,
+    val passwordRecoveryConfirmation: String,
+    val passwordRecoverySuccess: String,
+    val passwordRecoveryBackToSignIn: String,
 )
 
 internal data class OnboardingRegistrationStrings(
@@ -155,6 +205,10 @@ private fun KwaborStrings.toOnboardingAuthStrings(): OnboardingAuthStrings = Onb
     authTitle = authTitle,
     authSubtitle = authSubtitle,
     authEmail = authEmail,
+    authPassword = authPassword,
+    authEmailContinue = authEmailContinue,
+    authForgotPassword = authForgotPassword,
+    authCreateAccount = authCreateAccount,
     authFirstName = authFirstName,
     authLastName = authLastName,
     authOtpCode = authOtpCode,
@@ -163,6 +217,27 @@ private fun KwaborStrings.toOnboardingAuthStrings(): OnboardingAuthStrings = Onb
     authLegalAcceptance = authLegalAcceptance,
     authContinueAsGuest = authContinueAsGuest,
     authUnavailable = configurationUnavailable,
+    authInvalidInput = authInvalidInput,
+    authInvalidCredentials = authInvalidCredentials,
+    authEmailNotConfirmed = authEmailNotConfirmed,
+    authRateLimited = authRateLimited,
+    authAccount = authAccount,
+    authSignOut = authSignOut,
+    authSignOutTitle = authSignOutTitle,
+    authSignOutConfirmation = authSignOutConfirmation,
+    authConfirm = authConfirm,
+    authCancel = authCancel,
+    passwordRecoveryTitle = passwordRecoveryTitle,
+    passwordRecoverySubtitle = passwordRecoverySubtitle,
+    passwordRecoveryCode = passwordRecoveryCode,
+    passwordRecoverySendCode = passwordRecoverySendCode,
+    passwordRecoveryCodeSent = passwordRecoveryCodeSent,
+    passwordRecoveryResendCode = passwordRecoveryResendCode,
+    passwordRecoveryResendCountdown = passwordRecoveryResendCountdown,
+    passwordRecoveryNewPassword = passwordRecoveryNewPassword,
+    passwordRecoveryConfirmation = passwordRecoveryConfirmation,
+    passwordRecoverySuccess = passwordRecoverySuccess,
+    passwordRecoveryBackToSignIn = passwordRecoveryBackToSignIn,
 )
 
 private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrationStrings =

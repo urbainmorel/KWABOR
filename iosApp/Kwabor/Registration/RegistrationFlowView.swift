@@ -15,8 +15,10 @@ struct RegistrationFlowView: View {
                 locationProvider: coordinator.registrationLocationProvider,
                 notificationPermissionRequester: coordinator.registrationNotificationPermissionRequester,
                 notificationPrimingStore: coordinator.registrationNotificationPrimingStore,
+                interruptedAuthJourneyStore: coordinator.interruptedAuthJourneyStore,
                 applyObservabilityConsent: coordinator.applyRegistrationObservabilityConsent,
                 onCompleted: coordinator.completeRegistration,
+                onExistingAccountAuthenticated: coordinator.handleExistingRegistrationAccount,
                 onCancel: coordinator.cancelRegistration
             )
         )

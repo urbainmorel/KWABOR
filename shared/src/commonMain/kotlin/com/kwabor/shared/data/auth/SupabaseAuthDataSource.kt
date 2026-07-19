@@ -1,6 +1,13 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.AUTH_EMAIL_NOT_CONFIRMED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_INVALID_CREDENTIALS_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_OTP_EXPIRED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_PASSWORD_RECOVERY_REQUIRED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_PASSWORD_SAME_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_PASSWORD_TOO_WEAK_ERROR_KEY
+import com.kwabor.shared.domain.auth.AUTH_RATE_LIMITED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
@@ -28,6 +35,7 @@ import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -39,14 +47,30 @@ private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_CONFLICT = 409
 private const val HTTP_UNPROCESSABLE_CONTENT = 422
+private const val HTTP_TOO_MANY_REQUESTS = 429
 
 internal class SupabaseAuthDataSource(
     private val auth: Auth,
     private val postgrest: Postgrest,
+    private val passwordRecoverySessionStore: PasswordRecoverySessionStore,
 ) : AuthDataSource {
+    private val passwordRecoverySessionCoordinator =
+        PasswordRecoverySessionCoordinator(passwordRecoverySessionStore)
+
     override suspend fun getCurrentSession(): AuthSessionDto? = runAuthRequest {
         auth.awaitInitialization()
-        auth.currentSessionOrNull()?.toDtoWithServerStatus()
+        if (passwordRecoverySessionStore.isPasswordRecoveryInProgress()) {
+            passwordRecoverySessionCoordinator.restoreRecoverySessionOrNull(
+                currentSession = auth.currentSessionOrNull(),
+                loadStoredSession = auth.sessionManager::loadSessionOrNull,
+                clearCurrentSession = auth::clearSession,
+            )?.toDto(
+                onboardingCompleted = false,
+                purpose = AuthSessionPurpose.PasswordRecovery,
+            )
+        } else {
+            auth.currentSessionOrNull()?.toDtoWithServerStatus(AuthSessionPurpose.Standard)
+        }
     }
 
     override suspend fun requestEmailOtp(email: String): Unit = runAuthRequest {
@@ -57,7 +81,9 @@ internal class SupabaseAuthDataSource(
     }
 
     override suspend fun verifyEmailOtp(email: String, otpCode: String): AuthSessionDto = runAuthRequest {
-        auth.verifyEmailOtpForSession(email = email, otpCode = otpCode).toDtoWithServerStatus()
+        val session = auth.verifyEmailOtpForSession(email = email, otpCode = otpCode)
+        passwordRecoverySessionStore.clearPasswordRecovery()
+        session.toDtoWithServerStatus(AuthSessionPurpose.Standard)
     }
 
     override suspend fun setInitialPassword(password: String): Unit = runAuthRequest {
@@ -88,7 +114,10 @@ internal class SupabaseAuthDataSource(
         if (completedProfile.userId != session.user?.id || completedProfile.onboardingCompletedAt == null) {
             throw AuthDataException.Unexpected()
         }
-        session.toDto(onboardingCompleted = true)
+        session.toDto(
+            onboardingCompleted = true,
+            purpose = AuthSessionPurpose.Standard,
+        )
     }
 
     override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto = runAuthRequest {
@@ -96,7 +125,46 @@ internal class SupabaseAuthDataSource(
             this.email = email
             this.password = password
         }
-        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus()
+        passwordRecoverySessionStore.clearPasswordRecovery()
+        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus(
+            AuthSessionPurpose.Standard,
+        )
+    }
+
+    override suspend fun requestPasswordRecovery(email: String): Unit = runAuthRequest {
+        try {
+            auth.resetPasswordForEmail(email = email, redirectUrl = null)
+        } catch (exception: AuthRestException) {
+            if (!exception.isUnknownAccountError()) throw exception
+        }
+    }
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): AuthSessionDto = runAuthRequest {
+        val session = passwordRecoverySessionCoordinator.establishRecoverySession(
+            clearCurrentSession = auth::clearSession,
+        ) {
+            auth.verifyPasswordRecoveryOtpForSession(email = email, otpCode = otpCode)
+        }
+        session.toDtoWithServerStatus(AuthSessionPurpose.PasswordRecovery)
+    }
+
+    override suspend fun completePasswordRecovery(newPassword: String): Unit = runAuthRequest {
+        passwordRecoverySessionCoordinator.completeRecoverySession(
+            hasCurrentSession = { auth.currentSessionOrNull() != null },
+            missingSessionError = {
+                AuthDataException.AuthenticationRequired(AUTH_PASSWORD_RECOVERY_REQUIRED_ERROR_KEY)
+            },
+            updatePassword = {
+                auth.updateUser(updateCurrentUser = true, redirectUrl = null) {
+                    password = newPassword
+                }
+            },
+            clearCurrentSession = auth::clearSession,
+        )
+    }
+
+    override suspend fun cancelPasswordRecovery(): Unit = runAuthRequest {
+        passwordRecoverySessionCoordinator.cancelRecoverySession(auth::clearSession)
     }
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto = runAuthRequest {
@@ -104,14 +172,19 @@ internal class SupabaseAuthDataSource(
             idToken = request.idToken
             provider = request.provider.toSupabaseProvider()
         }
-        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus()
+        passwordRecoverySessionStore.clearPasswordRecovery()
+        (auth.currentSessionOrNull() ?: throw AuthDataException.AuthenticationRequired()).toDtoWithServerStatus(
+            AuthSessionPurpose.Standard,
+        )
     }
 
     override suspend fun signOut(): Unit = runAuthRequest {
-        auth.signOut(SignOutScope.LOCAL)
+        passwordRecoverySessionCoordinator.signOut {
+            auth.signOut(SignOutScope.LOCAL)
+        }
     }
 
-    private suspend fun UserSession.toDtoWithServerStatus(): AuthSessionDto {
+    private suspend fun UserSession.toDtoWithServerStatus(purpose: AuthSessionPurpose): AuthSessionDto {
         val sessionUser = user ?: throw AuthDataException.AuthenticationRequired()
         val profile = postgrest.from(PROFILES)
             .select {
@@ -120,7 +193,10 @@ internal class SupabaseAuthDataSource(
             }
             .decodeList<OnboardingProfileStatusDto>()
             .firstOrNull()
-        return toDto(onboardingCompleted = profile?.onboardingCompletedAt != null)
+        return toDto(
+            onboardingCompleted = profile?.onboardingCompletedAt != null,
+            purpose = purpose,
+        )
     }
 }
 
@@ -130,16 +206,29 @@ private suspend fun Auth.verifyEmailOtpForSession(email: String, otpCode: String
         OtpVerifyResult.VerifiedNoSession -> throw AuthDataException.AuthenticationRequired()
     }
 
-private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T = try {
+private suspend fun Auth.verifyPasswordRecoveryOtpForSession(email: String, otpCode: String): UserSession =
+    when (val result = verifyEmailOtp(OtpType.Email.RECOVERY, email = email, token = otpCode)) {
+        is OtpVerifyResult.Authenticated -> result.session
+        OtpVerifyResult.VerifiedNoSession -> throw AuthDataException.AuthenticationRequired()
+    }
+
+private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T =
+    runAuthTransportRequest { runAuthSdkRequest(block) }
+
+private suspend inline fun <T> runAuthSdkRequest(block: suspend () -> T): T = try {
     block()
 } catch (exception: AuthDataException) {
     throw exception
 } catch (exception: AuthWeakPasswordException) {
-    throw AuthDataException.Validation("error.auth.password_too_weak", exception)
+    throw AuthDataException.Validation(AUTH_PASSWORD_TOO_WEAK_ERROR_KEY, exception)
 } catch (exception: AuthSessionMissingException) {
     throw AuthDataException.AuthenticationRequired(cause = exception)
 } catch (exception: AuthRestException) {
     throw exception.toAuthDataException()
+}
+
+private suspend inline fun <T> runAuthTransportRequest(block: suspend () -> T): T = try {
+    block()
 } catch (exception: PostgrestRestException) {
     throw exception.toAuthDataException()
 } catch (exception: RestException) {
@@ -149,6 +238,12 @@ private suspend inline fun <T> runAuthRequest(block: suspend () -> T): T = try {
 } catch (exception: HttpRequestException) {
     throw AuthDataException.NetworkUnavailable(exception)
 } catch (exception: SerializationException) {
+    throw AuthDataException.Unexpected(exception)
+} catch (exception: CancellationException) {
+    throw exception
+} catch (exception: IllegalArgumentException) {
+    throw AuthDataException.Unexpected(exception)
+} catch (exception: IllegalStateException) {
     throw AuthDataException.Unexpected(exception)
 }
 
@@ -162,8 +257,13 @@ private fun AuthRestException.toAuthCodeDataExceptionOrNull(): AuthDataException
     "OtpDisabled",
     "ProviderDisabled",
     "ProviderEmailNeedsVerification",
-    "InvalidCredentials",
     -> AuthDataException.Validation(cause = this)
+
+    "InvalidCredentials" -> AuthDataException.Validation(AUTH_INVALID_CREDENTIALS_ERROR_KEY, this)
+    "EmailNotConfirmed" -> AuthDataException.Validation(AUTH_EMAIL_NOT_CONFIRMED_ERROR_KEY, this)
+    "OverEmailSendRateLimit",
+    "OverRequestRateLimit",
+    -> AuthDataException.Validation(AUTH_RATE_LIMITED_ERROR_KEY, this)
 
     "BadJwt",
     "SessionExpired",
@@ -171,9 +271,12 @@ private fun AuthRestException.toAuthCodeDataExceptionOrNull(): AuthDataException
     -> AuthDataException.AuthenticationRequired(cause = this)
 
     "OtpExpired" -> AuthDataException.Validation(AUTH_OTP_EXPIRED_ERROR_KEY, this)
-    "WeakPassword" -> AuthDataException.Validation("error.auth.password_too_weak", this)
+    "WeakPassword" -> AuthDataException.Validation(AUTH_PASSWORD_TOO_WEAK_ERROR_KEY, this)
+    "SamePassword" -> AuthDataException.Validation(AUTH_PASSWORD_SAME_ERROR_KEY, this)
     else -> null
 }
+
+private fun AuthRestException.isUnknownAccountError(): Boolean = errorCode?.name == "UserNotFound"
 
 private fun PostgrestRestException.toPostgrestCodeDataExceptionOrNull(): AuthDataException? = when (code) {
     "42501" -> AuthDataException.PermissionDenied(cause = this)
@@ -190,16 +293,18 @@ private fun RestException.toHttpStatusDataException(): AuthDataException = when 
     HTTP_UNAUTHORIZED -> AuthDataException.AuthenticationRequired(cause = this)
     HTTP_FORBIDDEN -> AuthDataException.PermissionDenied(cause = this)
     HTTP_NOT_FOUND -> AuthDataException.LegalDocumentsUnavailable(this)
+    HTTP_TOO_MANY_REQUESTS -> AuthDataException.Validation(AUTH_RATE_LIMITED_ERROR_KEY, this)
     else -> AuthDataException.Unexpected(this)
 }
 
-private fun UserSession.toDto(onboardingCompleted: Boolean): AuthSessionDto {
+private fun UserSession.toDto(onboardingCompleted: Boolean, purpose: AuthSessionPurpose): AuthSessionDto {
     val sessionUser = user ?: throw AuthDataException.AuthenticationRequired()
     return AuthSessionDto(
         userId = sessionUser.id,
         email = sessionUser.email,
         expiresAtEpochMilliseconds = expiresAt.toEpochMilliseconds(),
         onboardingCompleted = onboardingCompleted,
+        purpose = purpose,
     )
 }
 

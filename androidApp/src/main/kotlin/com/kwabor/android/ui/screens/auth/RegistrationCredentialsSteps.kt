@@ -11,13 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,8 +35,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import com.kwabor.android.R
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSizing
@@ -93,7 +86,7 @@ internal fun OtpStep(
             title = stringResource(R.string.registration_otp_title),
             supportingText = stringResource(R.string.registration_otp_support, state.email),
         )
-        OtpInput(code = code, onCodeChange = { updated -> code = updated })
+        AuthOtpInput(code = code, onCodeChange = { updated -> code = updated })
         ContinueButton(
             label = strings.authVerifyOtp,
             loading = state.isLoading,
@@ -117,7 +110,7 @@ internal fun OtpStep(
 }
 
 @Composable
-private fun OtpInput(code: String, onCodeChange: (String) -> Unit) {
+internal fun AuthOtpInput(code: String, onCodeChange: (String) -> Unit) {
     val focusRequester = remember { FocusRequester() }
     val accessibilityLabel = stringResource(R.string.registration_otp_accessibility)
     val accessibilityState = stringResource(R.string.registration_otp_digits_entered, code.length)
@@ -174,23 +167,24 @@ internal fun PasswordStep(
 ) {
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
     RegistrationScrollableColumn(modifier) {
         StepHeading(strings.registrationPassword, stringResource(R.string.registration_password_support))
-        PasswordField(
-            state = PasswordFieldState(password, strings.registrationPassword, passwordVisible, !state.isLoading),
+        AuthPasswordField(
+            value = password,
             onValueChange = { updated -> password = updated },
-            onVisibilityChange = { passwordVisible = !passwordVisible },
+            label = strings.registrationPassword,
+            enabled = !state.isLoading,
         )
-        PasswordField(
-            state = PasswordFieldState(
-                confirmation,
-                strings.registrationPasswordConfirmation,
-                passwordVisible,
-                !state.isLoading,
-            ),
+        AuthPasswordField(
+            value = confirmation,
             onValueChange = { updated -> confirmation = updated },
-            onVisibilityChange = { passwordVisible = !passwordVisible },
+            label = strings.registrationPasswordConfirmation,
+            enabled = !state.isLoading,
+            onDone = {
+                if (password.length >= MINIMUM_PASSWORD_LENGTH && password == confirmation) {
+                    actions.onSubmitPassword(password, confirmation)
+                }
+            },
         )
         ContinueButton(
             label = strings.registrationContinue,
@@ -199,37 +193,6 @@ internal fun PasswordStep(
             onClick = { actions.onSubmitPassword(password, confirmation) },
         )
     }
-}
-
-private data class PasswordFieldState(
-    val value: String,
-    val label: String,
-    val visible: Boolean,
-    val enabled: Boolean,
-)
-
-@Composable
-private fun PasswordField(state: PasswordFieldState, onValueChange: (String) -> Unit, onVisibilityChange: () -> Unit) {
-    OutlinedTextField(
-        value = state.value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = state.enabled,
-        singleLine = true,
-        label = { Text(state.label) },
-        visualTransformation = if (state.visible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        trailingIcon = {
-            IconButton(onClick = onVisibilityChange) {
-                Icon(
-                    imageVector = if (state.visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    contentDescription = stringResource(
-                        if (state.visible) R.string.registration_password_hide else R.string.registration_password_show,
-                    ),
-                )
-            }
-        },
-    )
 }
 
 @Composable

@@ -16,22 +16,37 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var authState: AuthUiState?
     @Published private(set) var introVideoURL: URL?
     @Published private(set) var registrationCancellationErrorMessage: String?
+    @Published private(set) var accountSignOutErrorMessage: String?
+    @Published private(set) var interruptedRegistrationEmail: String?
     @Published var isAuthenticationPresented = false
     @Published var isRegistrationPresented = false
     @Published var isGuestDisclosurePresented = false
     @Published private(set) var isCancellingRegistration = false
+    @Published private(set) var isSigningOutAccount = false
     @Published private(set) var isRequestingNotificationsAfterSessionRestore = false
 
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
     let authController: IosAuthController
+    let passwordRecoveryController: IosPasswordRecoveryController
     let registrationController: IosRegistrationController
     let registrationLocationProvider: RegistrationLocationProviding
     let registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting
     let registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting
+    let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
 
     var isGuestSession: Bool {
         guestAccessGranted && !hasCompleteAccount
+    }
+
+    var requiresInterruptedRegistrationPasswordSignIn: Bool {
+        interruptedAuthJourneyStore.current == .registration
+    }
+
+    var requiresProtectedAuthentication: Bool {
+        !AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
+            freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
+        ) || requiresInterruptedRegistrationPasswordSignIn
     }
 
     private let observability: FirebaseObservability
@@ -52,10 +67,14 @@ final class OnboardingCoordinator: ObservableObject {
     private var remoteMediaRevisionInFlight: Int64?
     private var completedRegistrationSession: AuthSession?
     private var shouldPresentRegistrationAfterAuthenticationDismissal = false
+    private var isRevokingInterruptedRegistrationSession = false
+    private var isReplacingInterruptedRegistrationSession = false
+    private var freshInstallSessionCleanupCompleted: Bool
 
     init(
         bridge: KwaborSharedBridge,
         authController: IosAuthController,
+        passwordRecoveryController: IosPasswordRecoveryController,
         registrationController: IosRegistrationController,
         observability: FirebaseObservability,
         registrationLocationProvider: RegistrationLocationProviding? = nil,
@@ -63,11 +82,13 @@ final class OnboardingCoordinator: ObservableObject {
         registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
         cache: IntroVideoCache = IntroVideoCache(),
         userDefaults: UserDefaults = .standard,
+        interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting? = nil,
         bundle: Bundle = .main
     ) {
         self.bridge = bridge
         strings = bridge.onboardingStrings()
         self.authController = authController
+        self.passwordRecoveryController = passwordRecoveryController
         self.registrationController = registrationController
         self.observability = observability
         self.registrationLocationProvider = registrationLocationProvider ?? CoreLocationRegistrationService()
@@ -75,6 +96,8 @@ final class OnboardingCoordinator: ObservableObject {
             UserNotificationRegistrationService()
         self.registrationNotificationPrimingStore = registrationNotificationPrimingStore ??
             UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
+        self.interruptedAuthJourneyStore = interruptedAuthJourneyStore ??
+            UserDefaultsInterruptedAuthJourneyStore(userDefaults: userDefaults)
         self.cache = cache
         telemetry = bridge.onboardingTelemetry()
         let bundledIntroVideoURL = bundle.url(
@@ -87,6 +110,7 @@ final class OnboardingCoordinator: ObservableObject {
         self.introStore = introStore
         let storedFirstLaunchCompleted = introStore.firstLaunchCompleted
         firstLaunchCompleted = storedFirstLaunchCompleted
+        freshInstallSessionCleanupCompleted = storedFirstLaunchCompleted
 
         let hadPendingVideo = introStore.hasPendingVideo
         let storedPendingVideo = introStore.pendingVideoNewerThanLastPresented()
@@ -118,28 +142,15 @@ final class OnboardingCoordinator: ObservableObject {
             guard let self else { return }
             authState = state
             if !state.isLoading {
-                if state.isAuthenticated {
-                    completedRegistrationSession = state.currentSession
-                    isAuthenticationPresented = false
-                    isRegistrationPresented = false
-                } else if state.hasSession, let session = state.currentSession {
-                    completedRegistrationSession = nil
-                    guestAccessGranted = false
-                    isAuthenticationPresented = false
-                    registrationController.resumeIncompleteSession(session: session)
-                    if launchIntroDecisionCompleted, !shouldPresentLaunchIntro {
-                        isRegistrationPresented = true
-                    }
-                } else {
-                    completedRegistrationSession = nil
-                }
+                handleAuthState(state)
             }
             resolveRoute()
         }
-        authController.restoreSession { [weak self] _ in
-            guard let self else { return }
-            sessionRestoreCompleted = true
-            resolveRoute()
+        switch AuthSessionBootstrapPolicy.action(hasInstallationMarker: storedFirstLaunchCompleted) {
+        case .clearLocalSession:
+            clearFreshInstallSessionBeforeRestore()
+        case .restoreSession:
+            restoreSessionAfterBootstrap()
         }
 
         if let pendingAtLaunch {
@@ -172,10 +183,7 @@ final class OnboardingCoordinator: ObservableObject {
     func completeIntro(skipped: Bool) {
         guard !launchIntroCompleted else { return }
         launchIntroCompleted = true
-        if !firstLaunchCompleted {
-            firstLaunchCompleted = true
-            introStore.firstLaunchCompleted = true
-        }
+        markFirstLaunchCompletedIfEligible()
         if let launchIntroRevision {
             introStore.markRemoteVideoPresented(revision: launchIntroRevision)
         }
@@ -183,6 +191,8 @@ final class OnboardingCoordinator: ObservableObject {
             observability.track(telemetry.skippedEvent)
         }
         resolveRoute()
+        presentInterruptedRegistrationSignInIfPossible()
+        presentPasswordRecoveryIfPossible()
         presentIncompleteRegistrationIfPossible()
         processDeferredRemoteMediaIfPossible()
     }
@@ -204,6 +214,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func presentRegistration() {
+        guard !requiresProtectedAuthentication else { return }
         registrationCancellationErrorMessage = nil
         if authState?.hasSession != true {
             registrationController.reset()
@@ -212,12 +223,18 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func presentRegistrationFromAuthentication() {
+        guard !requiresProtectedAuthentication else { return }
         guard !shouldPresentRegistrationAfterAuthenticationDismissal else { return }
         shouldPresentRegistrationAfterAuthenticationDismissal = true
         isAuthenticationPresented = false
     }
 
     func authenticationPresentationDismissed() {
+        guard !requiresProtectedAuthentication else {
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+            isAuthenticationPresented = true
+            return
+        }
         guard shouldPresentRegistrationAfterAuthenticationDismissal else { return }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
         presentRegistration()
@@ -236,6 +253,69 @@ final class OnboardingCoordinator: ObservableObject {
         registrationController.reset()
         resolveRoute()
         authController.restoreSession { _ in }
+    }
+
+    func handleExistingRegistrationAccount(email: String?) {
+        interruptedAuthJourneyStore.mark(.registration)
+        interruptedRegistrationEmail = normalizedEmail(email)
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isRegistrationPresented = false
+        registrationController.reset()
+        scheduleInterruptedRegistrationRevocation()
+        resolveRoute()
+    }
+
+    func signIn(
+        email: String,
+        password: String,
+        onCompleted: @escaping (Bool) -> Void
+    ) {
+        let replacesInterruptedRegistration = interruptedAuthJourneyStore.current == .registration
+        if replacesInterruptedRegistration {
+            isReplacingInterruptedRegistrationSession = true
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isRegistrationPresented = false
+        }
+        authController.signInWithEmail(email: email, password: password) { [weak self] completed in
+            guard let self else { return }
+            let didComplete = completed.boolValue
+            if replacesInterruptedRegistration {
+                finishInterruptedRegistrationPasswordSignIn(completed: didComplete)
+            }
+            onCompleted(didComplete)
+        }
+    }
+
+    func refreshSessionState() {
+        authController.restoreSession { _ in }
+    }
+
+    func signOutCurrentAccount() {
+        guard !isSigningOutAccount else { return }
+        accountSignOutErrorMessage = nil
+        isSigningOutAccount = true
+        guestAccessGranted = true
+        shouldPresentRegistrationAfterAuthenticationDismissal = false
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            isSigningOutAccount = false
+            if completed.boolValue {
+                completedRegistrationSession = nil
+                isAuthenticationPresented = false
+                isRegistrationPresented = false
+                registrationController.reset()
+            } else {
+                guestAccessGranted = false
+                accountSignOutErrorMessage = authState?.errorMessage ?? strings.authUnavailable
+            }
+            resolveRoute()
+        }
+    }
+
+    func clearAccountSignOutError() {
+        accountSignOutErrorMessage = nil
     }
 
     func cancelRegistration(requiresSignOut: Bool) {
@@ -268,10 +348,24 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func requestGuestAccess() {
+        guard !requiresProtectedAuthentication else {
+            isGuestDisclosurePresented = false
+            guestAccessGranted = false
+            isAuthenticationPresented = true
+            resolveRoute()
+            return
+        }
         isGuestDisclosurePresented = true
     }
 
     func confirmGuestAccess() {
+        guard !requiresProtectedAuthentication else {
+            isGuestDisclosurePresented = false
+            guestAccessGranted = false
+            isAuthenticationPresented = true
+            resolveRoute()
+            return
+        }
         isGuestDisclosurePresented = false
         guestAccessGranted = true
         resolveRoute()
@@ -282,6 +376,10 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func dismissAuthentication() {
+        guard !requiresProtectedAuthentication else {
+            isAuthenticationPresented = true
+            return
+        }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
         isAuthenticationPresented = false
     }
@@ -314,7 +412,80 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private var hasCompleteAccount: Bool {
-        (authState?.isAuthenticated ?? false) || completedRegistrationSession != nil
+        guard AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
+            freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
+        ) else { return false }
+        guard interruptedAuthJourneyStore.current != .registration else { return false }
+        return (authState?.isAuthenticated ?? false) || completedRegistrationSession != nil
+    }
+
+    private func handleAuthState(_ state: AuthUiState) {
+        guard AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
+            freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
+        ) else {
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isRegistrationPresented = false
+            return
+        }
+        if state.hasPasswordRecoverySession {
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isRegistrationPresented = false
+            passwordRecoveryController.resumeVerifiedSession(email: state.currentSession?.email)
+            presentPasswordRecoveryIfPossible()
+            return
+        }
+        if interruptedAuthJourneyStore.current == .registration {
+            handleInterruptedRegistrationAuthState(state)
+            return
+        }
+        applyStandardAuthState(state)
+    }
+
+    private func handleInterruptedRegistrationAuthState(_ state: AuthUiState) {
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isRegistrationPresented = false
+        if isReplacingInterruptedRegistrationSession {
+            isAuthenticationPresented = true
+            return
+        }
+        if state.isAuthenticated {
+            interruptedRegistrationEmail = normalizedEmail(state.currentSession?.email) ?? interruptedRegistrationEmail
+            scheduleInterruptedRegistrationRevocation()
+            return
+        }
+        if state.hasSession, let session = state.currentSession {
+            interruptedAuthJourneyStore.clear(.registration)
+            interruptedRegistrationEmail = nil
+            resumeIncompleteRegistration(session)
+            return
+        }
+        presentInterruptedRegistrationSignInIfPossible()
+    }
+
+    private func applyStandardAuthState(_ state: AuthUiState) {
+        if state.isAuthenticated {
+            completedRegistrationSession = state.currentSession
+            isAuthenticationPresented = false
+            isRegistrationPresented = false
+        } else if state.hasSession, let session = state.currentSession {
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            resumeIncompleteRegistration(session)
+        } else {
+            completedRegistrationSession = nil
+        }
+    }
+
+    private func resumeIncompleteRegistration(_ session: AuthSession) {
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        registrationController.resumeIncompleteSession(session: session)
+        if launchIntroDecisionCompleted, !shouldPresentLaunchIntro {
+            isRegistrationPresented = true
+        }
     }
 
     private func resolveRoute() {
@@ -373,6 +544,8 @@ final class OnboardingCoordinator: ObservableObject {
         }
         launchIntroDecisionCompleted = true
         resolveRoute()
+        presentInterruptedRegistrationSignInIfPossible()
+        presentPasswordRecoveryIfPossible()
         presentIncompleteRegistrationIfPossible()
         processDeferredRemoteMediaIfPossible()
     }
@@ -455,6 +628,7 @@ final class OnboardingCoordinator: ObservableObject {
               !shouldPresentLaunchIntro,
               authState?.isLoading == false,
               authState?.isAuthenticated == false,
+              authState?.hasPasswordRecoverySession == false,
               let session = authState?.currentSession else {
             return
         }
@@ -462,6 +636,121 @@ final class OnboardingCoordinator: ObservableObject {
         isAuthenticationPresented = false
         registrationController.resumeIncompleteSession(session: session)
         isRegistrationPresented = true
+    }
+
+    private func scheduleInterruptedRegistrationRevocation() {
+        guard interruptedAuthJourneyStore.current == .registration,
+              !isRevokingInterruptedRegistrationSession,
+              !isReplacingInterruptedRegistrationSession else {
+            return
+        }
+        isRevokingInterruptedRegistrationSession = true
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        Task { [weak self] in
+            self?.revokeInterruptedRegistrationSession()
+        }
+    }
+
+    private func clearFreshInstallSessionBeforeRestore() {
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            guard completed.boolValue else {
+                completedRegistrationSession = nil
+                guestAccessGranted = false
+                isAuthenticationPresented = false
+                isRegistrationPresented = false
+                sessionRestoreCompleted = true
+                resolveRoute()
+                return
+            }
+            freshInstallSessionCleanupCompleted = true
+            markFirstLaunchCompletedIfEligible()
+            restoreSessionAfterBootstrap()
+        }
+    }
+
+    private func restoreSessionAfterBootstrap() {
+        authController.restoreSession { [weak self] _ in
+            guard let self else { return }
+            sessionRestoreCompleted = true
+            resolveRoute()
+            presentInterruptedRegistrationSignInIfPossible()
+        }
+    }
+
+    private func markFirstLaunchCompletedIfEligible() {
+        guard launchIntroCompleted,
+              freshInstallSessionCleanupCompleted,
+              !firstLaunchCompleted else {
+            return
+        }
+        firstLaunchCompleted = true
+        introStore.firstLaunchCompleted = true
+    }
+
+    private func revokeInterruptedRegistrationSession() {
+        authController.signOut { [weak self] _ in
+            guard let self else { return }
+            isRevokingInterruptedRegistrationSession = false
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isRegistrationPresented = false
+            resolveRoute()
+            presentInterruptedRegistrationSignInIfPossible()
+        }
+    }
+
+    private func finishInterruptedRegistrationPasswordSignIn(completed: Bool) {
+        isReplacingInterruptedRegistrationSession = false
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isRegistrationPresented = false
+        guard completed else {
+            isAuthenticationPresented = true
+            resolveRoute()
+            return
+        }
+        interruptedAuthJourneyStore.clear(.registration)
+        interruptedRegistrationEmail = nil
+        if let authState {
+            applyStandardAuthState(authState)
+        }
+        resolveRoute()
+    }
+
+    private func presentInterruptedRegistrationSignInIfPossible() {
+        guard interruptedAuthJourneyStore.current == .registration,
+              sessionRestoreCompleted,
+              launchIntroDecisionCompleted,
+              !shouldPresentLaunchIntro,
+              authState?.hasPasswordRecoverySession != true,
+              !isRevokingInterruptedRegistrationSession else {
+            return
+        }
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isRegistrationPresented = false
+        isAuthenticationPresented = true
+    }
+
+    private func presentPasswordRecoveryIfPossible() {
+        guard launchIntroDecisionCompleted,
+              !shouldPresentLaunchIntro,
+              authState?.isLoading == false,
+              authState?.hasPasswordRecoverySession == true else {
+            return
+        }
+        guestAccessGranted = false
+        isRegistrationPresented = false
+        isAuthenticationPresented = true
+    }
+
+    private func normalizedEmail(_ email: String?) -> String? {
+        let candidate = email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return candidate.isEmpty ? nil : candidate
     }
 }
 

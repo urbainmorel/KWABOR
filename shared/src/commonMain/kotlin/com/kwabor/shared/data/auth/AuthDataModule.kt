@@ -9,9 +9,13 @@ import org.koin.dsl.module
 
 internal val authDataModule: Module = module {
     single<AuthDataSource> {
+        val auth = get<SupabaseClient>().auth
+        val passwordRecoverySessionStore = auth.sessionManager as? PasswordRecoverySessionStore
+            ?: error("Secure password recovery session storage is unavailable")
         SupabaseAuthDataSource(
-            auth = get<SupabaseClient>().auth,
+            auth = auth,
             postgrest = get<SupabaseClient>().postgrest,
+            passwordRecoverySessionStore = passwordRecoverySessionStore,
         )
     }
     single<AuthRepository> { DataAuthRepository(dataSource = get()) }

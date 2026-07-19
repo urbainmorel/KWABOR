@@ -21,8 +21,10 @@ final class RegistrationStore: ObservableObject {
     private let locationProvider: RegistrationLocationProviding
     private let notificationPermissionRequester: RegistrationNotificationPermissionRequesting
     private let notificationPrimingStore: RegistrationNotificationPrimingPersisting
+    private let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
     private let applyObservabilityConsent: (ObservabilityConsent) -> Void
     private let onCompleted: (AuthSession) -> Void
+    private let onExistingAccountAuthenticated: (String?) -> Void
     private let onCancel: (Bool) -> Void
     private var completionReported = false
     private var clockTask: Task<Void, Never>?
@@ -33,8 +35,10 @@ final class RegistrationStore: ObservableObject {
         locationProvider: RegistrationLocationProviding,
         notificationPermissionRequester: RegistrationNotificationPermissionRequesting,
         notificationPrimingStore: RegistrationNotificationPrimingPersisting,
+        interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting,
         applyObservabilityConsent: @escaping (ObservabilityConsent) -> Void,
         onCompleted: @escaping (AuthSession) -> Void,
+        onExistingAccountAuthenticated: @escaping (String?) -> Void,
         onCancel: @escaping (Bool) -> Void
     ) {
         self.controller = controller
@@ -42,8 +46,10 @@ final class RegistrationStore: ObservableObject {
         self.locationProvider = locationProvider
         self.notificationPermissionRequester = notificationPermissionRequester
         self.notificationPrimingStore = notificationPrimingStore
+        self.interruptedAuthJourneyStore = interruptedAuthJourneyStore
         self.applyObservabilityConsent = applyObservabilityConsent
         self.onCompleted = onCompleted
+        self.onExistingAccountAuthenticated = onExistingAccountAuthenticated
         self.onCancel = onCancel
 
         controller.observe { [weak self] state in
@@ -168,6 +174,7 @@ final class RegistrationStore: ObservableObject {
         if state.step == .email {
             controller.dispatch(intent: IosRegistrationRequestOtpIntent.shared)
         } else if state.step == .otp {
+            interruptedAuthJourneyStore.mark(.registration)
             controller.dispatch(intent: IosRegistrationVerifyOtpIntent(otpCode: otpCode))
         } else if state.step == .password {
             controller.dispatch(
@@ -276,9 +283,23 @@ final class RegistrationStore: ObservableObject {
             password = ""
             passwordConfirmation = ""
         }
-        if updatedState.step == .completed,
-           !completionReported,
-           let session = updatedState.currentSession {
+        guard !completionReported else { return }
+        switch RegistrationSessionGate.outcome(
+            previousStep: previousStep,
+            updatedState: updatedState,
+            interruptedJourney: interruptedAuthJourneyStore.current
+        ) {
+        case .none:
+            return
+        case .clearInterruptedJourney:
+            interruptedAuthJourneyStore.clear(.registration)
+        case .continueRegistration:
+            interruptedAuthJourneyStore.clear(.registration)
+        case .requirePasswordSignIn:
+            completionReported = true
+            onExistingAccountAuthenticated(updatedState.currentSession?.email)
+        case .completeRegistration:
+            guard let session = updatedState.currentSession else { return }
             completionReported = true
             onCompleted(session)
         }

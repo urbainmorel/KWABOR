@@ -8,6 +8,7 @@ internal enum class AuthSurface {
     SoftWall,
     Registration,
     SignIn,
+    PasswordRecovery,
 }
 
 internal enum class AuthEntryPoint {
@@ -36,10 +37,31 @@ internal data class AuthPlatformUiState(
     val notificationPrimingPersistenceFailed: Boolean = false,
 )
 
+internal enum class SignInStep {
+    Email,
+    Password,
+}
+
+internal data class AuthAccessUiState(
+    val signInStep: SignInStep = SignInStep.Email,
+    val signInEmail: String = "",
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val noticeMessage: String? = null,
+    val recoveryResendSecondsRemaining: Int = 0,
+    val signOutConfirmationVisible: Boolean = false,
+    val signOutInProgress: Boolean = false,
+    val signOutErrorMessage: String? = null,
+)
+
 internal sealed interface AuthIntent {
     sealed interface Journey : AuthIntent
 
     sealed interface Credentials : AuthIntent
+
+    sealed interface SignIn : AuthIntent
+
+    sealed interface PasswordRecovery : AuthIntent
 
     sealed interface ProfileField : AuthIntent
 
@@ -59,17 +81,56 @@ internal sealed interface AuthIntent {
 
     data object Back : Journey
 
+    data object OpenPasswordRecovery : Journey
+
+    data object RequestSignOut : Journey
+
+    data object CancelSignOut : Journey
+
+    data object ConfirmSignOut : Journey
+
+    data object SignOutNavigationHandled : Journey
+
     data class ChangeEmail(val email: String) : Credentials
 
     data object RequestOtp : Credentials
 
-    class SubmitOtp(val code: String) : Credentials
+    class SubmitOtp(val code: String) : Credentials {
+        override fun toString(): String = "SubmitOtp(code=<redacted>)"
+    }
 
     data object ResendOtp : Credentials
 
-    class SubmitPassword(val password: String, val confirmation: String) : Credentials
+    class SubmitPassword(val password: String, val confirmation: String) : Credentials {
+        override fun toString(): String = "SubmitPassword(password=<redacted>, confirmation=<redacted>)"
+    }
 
     data object RetryRequirements : Credentials
+
+    data class ChangeSignInEmail(val email: String) : SignIn
+
+    data object ContinueFromSignInEmail : SignIn
+
+    class SubmitSignInPassword(val password: String) : SignIn {
+        override fun toString(): String = "SubmitSignInPassword(password=<redacted>)"
+    }
+
+    data class ChangeRecoveryEmail(val email: String) : PasswordRecovery
+
+    data object RequestRecoveryOtp : PasswordRecovery
+
+    data object ResendRecoveryOtp : PasswordRecovery
+
+    class SubmitRecoveryOtp(val code: String) : PasswordRecovery {
+        override fun toString(): String = "SubmitRecoveryOtp(code=<redacted>)"
+    }
+
+    class SubmitRecoveryPassword(
+        val password: String,
+        val confirmation: String,
+    ) : PasswordRecovery {
+        override fun toString(): String = "SubmitRecoveryPassword(password=<redacted>, confirmation=<redacted>)"
+    }
 
     data class ChangeFirstName(val firstName: String) : ProfileField
 
@@ -116,6 +177,8 @@ internal sealed interface AuthEffect {
     data object AuthenticationCompleted : AuthEffect
 
     data object GuestContinuationSelected : AuthEffect
+
+    data object SignedOut : AuthEffect
 }
 
 internal sealed interface AuthPlatformEffect {

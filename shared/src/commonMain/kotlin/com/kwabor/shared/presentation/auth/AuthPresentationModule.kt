@@ -5,6 +5,12 @@ import org.koin.dsl.module
 
 internal val authPresentationModule: Module = module {
     factory { AuthPresenter(authRepository = get()) }
+    factory {
+        PasswordRecoveryPresenter(
+            authRepository = get(),
+            clockProvider = get(),
+        )
+    }
     factory { RegistrationReducer() }
     factory {
         RegistrationPresenter(

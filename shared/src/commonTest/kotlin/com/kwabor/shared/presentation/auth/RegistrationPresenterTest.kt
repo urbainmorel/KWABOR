@@ -248,6 +248,15 @@ private class FakeRegistrationAuthRepository(
     override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> =
         DomainResult.Success(authSession(AccountSetupStatus.Complete))
 
+    override suspend fun requestPasswordRecovery(email: String): DomainResult<Unit> = DomainResult.Success(Unit)
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): DomainResult<AuthSession> =
+        DomainResult.Success(authSession(AccountSetupStatus.Complete))
+
+    override suspend fun completePasswordRecovery(newPassword: String): DomainResult<Unit> = DomainResult.Success(Unit)
+
+    override suspend fun cancelPasswordRecovery(): DomainResult<Unit> = DomainResult.Success(Unit)
+
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
         DomainResult.Success(authSession(AccountSetupStatus.Complete))
 

@@ -7,6 +7,12 @@ import com.kwabor.shared.domain.money.KwaborCurrency
 
 const val MAX_ONBOARDING_NAME_LENGTH = 80
 const val AUTH_OTP_EXPIRED_ERROR_KEY = "error.auth.otp_expired"
+const val AUTH_INVALID_CREDENTIALS_ERROR_KEY = "error.auth.invalid_credentials"
+const val AUTH_EMAIL_NOT_CONFIRMED_ERROR_KEY = "error.auth.email_not_confirmed"
+const val AUTH_RATE_LIMITED_ERROR_KEY = "error.auth.rate_limited"
+const val AUTH_PASSWORD_TOO_WEAK_ERROR_KEY = "error.auth.password_too_weak"
+const val AUTH_PASSWORD_SAME_ERROR_KEY = "error.auth.password_same"
+const val AUTH_PASSWORD_RECOVERY_REQUIRED_ERROR_KEY = "error.auth.password_recovery_required"
 
 enum class SocialAuthProvider {
     Google,
@@ -18,11 +24,17 @@ enum class AccountSetupStatus {
     Complete,
 }
 
+enum class AuthSessionPurpose {
+    Standard,
+    PasswordRecovery,
+}
+
 data class AuthSession(
     val userId: String,
     val email: String?,
     val expiresAtEpochMilliseconds: Long,
     val accountSetupStatus: AccountSetupStatus,
+    val purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
 )
 
 enum class LegalDocumentType {

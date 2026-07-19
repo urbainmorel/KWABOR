@@ -2,6 +2,7 @@ package com.kwabor.shared.data.auth
 
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
+import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.CompleteOnboardingValues
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
@@ -65,6 +66,46 @@ class DataAuthRepositoryTest {
 
         assertIs<DomainResult.Failure>(result)
         assertEquals(null, dataSource.lastInitialPassword)
+    }
+
+    @Test
+    fun signInWithEmail_acceptsAnyNonEmptyPasswordAndPreservesWhitespace() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.signInWithEmail(" user@kwabor.test ", " a ")
+
+        assertIs<DomainResult.Success<AuthSession>>(result)
+        assertEquals("user@kwabor.test", dataSource.lastSignInEmail)
+        assertEquals(" a ", dataSource.lastSignInPassword)
+    }
+
+    @Test
+    fun signInWithEmail_rejectsOnlyEmptyPasswordLocally() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        val result = repository.signInWithEmail("user@kwabor.test", "")
+
+        val failure = assertIs<DomainResult.Failure>(result)
+        assertEquals("error.auth.password_required", failure.error.messageKey)
+        assertEquals(null, dataSource.lastSignInPassword)
+    }
+
+    @Test
+    fun passwordRecovery_validatesAndMapsRecoverySessionPurpose() = runTest {
+        val dataSource = FakeAuthDataSource()
+        val repository = DataAuthRepository(dataSource)
+
+        assertIs<DomainResult.Success<Unit>>(repository.requestPasswordRecovery(" user@kwabor.test "))
+        val verified = repository.verifyPasswordRecoveryOtp(" user@kwabor.test ", " 123456 ")
+        assertIs<DomainResult.Success<Unit>>(repository.completePasswordRecovery("new-password"))
+
+        val session = assertIs<DomainResult.Success<AuthSession>>(verified).value
+        assertEquals(AuthSessionPurpose.PasswordRecovery, session.purpose)
+        assertEquals("user@kwabor.test", dataSource.lastRecoveryEmail)
+        assertEquals("123456", dataSource.lastRecoveryOtpCode)
+        assertEquals("new-password", dataSource.lastRecoveredPassword)
     }
 
     @Test
@@ -134,6 +175,16 @@ private class FakeAuthDataSource(
         private set
     var lastCompleteRequest: CompleteOnboardingRequest? = null
         private set
+    var lastSignInEmail: String? = null
+        private set
+    var lastSignInPassword: String? = null
+        private set
+    var lastRecoveryEmail: String? = null
+        private set
+    var lastRecoveryOtpCode: String? = null
+        private set
+    var lastRecoveredPassword: String? = null
+        private set
 
     override suspend fun getCurrentSession(): AuthSessionDto? = session
 
@@ -157,8 +208,30 @@ private class FakeAuthDataSource(
         return authSessionDto(onboardingCompleted = true)
     }
 
-    override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto =
-        authSessionDto(onboardingCompleted = true)
+    override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto {
+        lastSignInEmail = email
+        lastSignInPassword = password
+        return authSessionDto(onboardingCompleted = true)
+    }
+
+    override suspend fun requestPasswordRecovery(email: String) {
+        lastRecoveryEmail = email
+    }
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): AuthSessionDto {
+        lastRecoveryEmail = email
+        lastRecoveryOtpCode = otpCode
+        return authSessionDto(
+            onboardingCompleted = true,
+            purpose = AuthSessionPurpose.PasswordRecovery,
+        )
+    }
+
+    override suspend fun completePasswordRecovery(newPassword: String) {
+        lastRecoveredPassword = newPassword
+    }
+
+    override suspend fun cancelPasswordRecovery() = Unit
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto =
         authSessionDto(onboardingCompleted = true)
@@ -166,11 +239,15 @@ private class FakeAuthDataSource(
     override suspend fun signOut() = Unit
 }
 
-private fun authSessionDto(onboardingCompleted: Boolean): AuthSessionDto = AuthSessionDto(
+private fun authSessionDto(
+    onboardingCompleted: Boolean,
+    purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
+): AuthSessionDto = AuthSessionDto(
     userId = "user-1",
     email = "user@kwabor.test",
     expiresAtEpochMilliseconds = 1_783_080_000_000,
     onboardingCompleted = onboardingCompleted,
+    purpose = purpose,
 )
 
 private fun completeRequest(): CompleteOnboardingRequest = assertIs<DomainResult.Success<CompleteOnboardingRequest>>(

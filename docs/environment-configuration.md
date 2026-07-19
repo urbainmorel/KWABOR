@@ -78,12 +78,17 @@ Pour chaque projet :
 3. appliquer les migrations sur staging et exécuter `supabase test db` ;
 4. vérifier les grants/RLS négatifs avant de reproduire la migration en production ;
 5. configurer Auth avec un mot de passe minimal de 8 caractères, un OTP email de 6 chiffres et un délai minimal de 30 secondes entre deux envois ;
-6. publier le template OTP français avec la variable Supabase `{{ .Token }}` et brancher un SMTP de production vérifié ;
+6. publier les templates OTP français d'inscription et de récupération avec la variable Supabase `{{ .Token }}`, puis brancher un SMTP de production vérifié ;
 7. provisionner les trois révisions juridiques actives décrites ci-dessous ;
 8. renseigner les variables GitHub de l'environnement correspondant ;
 9. délier ou relier explicitement avant toute commande distante suivante afin d'éviter une erreur de cible.
 
 La production ne doit jamais être utilisée comme environnement de test ou comme source de seed de développement.
+
+Les nouveaux projets Supabase gratuits ne doivent pas être supposés capables d'utiliser les
+templates d'authentification Kwabor avec le SMTP par défaut. Le propriétaire doit confirmer un
+plan compatible ou configurer un SMTP personnalisé pour staging et production, puis prouver la
+réception de l'OTP d'inscription et de l'OTP Recovery avant toute bêta.
 
 ### Révisions juridiques requises par l'inscription
 

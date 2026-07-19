@@ -23,6 +23,30 @@ Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
 
 L'OTP crée une session Supabase avant la fin du profil. Cette session porte le statut `OnboardingRequired` et n'est jamais considérée comme authentifiée par la navigation. La RPC vérifie elle-même que le compte email possède désormais un mot de passe avant toute écriture : un client modifié ne peut donc pas sauter cette étape. Si l'application est interrompue après vérification, elle reprend au minimum à l'étape du mot de passe et ne peut pas ouvrir l'accueil. Quitter le parcours après OTP déclenche d'abord une déconnexion confirmée ; un échec réseau conserve l'écran ouvert et affiche seulement un message utilisateur traduit.
 
+## Connexion et récupération livrées par AUTH-004
+
+La connexion est distincte de l'inscription sur les deux plateformes : l'utilisateur saisit
+d'abord son email, puis son mot de passe. Le bouton de connexion ne peut jamais demander ou
+vérifier l'OTP de création de compte. Un compte incomplet reprend son onboarding après une
+connexion valide ; un compte complet reprend la destination protégée qui avait ouvert le mur
+d'authentification.
+
+Le parcours « Mot de passe oublié » suit les mêmes étapes en Compose et SwiftUI : email,
+OTP Recovery de 6 chiffres, nouveau mot de passe et confirmation, puis retour à la connexion.
+La réponse après demande du code reste identique que l'adresse existe ou non. Le renvoi n'est
+disponible qu'après 30 secondes. Les OTP et mots de passe ne sont jamais conservés dans un
+état UI persistant, une destination de navigation ou un log.
+
+La vérification d'un OTP Recovery crée techniquement une session Supabase temporaire. Kwabor la
+classe explicitement comme récupération et refuse de la traiter comme une session utilisateur
+complète. Un arrêt de l'application avant le nouveau mot de passe reprend donc la
+récupération, jamais l'accueil. Un succès ou une annulation ferme cette session locale avant le
+retour au parcours public.
+
+La déconnexion utilisateur est accessible depuis Profil et exige une confirmation destructive.
+Elle retire la session de cet appareil, les destinations protégées en attente et revient sur
+l'accueil invité. La révocation des autres appareils reste réservée aux paramètres de sécurité.
+
 Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.
 
 Les trois consentements observabilité sont appliqués et persistés par les adaptateurs Firebase natifs lorsque l'utilisateur confirme cette étape, juste avant `complete_user_onboarding`. Ainsi, une réponse réseau perdue après le commit serveur ne peut pas effacer son choix explicite ; chaque nouvelle confirmation réapplique la dernière valeur sélectionnée. Autoriser Remote Config rend alors opérationnel le préchargement de l'intro distante décrit ci-dessous.
@@ -81,3 +105,10 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 16. Permission notifications refusée ou différée : compte finalisé et navigation débloquée sans token enregistré.
 17. Application arrêtée après la RPC mais avant le choix notifications : session restaurée sur le primer, puis résolution persistée avant l'accueil.
 18. Double appui sur « Autoriser » : une seule demande système ; échec de persistance locale Android : primer maintenu avec retry.
+19. « Se connecter » exige le mot de passe et ne déclenche jamais l'OTP d'inscription.
+20. Adresse de récupération inconnue : même confirmation visible qu'une adresse connue, sans fuite d'existence du compte.
+21. OTP Recovery invalide, expiré ou renvoyé trop tôt : état conservé et message utilisateur sûr, sans session authentifiée.
+22. Application arrêtée après l'OTP Recovery : reprise au nouveau mot de passe, jamais à l'accueil.
+23. Mot de passe Recovery faible, identique ou non concordant : mise à jour refusée sans perdre la session temporaire.
+24. Récupération terminée ou annulée : session temporaire effacée et retour à la connexion.
+25. Déconnexion confirmée : session et destination protégée en attente effacées, accueil invité affiché.
