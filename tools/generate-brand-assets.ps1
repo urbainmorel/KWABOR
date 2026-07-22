@@ -8,9 +8,13 @@ Add-Type -AssemblyName System.Drawing
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $masterAsset = Join-Path $repositoryRoot 'kwabor_icone_app.png'
+$launchWordmarkMasterAsset = Join-Path $repositoryRoot 'kwabor_2.png'
 $assetCatalog = Join-Path $repositoryRoot 'iosApp\Kwabor\Resources\Assets.xcassets'
 $appIconDirectory = Join-Path $assetCatalog 'AppIcon.appiconset'
 $launchMarkDirectory = Join-Path $assetCatalog 'LaunchMark.imageset'
+$launchWordmarkDirectory = Join-Path $assetCatalog 'LaunchWordmark.imageset'
+$androidLaunchWordmarkDirectory =
+    Join-Path $repositoryRoot 'androidApp\src\main\res\drawable-nodpi'
 $androidDrawableAssets = @(
     @{ Density = 'mdpi'; Size = 108 },
     @{ Density = 'hdpi'; Size = 162 },
@@ -23,10 +27,18 @@ $androidDrawableDirectories =
     ForEach-Object {
         Join-Path $repositoryRoot "androidApp\src\main\res\drawable-$($_.Density)"
     }
-$outputDirectories = @($appIconDirectory, $launchMarkDirectory) + $androidDrawableDirectories
+$outputDirectories = @(
+    $appIconDirectory,
+    $launchMarkDirectory,
+    $launchWordmarkDirectory,
+    $androidLaunchWordmarkDirectory
+) + $androidDrawableDirectories
 
 if (-not (Test-Path -LiteralPath $masterAsset -PathType Leaf)) {
     throw "Missing canonical Kwabor brand asset: $masterAsset"
+}
+if (-not (Test-Path -LiteralPath $launchWordmarkMasterAsset -PathType Leaf)) {
+    throw "Missing canonical Kwabor launch wordmark: $launchWordmarkMasterAsset"
 }
 
 New-Item `
@@ -161,4 +173,16 @@ Export-KwaborBrandBitmap `
         -OutputPath (Join-Path $launchMarkDirectory "LaunchMark-$($_.Scale).png")
 }
 
-Write-Output 'Generated deterministic Android and iOS assets from kwabor_icone_app.png.'
+Copy-Item `
+    -LiteralPath $launchWordmarkMasterAsset `
+    -Destination (Join-Path $androidLaunchWordmarkDirectory 'kwabor_launch_wordmark.png') `
+    -Force
+Copy-Item `
+    -LiteralPath $launchWordmarkMasterAsset `
+    -Destination (Join-Path $launchWordmarkDirectory 'LaunchWordmark.png') `
+    -Force
+
+Write-Output (
+    'Generated deterministic Android and iOS assets from ' +
+    'kwabor_icone_app.png and copied the exact kwabor_2.png launch wordmark.'
+)

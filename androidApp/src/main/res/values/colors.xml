@@ -1,4 +1,5 @@
 <resources>
     <color name="kwabor_icon_background">#0E0E0D</color>
     <color name="kwabor_icon_foreground">#FFFFFF</color>
+    <color name="kwabor_wordmark_background">#080707</color>
 </resources>

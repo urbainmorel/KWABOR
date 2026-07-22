@@ -20,6 +20,31 @@ class IntroPlaybackPolicyTest {
     }
 
     @Test
+    fun continuityWordmarkStaysVisibleUntilTheFirstRenderedFrame() {
+        val initialVisibility = IntroContinuityVisibility.Visible
+
+        assertEquals(IntroContinuityVisibility.Visible, initialVisibility)
+        assertEquals(
+            IntroContinuityVisibility.Hidden,
+            initialVisibility.afterFirstFrameRendered(),
+        )
+    }
+
+    @Test
+    fun firstFrameTransitionIsIdempotent() {
+        assertEquals(
+            IntroContinuityVisibility.Hidden,
+            IntroContinuityVisibility.Hidden.afterFirstFrameRendered(),
+        )
+    }
+
+    @Test
+    fun reducedMotionUsesStaticFallbackWhileDefaultModeUsesVideoContinuity() {
+        assertEquals(IntroPrimaryMode.StaticFallback, introPrimaryMode(reducedMotion = true))
+        assertEquals(IntroPrimaryMode.VideoWithContinuity, introPrimaryMode(reducedMotion = false))
+    }
+
+    @Test
     fun foregroundLifecycleStartsPlaybackOrCompletesAnAlreadyEndedVideo() {
         assertEquals(
             IntroPlayerLifecycleAction.Play,

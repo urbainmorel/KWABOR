@@ -14,6 +14,7 @@ internal class IntroPlayerLifecycleBinding(
     private val player: ExoPlayer,
     private val lifecycle: Lifecycle,
     private val onCompleted: () -> Unit,
+    private val onFirstFrameRendered: () -> Unit,
     private val onFailure: () -> Unit,
 ) {
     private var isForeground = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
@@ -32,6 +33,10 @@ internal class IntroPlayerLifecycleBinding(
             } else {
                 hasDeferredFailure = true
             }
+        }
+
+        override fun onRenderedFirstFrame() {
+            onFirstFrameRendered()
         }
     }
 
