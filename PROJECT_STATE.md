@@ -149,17 +149,17 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - Une session Supabase créée par un OTP Recovery reste explicitement non authentifiée. Les phases de mise à jour et de nettoyage sont persistées, reprises hors ligne et fermées en mode fail-closed après annulation, crash ou échec de suppression locale ; aucun OTP ou mot de passe n'est conservé dans un état UI persistant.
 - La vérification d'inscription OTP d'un compte déjà complet ne peut plus contourner la connexion par mot de passe. Android et iOS conservent un marqueur non secret jusqu'à déconnexion confirmée ; iOS neutralise aussi une ancienne session Keychain lors d'une nouvelle installation avant d'autoriser l'accueil.
 - Le template Supabase Recovery français utilise uniquement `{{ .Token }}`. Validation locale AUTH-004 après correctif du bridge Swift/Kotlin : 64 tests Android et 155 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug, compilation Kotlin iOS simulateur, intégrité du logo canonique et absence de modification des assets logo/intro verts en 11 min 12 s.
-- La PR AUTH-004 `#31` a passé `quality`, mais son build iOS a révélé deux comparaisons d'enums Kotlin non résolues par Swift dans la récupération de mot de passe et la reprise d'inscription.
-- Le correctif expose des propriétés sémantiques booléennes stables depuis le domaine/état partagé et les consomme côté SwiftUI, avec deux tests de pont dédiés ; aucune comparaison directe aux enums concernés ne subsiste dans Swift. La compilation Swift/Xcode doit encore être confirmée par CI macOS.
+- La première CI AUTH-004 a passé `quality`/pgTAP mais révélé deux comparaisons d'enums Kotlin non résolues par Swift. Le correctif expose des propriétés sémantiques booléennes stables depuis le partagé, avec deux tests de pont dédiés ; aucune comparaison directe aux enums concernés ne subsiste dans Swift.
+- La seconde CI du commit `a723a45` a passé `quality`, la vérification du média embarqué et pgTAP en 5 min 21 s, puis les XCFrameworks et les configurations SwiftUI simulateur Debug/Staging/Release sous Xcode 16.4 en 17 min 19 s.
 
 ## Tâche en cours
 
-Publier le correctif local d'interop Swift/Kotlin sur la PR AUTH-004 `#31`, relancer `quality`, pgTAP
-et les trois configurations iOS simulateur sur macOS, puis fusionner atomiquement.
+Démarrer AUTH-005 sur une nouvelle branche atomique : Google Android/iOS, Sign in with Apple iOS,
+activation Promoteur, ré-authentification et Edge Function `account-delete`.
 
 ## Blocages / limites
 
-- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-003 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-004 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
