@@ -1,12 +1,13 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.i18n.AppLocale
 
-internal interface AuthDataSource {
+internal interface AuthDataSource : PasswordRecoveryAuthDataSource {
     suspend fun getCurrentSession(): AuthSessionDto?
 
     suspend fun requestEmailOtp(email: String)
@@ -26,11 +27,22 @@ internal interface AuthDataSource {
     suspend fun signOut()
 }
 
+internal interface PasswordRecoveryAuthDataSource {
+    suspend fun requestPasswordRecovery(email: String)
+
+    suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): AuthSessionDto
+
+    suspend fun completePasswordRecovery(newPassword: String)
+
+    suspend fun cancelPasswordRecovery()
+}
+
 internal data class AuthSessionDto(
     val userId: String,
     val email: String?,
     val expiresAtEpochMilliseconds: Long,
     val onboardingCompleted: Boolean,
+    val purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
 )
 
 internal sealed class AuthDataException(

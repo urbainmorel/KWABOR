@@ -1,5 +1,7 @@
 package com.kwabor.android.presentation.auth
 
+import com.kwabor.android.auth.AuthJourneyStore
+import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.android.auth.NotificationPermissionPolicy
 import com.kwabor.android.auth.NotificationPrimingStore
 import com.kwabor.android.auth.RegistrationLocationResult
@@ -7,6 +9,7 @@ import com.kwabor.android.auth.RegistrationLocationService
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
+import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
@@ -30,6 +33,8 @@ import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
+import com.kwabor.shared.presentation.auth.PasswordRecoveryStep
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.RegistrationReducer
 import com.kwabor.shared.presentation.auth.RegistrationStep
@@ -393,6 +398,7 @@ class AuthViewModelTest {
         viewModel.onIntent(AuthIntent.RequestOtp)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        assertFalse(viewModel.state.value.isAuthenticated)
         advanceUntilIdle()
 
         viewModel.onIntent(AuthIntent.ContinueAsGuest)
@@ -413,6 +419,7 @@ class AuthViewModelTest {
         viewModel.onIntent(AuthIntent.RequestOtp)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        assertFalse(viewModel.state.value.isAuthenticated)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD))
         advanceUntilIdle()
@@ -445,9 +452,11 @@ class AuthViewModelTest {
                     clock,
                     RegistrationReducer(),
                 ),
+                passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
                 locationService = overrides.locationService,
                 notificationPermissionPolicy = overrides.notificationPermissionPolicy,
                 notificationPrimingStore = overrides.notificationPrimingStore,
+                authJourneyStore = overrides.authJourneyStore,
                 clockProvider = clock,
                 applyObservabilityConsent = overrides.applyConsent,
             ),
@@ -485,34 +494,164 @@ class AuthViewModelPostAuthenticationTest {
     private val strings = stringsFor(AppLocale.French)
 
     @Test
-    fun completedOtpSessionShowsUnresolvedNotificationPrimingBeforeHome() = runTest {
+    fun completedAccountOtpFromRegistrationSignsOutAndRequiresPassword() = runTest {
         val store = FakeNotificationPrimingStore(resolved = false)
+        val repository = RegistrationAuthRepository(verifiedSession = completeSession())
         val viewModel = createViewModel(
-            repository = RegistrationAuthRepository(verifiedSession = completeSession()),
+            repository = repository,
             scope = this,
             overrides = AuthTestOverrides(notificationPrimingStore = store),
         )
         val effects = viewModel.effects.produceIn(backgroundScope)
         advanceUntilIdle()
 
-        viewModel.onIntent(AuthIntent.OpenSignIn())
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.RequestOtp)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        assertFalse(viewModel.state.value.isAuthenticated)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.hasSession)
+        assertEquals(AuthSurface.SignIn, viewModel.platformState.value.surface)
+        assertEquals(SignInStep.Password, viewModel.accessState.value.signInStep)
+        assertEquals(TEST_EMAIL, viewModel.accessState.value.signInEmail)
+        assertEquals(1, repository.signOutCallCount)
+        assertTrue(effects.tryReceive().isFailure)
+    }
+
+    @Test
+    fun completedAccountOtpSignOutFailureShowsRetryablePasswordScreen() = runTest {
+        val journeyStore = FakeAuthJourneyStore()
+        val repository = RegistrationAuthRepository(
+            verifiedSession = completeSession(),
+            authBehavior = RegistrationAuthBehavior(
+                signOutFailure = DomainError.NetworkUnavailable(),
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(authJourneyStore = journeyStore),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.RequestOtp)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        assertFalse(viewModel.state.value.isAuthenticated)
+        advanceUntilIdle()
+
+        assertEquals(AuthSurface.SignIn, viewModel.platformState.value.surface)
+        assertEquals(SignInStep.Password, viewModel.accessState.value.signInStep)
+        assertEquals(TEST_EMAIL, viewModel.accessState.value.signInEmail)
+        assertEquals(strings.offlineBanner, viewModel.accessState.value.errorMessage)
+        assertEquals(RegistrationStep.Email, viewModel.registrationState.value.step)
+        assertEquals(InterruptedAuthJourney.Registration, journeyStore.read())
+        assertFalse(viewModel.state.value.isAuthenticated)
+    }
+
+    @Test
+    fun passwordSignInAfterRedirectFailureClearsMarkerBeforeRestart() = runTest {
+        val journeyStore = FakeAuthJourneyStore()
+        val notificationStore = FakeNotificationPrimingStore(resolved = true)
+        val repository = RegistrationAuthRepository(
+            verifiedSession = completeSession(),
+            authBehavior = RegistrationAuthBehavior(
+                signOutFailure = DomainError.NetworkUnavailable(),
+            ),
+        )
+        val overrides = AuthTestOverrides(
+            notificationPrimingStore = notificationStore,
+            authJourneyStore = journeyStore,
+        )
+        val viewModel = createViewModel(repository = repository, scope = this, overrides = overrides)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenRegistration())
         viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
         viewModel.onIntent(AuthIntent.RequestOtp)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
         advanceUntilIdle()
-
-        assertTrue(viewModel.state.value.isAuthenticated)
-        assertEquals(AuthSurface.Registration, viewModel.platformState.value.surface)
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
-        assertTrue(effects.tryReceive().isFailure)
-
-        viewModel.onIntent(AuthIntent.SkipNotifications)
+        viewModel.onIntent(AuthIntent.SubmitSignInPassword(TEST_PASSWORD))
         advanceUntilIdle()
 
-        assertTrue(store.resolved)
+        assertTrue(viewModel.state.value.isAuthenticated)
         assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
-        assertEquals(AuthEffect.AuthenticationCompleted, effects.receive())
+        assertEquals(InterruptedAuthJourney.None, journeyStore.read())
+        assertEquals(1, repository.signOutCallCount)
+
+        val restoredViewModel = createViewModel(repository = repository, scope = this, overrides = overrides)
+        advanceUntilIdle()
+
+        assertTrue(restoredViewModel.state.value.isAuthenticated)
+        assertEquals(AuthSurface.Hidden, restoredViewModel.platformState.value.surface)
+        assertEquals(1, repository.signOutCallCount)
+    }
+
+    @Test
+    fun passwordSignInMarkerClearFailureNeverPublishesAuthenticatedState() = runTest {
+        val journeyStore = FakeAuthJourneyStore(clearsSucceed = false)
+        val repository = RegistrationAuthRepository(
+            verifiedSession = completeSession(),
+            authBehavior = RegistrationAuthBehavior(
+                signOutFailure = DomainError.NetworkUnavailable(),
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                authJourneyStore = journeyStore,
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.RequestOtp)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.SubmitSignInPassword(TEST_PASSWORD))
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.isAuthenticated)
+        assertEquals(AuthSurface.SignIn, viewModel.platformState.value.surface)
+        assertEquals(InterruptedAuthJourney.Registration, journeyStore.read())
+        assertEquals(strings.authInvalidInput, viewModel.accessState.value.errorMessage)
+    }
+
+    @Test
+    fun recoveryBackToEmailCannotBypassCooldownForSameAddress() = runTest {
+        val repository = RegistrationAuthRepository()
+        val viewModel = createViewModel(repository = repository, scope = this)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenSignIn())
+        viewModel.onIntent(AuthIntent.ChangeSignInEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.ContinueFromSignInEmail)
+        viewModel.onIntent(AuthIntent.OpenPasswordRecovery)
+        viewModel.onIntent(AuthIntent.RequestRecoveryOtp)
+        runCurrent()
+
+        assertEquals(1, repository.recoveryRequestCount)
+        assertEquals(PasswordRecoveryStep.Otp, viewModel.passwordRecoveryState.value.step)
+
+        viewModel.onIntent(AuthIntent.Back)
+        runCurrent()
+        viewModel.onIntent(AuthIntent.RequestRecoveryOtp)
+        runCurrent()
+
+        assertEquals(1, repository.recoveryRequestCount)
+        assertEquals(PasswordRecoveryStep.Email, viewModel.passwordRecoveryState.value.step)
+        assertEquals(strings.registrationOtpWait, viewModel.passwordRecoveryState.value.errorMessage)
+        assertTrue(viewModel.accessState.value.recoveryResendSecondsRemaining > 0)
     }
 
     @Test
@@ -563,9 +702,11 @@ class AuthViewModelPostAuthenticationTest {
                     clock,
                     RegistrationReducer(),
                 ),
+                passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
                 locationService = overrides.locationService,
                 notificationPermissionPolicy = overrides.notificationPermissionPolicy,
                 notificationPrimingStore = overrides.notificationPrimingStore,
+                authJourneyStore = overrides.authJourneyStore,
                 clockProvider = clock,
                 applyObservabilityConsent = overrides.applyConsent,
             ),
@@ -581,7 +722,14 @@ private data class AuthTestOverrides(
     },
     val notificationPermissionPolicy: NotificationPermissionPolicy = NotificationPermissionPolicy { false },
     val notificationPrimingStore: NotificationPrimingStore = FakeNotificationPrimingStore(resolved = false),
+    val authJourneyStore: AuthJourneyStore = FakeAuthJourneyStore(),
     val applyConsent: (ObservabilityConsent) -> Boolean = { true },
+)
+
+private data class RegistrationAuthBehavior(
+    val signInSession: AuthSession = completeSession(),
+    val recoverySession: AuthSession = passwordRecoverySession(),
+    val signOutFailure: DomainError? = null,
 )
 
 private class RegistrationAuthRepository(
@@ -590,6 +738,7 @@ private class RegistrationAuthRepository(
     private val failFirstLegalDocumentsLoad: Boolean = false,
     private var onboardingCompletionFailuresRemaining: Int = 0,
     private val onCompleteOnboarding: () -> Unit = {},
+    private val authBehavior: RegistrationAuthBehavior = RegistrationAuthBehavior(),
 ) : AuthRepository {
     private var session: AuthSession? = currentSession
     private var legalDocumentsLoadCount = 0
@@ -599,6 +748,14 @@ private class RegistrationAuthRepository(
     var passwordUpdateCount = 0
         private set
     var completeOnboardingCallCount = 0
+        private set
+    var signInCallCount = 0
+        private set
+    var recoveryRequestCount = 0
+        private set
+    var recoveryCompletionCount = 0
+        private set
+    var signOutCallCount = 0
         private set
 
     override suspend fun getCurrentSession(): DomainResult<AuthSession?> = DomainResult.Success(session)
@@ -636,8 +793,32 @@ private class RegistrationAuthRepository(
         return DomainResult.Success(completed)
     }
 
-    override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> =
-        DomainResult.Success(completeSession())
+    override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> {
+        signInCallCount += 1
+        session = authBehavior.signInSession
+        return DomainResult.Success(authBehavior.signInSession)
+    }
+
+    override suspend fun requestPasswordRecovery(email: String): DomainResult<Unit> {
+        recoveryRequestCount += 1
+        return DomainResult.Success(Unit)
+    }
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): DomainResult<AuthSession> {
+        session = authBehavior.recoverySession
+        return DomainResult.Success(authBehavior.recoverySession)
+    }
+
+    override suspend fun completePasswordRecovery(newPassword: String): DomainResult<Unit> {
+        recoveryCompletionCount += 1
+        session = null
+        return DomainResult.Success(Unit)
+    }
+
+    override suspend fun cancelPasswordRecovery(): DomainResult<Unit> {
+        session = null
+        return DomainResult.Success(Unit)
+    }
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
         DomainResult.Success(completeSession())
@@ -646,9 +827,29 @@ private class RegistrationAuthRepository(
         DomainResult.Failure(DomainError.Validation("error.auth.unused"))
 
     override suspend fun signOut(): DomainResult<Unit> {
+        signOutCallCount += 1
         signOutCalled = true
+        authBehavior.signOutFailure?.let { return DomainResult.Failure(it) }
         session = null
         return DomainResult.Success(Unit)
+    }
+}
+
+private class FakeAuthJourneyStore(
+    private var journey: InterruptedAuthJourney = InterruptedAuthJourney.None,
+    private val clearsSucceed: Boolean = true,
+) : AuthJourneyStore {
+    override fun read(): InterruptedAuthJourney = journey
+
+    override fun write(journey: InterruptedAuthJourney): Boolean {
+        this.journey = journey
+        return true
+    }
+
+    override fun clear(): Boolean {
+        if (!clearsSucceed) return false
+        journey = InterruptedAuthJourney.None
+        return true
     }
 }
 
@@ -722,6 +923,10 @@ private fun onboardingSession(): AuthSession = AuthSession(
 )
 
 private fun completeSession(): AuthSession = onboardingSession().copy(accountSetupStatus = AccountSetupStatus.Complete)
+
+private fun passwordRecoverySession(): AuthSession = completeSession().copy(
+    purpose = AuthSessionPurpose.PasswordRecovery,
+)
 
 private const val TEST_EMAIL = "user@kwabor.test"
 private const val TEST_OTP = "123456"

@@ -145,14 +145,21 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - La revue croisée AUTH-003 garantit aussi le primer après une session OTP déjà complète, rend la demande de localisation Android single-flight, masque les secrets des requêtes sociales/promoteur, distingue un OTP expiré et remplace le rectangle GPS par un polygone local du Bénin excluant notamment Lomé et Lagos.
 - Validation locale AUTH-003 : 60 tests Android et 129 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation Kotlin iOS Simulator verts en 8 min 13 s ; vidéo embarquée H.264 portrait silencieuse/faststart validée et 167 assertions pgTAP vertes.
 - La CI du commit `8f10fc9` a passé `quality` et pgTAP en 4 min 01 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release sous Xcode 16.4 en 20 min 14 s. Les ponts Swift/KMP de session, d'état et de consentement juridique sont ainsi validés nativement.
+- AUTH-004 implémentée sur branche : connexion email puis mot de passe, récupération email → OTP Recovery → nouveau mot de passe, annulation sûre et déconnexion depuis Profil sont disponibles en Android Compose et iOS SwiftUI natif.
+- Une session Supabase créée par un OTP Recovery reste explicitement non authentifiée. Les phases de mise à jour et de nettoyage sont persistées, reprises hors ligne et fermées en mode fail-closed après annulation, crash ou échec de suppression locale ; aucun OTP ou mot de passe n'est conservé dans un état UI persistant.
+- La vérification d'inscription OTP d'un compte déjà complet ne peut plus contourner la connexion par mot de passe. Android et iOS conservent un marqueur non secret jusqu'à déconnexion confirmée ; iOS neutralise aussi une ancienne session Keychain lors d'une nouvelle installation avant d'autoriser l'accueil.
+- Le template Supabase Recovery français utilise uniquement `{{ .Token }}`. Validation locale AUTH-004 après correctif du bridge Swift/Kotlin : 64 tests Android et 155 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug, compilation Kotlin iOS simulateur, intégrité du logo canonique et absence de modification des assets logo/intro verts en 11 min 12 s.
+- La première CI AUTH-004 a passé `quality`/pgTAP mais révélé deux comparaisons d'enums Kotlin non résolues par Swift. Le correctif expose des propriétés sémantiques booléennes stables depuis le partagé, avec deux tests de pont dédiés ; aucune comparaison directe aux enums concernés ne subsiste dans Swift.
+- La seconde CI du commit `a723a45` a passé `quality`, la vérification du média embarqué et pgTAP en 5 min 21 s, puis les XCFrameworks et les configurations SwiftUI simulateur Debug/Staging/Release sous Xcode 16.4 en 17 min 19 s.
 
 ## Tâche en cours
 
-Fusionner la PR AUTH-003 `#30` après la dernière CI du commit de clôture documentaire.
+Démarrer AUTH-005 sur une nouvelle branche atomique : Google Android/iOS, Sign in with Apple iOS,
+activation Promoteur, ré-authentification et Edge Function `account-delete`.
 
 ## Blocages / limites
 
-- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-003 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-004 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
@@ -161,7 +168,8 @@ Fusionner la PR AUTH-003 `#30` après la dernière CI du commit de clôture docu
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
-- Le parcours de création OTP, mot de passe initial, identité, ville/GPS, devise et consentements versionnés est livré sur Android/iOS ; la connexion par mot de passe, la récupération et Google/Apple restent à livrer dans AUTH-004/AUTH-005.
+- Le parcours de création OTP et AUTH-004 sont livrés sur Android/iOS ; Google Android/iOS, Sign in with Apple iOS, activation Promoteur, ré-authentification et suppression de compte restent à livrer dans AUTH-005.
+- Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - La capture sur émulateur Android confirme la fidélité du logo natif ; le projet ne possède pas encore de cible XCTest et la validation perceptuelle de l'autoplay silencieux, reduced-motion, lifecycle/fallback et Remote Config réel sur appareils physiques demeure obligatoire avant bêta.
 - Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B et l'activation de Firebase Remote Config Realtime API ; le consentement observabilité est désormais branché dans AUTH-003.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
@@ -172,4 +180,4 @@ Fusionner la PR AUTH-003 `#30` après la dernière CI du commit de clôture docu
 
 ## Prochaine tâche logique
 
-Après fusion vérifiée d'AUTH-003, démarrer `AUTH-004` : connexion par mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents ; finaliser ENV-001B/OBS-001B dès que le propriétaire a choisi l'organisation Supabase, réauthentifié Firebase et provisionné les environnements distants.
+Après fusion vérifiée d'AUTH-004, démarrer `AUTH-005` : Google Android/iOS, Sign in with Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete` ; finaliser ENV-001B/OBS-001B dès que le propriétaire a choisi l'organisation Supabase, réauthentifié Firebase et provisionné les environnements distants.

@@ -53,8 +53,32 @@ class DataAuthRepository internal constructor(
 
     override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> = runAuthCall {
         requireValidEmail(email)
-        requirePassword(password)
+        requireSignInPassword(password)
         dataSource.signInWithEmail(email = email.trim(), password = password).toDomain()
+    }
+
+    override suspend fun requestPasswordRecovery(email: String): DomainResult<Unit> = runAuthCall {
+        requireValidEmail(email)
+        dataSource.requestPasswordRecovery(email.trim())
+    }
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): DomainResult<AuthSession> =
+        runAuthCall {
+            requireValidEmail(email)
+            requireOtpCode(otpCode)
+            dataSource.verifyPasswordRecoveryOtp(
+                email = email.trim(),
+                otpCode = otpCode.trim(),
+            ).toDomain()
+        }
+
+    override suspend fun completePasswordRecovery(newPassword: String): DomainResult<Unit> = runAuthCall {
+        requirePassword(newPassword)
+        dataSource.completePasswordRecovery(newPassword)
+    }
+
+    override suspend fun cancelPasswordRecovery(): DomainResult<Unit> = runAuthCall {
+        dataSource.cancelPasswordRecovery()
     }
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
@@ -93,6 +117,7 @@ private fun AuthSessionDto.toDomain(): AuthSession = AuthSession(
     } else {
         AccountSetupStatus.OnboardingRequired
     },
+    purpose = purpose,
 )
 
 private fun requireValidEmail(email: String) {
@@ -104,6 +129,12 @@ private fun requireValidEmail(email: String) {
 private fun requirePassword(password: String) {
     if (password.length < MINIMUM_PASSWORD_LENGTH) {
         throw AuthDataException.Validation("error.auth.password_too_short")
+    }
+}
+
+private fun requireSignInPassword(password: String) {
+    if (password.isEmpty()) {
+        throw AuthDataException.Validation("error.auth.password_required")
     }
 }
 

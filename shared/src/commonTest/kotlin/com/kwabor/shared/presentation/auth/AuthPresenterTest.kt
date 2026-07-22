@@ -3,6 +3,7 @@ package com.kwabor.shared.presentation.auth
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
+import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
@@ -28,6 +29,7 @@ class AuthPresenterTest {
         val state = presenter.loadCurrentSession(initialAuthUiState(), strings)
 
         assertTrue(state.hasSession)
+        assertFalse(state.hasPasswordRecoverySession)
         assertFalse(state.isAuthenticated)
     }
 
@@ -38,6 +40,19 @@ class AuthPresenterTest {
         val state = presenter.loadCurrentSession(initialAuthUiState(), strings)
 
         assertTrue(state.isAuthenticated)
+    }
+
+    @Test
+    fun loadCurrentSession_neverAuthenticatesPasswordRecoverySession() = runTest {
+        val recoverySession = authSession(AccountSetupStatus.Complete).copy(
+            purpose = AuthSessionPurpose.PasswordRecovery,
+        )
+        val presenter = AuthPresenter(FakeAuthRepository(currentSession = recoverySession))
+
+        val state = presenter.loadCurrentSession(initialAuthUiState(), strings)
+
+        assertTrue(state.hasSession)
+        assertFalse(state.isAuthenticated)
     }
 
     @Test
@@ -107,6 +122,15 @@ private class FakeAuthRepository(
         signInResult
 
     override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> = signInResult
+
+    override suspend fun requestPasswordRecovery(email: String): DomainResult<Unit> = DomainResult.Success(Unit)
+
+    override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): DomainResult<AuthSession> =
+        signInResult
+
+    override suspend fun completePasswordRecovery(newPassword: String): DomainResult<Unit> = DomainResult.Success(Unit)
+
+    override suspend fun cancelPasswordRecovery(): DomainResult<Unit> = DomainResult.Success(Unit)
 
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
         socialResult

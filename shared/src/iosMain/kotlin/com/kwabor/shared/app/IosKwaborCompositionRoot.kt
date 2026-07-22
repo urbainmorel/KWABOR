@@ -26,10 +26,15 @@ class IosKwaborCompositionRoot(
         presenter = sharedRoot?.registrationPresenter,
         dispatcherProvider = dispatcherProvider,
     )
+    val passwordRecoveryController = IosPasswordRecoveryController(
+        presenter = sharedRoot?.passwordRecoveryPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
 
     fun close() {
         authController.close()
         registrationController.close()
+        passwordRecoveryController.close()
         sharedRoot?.close()
     }
 }

@@ -11,6 +11,7 @@ import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.authPresentationModule
 import com.kwabor.shared.presentation.explore.ExplorePresenter
@@ -31,6 +32,7 @@ class KwaborCompositionRoot internal constructor(
     val explorePresenter: ExplorePresenter = application.koin.get()
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
+    val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
     val registrationPresenter: RegistrationPresenter? = if (hasAuthentication) application.koin.get() else null
 
     fun close() {

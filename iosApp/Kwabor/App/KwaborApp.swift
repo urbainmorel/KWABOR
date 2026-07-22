@@ -20,6 +20,7 @@ struct KwaborApp: App {
             wrappedValue: OnboardingCoordinator(
                 bridge: compositionRoot.bridge,
                 authController: compositionRoot.authController,
+                passwordRecoveryController: compositionRoot.passwordRecoveryController,
                 registrationController: compositionRoot.registrationController,
                 observability: observability
             )
