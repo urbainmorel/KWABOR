@@ -46,23 +46,32 @@ struct OnboardingView: View {
 private struct IntroView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
     @Environment(\.accessibilityReduceMotion) private var reducedMotion
+    @State private var isVideoReadyForDisplay = false
 
     var body: some View {
         ZStack {
-            Image("IntroFallback")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-                .accessibilityHidden(true)
-
-            if !reducedMotion, let videoURL = coordinator.introVideoURL {
-                IntroVideoPlayer(url: videoURL) {
-                    coordinator.completeIntro(skipped: false)
-                } onFailed: {
-                    coordinator.introPlaybackFailed()
-                }
+            if reducedMotion || coordinator.introVideoURL == nil {
+                IntroStaticFallbackView()
+            } else if let videoURL = coordinator.introVideoURL {
+                IntroVideoPlayer(
+                    url: videoURL,
+                    onReadyForDisplay: {
+                        isVideoReadyForDisplay = true
+                    },
+                    onCompleted: {
+                        coordinator.completeIntro(skipped: false)
+                    },
+                    onFailed: {
+                        isVideoReadyForDisplay = false
+                        coordinator.introPlaybackFailed()
+                    }
+                )
                 .id(videoURL)
                 .accessibilityHidden(true)
+
+                if !isVideoReadyForDisplay {
+                    LaunchWordmarkContinuityView()
+                }
             }
 
             VStack {
@@ -86,6 +95,36 @@ private struct IntroView: View {
             .padding(KwaborDesignTokens.Spacing.xxl)
         }
         .onAppear { coordinator.introDisplayed() }
+        .onChange(of: coordinator.introVideoURL) { _, _ in
+            isVideoReadyForDisplay = false
+        }
+        .onChange(of: reducedMotion) { _, _ in
+            isVideoReadyForDisplay = false
+        }
+    }
+}
+
+private struct LaunchWordmarkContinuityView: View {
+    var body: some View {
+        ZStack {
+            Color("LaunchBackground")
+                .ignoresSafeArea()
+            Image("LaunchWordmark")
+                .resizable()
+                .scaledToFit()
+                .padding(.horizontal, KwaborDesignTokens.Spacing.xxl)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct IntroStaticFallbackView: View {
+    var body: some View {
+        Image("IntroFallback")
+            .resizable()
+            .scaledToFill()
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
     }
 }
 

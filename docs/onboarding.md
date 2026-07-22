@@ -2,7 +2,7 @@
 
 ## Fondation livrée par AUTH-002
 
-Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Le bouton **Passer** reste immédiatement disponible. Lorsque la réduction des animations est active, l'application affiche l'image statique embarquée et un bouton **Continuer**.
+Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Le bouton **Passer** reste immédiatement disponible. Le logo horizontal officiel reste visible entre le lancement natif et la première frame vidéo. Lorsque la réduction des animations est active, l'application affiche l'image de repli statique embarquée et un bouton **Continuer** sans démarrer la vidéo.
 
 Après l'intro, un utilisateur non connecté peut ouvrir le flux OTP ou demander un accès invité. Avant de confirmer cet accès, l'application précise que les prix restent en FCFA et que les interactions nécessitent un compte. L'accès invité ouvre le mur Explore en lecture seule ; toucher une destination protégée conserve le mur souple d'authentification.
 
@@ -60,6 +60,8 @@ Les actifs de repli sont versionnés avec chaque client :
 - Android : `res/raw/kwabor_intro.mp4` et `res/drawable-nodpi/kwabor_intro_fallback.png` ;
 - iOS : `KwaborIntro.mp4` et l'image set `IntroFallback`.
 
+Le raccord de lancement utilise séparément le master `kwabor_2.png`, copié bit pour bit dans les ressources Android et iOS. Le format officiel 2172 × 724, son ratio 3:1, son mode RGBA opaque et son SHA-256 sont contrôlés en CI par `tools/verify-brand-assets.py`. Android conserve le symbole carré pendant le splash système masqué, puis affiche immédiatement le wordmark en `Fit`. iOS l'affiche dès `LaunchScreen.storyboard` en `scaleAspectFit`. Sur les deux plateformes, il reste au-dessus du lecteur jusqu'au signal natif de première frame ; le démarrage hors ligne ne dépend donc jamais du réseau ni d'un décodage déjà prêt.
+
 Le remplacement distant dépend du consentement Remote Config et des clés documentées dans [Observabilité](observability.md). La configuration n'est acceptée que si l'URL est HTTPS, le SHA-256 comporte 64 caractères hexadécimaux et la révision est positive. Après consentement, un listener temps réel permet de précharger une publication du super-admin sans attendre le prochain fetch périodique.
 
 Après téléchargement, chaque client exige :
@@ -87,8 +89,8 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 
 ## Vérification avant livraison
 
-1. Nouvelle installation sans réseau : intro locale, bouton Passer et landing visibles.
-2. Réduction des animations active : image statique et bouton Continuer visibles, aucune lecture vidéo.
+1. Nouvelle installation sans réseau : logo officiel complet sans flash vide, intro locale, bouton Passer et landing visibles.
+2. Réduction des animations active : image de repli statique et bouton Continuer visibles, aucune lecture vidéo.
 3. Confirmation invité : navigation racine disponible ; interaction protégée renvoie vers l'authentification.
 4. Nouveau lancement sans session et sans nouvelle révision : landing affichée sans rejouer l'intro.
 5. Remote Config refusé ou absent : aucun téléchargement média.

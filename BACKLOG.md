@@ -69,6 +69,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
+- [x] BRAND-001 — Restaurer le wordmark officiel complet au lancement Android/iOS, assurer la continuité jusqu'à la première frame et verrouiller l'intégrité des assets en CI.
 - [ ] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
 
 ### Offline, préférences et médias

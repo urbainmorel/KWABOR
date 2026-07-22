@@ -3,10 +3,12 @@
 package com.kwabor.android.ui.screens.onboarding
 
 import android.content.ContentResolver
-import android.graphics.Color.TRANSPARENT
+import android.content.Context
 import android.net.Uri
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.annotation.RawRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,7 +40,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.kwabor.android.R
-import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.shared.i18n.KwaborStrings
@@ -56,7 +58,7 @@ internal fun IntroScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(KwaborColors.Ink950)
+            .background(colorResource(R.color.kwabor_wordmark_background))
             .semantics { contentDescription = strings.introAccessibilityLabel },
     ) {
         IntroPrimaryContent(
@@ -76,29 +78,43 @@ private fun BoxScope.IntroPrimaryContent(
     reducedMotion: Boolean,
     onCompleted: () -> Unit,
 ) {
-    Image(
-        painter = painterResource(R.drawable.kwabor_intro_fallback),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize(),
-    )
-    if (reducedMotion) {
-        Button(
-            onClick = onCompleted,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(KwaborSpacing.Xxl),
-        ) {
-            Text(strings.introContinue)
+    when (introPrimaryMode(reducedMotion)) {
+        IntroPrimaryMode.StaticFallback -> {
+            Image(
+                painter = painterResource(R.drawable.kwabor_intro_fallback),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Button(
+                onClick = onCompleted,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(KwaborSpacing.Xxl),
+            ) {
+                Text(strings.introContinue)
+            }
         }
-    } else {
-        IntroVideo(
-            mediaSource = mediaSource,
-            bundledVideoResource = R.raw.kwabor_intro,
-            onCompleted = onCompleted,
-            modifier = Modifier.fillMaxSize(),
-        )
+        IntroPrimaryMode.VideoWithContinuity -> {
+            IntroVideo(
+                mediaSource = mediaSource,
+                bundledVideoResource = R.raw.kwabor_intro,
+                onCompleted = onCompleted,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
+}
+
+internal enum class IntroPrimaryMode {
+    StaticFallback,
+    VideoWithContinuity,
+}
+
+internal fun introPrimaryMode(reducedMotion: Boolean): IntroPrimaryMode = if (reducedMotion) {
+    IntroPrimaryMode.StaticFallback
+} else {
+    IntroPrimaryMode.VideoWithContinuity
 }
 
 @Composable
@@ -141,11 +157,17 @@ private fun IntroVideo(
         IntroMediaSource.Bundled -> bundledMediaUri
         is IntroMediaSource.Remote -> Uri.fromFile(sourceForPlayer.file)
     }
+    var continuityVisibility by remember(mediaUri) {
+        mutableStateOf(IntroContinuityVisibility.Visible)
+    }
     val player = rememberIntroPlayer(mediaUri)
     BindIntroPlayerLifecycle(
         player = player,
         mediaUri = mediaUri,
         onCompleted = onCompleted,
+        onFirstFrameRendered = {
+            continuityVisibility = continuityVisibility.afterFirstFrameRendered()
+        },
         onFailure = {
             when (sourceForPlayer.failureAction()) {
                 IntroPlaybackFailureAction.UseBundled -> playbackSource = IntroMediaSource.Bundled
@@ -153,7 +175,11 @@ private fun IntroVideo(
             }
         },
     )
-    IntroPlayerSurface(player = player, modifier = modifier)
+    IntroPlayerSurface(
+        player = player,
+        continuityVisibility = continuityVisibility,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -167,16 +193,19 @@ private fun BindIntroPlayerLifecycle(
     player: ExoPlayer,
     mediaUri: Uri,
     onCompleted: () -> Unit,
+    onFirstFrameRendered: () -> Unit,
     onFailure: () -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnCompleted by rememberUpdatedState(onCompleted)
+    val currentOnFirstFrameRendered by rememberUpdatedState(onFirstFrameRendered)
     val currentOnFailure by rememberUpdatedState(onFailure)
     DisposableEffect(player, mediaUri, lifecycle) {
         val binding = IntroPlayerLifecycleBinding(
             player = player,
             lifecycle = lifecycle,
             onCompleted = { currentOnCompleted() },
+            onFirstFrameRendered = { currentOnFirstFrameRendered() },
             onFailure = { currentOnFailure() },
         )
         binding.start(mediaUri)
@@ -185,6 +214,14 @@ private fun BindIntroPlayerLifecycle(
         }
     }
 }
+
+internal enum class IntroContinuityVisibility {
+    Visible,
+    Hidden,
+}
+
+internal fun IntroContinuityVisibility.afterFirstFrameRendered(): IntroContinuityVisibility =
+    IntroContinuityVisibility.Hidden
 
 internal enum class IntroPlaybackFailureAction {
     UseBundled,
@@ -197,21 +234,45 @@ internal fun IntroMediaSource.failureAction(): IntroPlaybackFailureAction = when
 }
 
 @Composable
-private fun IntroPlayerSurface(player: ExoPlayer, modifier: Modifier) {
+private fun IntroPlayerSurface(
+    player: ExoPlayer,
+    continuityVisibility: IntroContinuityVisibility,
+    modifier: Modifier,
+) {
     AndroidView(
-        factory = { viewContext ->
-            PlayerView(viewContext).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                )
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                setShutterBackgroundColor(TRANSPARENT)
-                this.player = player
-            }
-        },
-        update = { playerView -> playerView.player = player },
+        factory = ::IntroPlayerView,
+        update = { playerView -> playerView.bind(player, continuityVisibility) },
         modifier = modifier,
     )
+}
+
+private class IntroPlayerView(context: Context) : FrameLayout(context) {
+    private val playerView = PlayerView(context).apply {
+        useController = false
+        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        setShutterBackgroundColor(context.getColor(R.color.kwabor_wordmark_background))
+    }
+    private val continuityView = ImageView(context).apply {
+        setImageResource(R.drawable.kwabor_launch_wordmark)
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        setBackgroundColor(context.getColor(R.color.kwabor_wordmark_background))
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    init {
+        val matchParent = LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        addView(playerView, matchParent)
+        addView(continuityView, LayoutParams(matchParent))
+    }
+
+    fun bind(player: ExoPlayer, continuityVisibility: IntroContinuityVisibility) {
+        playerView.player = player
+        continuityView.visibility = when (continuityVisibility) {
+            IntroContinuityVisibility.Visible -> View.VISIBLE
+            IntroContinuityVisibility.Hidden -> View.GONE
+        }
+    }
 }

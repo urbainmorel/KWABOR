@@ -24,14 +24,20 @@ Le workflow reçoit ces valeurs comme entrées et les valide avant d'importer le
 
 ## Icône et lancement
 
-Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source canonique. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG officiel, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
+Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source canonique du symbole carré. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG officiel, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
 
-Le lancement natif s'appuie sur `UILaunchScreen`, une couleur ink et un redimensionnement opaque intégral du même master au ratio 1:1, sans détourage, seuil, matrice de couleur, storyboard ni logique applicative. Les nuances, l'ombre douce et la texture du PNG officiel restent donc présentes. Apple documente `UIColorName` et `UIImageName` pour ce contrat : [UILaunchScreen](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen).
+Le logo horizontal complet utilise séparément `kwabor_2.png`. `LaunchWordmark.imageset/LaunchWordmark.png` en est une copie binaire exacte de 2172 × 724, au ratio 3:1. `LaunchScreen.storyboard` l'affiche centré en `scaleAspectFit`, avec un inset horizontal de 24 points et le fond ink du catalogue. La vue SwiftUI conserve le même wordmark au-dessus du lecteur jusqu'à ce que `AVPlayerLayer.isReadyForDisplay` confirme la première frame. Ce raccord évite tout flash vide sans recadrer, recolorer ou réencoder le logo officiel.
 
 Les PNG sont déterministes et régénérables sur Windows avec :
 
 ```powershell
 .\tools\generate-brand-assets.ps1
+```
+
+La CI verrouille les hashes, dimensions, modes PNG, copies exactes et références Xcode. Le même contrôle sans dépendance tierce est disponible localement :
+
+```powershell
+python -B tools/verify-brand-assets.py
 ```
 
 ## Privacy Manifest

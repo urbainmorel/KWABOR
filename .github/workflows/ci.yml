@@ -22,6 +22,9 @@ jobs:
       - name: Verify embedded onboarding media
         run: python3 tools/verify-onboarding-media.py
 
+      - name: Verify brand asset integrity
+        run: python3 tools/verify-brand-assets.py
+
       - uses: actions/setup-java@v5.5.0
         with:
           distribution: temurin

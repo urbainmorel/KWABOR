@@ -4,12 +4,15 @@ import SwiftUI
 
 struct IntroVideoPlayer: View {
     @StateObject private var model: IntroVideoPlayerModel
+    private let onReadyForDisplay: () -> Void
 
     init(
         url: URL,
+        onReadyForDisplay: @escaping () -> Void,
         onCompleted: @escaping () -> Void,
         onFailed: @escaping () -> Void
     ) {
+        self.onReadyForDisplay = onReadyForDisplay
         _model = StateObject(
             wrappedValue: IntroVideoPlayerModel(
                 url: url,
@@ -20,10 +23,13 @@ struct IntroVideoPlayer: View {
     }
 
     var body: some View {
-        PlayerLayerView(player: model.player)
-            .onAppear { model.play() }
-            .onDisappear { model.pause() }
-            .ignoresSafeArea()
+        PlayerLayerView(
+            player: model.player,
+            onReadyForDisplay: onReadyForDisplay
+        )
+        .onAppear { model.play() }
+        .onDisappear { model.pause() }
+        .ignoresSafeArea()
     }
 }
 
@@ -110,20 +116,25 @@ private final class IntroVideoPlayerModel: ObservableObject {
 
 private struct PlayerLayerView: UIViewRepresentable {
     let player: AVPlayer
+    let onReadyForDisplay: () -> Void
 
     func makeUIView(context: Context) -> PlayerContainerView {
         let view = PlayerContainerView()
-        view.playerLayer.player = player
         view.playerLayer.videoGravity = .resizeAspectFill
+        view.configure(player: player, onReadyForDisplay: onReadyForDisplay)
         return view
     }
 
     func updateUIView(_ uiView: PlayerContainerView, context: Context) {
-        uiView.playerLayer.player = player
+        uiView.configure(player: player, onReadyForDisplay: onReadyForDisplay)
     }
 }
 
 private final class PlayerContainerView: UIView {
+    private var readinessObservation: NSKeyValueObservation?
+    private var onReadyForDisplay: (() -> Void)?
+    private var didDeliverReadiness = false
+
     override class var layerClass: AnyClass { AVPlayerLayer.self }
 
     var playerLayer: AVPlayerLayer {
@@ -131,5 +142,33 @@ private final class PlayerContainerView: UIView {
             preconditionFailure("PlayerContainerView requires AVPlayerLayer")
         }
         return playerLayer
+    }
+
+    func configure(player: AVPlayer, onReadyForDisplay: @escaping () -> Void) {
+        self.onReadyForDisplay = onReadyForDisplay
+        guard playerLayer.player !== player else { return }
+
+        readinessObservation?.invalidate()
+        didDeliverReadiness = false
+        playerLayer.player = player
+        readinessObservation = playerLayer.observe(
+            \.isReadyForDisplay,
+            options: [.initial, .new]
+        ) { [weak self] layer, _ in
+            guard layer.isReadyForDisplay else { return }
+            Task { @MainActor [weak self] in
+                self?.deliverReadiness()
+            }
+        }
+    }
+
+    private func deliverReadiness() {
+        guard !didDeliverReadiness else { return }
+        didDeliverReadiness = true
+        onReadyForDisplay?()
+    }
+
+    deinit {
+        readinessObservation?.invalidate()
     }
 }
