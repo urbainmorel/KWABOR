@@ -58,12 +58,12 @@ enum RegistrationSessionGate {
             return .clearInterruptedJourney
         }
         guard let session = updatedState.currentSession else { return .none }
-        if previousStep == .otp, session.accountSetupStatus == .onboardingRequired {
+        if previousStep == .otp, session.requiresAccountSetup {
             return .continueRegistration
         }
         if interruptedJourney == .registration,
            updatedState.step == .completed,
-           session.accountSetupStatus == .complete {
+           session.isAccountSetupComplete {
             return .requirePasswordSignIn
         }
         if updatedState.step == .completed {

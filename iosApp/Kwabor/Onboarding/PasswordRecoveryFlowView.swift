@@ -29,13 +29,13 @@ struct PasswordRecoveryFlowView: View {
 
     @ViewBuilder
     private func recoveryContent(state: PasswordRecoveryUiState) -> some View {
-        if state.step == .email {
+        if state.isEmailStep {
             emailStep
-        } else if state.step == .otp {
+        } else if state.isOtpStep {
             otpStep(state: state)
-        } else if state.step == .newPassword {
+        } else if state.isNewPasswordStep {
             newPasswordStep
-        } else if state.step == .completed {
+        } else if state.isCompletedStep {
             completedStep
         } else {
             ProgressView()

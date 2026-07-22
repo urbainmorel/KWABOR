@@ -35,7 +35,13 @@ data class AuthSession(
     val expiresAtEpochMilliseconds: Long,
     val accountSetupStatus: AccountSetupStatus,
     val purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
-)
+) {
+    val requiresAccountSetup: Boolean
+        get() = accountSetupStatus == AccountSetupStatus.OnboardingRequired
+
+    val isAccountSetupComplete: Boolean
+        get() = accountSetupStatus == AccountSetupStatus.Complete
+}
 
 enum class LegalDocumentType {
     Terms,

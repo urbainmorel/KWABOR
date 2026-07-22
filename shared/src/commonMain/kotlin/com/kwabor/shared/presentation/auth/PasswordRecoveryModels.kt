@@ -15,6 +15,18 @@ data class PasswordRecoveryUiState(
     val errorMessage: String? = null,
     val noticeMessage: String? = null,
 ) {
+    val isEmailStep: Boolean
+        get() = step == PasswordRecoveryStep.Email
+
+    val isOtpStep: Boolean
+        get() = step == PasswordRecoveryStep.Otp
+
+    val isNewPasswordStep: Boolean
+        get() = step == PasswordRecoveryStep.NewPassword
+
+    val isCompletedStep: Boolean
+        get() = step == PasswordRecoveryStep.Completed
+
     fun canResendOtp(nowEpochMilliseconds: Long): Boolean =
         resendAvailableAtEpochMilliseconds?.let { availableAt -> nowEpochMilliseconds >= availableAt } ?: true
 

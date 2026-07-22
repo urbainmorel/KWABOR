@@ -68,6 +68,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-AUTH-002 — PR `#29` mergée après vérification média, `quality`, pgTAP et les trois configurations `iOS simulator build` vertes.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
+- [ ] PR-AUTH-004 — PR `#31` ouverte : `quality` verte ; correctif interop Swift/Kotlin validé localement, publication interdite sans autorisation explicite puis CI iOS macOS et fusion requises.
 - [ ] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
 
 ### Offline, préférences et médias

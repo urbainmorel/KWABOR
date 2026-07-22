@@ -38,7 +38,7 @@ final class AuthenticationStore: ObservableObject {
         email = initialEmail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         recoveryController.observe { [weak self] state in
             self?.recoveryState = state
-            if state.step != .email {
+            if !state.isEmailStep {
                 self?.isRecovering = true
             }
         }
@@ -76,7 +76,7 @@ final class AuthenticationStore: ObservableObject {
     }
 
     var requiresProtectedRecoveryCancellation: Bool {
-        isRecovering && recoveryState?.step == .newPassword
+        isRecovering && recoveryState?.isNewPasswordStep == true
     }
 
     var canResendRecoveryCode: Bool {
