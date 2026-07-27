@@ -152,16 +152,17 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - La première CI AUTH-004 a passé `quality`/pgTAP mais révélé deux comparaisons d'enums Kotlin non résolues par Swift. Le correctif expose des propriétés sémantiques booléennes stables depuis le partagé, avec deux tests de pont dédiés ; aucune comparaison directe aux enums concernés ne subsiste dans Swift.
 - La seconde CI du commit `a723a45` a passé `quality`, la vérification du média embarqué et pgTAP en 5 min 21 s, puis les XCFrameworks et les configurations SwiftUI simulateur Debug/Staging/Release sous Xcode 16.4 en 17 min 19 s.
 - BRAND-001 implémentée sur branche : wordmark complet centré au lancement Android/iOS et conservé jusqu'à la première frame vidéo, copies raster strictement identiques au master `kwabor_2.png`, AppIcon et splash système toujours issus exclusivement de `kwabor_icone_app.png`. Le vérificateur Python standard-library contrôle hashes, dimensions, modes, ratio, provenance, catalogues/références Android/iOS et est exécuté par la CI. Validation locale : 67 tests Android et 155 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug, intégrité brand/média et `git diff --check` verts en 8 min 21 s ; une installation fraîche sur émulateur Android 11 confirme la séquence pictogramme système → wordmark complet → vidéo sans flash du fallback. La CI du commit `8324d27` a passé `quality` en 4 min 45 s et la compilation SwiftUI/storyboard Debug/Staging/Release en 16 min 50 s.
-- AUTH-005 est implémentée sur la branche en cours : Google natif Android/iOS, Sign in with Apple iOS, reprise de l'onboarding social, activation Promoteur sécurisée, ré-authentification Danger Zone et Edge Function idempotente `account-delete`.
+- AUTH-005 est implémentée dans la PR atomique `#33` : Google natif Android/iOS, Sign in with Apple iOS, reprise de l'onboarding social, activation Promoteur sécurisée, ré-authentification Danger Zone et Edge Function idempotente `account-delete`.
 - L'activation Promoteur vérifie l'email confirmé de l'invitation, ne remplace jamais une session existante et borne l'attribution à Promoteur vérifié + Éditeur d'organisation. La fiche est rattachée à l'organisation sans transfert de propriété ni élévation Propriétaire/Gestionnaire/Admin.
 - La suppression exige `SUPPRIMER` et une identité fraîche identique au bearer, refuse les conflits de propriété/Storage, révoque les sessions, efface l'utilisateur Auth et conserve un tombstone serveur privé sans PII métier. Une fonction privilégiée réconcilie quotidiennement les opérations interrompues puis purge les tombstones complétés après 30 jours.
 - ADR-0017 et les runbooks environnement/onboarding documentent le provisionnement propriétaire OAuth/Supabase/Apple, les frontières de confidentialité et la réconciliation des suppressions interrompues.
-- Validation locale AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; reset Supabase complet, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente. La compilation Xcode macOS et les checks GitHub `quality`/`iOS simulator build` restent obligatoires avant fusion ; cette tranche n'est pas encore déclarée livrée.
+- Validation locale AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; reset Supabase complet, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente.
+- Les premiers builds Xcode de la PR `#33` ont détecté l'export incomplet des chaînes AUTH-005 vers Swift, le nom importé du code d'annulation Google Sign-In et un masquage de propriété Promoteur. Les correctifs conservent un pont KMP typé sans texte dupliqué ; le run final `30294633454` du commit `578f8c4` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release sous Xcode 16.4 en 19 min 27 s.
 
 ## Tâche en cours
 
-Pousser la branche AUTH-005 et ouvrir sa PR atomique après la revue croisée finale.
-Ne déclarer AUTH-005 livrée qu'après les checks GitHub `quality`, pgTAP et build Xcode iOS macOS verts.
+Clôture atomique AUTH-005 uniquement. Aucun développement de BRAND-002 ni d'une tranche V1 suivante
+ne doit commencer dans cette exécution.
 
 ## Blocages / limites
 
@@ -173,7 +174,7 @@ Ne déclarer AUTH-005 livrée qu'après les checks GitHub `quality`, pgTAP et bu
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
-- AUTH-005 est implémentée et validée localement mais non fusionnée : aucune preuve fournisseur réelle ni compilation Xcode de cette branche n'est acquise avant la CI macOS.
+- AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
@@ -187,7 +188,7 @@ Ne déclarer AUTH-005 livrée qu'après les checks GitHub `quality`, pgTAP et bu
 
 ## Prochaine tâche logique
 
-Pousser AUTH-005 et obtenir `quality`, pgTAP et `iOS simulator build` verts avant fusion. Ensuite,
-livrer BRAND-002 sur une branche séparée avec le monogramme officiel exact et ses captures, puis
-reprendre la prochaine tranche V1 et finaliser ENV-001B/OBS-001B dès que le propriétaire a
-provisionné les environnements distants.
+L'exécution s'arrête à la clôture atomique AUTH-005, conformément à l'instruction propriétaire.
+Au prochain ordre, BRAND-002 restera la tranche prioritaire sur une branche séparée avec le
+monogramme officiel exact et ses captures. ENV-001B/OBS-001B reprendra lorsque le propriétaire
+aura provisionné les environnements distants.
