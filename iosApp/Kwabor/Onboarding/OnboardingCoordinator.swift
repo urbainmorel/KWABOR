@@ -435,7 +435,7 @@ final class OnboardingCoordinator: ObservableObject {
         federatedIdentityHintStore.clearPendingHints()
         completedRegistrationSession = result.session
         guestAccessGranted = false
-        promoterActivationContext = nil
+        self.promoterActivationContext = nil
         promoterActivationSessionImported = false
         promoterActivationErrorMessage = nil
         isPromoterActivationPresented = false
