@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -66,18 +67,29 @@ internal data class SignInScreenActions(
     val onEmailChange: (String) -> Unit,
     val onContinueFromEmail: () -> Unit,
     val onSubmitPassword: (String) -> Unit,
+    val onGoogleSignIn: () -> Unit,
     val onForgotPassword: () -> Unit,
     val onSignUp: () -> Unit,
 )
 
 internal object SignInScreen {
     @Composable
-    operator fun invoke(state: AuthAccessUiState, strings: KwaborStrings, actions: SignInScreenActions) {
+    operator fun invoke(
+        state: AuthAccessUiState,
+        federatedSignInInProgress: Boolean,
+        strings: KwaborStrings,
+        actions: SignInScreenActions,
+    ) {
         BackHandler(onBack = actions.onBack)
         AuthScreenFrame(onBack = actions.onBack) {
             AuthInlineMessage(state.errorMessage ?: state.noticeMessage, state.errorMessage != null)
             when (state.signInStep) {
-                SignInStep.Email -> SignInEmailStep(state, strings, actions)
+                SignInStep.Email -> SignInEmailStep(
+                    state = state,
+                    federatedSignInInProgress = federatedSignInInProgress,
+                    strings = strings,
+                    actions = actions,
+                )
                 SignInStep.Password -> key(state.signInEmail) {
                     SignInPasswordStep(state, actions)
                 }
@@ -88,8 +100,14 @@ internal object SignInScreen {
 }
 
 @Composable
-internal fun AuthScreenFrame(onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize()) {
+internal fun AuthScreenFrame(
+    onBack: () -> Unit,
+    backEnabled: Boolean = true,
+    showBackButton: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize().imePadding()) {
             AuthLanguageChip(modifier = Modifier.align(Alignment.TopEnd).padding(KwaborSpacing.Lg))
             Column(
@@ -100,7 +118,9 @@ internal fun AuthScreenFrame(onBack: () -> Unit, content: @Composable ColumnScop
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                AuthBackButton(onBack)
+                if (showBackButton) {
+                    AuthBackButton(onBack = onBack, enabled = backEnabled)
+                }
                 Image(
                     painter = painterResource(R.drawable.kwabor_brand_mark),
                     contentDescription = null,
@@ -115,12 +135,25 @@ internal fun AuthScreenFrame(onBack: () -> Unit, content: @Composable ColumnScop
 }
 
 @Composable
-private fun SignInEmailStep(state: AuthAccessUiState, strings: KwaborStrings, actions: SignInScreenActions) {
+private fun SignInEmailStep(
+    state: AuthAccessUiState,
+    federatedSignInInProgress: Boolean,
+    strings: KwaborStrings,
+    actions: SignInScreenActions,
+) {
     AuthHeading(
         title = stringResource(R.string.auth_sign_in_email_title),
         supportingText = stringResource(R.string.auth_sign_in_email_support),
     )
     Spacer(Modifier.height(KwaborSpacing.Xl))
+    GoogleSignInButton(
+        loading = federatedSignInInProgress,
+        enabled = !state.isLoading,
+        onClick = actions.onGoogleSignIn,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Lg))
+    AuthMethodDivider()
+    Spacer(Modifier.height(KwaborSpacing.Lg))
     OutlinedTextField(
         value = state.signInEmail,
         onValueChange = actions.onEmailChange,
@@ -228,7 +261,11 @@ internal fun AuthPrimaryButton(label: String, loading: Boolean, enabled: Boolean
 
 @Composable
 internal fun AuthHeading(title: String, supportingText: String) {
-    Text(text = title, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        text = title,
+        modifier = Modifier.semantics { heading() },
+        style = MaterialTheme.typography.headlineSmall,
+    )
     Spacer(Modifier.height(KwaborSpacing.Sm))
     Text(
         text = supportingText,
@@ -280,11 +317,12 @@ internal fun AuthLanguageChip(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun AuthBackButton(onBack: () -> Unit) {
+internal fun AuthBackButton(onBack: () -> Unit, enabled: Boolean = true) {
     Box(modifier = Modifier.fillMaxWidth()) {
         IconButton(
             onClick = onBack,
             modifier = Modifier.align(Alignment.CenterStart).size(KwaborSizing.TouchTarget),
+            enabled = enabled,
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,

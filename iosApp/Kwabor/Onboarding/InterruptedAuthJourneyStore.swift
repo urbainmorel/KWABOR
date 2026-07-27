@@ -3,6 +3,16 @@ import Shared
 
 enum InterruptedAuthJourney: String {
     case registration
+    case socialAuthentication = "social_authentication"
+    case socialRegistrationIdentity = "social_registration_identity"
+
+    var isRegistration: Bool {
+        self == .registration || self == .socialRegistrationIdentity
+    }
+
+    var resumesAtIdentity: Bool {
+        self == .socialAuthentication || self == .socialRegistrationIdentity
+    }
 }
 
 protocol InterruptedAuthJourneyPersisting {
@@ -11,6 +21,8 @@ protocol InterruptedAuthJourneyPersisting {
     func mark(_ journey: InterruptedAuthJourney)
 
     func clear(_ journey: InterruptedAuthJourney)
+
+    func clearRegistration()
 }
 
 struct UserDefaultsInterruptedAuthJourneyStore: InterruptedAuthJourneyPersisting {
@@ -31,6 +43,11 @@ struct UserDefaultsInterruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
 
     func clear(_ journey: InterruptedAuthJourney) {
         guard current == journey else { return }
+        userDefaults.removeObject(forKey: interruptedAuthJourneyKey)
+    }
+
+    func clearRegistration() {
+        guard current?.isRegistration == true || current == .socialAuthentication else { return }
         userDefaults.removeObject(forKey: interruptedAuthJourneyKey)
     }
 }

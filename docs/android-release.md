@@ -61,7 +61,15 @@ Pour un build local production, fournir ensemble :
 
 Une configuration partielle, un fichier absent ou une demande directe d'artefact release sans ces quatre valeurs fait échouer le build. Aucun certificat production factice n'est créé par le projet.
 
-## Secrets GitHub production
+## Configuration GitHub
+
+Les GitHub Environments `staging` et `production` doivent fournir les variables publiques
+`KWABOR_SUPABASE_URL`, `KWABOR_SUPABASE_PUBLISHABLE_KEY`, `KWABOR_FIREBASE_PROJECT_ID` et
+`KWABOR_GOOGLE_WEB_CLIENT_ID`. Le client OAuth Google est le client Web/serveur du tier configuré
+dans Supabase et doit respecter `*.apps.googleusercontent.com` ; une valeur absente ou mal formée
+arrête le workflow avant le build.
+
+### Secrets production
 
 Dans le GitHub Environment `production`, créer les secrets suivants :
 
@@ -96,7 +104,7 @@ La troisième commande exige la clé d'upload injectée. Les sorties attendues s
 Le workflow GitHub Actions `Android release artifact` accepte uniquement `staging` ou `production`, un `version_code` et un `version_name`. Il doit être lancé depuis `main` :
 
 1. choisir `staging` pour l'APK interne ou `production` pour l'AAB Play ;
-2. vérifier que les variables Supabase du GitHub Environment ciblé existent ;
+2. vérifier que les variables Supabase, Firebase et OAuth Google du GitHub Environment ciblé existent ;
 3. pour production, faire approuver le déploiement par le propriétaire ;
 4. télécharger l'artefact Actions et vérifier son SHA-256 ;
 5. archiver le mapping R8 avec la release correspondante.
@@ -106,7 +114,7 @@ Le workflow exécute la gate `check` avant de publier. Toute configuration dista
 ## Contrôles avant Play Console
 
 - `versionCode` supérieur au dernier bundle téléversé ;
-- environnement `production` et project ref Supabase production vérifiés ;
+- environnement `production`, project ref Supabase et client OAuth Google production vérifiés ;
 - signature de l'AAB issue de la clé d'upload attendue ;
 - mapping R8 et SHA-256 archivés ;
 - aucun fichier de configuration ou secret ajouté à Git ;

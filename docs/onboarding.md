@@ -47,6 +47,69 @@ La déconnexion utilisateur est accessible depuis Profil et exige une confirmati
 Elle retire la session de cet appareil, les destinations protégées en attente et revient sur
 l'accueil invité. La révocation des autres appareils reste réservée aux paramètres de sécurité.
 
+## AUTH-005 implémentée sur branche, validations finales en attente
+
+Google est acquis nativement sur Android et iOS. Sign in with Apple est acquis par
+`AuthenticationServices` sur iOS uniquement et apparaît au même niveau que Google. Chaque tentative
+utilise un nonce aléatoire à usage unique ; seuls l'ID token, le nonce brut correspondant et les
+indices de nom éventuellement fournis sont transmis au data layer partagé. Aucun access token ou
+refresh token Google/Apple n'est demandé, persisté ou envoyé à Analytics.
+
+Un compte complet ouvre la destination protégée attendue. Un compte nouveau ou incomplet reprend la
+révision Nom/Prénom, puis Ville/GPS, Devise, consentements et primer notifications. Les indices de
+nom restent modifiables et ne finalisent jamais le profil à eux seuls. Apple pouvant ne fournir le
+nom qu'à la première autorisation, l'écran de révision reste utilisable sans indice. Une annulation
+du fournisseur ne crée pas de session et ne montre aucun message technique.
+
+### Activation Promoteur
+
+Le lien accepté est strictement `kwabor://auth/promoter-activate` avec un token d'invitation et,
+si le callback doit établir une session temporaire, un code d'autorisation PKCE. Les fragments et
+jetons implicites, ainsi que les schémas, hosts, chemins, paramètres inconnus ou dupliqués et valeurs
+hors bornes, sont rejetés.
+
+Le serveur n'affiche le nom du commerce que si le compte Auth possède une adresse confirmée
+identique à celle de l'invitation. Une session déjà connectée n'est jamais remplacée par la preuve
+du callback. Sans session, une session temporaire peut être importée pour la prévisualisation ; elle
+est effacée si le lien est invalide ou si l'utilisateur annule.
+
+L'utilisateur choisit ensuite un mot de passe ou une identité sociale native. L'activation serveur
+ré-authentifie exactement le même utilisateur et exige dans son JWT une preuve `password` ou
+`oauth` âgée de cinq minutes au maximum. L'activation serveur est atomique et peut uniquement
+attribuer `promoteur` vérifié et le rôle d'organisation `editeur`.
+Elle ne donne jamais Propriétaire, Gestionnaire ou Admin, et ne transfère pas la propriété de la
+fiche. Le succès affiche le nom réel du commerce et propose le retour à l'accueil. Une destination
+Promoteur typée est conservée de façon privée pour que B2B-003 ouvre le vrai tableau de bord lorsqu'il
+sera livré ; aucun placeholder n'est présenté comme dashboard.
+
+Un échec réseau pendant la restauration iOS bloque les actions Auth et invité jusqu'au retry. Un
+callback Promoteur provisoire en erreur est déconnecté et son marqueur effacé avant l'affichage de
+l'erreur. Une suppression de compte en cours invalide toute file ou callback Promoteur concurrent :
+la suppression gagne toujours, sans réimporter ensuite une session devenue invalide.
+
+### Danger Zone et suppression de compte
+
+La suppression exige la confirmation exacte `SUPPRIMER`, puis une ré-authentification récente par
+mot de passe ou par un nouvel ID token Google/Apple avec nonce. La fonction serveur compare
+l'identité ré-authentifiée au bearer courant, vérifie les blocages de propriété d'organisation et
+d'objets Storage, puis prépare l'effacement avec une clé d'idempotence. Les politiques Storage
+restrictives partagent le verrou de suppression : un upload déjà engagé finit avant la vérification,
+et tout nouvel upload attend puis échoue dès que le tombstone existe.
+
+La préparation supprime le profil, les rôles, acceptations juridiques et données utilisateur
+rattachées, et neutralise les attributions résiduelles de fiches. La fonction révoque ensuite toutes
+les sessions, revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Un retry
+réutilise la même opération serveur, y compris si l'application redémarre avec une nouvelle clé
+client.
+
+Le tombstone privé `account_deletion_requests` conserve seulement un identifiant utilisateur
+pseudonyme, une clé d'idempotence, un statut et des horodatages. Il ne contient aucun email, nom,
+contenu ou credential. Une ligne `prepared` interdit les écritures produit jusqu'à reprise. Si le
+compte Auth existe encore, l'utilisateur reprend avec une preuve fraîche ; s'il a déjà disparu, la
+réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le tombstone. Les
+tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa mention dans la
+politique de confidentialité restent une gate juridique avant release candidate.
+
 Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.
 
 Les trois consentements observabilité sont appliqués et persistés par les adaptateurs Firebase natifs lorsque l'utilisateur confirme cette étape, juste avant `complete_user_onboarding`. Ainsi, une réponse réseau perdue après le commit serveur ne peut pas effacer son choix explicite ; chaque nouvelle confirmation réapplique la dernière valeur sélectionnée. Autoriser Remote Config rend alors opérationnel le préchargement de l'intro distante décrit ci-dessous.
@@ -114,3 +177,18 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 23. Mot de passe Recovery faible, identique ou non concordant : mise à jour refusée sans perdre la session temporaire.
 24. Récupération terminée ou annulée : session temporaire effacée et retour à la connexion.
 25. Déconnexion confirmée : session et destination protégée en attente effacées, accueil invité affiché.
+26. Google annulé sur Android/iOS : aucun compte créé, aucune erreur technique et destination en attente conservée.
+27. Apple annulé sur iOS : même comportement que Google ; aucun bouton Apple visible sur Android.
+28. ID token absent, nonce absent/réutilisé ou audience d'un autre environnement : authentification refusée sans secret dans les logs.
+29. Nouveau compte Google/Apple : révision du nom puis onboarding complet ; compte existant complet : connexion directe.
+30. Apple sans nom lors d'une reconnexion : révision manuelle toujours disponible et aucun nom précédent attribué à une autre identité.
+31. Invitation Promoteur invalide, expirée, utilisée ou destinée à un autre email : activation refusée sans révéler l'email attendu.
+32. Lien Promoteur reçu avec une session existante : session jamais remplacée ni déconnectée, y compris si le lien est invalide.
+33. Lien Promoteur sans session : session temporaire conservée jusqu'à activation, puis supprimée en cas d'annulation ou de prévisualisation invalide.
+34. Activation réussie : rôle Promoteur vérifié et rôle Éditeur seulement ; aucun rôle critique ni transfert de `owner_id`.
+35. Suppression sans la phrase exacte, avec mot de passe faux ou identité sociale différente : aucune préparation ni révocation.
+36. Propriété d'organisation ou objets Storage restants : suppression bloquée avec message utilisateur sûr et données intactes avant résolution.
+37. Double appui, retry réseau ou redémarrage avec une autre clé client : une seule préparation effective et aucune double suppression.
+38. Échec après état `prepared` avec compte Auth encore présent : reprise utilisateur fraîche ; écritures produit bloquées entre-temps.
+39. Compte Auth déjà absent mais tombstone encore `prepared` : réconciliation serveur vers `completed`, sans suppression manuelle d'un compte présent.
+40. Suppression réussie : toutes les sessions révoquées, session locale et destinations privées effacées, retour à l'accueil invité.

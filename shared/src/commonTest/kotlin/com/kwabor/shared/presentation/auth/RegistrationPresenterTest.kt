@@ -1,6 +1,7 @@
 package com.kwabor.shared.presentation.auth
 
 import com.kwabor.shared.domain.auth.AUTH_OTP_EXPIRED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
@@ -8,7 +9,9 @@ import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.auth.MAX_ONBOARDING_NAME_LENGTH
+import com.kwabor.shared.domain.auth.PromoterActivationContext
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
+import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
@@ -260,8 +263,15 @@ private class FakeRegistrationAuthRepository(
     override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
         DomainResult.Success(authSession(AccountSetupStatus.Complete))
 
-    override suspend fun activatePromoterInvite(request: PromoterActivationRequest): DomainResult<AuthSession> =
-        DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+    override suspend fun handlePromoterActivationCallback(
+        callbackUrl: String,
+    ): DomainResult<PromoterActivationContext> = DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+
+    override suspend fun activatePromoterInvite(
+        request: PromoterActivationRequest,
+    ): DomainResult<PromoterActivationResult> = DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+
+    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<Unit> = DomainResult.Success(Unit)
 
     override suspend fun signOut(): DomainResult<Unit> = DomainResult.Success(Unit)
 }

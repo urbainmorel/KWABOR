@@ -36,6 +36,9 @@ jobs:
       KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
       KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
       KWABOR_FIREBASE_PROJECT_ID: ${{ vars.KWABOR_FIREBASE_PROJECT_ID }}
+      KWABOR_GOOGLE_IOS_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_IOS_CLIENT_ID }}
+      KWABOR_GOOGLE_SERVER_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_SERVER_CLIENT_ID }}
+      KWABOR_GOOGLE_REVERSED_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_REVERSED_CLIENT_ID }}
       KWABOR_IOS_DEVELOPMENT_TEAM: ${{ vars.KWABOR_IOS_DEVELOPMENT_TEAM }}
       KWABOR_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
       KWABOR_IOS_VERSION_NAME: ${{ inputs.version_name }}
@@ -60,6 +63,19 @@ jobs:
         run: |
           if [[ -z "$KWABOR_SUPABASE_URL" || -z "$KWABOR_SUPABASE_PUBLISHABLE_KEY" ]]; then
             echo "The selected GitHub Environment is missing its Supabase client variables." >&2
+            exit 1
+          fi
+          google_client_id_pattern='^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$'
+          if [[ ! "$KWABOR_GOOGLE_IOS_CLIENT_ID" =~ $google_client_id_pattern ||
+                ! "$KWABOR_GOOGLE_SERVER_CLIENT_ID" =~ $google_client_id_pattern ||
+                "$KWABOR_GOOGLE_IOS_CLIENT_ID" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]; then
+            echo "The selected GitHub Environment has invalid or non-distinct Google OAuth client IDs." >&2
+            exit 1
+          fi
+          google_ios_identifier="${KWABOR_GOOGLE_IOS_CLIENT_ID%.apps.googleusercontent.com}"
+          expected_reversed_client_id="com.googleusercontent.apps.$google_ios_identifier"
+          if [[ "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" != "$expected_reversed_client_id" ]]; then
+            echo "KWABOR_GOOGLE_REVERSED_CLIENT_ID does not match the iOS OAuth client ID." >&2
             exit 1
           fi
           if [[ ! "$KWABOR_IOS_DEVELOPMENT_TEAM" =~ ^[A-Z0-9]{10}$ ]]; then
@@ -183,6 +199,12 @@ jobs:
             KWABOR_ENVIRONMENT="$KWABOR_ENVIRONMENT" \
             KWABOR_SUPABASE_URL="$KWABOR_SUPABASE_URL" \
             KWABOR_SUPABASE_PUBLISHABLE_KEY="$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            KWABOR_GOOGLE_IOS_CLIENT_ID_STAGING="$KWABOR_GOOGLE_IOS_CLIENT_ID" \
+            KWABOR_GOOGLE_SERVER_CLIENT_ID_STAGING="$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
+            KWABOR_GOOGLE_REVERSED_CLIENT_ID_STAGING="$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
+            KWABOR_GOOGLE_IOS_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_IOS_CLIENT_ID" \
+            KWABOR_GOOGLE_SERVER_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
+            KWABOR_GOOGLE_REVERSED_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
             KWABOR_MARKETING_VERSION="$KWABOR_IOS_VERSION_NAME" \
             KWABOR_CURRENT_PROJECT_VERSION="$KWABOR_IOS_BUILD_NUMBER" \
             KWABOR_DEVELOPMENT_TEAM="$KWABOR_IOS_DEVELOPMENT_TEAM" \
@@ -207,6 +229,10 @@ jobs:
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")" == "$KWABOR_IOS_VERSION_NAME" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")" == "$KWABOR_IOS_BUILD_NUMBER" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_ENVIRONMENT' "$info_plist")" == "$KWABOR_ENVIRONMENT" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_IOS_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_IOS_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_SERVER_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_REVERSED_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:1:CFBundleURLSchemes:0' "$info_plist")" == "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" ]]
 
           codesign --verify --deep --strict --verbose=2 "$app_path"
           codesign -d --entitlements :- "$app_path" > "$entitlements_plist"

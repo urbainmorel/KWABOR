@@ -114,12 +114,34 @@ class IosRegistrationController internal constructor(
     }
 
     fun resumeIncompleteSession(session: AuthSession?) {
+        resumeIncompleteSession(session = session, resumesAtIdentity = false)
+    }
+
+    fun resumeIncompleteSocialSession(session: AuthSession?, suggestedFirstName: String?, suggestedLastName: String?) {
+        resumeIncompleteSession(
+            session = session,
+            resumesAtIdentity = true,
+            suggestedFirstName = suggestedFirstName,
+            suggestedLastName = suggestedLastName,
+        )
+    }
+
+    private fun resumeIncompleteSession(
+        session: AuthSession?,
+        resumesAtIdentity: Boolean,
+        suggestedFirstName: String? = null,
+        suggestedLastName: String? = null,
+    ) {
         if (session?.accountSetupStatus != AccountSetupStatus.OnboardingRequired) return
-        if (state.currentSession?.userId == session.userId && state.step != RegistrationStep.Email) return
+        val isSameSessionInProgress = state.currentSession?.userId == session.userId &&
+            state.step != RegistrationStep.Email
+        if (isSameSessionInProgress && (!resumesAtIdentity || state.step != RegistrationStep.Password)) return
         operationJob?.cancel()
         state = initialRegistrationUiState().copy(
-            step = RegistrationStep.Password,
+            step = if (resumesAtIdentity) RegistrationStep.Identity else RegistrationStep.Password,
             email = session.email.orEmpty(),
+            firstName = suggestedFirstName ?: session.suggestedFirstName.orEmpty(),
+            lastName = suggestedLastName ?: session.suggestedLastName.orEmpty(),
             currentSession = session,
         )
     }

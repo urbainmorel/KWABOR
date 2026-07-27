@@ -5,6 +5,7 @@ import android.content.Context
 internal enum class InterruptedAuthJourney {
     None,
     Registration,
+    SocialRegistration,
 }
 
 internal interface AuthJourneyStore {
@@ -20,6 +21,7 @@ internal class SharedPreferencesAuthJourneyStore(context: Context) : AuthJourney
 
     override fun read(): InterruptedAuthJourney = when (preferences.getString(KEY_ACTIVE_JOURNEY, null)) {
         VALUE_REGISTRATION -> InterruptedAuthJourney.Registration
+        VALUE_SOCIAL_REGISTRATION -> InterruptedAuthJourney.SocialRegistration
         else -> InterruptedAuthJourney.None
     }
 
@@ -28,6 +30,10 @@ internal class SharedPreferencesAuthJourneyStore(context: Context) : AuthJourney
         when (journey) {
             InterruptedAuthJourney.None -> editor.remove(KEY_ACTIVE_JOURNEY)
             InterruptedAuthJourney.Registration -> editor.putString(KEY_ACTIVE_JOURNEY, VALUE_REGISTRATION)
+            InterruptedAuthJourney.SocialRegistration -> editor.putString(
+                KEY_ACTIVE_JOURNEY,
+                VALUE_SOCIAL_REGISTRATION,
+            )
         }
         return editor.commit()
     }
@@ -36,3 +42,4 @@ internal class SharedPreferencesAuthJourneyStore(context: Context) : AuthJourney
 private const val PREFERENCES_NAME = "kwabor_auth_journey"
 private const val KEY_ACTIVE_JOURNEY = "active_journey"
 private const val VALUE_REGISTRATION = "registration"
+private const val VALUE_SOCIAL_REGISTRATION = "social_registration"

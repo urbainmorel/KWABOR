@@ -44,6 +44,7 @@ import com.kwabor.shared.presentation.auth.RegistrationUiState
 @Composable
 internal fun EmailStep(
     state: RegistrationUiState,
+    federatedSignInInProgress: Boolean,
     strings: KwaborStrings,
     actions: RegistrationScreenActions,
     modifier: Modifier,
@@ -53,6 +54,12 @@ internal fun EmailStep(
             title = stringResource(R.string.registration_email_title),
             supportingText = stringResource(R.string.registration_email_support),
         )
+        GoogleSignInButton(
+            loading = federatedSignInInProgress,
+            enabled = !state.isLoading,
+            onClick = actions.onGoogleSignIn,
+        )
+        AuthMethodDivider()
         OutlinedTextField(
             value = state.email,
             onValueChange = actions.onEmailChange,

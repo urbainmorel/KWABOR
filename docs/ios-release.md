@@ -90,6 +90,9 @@ Le workflow `iOS archive artifact` s'exécute uniquement depuis `main`, dans le 
 |---|---|---|
 | `KWABOR_SUPABASE_URL` | Variable | URL publique du projet ciblé |
 | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable | clé publishable du projet ciblé |
+| `KWABOR_GOOGLE_IOS_CLIENT_ID` | Variable | client OAuth iOS `*.apps.googleusercontent.com` |
+| `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Variable | client OAuth Web/serveur distinct, configuré dans Supabase |
+| `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Variable | schéma callback exact dérivé du client iOS |
 | `KWABOR_IOS_DEVELOPMENT_TEAM` | Variable | Team ID Apple sur 10 caractères |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Secret | certificat + clé privée exportés en `.p12`, encodés Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Secret | mot de passe du `.p12` |
@@ -97,11 +100,11 @@ Le workflow `iOS archive artifact` s'exécute uniquement depuis `main`, dans le 
 
 Le workflow :
 
-1. valide tier, version, build number et configuration Supabase ;
+1. valide tier, version, build number, configuration Supabase et cohérence des trois identifiants OAuth Google ;
 2. importe le certificat dans un keychain temporaire ;
 3. vérifie bundle ID, APNs production et Sign in with Apple dans le profil ;
 4. assemble le XCFramework release et archive avec signature manuelle ;
-5. vérifie Info.plist, Privacy Manifest, assets, dSYM, signature et entitlements ;
+5. vérifie Info.plist, callback Google, Privacy Manifest, assets, dSYM, signature et entitlements ;
 6. publie uniquement l'archive compressée et son SHA-256 ;
 7. supprime keychain et profil du runner, y compris après échec.
 

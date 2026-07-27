@@ -17,4 +17,7 @@ object KwaborColors {
     val DarkBackground = Color(color = 0xFF0B0B0C)
     val DarkSurface = Color(color = 0xFF161619)
     val DarkText = Color(color = 0xFFF2F2F4)
+    val GoogleButtonSurface = Color(color = 0xFFFFFFFF)
+    val GoogleButtonStroke = Color(color = 0xFF747775)
+    val GoogleButtonText = Color(color = 0xFF1F1F1F)
 }

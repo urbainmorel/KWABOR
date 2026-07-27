@@ -28,6 +28,14 @@
 				<string>kwabor</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(KWABOR_GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
@@ -45,6 +53,12 @@
 	<string>Kwabor utilise votre position une seule fois pour proposer la ville la plus proche. Vous pouvez aussi choisir votre ville manuellement.</string>
 	<key>KWABOR_ENVIRONMENT</key>
 	<string>$(KWABOR_ENVIRONMENT)</string>
+	<key>KWABOR_GOOGLE_IOS_CLIENT_ID</key>
+	<string>$(KWABOR_GOOGLE_IOS_CLIENT_ID)</string>
+	<key>KWABOR_GOOGLE_REVERSED_CLIENT_ID</key>
+	<string>$(KWABOR_GOOGLE_REVERSED_CLIENT_ID)</string>
+	<key>KWABOR_GOOGLE_SERVER_CLIENT_ID</key>
+	<string>$(KWABOR_GOOGLE_SERVER_CLIENT_ID)</string>
 	<key>KWABOR_SUPABASE_PUBLISHABLE_KEY</key>
 	<string>$(KWABOR_SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>KWABOR_SUPABASE_URL</key>

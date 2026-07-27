@@ -13,6 +13,13 @@ const val AUTH_RATE_LIMITED_ERROR_KEY = "error.auth.rate_limited"
 const val AUTH_PASSWORD_TOO_WEAK_ERROR_KEY = "error.auth.password_too_weak"
 const val AUTH_PASSWORD_SAME_ERROR_KEY = "error.auth.password_same"
 const val AUTH_PASSWORD_RECOVERY_REQUIRED_ERROR_KEY = "error.auth.password_recovery_required"
+const val AUTH_SOCIAL_NONCE_REQUIRED_ERROR_KEY = "error.auth.social_nonce_required"
+const val AUTH_PROMOTER_INVITE_INVALID_ERROR_KEY = "error.auth.promoter_invite_invalid"
+const val AUTH_PROMOTER_INVITE_EXPIRED_ERROR_KEY = "error.auth.promoter_invite_expired"
+const val AUTH_PROMOTER_INVITE_USED_ERROR_KEY = "error.auth.promoter_invite_used"
+const val AUTH_ACCOUNT_DELETION_REAUTHENTICATION_ERROR_KEY = "error.auth.account_deletion_reauthentication"
+const val AUTH_ACCOUNT_DELETION_OWNERSHIP_ERROR_KEY = "error.auth.account_deletion_ownership"
+const val AUTH_ACCOUNT_DELETION_STORAGE_ERROR_KEY = "error.auth.account_deletion_storage"
 
 enum class SocialAuthProvider {
     Google,
@@ -29,12 +36,21 @@ enum class AuthSessionPurpose {
     PasswordRecovery,
 }
 
+enum class AuthenticationMethod {
+    Email,
+    Google,
+    Apple,
+}
+
 data class AuthSession(
     val userId: String,
     val email: String?,
     val expiresAtEpochMilliseconds: Long,
     val accountSetupStatus: AccountSetupStatus,
     val purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
+    val authenticationMethod: AuthenticationMethod = AuthenticationMethod.Email,
+    val suggestedFirstName: String? = null,
+    val suggestedLastName: String? = null,
 ) {
     val requiresAccountSetup: Boolean
         get() = accountSetupStatus == AccountSetupStatus.OnboardingRequired
@@ -119,8 +135,12 @@ private fun CompleteOnboardingValues.validationError(): DomainError.Validation? 
 class SocialSignInRequest(
     val provider: SocialAuthProvider,
     val idToken: String,
+    val rawNonce: String,
+    val suggestedFirstName: String? = null,
+    val suggestedLastName: String? = null,
 ) {
-    override fun toString(): String = "SocialSignInRequest(provider=$provider, idToken=<redacted>)"
+    override fun toString(): String =
+        "SocialSignInRequest(provider=$provider, idToken=<redacted>, rawNonce=<redacted>, nameHints=<redacted>)"
 }
 
 class PromoterActivationRequest(
@@ -130,4 +150,37 @@ class PromoterActivationRequest(
 ) {
     override fun toString(): String =
         "PromoterActivationRequest(inviteToken=<redacted>, password=<redacted>, socialSignInRequest=<redacted>)"
+}
+
+data class PromoterActivationResult(
+    val session: AuthSession,
+    val organizationId: String,
+    val listingId: String,
+)
+
+class PromoterActivationContext(
+    val inviteToken: String,
+    val organizationId: String,
+    val listingId: String,
+    val businessName: String,
+    val sessionImportedForActivation: Boolean = false,
+) {
+    override fun toString(): String = "PromoterActivationContext(<redacted>)"
+}
+
+sealed interface AccountDeletionCredential {
+    class Password(val password: String) : AccountDeletionCredential {
+        override fun toString(): String = "Password(password=<redacted>)"
+    }
+
+    class Social(val request: SocialSignInRequest) : AccountDeletionCredential {
+        override fun toString(): String = "Social(request=<redacted>)"
+    }
+}
+
+class AccountDeletionRequest(
+    val idempotencyKey: String,
+    val credential: AccountDeletionCredential,
+) {
+    override fun toString(): String = "AccountDeletionRequest(idempotencyKey=<redacted>, credential=<redacted>)"
 }

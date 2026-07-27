@@ -9,6 +9,8 @@ internal enum class AuthSurface {
     Registration,
     SignIn,
     PasswordRecovery,
+    PromoterActivation,
+    SessionRestoreFailure,
 }
 
 internal enum class AuthEntryPoint {
@@ -35,6 +37,7 @@ internal data class AuthPlatformUiState(
     val observabilityConsentPersistenceFailed: Boolean = false,
     val notificationPermissionRequestInFlight: Boolean = false,
     val notificationPrimingPersistenceFailed: Boolean = false,
+    val federatedSignInInProgress: Boolean = false,
 )
 
 internal enum class SignInStep {
@@ -52,6 +55,31 @@ internal data class AuthAccessUiState(
     val signOutConfirmationVisible: Boolean = false,
     val signOutInProgress: Boolean = false,
     val signOutErrorMessage: String? = null,
+    val accountDeletionDialogVisible: Boolean = false,
+    val accountDeletionInProgress: Boolean = false,
+    val accountDeletionErrorMessage: String? = null,
+)
+
+internal enum class AuthSessionRestoreStatus {
+    InProgress,
+    Ready,
+    Failed,
+}
+
+internal enum class PromoterActivationStage {
+    Loading,
+    Ready,
+    Activating,
+    Cancelling,
+    Completed,
+    Error,
+}
+
+internal data class PromoterActivationUiState(
+    val stage: PromoterActivationStage = PromoterActivationStage.Loading,
+    val businessName: String = "",
+    val errorMessage: String? = null,
+    val retryAvailable: Boolean = true,
 )
 
 internal sealed interface AuthIntent {
@@ -63,9 +91,17 @@ internal sealed interface AuthIntent {
 
     sealed interface PasswordRecovery : AuthIntent
 
-    sealed interface ProfileField : AuthIntent
+    sealed interface Federated : AuthIntent
 
-    sealed interface ProfileProgress : AuthIntent
+    sealed interface AccountSecurity : AuthIntent
+
+    sealed interface PromoterActivation : AuthIntent
+
+    sealed interface Profile : AuthIntent
+
+    sealed interface ProfileField : Profile
+
+    sealed interface ProfileProgress : Profile
 
     sealed interface Platform : AuthIntent
 
@@ -91,6 +127,8 @@ internal sealed interface AuthIntent {
 
     data object SignOutNavigationHandled : Journey
 
+    data object RetrySessionRestore : Journey
+
     data class ChangeEmail(val email: String) : Credentials
 
     data object RequestOtp : Credentials
@@ -114,6 +152,41 @@ internal sealed interface AuthIntent {
     class SubmitSignInPassword(val password: String) : SignIn {
         override fun toString(): String = "SubmitSignInPassword(password=<redacted>)"
     }
+
+    data object ContinueWithGoogle : Federated
+
+    data object RequestAccountDeletion : AccountSecurity
+
+    data object CancelAccountDeletion : AccountSecurity
+
+    data object AccountDeletionNavigationHandled : AccountSecurity
+
+    class DeleteAccountWithPassword(
+        val password: String,
+        val confirmation: String,
+    ) : AccountSecurity {
+        override fun toString(): String = "DeleteAccountWithPassword(password=<redacted>, confirmation=<redacted>)"
+    }
+
+    class DeleteAccountWithGoogle(val confirmation: String) : AccountSecurity {
+        override fun toString(): String = "DeleteAccountWithGoogle(confirmation=<redacted>)"
+    }
+
+    class OpenPromoterActivation(val callbackUrl: String) : PromoterActivation {
+        override fun toString(): String = "OpenPromoterActivation(callbackUrl=<redacted>)"
+    }
+
+    data object RetryPromoterActivationLink : PromoterActivation
+
+    class ActivatePromoterWithPassword(val password: String) : PromoterActivation {
+        override fun toString(): String = "ActivatePromoterWithPassword(password=<redacted>)"
+    }
+
+    data object ActivatePromoterWithGoogle : PromoterActivation
+
+    data object CancelPromoterActivation : PromoterActivation
+
+    data object FinishPromoterActivation : PromoterActivation
 
     data class ChangeRecoveryEmail(val email: String) : PasswordRecovery
 
@@ -179,6 +252,13 @@ internal sealed interface AuthEffect {
     data object GuestContinuationSelected : AuthEffect
 
     data object SignedOut : AuthEffect
+
+    data object AccountDeleted : AuthEffect
+
+    data class PromoterActivationCompleted(
+        val organizationId: String,
+        val listingId: String,
+    ) : AuthEffect
 }
 
 internal sealed interface AuthPlatformEffect {

@@ -5,6 +5,7 @@ import SwiftUI
 struct RegistrationFlowView: View {
     @ObservedObject private var coordinator: OnboardingCoordinator
     @StateObject private var store: RegistrationStore
+    @StateObject private var federatedStore: FederatedSignInStore
 
     init(coordinator: OnboardingCoordinator) {
         self.coordinator = coordinator
@@ -22,6 +23,14 @@ struct RegistrationFlowView: View {
                 onCancel: coordinator.cancelRegistration
             )
         )
+        _federatedStore = StateObject(
+            wrappedValue: FederatedSignInStore(
+                strings: coordinator.strings,
+                presenterProvider: WindowScenePresentingViewControllerProvider(),
+                identityHintStore: coordinator.federatedIdentityHintStore,
+                onCredential: coordinator.signInWithFederatedCredential
+            )
+        )
     }
 
     var body: some View {
@@ -31,7 +40,8 @@ struct RegistrationFlowView: View {
                     RegistrationStepContent(
                         state: state,
                         externalErrorMessage: coordinator.registrationCancellationErrorMessage,
-                        store: store
+                        store: store,
+                        federatedStore: federatedStore
                     )
                 } else {
                     ProgressView()
@@ -118,6 +128,7 @@ private struct RegistrationStepContent: View {
     let state: RegistrationUiState
     let externalErrorMessage: String?
     @ObservedObject var store: RegistrationStore
+    @ObservedObject var federatedStore: FederatedSignInStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -199,19 +210,27 @@ private struct RegistrationStepContent: View {
     }
 
     private var emailStep: some View {
-        Section {
-            TextField(
-                store.strings.authEmail,
-                text: Binding(
-                    get: { state.email },
-                    set: store.updateEmail
+        Group {
+            Section {
+                TextField(
+                    store.strings.authEmail,
+                    text: Binding(
+                        get: { state.email },
+                        set: store.updateEmail
+                    )
                 )
-            )
-            .textInputAutocapitalization(.never)
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .submitLabel(.continue)
-            .onSubmit(store.submitPrimaryAction)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .submitLabel(.continue)
+                .onSubmit(store.submitPrimaryAction)
+            }
+            Section {
+                FederatedSignInButtons(
+                    store: federatedStore,
+                    isDisabled: state.isLoading
+                )
+            }
         }
     }
 

@@ -1,15 +1,35 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
+import com.kwabor.shared.domain.auth.PromoterActivationContext
+import com.kwabor.shared.domain.auth.PromoterActivationSessionProof
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.i18n.AppLocale
 
-internal interface AuthDataSource : PasswordRecoveryAuthDataSource {
+internal interface AuthDataSource :
+    AuthSessionDataSource,
+    AuthRegistrationDataSource,
+    PasswordRecoveryAuthDataSource,
+    PromoterActivationAuthDataSource,
+    AccountSecurityAuthDataSource
+
+internal interface AuthSessionDataSource {
     suspend fun getCurrentSession(): AuthSessionDto?
 
+    suspend fun signInWithEmail(email: String, password: String): AuthSessionDto
+
+    suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto
+
+    suspend fun discardTemporarySession()
+
+    suspend fun signOut()
+}
+
+internal interface AuthRegistrationDataSource {
     suspend fun requestEmailOtp(email: String)
 
     suspend fun verifyEmailOtp(email: String, otpCode: String): AuthSessionDto
@@ -19,12 +39,18 @@ internal interface AuthDataSource : PasswordRecoveryAuthDataSource {
     suspend fun listActiveLegalDocuments(locale: AppLocale): List<LegalDocumentRevision>
 
     suspend fun completeOnboarding(request: CompleteOnboardingRequest): AuthSessionDto
+}
 
-    suspend fun signInWithEmail(email: String, password: String): AuthSessionDto
+internal interface PromoterActivationAuthDataSource {
+    suspend fun establishPromoterActivationSession(proof: PromoterActivationSessionProof)
 
-    suspend fun signInWithSocialProvider(request: SocialSignInRequest): AuthSessionDto
+    suspend fun previewPromoterInvite(inviteToken: String): PromoterActivationContext
 
-    suspend fun signOut()
+    suspend fun activatePromoterInvite(inviteToken: String): PromoterActivationResultDto
+}
+
+internal interface AccountSecurityAuthDataSource {
+    suspend fun deleteAccount(request: AccountDeletionRequest)
 }
 
 internal interface PasswordRecoveryAuthDataSource {
@@ -43,6 +69,16 @@ internal data class AuthSessionDto(
     val expiresAtEpochMilliseconds: Long,
     val onboardingCompleted: Boolean,
     val purpose: AuthSessionPurpose = AuthSessionPurpose.Standard,
+    val authenticationMethod: com.kwabor.shared.domain.auth.AuthenticationMethod =
+        com.kwabor.shared.domain.auth.AuthenticationMethod.Email,
+    val suggestedFirstName: String? = null,
+    val suggestedLastName: String? = null,
+)
+
+internal data class PromoterActivationResultDto(
+    val session: AuthSessionDto,
+    val organizationId: String,
+    val listingId: String,
 )
 
 internal sealed class AuthDataException(

@@ -36,6 +36,7 @@ import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthPlatformUiState
 import com.kwabor.android.presentation.auth.AuthSurface
 import com.kwabor.android.presentation.auth.AuthViewModel
+import com.kwabor.android.presentation.auth.PromoterActivationUiState
 import com.kwabor.android.presentation.explore.ExploreEffect
 import com.kwabor.android.presentation.explore.ExploreIntent
 import com.kwabor.android.presentation.explore.ExploreViewModel
@@ -45,13 +46,12 @@ import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
-import com.kwabor.android.ui.screens.auth.PasswordRecoveryScreen
-import com.kwabor.android.ui.screens.auth.RegistrationScreen
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
-import com.kwabor.android.ui.screens.auth.SignInScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
 import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
+import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
+import com.kwabor.shared.domain.auth.AuthenticationMethod
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
@@ -85,24 +85,30 @@ private fun KwaborThemedContent(
     onDeepLinkConsumed: () -> Unit,
 ) {
     when (state.authPlatform.surface) {
-        AuthSurface.Registration -> RegistrationScreen(
+        AuthSurface.Registration -> RegistrationSurface(
             state = state.registrationScreenState,
             strings = strings,
-            actions = remember(dependencies.authViewModel) { dependencies.authViewModel.registrationActions() },
+            authViewModel = dependencies.authViewModel,
         )
-        AuthSurface.SignIn -> SignInScreen(
+        AuthSurface.SignIn -> SignInSurface(
             state = state.authAccess,
+            federatedSignInInProgress = state.authPlatform.federatedSignInInProgress,
             strings = strings,
-            actions = remember(dependencies.authViewModel) { dependencies.authViewModel.signInActions() },
+            authViewModel = dependencies.authViewModel,
         )
-        AuthSurface.PasswordRecovery -> PasswordRecoveryScreen(
+        AuthSurface.PasswordRecovery -> PasswordRecoverySurface(
             state = state.passwordRecovery,
             resendSecondsRemaining = state.authAccess.recoveryResendSecondsRemaining,
             strings = strings,
-            actions = remember(dependencies.authViewModel) {
-                dependencies.authViewModel.passwordRecoveryActions()
-            },
+            authViewModel = dependencies.authViewModel,
         )
+        AuthSurface.PromoterActivation -> PromoterActivationSurface(
+            state = state.promoterActivation,
+            strings = strings,
+            authViewModel = dependencies.authViewModel,
+        )
+        AuthSurface.SessionRestoreFailure ->
+            SessionRestoreFailureSurface(strings, dependencies.authViewModel)
         AuthSurface.Hidden,
         AuthSurface.SoftWall,
         -> KwaborEntryContent(
@@ -146,6 +152,7 @@ private class KwaborCollectedState(
     val authAccess: AuthAccessUiState get() = authentication.access
     val registration: RegistrationUiState get() = authentication.registration
     val passwordRecovery: PasswordRecoveryUiState get() = authentication.passwordRecovery
+    val promoterActivation: PromoterActivationUiState get() = authentication.promoterActivation
     val authPlatform: AuthPlatformUiState get() = authentication.platform
     val isSessionRestoreComplete: Boolean get() = authentication.isSessionRestoreComplete
 
@@ -160,6 +167,7 @@ private class KwaborCollectedState(
             observabilityConsentPersistenceFailed = authPlatform.observabilityConsentPersistenceFailed,
             notificationPermissionRequestInFlight = authPlatform.notificationPermissionRequestInFlight,
             notificationPrimingPersistenceFailed = authPlatform.notificationPrimingPersistenceFailed,
+            federatedSignInInProgress = authPlatform.federatedSignInInProgress,
         )
 
     val onboardingEntry: OnboardingEntry
@@ -180,6 +188,7 @@ private data class CollectedAuthenticationState(
     val access: AuthAccessUiState,
     val registration: RegistrationUiState,
     val passwordRecovery: PasswordRecoveryUiState,
+    val promoterActivation: PromoterActivationUiState,
     val platform: AuthPlatformUiState,
     val isSessionRestoreComplete: Boolean,
 )
@@ -215,6 +224,19 @@ private object AuthEffectDispatcher {
                     dependencies.exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
                     dependencies.authViewModel.onIntent(AuthIntent.SignOutNavigationHandled)
                 }
+                AuthEffect.AccountDeleted -> {
+                    dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
+                    actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
+                    actions.onDestinationResolved()
+                    actions.onDeepLinkConsumed()
+                    dependencies.exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
+                    dependencies.authViewModel.onIntent(AuthIntent.AccountDeletionNavigationHandled)
+                }
+                is AuthEffect.PromoterActivationCompleted -> {
+                    actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
+                    actions.onDestinationResolved()
+                    actions.onDeepLinkConsumed()
+                }
             }
         }
 }
@@ -236,6 +258,7 @@ private fun collectKwaborAppState(
     val onboardingState by dependencies.onboardingViewModel.state.collectAsStateWithLifecycle()
     val registrationState by dependencies.authViewModel.registrationState.collectAsStateWithLifecycle()
     val passwordRecoveryState by dependencies.authViewModel.passwordRecoveryState.collectAsStateWithLifecycle()
+    val promoterActivationState by dependencies.authViewModel.promoterActivationState.collectAsStateWithLifecycle()
     val authPlatformState by dependencies.authViewModel.platformState.collectAsStateWithLifecycle()
     val deepLink by runtimeState.pendingDeepLink.collectAsStateWithLifecycle()
     return KwaborCollectedState(
@@ -244,6 +267,7 @@ private fun collectKwaborAppState(
             access = authAccessState,
             registration = registrationState,
             passwordRecovery = passwordRecoveryState,
+            promoterActivation = promoterActivationState,
             platform = authPlatformState,
             isSessionRestoreComplete = restoreComplete,
         ),
@@ -413,8 +437,12 @@ private fun KwaborRootNavHost(
         rootAnchorRoutes(paddingValues = paddingValues, strings = strings)
         composable<ProfileRoute> {
             ProfileSessionScreen(
-                email = state.auth.currentSession?.email ?: strings.authConnectedSession,
-                authAccessState = state.authAccess,
+                model = ProfileSessionUiModel(
+                    email = state.auth.currentSession?.email ?: strings.authConnectedSession,
+                    authenticationMethod = state.auth.currentSession?.authenticationMethod
+                        ?: AuthenticationMethod.Email,
+                    authAccessState = state.authAccess,
+                ),
                 strings = strings,
                 actions = remember(dependencies.authViewModel) {
                     dependencies.authViewModel.profileSessionActions()

@@ -7,6 +7,7 @@ import com.kwabor.shared.presentation.auth.RegistrationIntent
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 internal class AuthSessionCoordinator(
@@ -31,11 +32,16 @@ internal class AuthSessionCoordinator(
             AuthIntent.ConfirmSignOut,
             AuthIntent.SignOutNavigationHandled,
             -> Unit
+            AuthIntent.RetrySessionRestore -> retrySessionRestore()
         }
     }
 
     fun loadCurrentSession(onPasswordRecoverySession: suspend (AuthSession) -> Unit) {
         sessionRestorer.load(onPasswordRecoverySession)
+    }
+
+    fun retrySessionRestore() {
+        sessionRestorer.retry()
     }
 
     private fun openSoftWall() {
@@ -79,6 +85,7 @@ internal class AuthSessionCoordinator(
             val updatedAuthState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
             runtime.authState.value = updatedAuthState
             if (!updatedAuthState.hasSession && updatedAuthState.errorMessage == null) {
+                dependencies.googleIdentityProvider.clearCredentialState()
                 dependencies.authJourneyStore.clear()
                 runtime.registrationState.value = initialRegistrationUiState()
                 closeJourneyAfterCancellation()
@@ -177,7 +184,7 @@ internal class AuthSessionCoordinator(
     }
 
     private fun hasInterruptedRegistration(): Boolean =
-        dependencies.authJourneyStore.read() == InterruptedAuthJourney.Registration
+        dependencies.authJourneyStore.read() != InterruptedAuthJourney.None
 }
 
 private class AuthSessionRestorer(
@@ -185,11 +192,15 @@ private class AuthSessionRestorer(
     private val dependencies: AuthViewModelDependencies,
     private val onExistingAccount: suspend (String) -> Unit,
 ) {
+    private var passwordRecoverySessionHandler: (suspend (AuthSession) -> Unit)? = null
+
     private val resumeIncompleteSession: suspend (AuthSession) -> Unit = { session ->
-        dependencies.authJourneyStore.clear()
+        val interruptedJourney = dependencies.authJourneyStore.read()
         runtime.registrationState.value = initialRegistrationUiState().copy(
-            step = RegistrationStep.Password,
+            step = interruptedJourney.resumeRegistrationStep(),
             email = session.email.orEmpty(),
+            firstName = session.suggestedFirstName.orEmpty(),
+            lastName = session.suggestedLastName.orEmpty(),
             currentSession = session,
         )
         runtime.platformState.value = AuthPlatformUiState(surface = AuthSurface.Registration)
@@ -209,14 +220,77 @@ private class AuthSessionRestorer(
     }
 
     fun load(onPasswordRecoverySession: suspend (AuthSession) -> Unit) {
-        runtime.coroutineScope.launch {
+        passwordRecoverySessionHandler = onPasswordRecoverySession
+        start(onPasswordRecoverySession)
+    }
+
+    fun retry() {
+        if (runtime.sessionRestoreStatus.value != AuthSessionRestoreStatus.Failed) return
+        val handler = passwordRecoverySessionHandler ?: return
+        start(handler)
+    }
+
+    private fun start(onPasswordRecoverySession: suspend (AuthSession) -> Unit) {
+        if (runtime.sessionRestoreJob?.isActive == true) return
+        runtime.sessionRestoreStatus.value = AuthSessionRestoreStatus.InProgress
+        runtime.sessionRestoreComplete.value = false
+        runtime.sessionRestoreJob = runtime.coroutineScope.launch {
+            var restoreSucceeded = false
             try {
+                if (!revokePendingPromoterActivationSession()) return@launch
                 val state = dependencies.authPresenter.loadCurrentSession(initialAuthUiState(), runtime.strings)
+                if (state.errorMessage != null) {
+                    runtime.authState.value = state
+                    return@launch
+                }
                 route(state, onPasswordRecoverySession)
+                restoreSucceeded = true
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                runtime.authState.value = initialAuthUiState().copy(
+                    errorMessage = runtime.strings.authFederatedUnavailable,
+                )
             } finally {
+                runtime.sessionRestoreStatus.value = if (restoreSucceeded) {
+                    AuthSessionRestoreStatus.Ready
+                } else {
+                    AuthSessionRestoreStatus.Failed
+                }
+                publishRestoreSurface(restoreSucceeded)
                 runtime.sessionRestoreComplete.value = true
             }
         }
+    }
+
+    private fun publishRestoreSurface(restoreSucceeded: Boolean) {
+        if (!restoreSucceeded) {
+            runtime.platformState.value = AuthPlatformUiState(
+                surface = AuthSurface.SessionRestoreFailure,
+            )
+            return
+        }
+        if (runtime.platformState.value.surface == AuthSurface.SessionRestoreFailure) {
+            runtime.platformState.value = AuthPlatformUiState()
+        }
+    }
+
+    private suspend fun revokePendingPromoterActivationSession(): Boolean {
+        if (!dependencies.promoterActivationSessionStore.hasPendingImportedSession()) return true
+        val signedOutState = dependencies.authPresenter.signOut(initialAuthUiState(), runtime.strings)
+        if (signedOutState.errorMessage != null) {
+            runtime.authState.value = signedOutState
+            return false
+        }
+        runtime.authState.value = signedOutState
+        dependencies.googleIdentityProvider.clearCredentialState()
+        if (!dependencies.promoterActivationSessionStore.clear()) {
+            runtime.authState.value = signedOutState.copy(
+                errorMessage = runtime.strings.authFederatedUnavailable,
+            )
+            return false
+        }
+        return true
     }
 
     private suspend fun route(
@@ -224,7 +298,7 @@ private class AuthSessionRestorer(
         onPasswordRecoverySession: suspend (AuthSession) -> Unit,
     ) {
         val session = state.currentSession
-        val registrationInterrupted = dependencies.authJourneyStore.read() == InterruptedAuthJourney.Registration
+        val registrationInterrupted = dependencies.authJourneyStore.read() != InterruptedAuthJourney.None
         val mustRevokeOtpSession = registrationInterrupted &&
             session?.accountSetupStatus == AccountSetupStatus.Complete
         runtime.authState.value = if (mustRevokeOtpSession) initialAuthUiState() else state
@@ -242,6 +316,13 @@ private class AuthSessionRestorer(
     }
 }
 
+private fun InterruptedAuthJourney.resumeRegistrationStep(): RegistrationStep = when (this) {
+    InterruptedAuthJourney.SocialRegistration -> RegistrationStep.Identity
+    InterruptedAuthJourney.None,
+    InterruptedAuthJourney.Registration,
+    -> RegistrationStep.Password
+}
+
 private class AuthSignOutCoordinator(
     private val runtime: AuthViewModelRuntime,
     private val dependencies: AuthViewModelDependencies,
@@ -251,6 +332,7 @@ private class AuthSignOutCoordinator(
         AuthIntent.CancelSignOut -> true.also { cancel() }
         AuthIntent.ConfirmSignOut -> true.also { confirm() }
         AuthIntent.SignOutNavigationHandled -> true.also { completeNavigation() }
+        AuthIntent.RetrySessionRestore -> false
         AuthIntent.OpenSoftWall,
         is AuthIntent.OpenRegistration,
         is AuthIntent.OpenSignIn,
@@ -292,6 +374,7 @@ private class AuthSignOutCoordinator(
                 )
                 return@launch
             }
+            dependencies.googleIdentityProvider.clearCredentialState()
             runtime.pendingSignedOutState = signedOutState
             runtime.effectChannel.send(AuthEffect.SignedOut)
         }

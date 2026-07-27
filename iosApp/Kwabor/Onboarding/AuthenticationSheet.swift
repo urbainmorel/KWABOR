@@ -4,6 +4,7 @@ import SwiftUI
 struct AuthenticationSheet: View {
     @ObservedObject private var coordinator: OnboardingCoordinator
     @StateObject private var store: AuthenticationStore
+    @StateObject private var federatedStore: FederatedSignInStore
 
     init(coordinator: OnboardingCoordinator) {
         self.coordinator = coordinator
@@ -19,6 +20,14 @@ struct AuthenticationSheet: View {
         }
         _store = StateObject(
             wrappedValue: store
+        )
+        _federatedStore = StateObject(
+            wrappedValue: FederatedSignInStore(
+                strings: coordinator.strings,
+                presenterProvider: WindowScenePresentingViewControllerProvider(),
+                identityHintStore: coordinator.federatedIdentityHintStore,
+                onCredential: coordinator.signInWithFederatedCredential
+            )
         )
     }
 
@@ -39,6 +48,7 @@ struct AuthenticationSheet: View {
                             authErrorMessage: coordinator.authState?.errorMessage,
                             allowsAlternativeActions:
                                 !coordinator.requiresProtectedAuthentication,
+                            federatedStore: federatedStore,
                             onCreateAccount: coordinator.presentRegistrationFromAuthentication,
                             onContinueAsGuest: continueAsGuest
                         )
@@ -57,7 +67,7 @@ struct AuthenticationSheet: View {
         .interactiveDismissDisabled(
             store.requiresProtectedRecoveryCancellation ||
                 store.isLoading ||
-                coordinator.requiresProtectedAuthentication
+                coordinator.requiresProtectedAuthentication || federatedStore.isLoading
         )
         .onDisappear(perform: store.resetAfterDismissal)
     }

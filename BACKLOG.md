@@ -70,7 +70,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
 - [x] BRAND-001 — Restaurer le wordmark officiel complet au lancement Android/iOS, assurer la continuité jusqu'à la première frame et verrouiller l'intégrité des assets en CI.
+- [ ] BRAND-002 — Remplacer le monogramme Android de lancement rééchantillonné par le master officiel haute définition exact, verrouiller hash/géométrie et fournir les captures multi-API Android ainsi que le contrôle iOS.
 - [ ] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
+  - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.
+  - [x] Validations locales finales, reset Supabase, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
+  - [ ] Build Xcode macOS, PR et CI obligatoires avant fusion.
 
 ### Offline, préférences et médias
 

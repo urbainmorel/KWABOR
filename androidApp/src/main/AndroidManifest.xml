@@ -47,6 +47,17 @@
                     android:host="app"
                     android:scheme="kwabor" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="auth"
+                    android:path="/promoter-activate"
+                    android:scheme="kwabor" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

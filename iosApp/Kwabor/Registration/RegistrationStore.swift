@@ -292,9 +292,9 @@ final class RegistrationStore: ObservableObject {
         case .none:
             return
         case .clearInterruptedJourney:
-            interruptedAuthJourneyStore.clear(.registration)
+            interruptedAuthJourneyStore.clearRegistration()
         case .continueRegistration:
-            interruptedAuthJourneyStore.clear(.registration)
+            interruptedAuthJourneyStore.clearRegistration()
         case .requirePasswordSignIn:
             completionReported = true
             onExistingAccountAuthenticated(updatedState.currentSession?.email)
