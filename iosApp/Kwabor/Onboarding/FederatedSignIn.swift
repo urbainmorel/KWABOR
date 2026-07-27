@@ -418,7 +418,7 @@ final class FederatedSignInStore: ObservableObject {
             return true
         }
         return nsError.domain == kGIDSignInErrorDomain &&
-            nsError.code == GIDSignInErrorCode.canceled.rawValue
+            nsError.code == GIDSignInError.Code.canceled.rawValue
     }
 }
 
