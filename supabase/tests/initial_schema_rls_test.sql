@@ -43,6 +43,7 @@ BEGIN
 EXCEPTION
   WHEN OTHERS THEN
     RESET ROLE;
+    RAISE NOTICE 'statement_succeeds_as failed: %', SQLERRM;
     RETURN false;
 END;
 $$;

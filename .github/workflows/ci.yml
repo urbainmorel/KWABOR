@@ -32,10 +32,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6.2.0
 
+      - uses: denoland/setup-deno@v2.0.4
+        with:
+          deno-version: 2.9.4
+          cache: true
+
       - uses: supabase/setup-cli@v2.1.1
         with:
           version: 2.84.2
           github-token: ${{ github.token }}
+
+      - name: Verify account deletion Edge Function
+        working-directory: supabase/functions/account-delete
+        run: |
+          deno install --frozen
+          deno fmt --check .
+          deno lint *.ts
+          deno check *.ts
+          deno test core_test.ts identity_test.ts
 
       - name: Quality gate
         run: ./gradlew check
@@ -60,6 +74,14 @@ jobs:
 
       - name: Xcode version
         run: xcodebuild -version
+
+      - name: Test pure Swift auth policies
+        run: |
+          xcrun swiftc \
+            iosApp/Kwabor/Onboarding/PromoterActivationSessionMarker.swift \
+            iosApp/PolicyTests/main.swift \
+            -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
+          "$RUNNER_TEMP/kwabor-ios-policy-tests"
 
       - name: Build shared iOS XCFrameworks
         run: ./gradlew :shared:assembleSharedDebugXCFramework :shared:assembleSharedReleaseXCFramework

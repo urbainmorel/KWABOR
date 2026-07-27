@@ -198,7 +198,13 @@ private fun RegistrationStepContent(
 ) {
     val state = screenState.registration
     when (state.step) {
-        RegistrationStep.Email -> EmailStep(state, strings, actions, modifier)
+        RegistrationStep.Email -> EmailStep(
+            state = state,
+            federatedSignInInProgress = screenState.federatedSignInInProgress,
+            strings = strings,
+            actions = actions,
+            modifier = modifier,
+        )
         RegistrationStep.Otp -> OtpStep(state, screenState.otpResendSecondsRemaining, strings, actions, modifier)
         RegistrationStep.Password -> PasswordStep(state, strings, actions, modifier)
         RegistrationStep.Identity -> IdentityStep(state, strings, actions, modifier)

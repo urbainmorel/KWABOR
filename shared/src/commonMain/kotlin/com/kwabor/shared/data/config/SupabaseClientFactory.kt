@@ -6,6 +6,8 @@ import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.MemoryCodeVerifierCache
 import io.github.jan.supabase.auth.SessionManager
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.logging.LogLevel
 import io.github.jan.supabase.postgrest.Postgrest
 
 fun createKwaborSupabaseClient(
@@ -15,7 +17,9 @@ fun createKwaborSupabaseClient(
     supabaseUrl = environment.supabaseUrl,
     supabaseKey = environment.supabasePublishableKey,
 ) {
+    defaultLogLevel = LogLevel.WARNING
     install(Postgrest)
+    install(Functions)
     authSessionManager?.let { secureSessionManager ->
         install(Auth) {
             sessionManager = secureSessionManager

@@ -12,11 +12,17 @@ import com.kwabor.android.app.KwaborApp
 import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
 import com.kwabor.android.app.KwaborUnavailableApp
+import com.kwabor.android.auth.AndroidDeepLinkClassifier
+import com.kwabor.android.auth.AndroidDeepLinkDestination
+import com.kwabor.android.auth.AndroidGoogleIdentityProvider
 import com.kwabor.android.auth.AndroidLegalDocumentLauncher
 import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
 import com.kwabor.android.auth.AndroidRegistrationLocationService
 import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
 import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
+import com.kwabor.android.auth.SharedPreferencesPromoterActivationSessionStore
+import com.kwabor.android.auth.UuidIdempotencyKeyProvider
+import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
 import com.kwabor.android.presentation.explore.ExploreViewModel
@@ -35,6 +41,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<String?>(null)
+    private var pendingAuthCallback: String? = null
+    private var authViewModel: AuthViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -42,6 +50,7 @@ class MainActivity : ComponentActivity() {
         acceptDeepLink(intent)
         val configuredApp = configuredAppOrNull()
         if (configuredApp == null) {
+            pendingAuthCallback = null
             setContent { KwaborUnavailableApp() }
             return
         }
@@ -62,13 +71,17 @@ class MainActivity : ComponentActivity() {
     private fun showConfiguredApp(configuredApp: ConfiguredApp) {
         val strings = stringsFor(AppLocale.French)
         val applicationState = application as KwaborApplication
+        val configuredAuthViewModel = createAuthViewModel(
+            configuredApp = configuredApp,
+            strings = strings,
+            applicationState = applicationState,
+        )
+        authViewModel = configuredAuthViewModel
+        configuredAuthViewModel.attachGoogleIdentityActivity(this)
+        dispatchPendingAuthCallback(configuredAuthViewModel)
         val dependencies = KwaborAppDependencies(
             exploreViewModel = createExploreViewModel(configuredApp.compositionRoot, strings),
-            authViewModel = createAuthViewModel(
-                configuredApp = configuredApp,
-                strings = strings,
-                applicationState = applicationState,
-            ),
+            authViewModel = configuredAuthViewModel,
             onboardingViewModel = createOnboardingViewModel(
                 applicationState,
                 configuredApp.compositionRoot.dispatcherProvider,
@@ -120,6 +133,14 @@ class MainActivity : ComponentActivity() {
                         notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
                         notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
                         authJourneyStore = SharedPreferencesAuthJourneyStore(applicationContext),
+                        promoterActivationSessionStore =
+                        SharedPreferencesPromoterActivationSessionStore(applicationContext),
+                        googleIdentityProvider = AndroidGoogleIdentityProvider(
+                            context = applicationContext,
+                            serverClientId = BuildConfig.KWABOR_GOOGLE_WEB_CLIENT_ID,
+                        ),
+                        googleIdentityUnavailableMessage = getString(R.string.auth_google_unavailable),
+                        idempotencyKeyProvider = UuidIdempotencyKeyProvider,
                         clockProvider = configuredApp.compositionRoot.clockProvider,
                         applyObservabilityConsent = applicationState.observability::updateConsent,
                     ),
@@ -156,9 +177,36 @@ class MainActivity : ComponentActivity() {
         acceptDeepLink(intent)
     }
 
+    override fun onDestroy() {
+        authViewModel?.detachGoogleIdentityActivity(this)
+        authViewModel = null
+        super.onDestroy()
+    }
+
     private fun acceptDeepLink(sourceIntent: Intent) {
-        pendingDeepLink.value = sourceIntent.dataString
+        val data = sourceIntent.data ?: return
         sourceIntent.data = null
+        val rawUrl = data.toString()
+        when (AndroidDeepLinkClassifier.classify(rawUrl)) {
+            AndroidDeepLinkDestination.PromoterActivation -> acceptPromoterAuthCallback(rawUrl)
+            AndroidDeepLinkDestination.RootNavigation -> pendingDeepLink.value = rawUrl
+            AndroidDeepLinkDestination.Rejected -> Unit
+        }
+    }
+
+    private fun acceptPromoterAuthCallback(callbackUrl: String) {
+        val currentAuthViewModel = authViewModel
+        if (currentAuthViewModel == null) {
+            pendingAuthCallback = callbackUrl
+        } else {
+            currentAuthViewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
+        }
+    }
+
+    private fun dispatchPendingAuthCallback(viewModel: AuthViewModel) {
+        val callbackUrl = pendingAuthCallback ?: return
+        pendingAuthCallback = null
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
     }
 }
 

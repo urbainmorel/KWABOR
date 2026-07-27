@@ -6,6 +6,7 @@ struct SignInFlowView: View {
     let strings: OnboardingStrings
     let authErrorMessage: String?
     let allowsAlternativeActions: Bool
+    @ObservedObject var federatedStore: FederatedSignInStore
     let onCreateAccount: () -> Void
     let onContinueAsGuest: () -> Void
     @State private var password = ""
@@ -24,6 +25,10 @@ struct SignInFlowView: View {
                     action: store.continueToPassword
                 )
             }
+            FederatedSignInButtons(
+                store: federatedStore,
+                isDisabled: store.isLoading
+            )
             if allowsAlternativeActions {
                 accountActions
             }

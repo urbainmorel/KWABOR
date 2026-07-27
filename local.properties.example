@@ -3,14 +3,18 @@ kwabor.environment=development
 # Generic values apply only to the tier selected above.
 kwabor.supabase.url=
 kwabor.supabase.publishableKey=
+kwabor.google.webClientId=
 
 # Optional per-tier values are useful when validating multiple Android variants.
 kwabor.development.supabase.url=
 kwabor.development.supabase.publishableKey=
+kwabor.development.google.webClientId=
 kwabor.staging.supabase.url=
 kwabor.staging.supabase.publishableKey=
+kwabor.staging.google.webClientId=
 kwabor.production.supabase.url=
 kwabor.production.supabase.publishableKey=
+kwabor.production.google.webClientId=
 
 kwabor.versionCode=1
 kwabor.versionName=0.1.0

@@ -16,6 +16,7 @@ internal data class RegistrationScreenState(
     val observabilityConsentPersistenceFailed: Boolean,
     val notificationPermissionRequestInFlight: Boolean,
     val notificationPrimingPersistenceFailed: Boolean,
+    val federatedSignInInProgress: Boolean,
 )
 
 internal data class RegistrationScreenActions(
@@ -25,6 +26,7 @@ internal data class RegistrationScreenActions(
     val onSubmitOtp: (String) -> Unit,
     val onResendOtp: () -> Unit,
     val onSubmitPassword: (String, String) -> Unit,
+    val onGoogleSignIn: () -> Unit,
     val onFirstNameChange: (String) -> Unit,
     val onLastNameChange: (String) -> Unit,
     val onContinueFromIdentity: () -> Unit,

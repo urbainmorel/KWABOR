@@ -20,6 +20,31 @@ class KwaborSharedBridgeTest {
         assertEquals("S'inscrire", onboardingStrings.signUp)
         assertEquals("Recevoir le code", onboardingStrings.authRequestOtp)
         assertEquals("Kwabor est indisponible pour le moment. Réessayez plus tard.", onboardingStrings.authUnavailable)
+        assertEquals("Accueil", onboardingStrings.home)
+        assertEquals("Réessayer", onboardingStrings.retry)
+        assertEquals("Chargement", onboardingStrings.loading)
+        assertEquals("Continuer avec Google", onboardingStrings.authSignInWithGoogle)
+        assertEquals("Continuer avec Apple", onboardingStrings.authSignInWithApple)
+        assertEquals("ou", onboardingStrings.authOrSeparator)
+        assertEquals(
+            "Cette méthode de connexion est indisponible pour le moment.",
+            onboardingStrings.authFederatedUnavailable,
+        )
+        assertEquals(
+            "La vérification de votre identité a échoué.",
+            onboardingStrings.authReauthenticationFailed,
+        )
+        assertEquals("Zone sensible", onboardingStrings.dangerZoneTitle)
+        assertEquals("Supprimer mon compte", onboardingStrings.authDeleteAccount)
+        assertEquals("SUPPRIMER", onboardingStrings.authDeleteAccountConfirmationPhrase)
+        assertEquals(
+            "La suppression du compte a échoué. Réessayez sans fermer cet écran.",
+            onboardingStrings.authAccountDeletionFailed,
+        )
+        assertEquals("Activer mon espace Promoteur", onboardingStrings.promoterActivationTitle)
+        assertEquals("Commerce invité", onboardingStrings.promoterActivationBusinessName)
+        assertEquals("Votre espace Promoteur est prêt.", onboardingStrings.promoterActivationSuccess)
+        assertEquals("Ce lien d'activation est invalide.", onboardingStrings.authPromoterInviteInvalid)
         assertEquals(
             "Ce code a expiré. Demandez-en un nouveau.",
             onboardingStrings.registrationOtpExpired,

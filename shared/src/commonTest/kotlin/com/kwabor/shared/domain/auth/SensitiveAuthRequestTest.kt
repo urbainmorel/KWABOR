@@ -10,6 +10,7 @@ class SensitiveAuthRequestTest {
         val request = SocialSignInRequest(
             provider = SocialAuthProvider.Google,
             idToken = idToken,
+            rawNonce = "abcdefghijklmnopqrstuvwxyzABCDEF",
         )
 
         assertFalse(request.toString().contains(idToken))
@@ -26,6 +27,7 @@ class SensitiveAuthRequestTest {
             socialSignInRequest = SocialSignInRequest(
                 provider = SocialAuthProvider.Apple,
                 idToken = idToken,
+                rawNonce = "abcdefghijklmnopqrstuvwxyzABCDEF",
             ),
         )
         val representation = request.toString()
@@ -33,5 +35,33 @@ class SensitiveAuthRequestTest {
         assertFalse(representation.contains(inviteToken))
         assertFalse(representation.contains(password))
         assertFalse(representation.contains(idToken))
+    }
+
+    @Test
+    fun promoterActivationContextDoesNotExposeTokenIdentifiersOrBusinessName() {
+        val context = PromoterActivationContext(
+            inviteToken = "invite-secret",
+            organizationId = "organization-secret",
+            listingId = "listing-secret",
+            businessName = "Entreprise individuelle sensible",
+        )
+        val representation = context.toString()
+
+        assertFalse(representation.contains(context.inviteToken))
+        assertFalse(representation.contains(context.organizationId))
+        assertFalse(representation.contains(context.listingId))
+        assertFalse(representation.contains(context.businessName))
+    }
+
+    @Test
+    fun accountDeletionRequestDoesNotExposeIdempotencyOrPassword() {
+        val request = AccountDeletionRequest(
+            idempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            credential = AccountDeletionCredential.Password("password-secret"),
+        )
+        val representation = request.toString()
+
+        assertFalse(representation.contains(request.idempotencyKey))
+        assertFalse(representation.contains("password-secret"))
     }
 }

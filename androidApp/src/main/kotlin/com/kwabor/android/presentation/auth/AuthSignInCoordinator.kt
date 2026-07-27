@@ -93,7 +93,7 @@ internal class AuthSignInCoordinator(
     }
 
     private fun clearInterruptedRegistration(): Boolean {
-        if (dependencies.authJourneyStore.read() != InterruptedAuthJourney.Registration) return true
+        if (dependencies.authJourneyStore.read() == InterruptedAuthJourney.None) return true
         if (dependencies.authJourneyStore.clear()) return true
         publishInvalidSignInResult()
         return false

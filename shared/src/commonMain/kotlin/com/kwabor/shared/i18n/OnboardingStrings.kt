@@ -1,10 +1,15 @@
 package com.kwabor.shared.i18n
 
 class OnboardingStrings internal constructor(
+    common: OnboardingCommonStrings,
     intro: OnboardingIntroStrings,
     auth: OnboardingAuthStrings,
+    security: OnboardingSecurityStrings,
     registration: OnboardingRegistrationStrings,
 ) {
+    val home: String = common.home
+    val retry: String = common.retry
+    val loading: String = common.loading
     val introSkip: String = intro.introSkip
     val introContinue: String = intro.introContinue
     val introAccessibilityLabel: String = intro.introAccessibilityLabel
@@ -42,6 +47,26 @@ class OnboardingStrings internal constructor(
     val authSignOutConfirmation: String = auth.authSignOutConfirmation
     val authConfirm: String = auth.authConfirm
     val authCancel: String = auth.authCancel
+    val authSignInWithGoogle: String = security.authSignInWithGoogle
+    val authSignInWithApple: String = security.authSignInWithApple
+    val authOrSeparator: String = security.authOrSeparator
+    val authFederatedUnavailable: String = security.authFederatedUnavailable
+    val authReauthenticationFailed: String = security.authReauthenticationFailed
+    val dangerZoneTitle: String = security.dangerZoneTitle
+    val authDeleteAccount: String = security.authDeleteAccount
+    val authDeleteAccountWarning: String = security.authDeleteAccountWarning
+    val authDeleteAccountPasswordPrompt: String = security.authDeleteAccountPasswordPrompt
+    val authDeleteAccountConfirmationPrompt: String = security.authDeleteAccountConfirmationPrompt
+    val authDeleteAccountConfirmationPhrase: String = security.authDeleteAccountConfirmationPhrase
+    val authDeleteAccountConfirm: String = security.authDeleteAccountConfirm
+    val authAccountDeletionFailed: String = security.authAccountDeletionFailed
+    val promoterActivationTitle: String = security.promoterActivationTitle
+    val promoterActivationBusinessName: String = security.promoterActivationBusinessName
+    val promoterActivationInvitePrompt: String = security.promoterActivationInvitePrompt
+    val promoterActivationPasswordPrompt: String = security.promoterActivationPasswordPrompt
+    val promoterActivationSuccess: String = security.promoterActivationSuccess
+    val authContinueWithPassword: String = security.authContinueWithPassword
+    val authPromoterInviteInvalid: String = security.authPromoterInviteInvalid
     val passwordRecoveryTitle: String = auth.passwordRecoveryTitle
     val passwordRecoverySubtitle: String = auth.passwordRecoverySubtitle
     val passwordRecoveryCode: String = auth.passwordRecoveryCode
@@ -88,6 +113,12 @@ class OnboardingStrings internal constructor(
     val registrationLegalUnavailable: String = registration.registrationLegalUnavailable
     val registrationComplete: String = registration.registrationComplete
 }
+
+internal data class OnboardingCommonStrings(
+    val home: String,
+    val retry: String,
+    val loading: String,
+)
 
 internal data class OnboardingIntroStrings(
     val introSkip: String,
@@ -143,6 +174,29 @@ internal data class OnboardingAuthStrings(
     val passwordRecoveryBackToSignIn: String,
 )
 
+internal data class OnboardingSecurityStrings(
+    val authSignInWithGoogle: String,
+    val authSignInWithApple: String,
+    val authOrSeparator: String,
+    val authFederatedUnavailable: String,
+    val authReauthenticationFailed: String,
+    val dangerZoneTitle: String,
+    val authDeleteAccount: String,
+    val authDeleteAccountWarning: String,
+    val authDeleteAccountPasswordPrompt: String,
+    val authDeleteAccountConfirmationPrompt: String,
+    val authDeleteAccountConfirmationPhrase: String,
+    val authDeleteAccountConfirm: String,
+    val authAccountDeletionFailed: String,
+    val promoterActivationTitle: String,
+    val promoterActivationBusinessName: String,
+    val promoterActivationInvitePrompt: String,
+    val promoterActivationPasswordPrompt: String,
+    val promoterActivationSuccess: String,
+    val authContinueWithPassword: String,
+    val authPromoterInviteInvalid: String,
+)
+
 internal data class OnboardingRegistrationStrings(
     val registrationTitle: String,
     val registrationPassword: String,
@@ -181,9 +235,17 @@ internal data class OnboardingRegistrationStrings(
 )
 
 internal fun KwaborStrings.toOnboardingStrings(): OnboardingStrings = OnboardingStrings(
+    common = toOnboardingCommonStrings(),
     intro = toOnboardingIntroStrings(),
     auth = toOnboardingAuthStrings(),
+    security = toOnboardingSecurityStrings(),
     registration = toOnboardingRegistrationStrings(),
+)
+
+private fun KwaborStrings.toOnboardingCommonStrings(): OnboardingCommonStrings = OnboardingCommonStrings(
+    home = home,
+    retry = retry,
+    loading = loading,
 )
 
 private fun KwaborStrings.toOnboardingIntroStrings(): OnboardingIntroStrings = OnboardingIntroStrings(
@@ -238,6 +300,29 @@ private fun KwaborStrings.toOnboardingAuthStrings(): OnboardingAuthStrings = Onb
     passwordRecoveryConfirmation = passwordRecoveryConfirmation,
     passwordRecoverySuccess = passwordRecoverySuccess,
     passwordRecoveryBackToSignIn = passwordRecoveryBackToSignIn,
+)
+
+private fun KwaborStrings.toOnboardingSecurityStrings(): OnboardingSecurityStrings = OnboardingSecurityStrings(
+    authSignInWithGoogle = authSignInWithGoogle,
+    authSignInWithApple = authSignInWithApple,
+    authOrSeparator = authOrSeparator,
+    authFederatedUnavailable = authFederatedUnavailable,
+    authReauthenticationFailed = authReauthenticationFailed,
+    dangerZoneTitle = dangerZoneTitle,
+    authDeleteAccount = authDeleteAccount,
+    authDeleteAccountWarning = authDeleteAccountWarning,
+    authDeleteAccountPasswordPrompt = authDeleteAccountPasswordPrompt,
+    authDeleteAccountConfirmationPrompt = authDeleteAccountConfirmationPrompt,
+    authDeleteAccountConfirmationPhrase = authDeleteAccountConfirmationPhrase,
+    authDeleteAccountConfirm = authDeleteAccountConfirm,
+    authAccountDeletionFailed = authAccountDeletionFailed,
+    promoterActivationTitle = promoterActivationTitle,
+    promoterActivationBusinessName = promoterActivationBusinessName,
+    promoterActivationInvitePrompt = promoterActivationInvitePrompt,
+    promoterActivationPasswordPrompt = promoterActivationPasswordPrompt,
+    promoterActivationSuccess = promoterActivationSuccess,
+    authContinueWithPassword = authContinueWithPassword,
+    authPromoterInviteInvalid = authPromoterInviteInvalid,
 )
 
 private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrationStrings =

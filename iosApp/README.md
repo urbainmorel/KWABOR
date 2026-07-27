@@ -22,8 +22,11 @@ Configuration locale Supabase, sans secret commité :
 
 - `KWABOR_SUPABASE_URL`
 - `KWABOR_SUPABASE_PUBLISHABLE_KEY`
+- `KWABOR_GOOGLE_IOS_CLIENT_ID`
+- `KWABOR_GOOGLE_SERVER_CLIENT_ID`
+- `KWABOR_GOOGLE_REVERSED_CLIENT_ID`
 
-Copier `Kwabor/Config/Local.xcconfig.example` vers `Kwabor/Config/Local.xcconfig`, puis renseigner les valeurs qualifiées par tier. Le fichier local est ignoré par Git. Debug utilise development et le XCFramework debug ; Staging/Release utilisent respectivement staging/production et le XCFramework release.
+Copier `Kwabor/Config/Local.xcconfig.example` vers `Kwabor/Config/Local.xcconfig`, puis renseigner les valeurs qualifiées par tier. Le client Google iOS et le client Web/serveur doivent être distincts ; le reversed client ID doit correspondre exactement au client iOS. Le fichier local est ignoré par Git. Debug utilise development et le XCFramework debug ; Staging/Release utilisent respectivement staging/production et le XCFramework release.
 
 Le contrat complet et les runbooks sont décrits dans [`docs/environment-configuration.md`](../docs/environment-configuration.md) et [`docs/ios-release.md`](../docs/ios-release.md).
 

@@ -17,12 +17,18 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var introVideoURL: URL?
     @Published private(set) var registrationCancellationErrorMessage: String?
     @Published private(set) var accountSignOutErrorMessage: String?
+    @Published private(set) var promoterActivationContext: PromoterActivationContext?
+    @Published private(set) var promoterActivationErrorMessage: String?
+    @Published private(set) var pendingRootDeepLinkDestinationKey: String?
     @Published private(set) var interruptedRegistrationEmail: String?
     @Published var isAuthenticationPresented = false
     @Published var isRegistrationPresented = false
+    @Published var isPromoterActivationPresented = false
     @Published var isGuestDisclosurePresented = false
     @Published private(set) var isCancellingRegistration = false
     @Published private(set) var isSigningOutAccount = false
+    @Published private(set) var sessionRestoreFailed = false
+    @Published private(set) var isDeletingAccount = false
     @Published private(set) var isRequestingNotificationsAfterSessionRestore = false
 
     let bridge: KwaborSharedBridge
@@ -30,6 +36,8 @@ final class OnboardingCoordinator: ObservableObject {
     let authController: IosAuthController
     let passwordRecoveryController: IosPasswordRecoveryController
     let registrationController: IosRegistrationController
+    let federatedIdentityHintStore: FederatedIdentityHintPersisting
+    let promoterActivationDestinationStore: PromoterActivationDestinationPersisting
     let registrationLocationProvider: RegistrationLocationProviding
     let registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting
     let registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting
@@ -39,11 +47,22 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted && !hasCompleteAccount
     }
 
+    private var canExposeSessionDuringPromoterActivation: Bool {
+        PromoterActivationSessionPolicy.canExposeSession(
+            cleanupRequired: temporaryPromoterActivationSessionCleanupRequired,
+            activationCallbackInProgress: isHandlingPromoterActivationCallback
+        )
+    }
+
     var requiresInterruptedRegistrationPasswordSignIn: Bool {
         interruptedAuthJourneyStore.current == .registration
     }
 
     var requiresProtectedAuthentication: Bool {
+        !sessionRestoreCompleted ||
+        sessionRestoreFailed ||
+        isDeletingAccount ||
+        !canExposeSessionDuringPromoterActivation ||
         !AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) || requiresInterruptedRegistrationPasswordSignIn
@@ -69,7 +88,15 @@ final class OnboardingCoordinator: ObservableObject {
     private var shouldPresentRegistrationAfterAuthenticationDismissal = false
     private var isRevokingInterruptedRegistrationSession = false
     private var isReplacingInterruptedRegistrationSession = false
+    private var isHandlingPromoterActivationCallback = false
+    private var promoterActivationSessionImported = false
+    private var promoterActivationCallbackMarkerArmed = false
+    private var promoterActivationCallbackGeneration = 0
+    private var promoterActivationCallbackQueue = PromoterActivationCallbackQueue()
+    private var temporaryPromoterActivationSessionCleanupRequired = false
+    private var isClearingTemporaryPromoterActivationSessionAtBootstrap = false
     private var freshInstallSessionCleanupCompleted: Bool
+    private let promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting
 
     init(
         bridge: KwaborSharedBridge,
@@ -77,12 +104,17 @@ final class OnboardingCoordinator: ObservableObject {
         passwordRecoveryController: IosPasswordRecoveryController,
         registrationController: IosRegistrationController,
         observability: FirebaseObservability,
+        federatedIdentityHintStore: FederatedIdentityHintPersisting = KeychainFederatedIdentityHintStore(),
+        promoterActivationDestinationStore: PromoterActivationDestinationPersisting =
+            KeychainPromoterActivationDestinationStore(),
         registrationLocationProvider: RegistrationLocationProviding? = nil,
         registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting? = nil,
         registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
         cache: IntroVideoCache = IntroVideoCache(),
         userDefaults: UserDefaults = .standard,
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting? = nil,
+        promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting =
+            FilePromoterActivationSessionMarkerStore(),
         bundle: Bundle = .main
     ) {
         self.bridge = bridge
@@ -90,6 +122,8 @@ final class OnboardingCoordinator: ObservableObject {
         self.authController = authController
         self.passwordRecoveryController = passwordRecoveryController
         self.registrationController = registrationController
+        self.federatedIdentityHintStore = federatedIdentityHintStore
+        self.promoterActivationDestinationStore = promoterActivationDestinationStore
         self.observability = observability
         self.registrationLocationProvider = registrationLocationProvider ?? CoreLocationRegistrationService()
         self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester ??
@@ -98,6 +132,7 @@ final class OnboardingCoordinator: ObservableObject {
             UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
         self.interruptedAuthJourneyStore = interruptedAuthJourneyStore ??
             UserDefaultsInterruptedAuthJourneyStore(userDefaults: userDefaults)
+        self.promoterActivationSessionMarkerStore = promoterActivationSessionMarkerStore
         self.cache = cache
         telemetry = bridge.onboardingTelemetry()
         let bundledIntroVideoURL = bundle.url(
@@ -111,6 +146,14 @@ final class OnboardingCoordinator: ObservableObject {
         let storedFirstLaunchCompleted = introStore.firstLaunchCompleted
         firstLaunchCompleted = storedFirstLaunchCompleted
         freshInstallSessionCleanupCompleted = storedFirstLaunchCompleted
+        switch PromoterActivationSessionPolicy.bootstrapAction(
+            markerState: promoterActivationSessionMarkerStore.state
+        ) {
+        case .proceed:
+            temporaryPromoterActivationSessionCleanupRequired = false
+        case .clearTemporarySession:
+            temporaryPromoterActivationSessionCleanupRequired = true
+        }
 
         let hadPendingVideo = introStore.hasPendingVideo
         let storedPendingVideo = introStore.pendingVideoNewerThanLastPresented()
@@ -128,7 +171,11 @@ final class OnboardingCoordinator: ObservableObject {
         }
         let purgeRejectedPendingBeforeObservation = hadPendingVideo && pendingAtLaunch == nil
 
-        if storedFirstLaunchCompleted {
+        if temporaryPromoterActivationSessionCleanupRequired {
+            route = .restoringSession
+            introVideoURL = nil
+            launchIntroDecisionCompleted = pendingAtLaunch == nil
+        } else if storedFirstLaunchCompleted {
             route = .restoringSession
             introVideoURL = nil
             launchIntroDecisionCompleted = pendingAtLaunch == nil
@@ -145,13 +192,9 @@ final class OnboardingCoordinator: ObservableObject {
                 handleAuthState(state)
             }
             resolveRoute()
+            processPendingPromoterActivationCallbackIfPossible()
         }
-        switch AuthSessionBootstrapPolicy.action(hasInstallationMarker: storedFirstLaunchCompleted) {
-        case .clearLocalSession:
-            clearFreshInstallSessionBeforeRestore()
-        case .restoreSession:
-            restoreSessionAfterBootstrap()
-        }
+        startSessionBootstrap()
 
         if let pendingAtLaunch {
             Task { [weak self, cache] in
@@ -210,6 +253,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func presentAuthentication() {
+        guard !requiresProtectedAuthentication else { return }
         isAuthenticationPresented = true
     }
 
@@ -230,6 +274,11 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func authenticationPresentationDismissed() {
+        guard canExposeSessionDuringPromoterActivation else {
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+            isAuthenticationPresented = false
+            return
+        }
         guard !requiresProtectedAuthentication else {
             shouldPresentRegistrationAfterAuthenticationDismissal = false
             isAuthenticationPresented = true
@@ -245,6 +294,8 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func completeRegistration(_ session: AuthSession) {
+        federatedIdentityHintStore.clearPendingHints()
+        interruptedAuthJourneyStore.clearRegistration()
         registrationCancellationErrorMessage = nil
         completedRegistrationSession = session
         guestAccessGranted = false
@@ -252,7 +303,7 @@ final class OnboardingCoordinator: ObservableObject {
         isRegistrationPresented = false
         registrationController.reset()
         resolveRoute()
-        authController.restoreSession { _ in }
+        refreshSessionState()
     }
 
     func handleExistingRegistrationAccount(email: String?) {
@@ -288,8 +339,146 @@ final class OnboardingCoordinator: ObservableObject {
         }
     }
 
+    func signInWithFederatedCredential(
+        _ credential: FederatedAuthCredential,
+        onCompleted: @escaping (Bool) -> Void
+    ) {
+        let replacesInterruptedRegistration = interruptedAuthJourneyStore.current == .registration
+        if replacesInterruptedRegistration {
+            isReplacingInterruptedRegistrationSession = true
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isRegistrationPresented = false
+        } else {
+            interruptedAuthJourneyStore.mark(.socialAuthentication)
+        }
+        authController.signInWithSocialIdToken(
+            request: credential.sharedRequest
+        ) { [weak self] completed in
+            guard let self else { return }
+            let didComplete = completed.boolValue
+            if replacesInterruptedRegistration {
+                finishInterruptedRegistrationPasswordSignIn(completed: didComplete)
+            } else if !didComplete {
+                interruptedAuthJourneyStore.clear(.socialAuthentication)
+            }
+            onCompleted(didComplete)
+        }
+    }
+
     func refreshSessionState() {
-        authController.restoreSession { _ in }
+        restoreSessionAfterBootstrap()
+    }
+
+    @discardableResult
+    func handleIncomingUrl(_ url: URL) -> Bool {
+        let isAuthenticationUrl = PromoterActivationLinkRoutingPolicy.targetsActivationHost(
+            scheme: url.scheme,
+            host: url.host
+        )
+        if isAuthenticationUrl {
+            guard !sessionRestoreFailed, !isDeletingAccount else { return true }
+            let hasExplicitFragment = url.fragment != nil || url.absoluteString.contains("#")
+            let linkAccepted = PromoterActivationLinkRoutingPolicy.acceptsCallback(
+                scheme: url.scheme,
+                host: url.host,
+                path: url.path,
+                hasExplicitFragment: hasExplicitFragment
+            )
+            switch PromoterActivationSessionPolicy.callbackPreparationAction(
+                linkAccepted: linkAccepted
+            ) {
+            case .rejectBeforeShared:
+                promoterActivationErrorMessage = strings.authPromoterInviteInvalid
+                return true
+            case .queueForBootstrap:
+                _ = promoterActivationCallbackQueue.enqueue(url)
+                processPendingPromoterActivationCallbackIfPossible()
+                return true
+            }
+        }
+        guard !requiresProtectedAuthentication else {
+            return true
+        }
+        guard let routeKey = bridge.rootDestinationKeyForDeepLink(rawUrl: url.absoluteString) else {
+            return false
+        }
+        pendingRootDeepLinkDestinationKey = routeKey
+        return true
+    }
+
+    func consumeRootDeepLinkDestination() {
+        pendingRootDeepLinkDestinationKey = nil
+    }
+
+    func completePromoterActivation(_ result: PromoterActivationResult) {
+        guard let promoterActivationContext else {
+            promoterActivationErrorMessage = strings.authPromoterInviteInvalid
+            return
+        }
+        let destination = PromoterActivationDestination(
+            organizationId: result.organizationId,
+            listingId: result.listingId,
+            businessName: promoterActivationContext.businessName
+        )
+        guard promoterActivationDestinationStore.save(destination) else {
+            promoterActivationErrorMessage = strings.authUnavailable
+            return
+        }
+        if promoterActivationSessionImported {
+            guard promoterActivationSessionMarkerStore.clear() else {
+                promoterActivationErrorMessage = strings.authUnavailable
+                return
+            }
+            temporaryPromoterActivationSessionCleanupRequired = false
+        }
+        federatedIdentityHintStore.clearPendingHints()
+        completedRegistrationSession = result.session
+        guestAccessGranted = false
+        self.promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationErrorMessage = nil
+        isPromoterActivationPresented = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        pendingRootDeepLinkDestinationKey = nil
+        resolveRoute()
+        processPendingPromoterActivationCallbackIfPossible()
+    }
+
+    func cancelPromoterActivation() {
+        guard !isHandlingPromoterActivationCallback else { return }
+        guard promoterActivationSessionImported else {
+            closePromoterActivation()
+            return
+        }
+        isHandlingPromoterActivationCallback = true
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            isHandlingPromoterActivationCallback = false
+            guard completed.boolValue else {
+                promoterActivationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
+                return
+            }
+            GoogleSignInBootstrap.clearLocalSession()
+            completedRegistrationSession = nil
+            guard promoterActivationSessionMarkerStore.clear() else {
+                promoterActivationErrorMessage = strings.authUnavailable
+                resolveRoute()
+                return
+            }
+            temporaryPromoterActivationSessionCleanupRequired = false
+            closePromoterActivation()
+        }
+    }
+
+    func dismissPromoterActivationError() {
+        promoterActivationErrorMessage = nil
+        if temporaryPromoterActivationSessionCleanupRequired {
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+            return
+        }
+        processPendingPromoterActivationCallbackIfPossible()
     }
 
     func signOutCurrentAccount() {
@@ -302,9 +491,13 @@ final class OnboardingCoordinator: ObservableObject {
             guard let self else { return }
             isSigningOutAccount = false
             if completed.boolValue {
+                federatedIdentityHintStore.clearPendingHints()
+                promoterActivationDestinationStore.clear()
+                GoogleSignInBootstrap.clearLocalSession()
                 completedRegistrationSession = nil
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
+                pendingRootDeepLinkDestinationKey = nil
                 registrationController.reset()
             } else {
                 guestAccessGranted = false
@@ -316,6 +509,44 @@ final class OnboardingCoordinator: ObservableObject {
 
     func clearAccountSignOutError() {
         accountSignOutErrorMessage = nil
+    }
+
+    func accountDeletionStateChanged(isInProgress: Bool) {
+        guard isDeletingAccount != isInProgress else { return }
+        isDeletingAccount = isInProgress
+        if isInProgress {
+            invalidatePromoterActivationCallbacksForAccountDeletion()
+        } else if temporaryPromoterActivationSessionCleanupRequired {
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+            return
+        }
+        resolveRoute()
+    }
+
+    func accountDeletionCompleted() {
+        promoterActivationCallbackGeneration += 1
+        promoterActivationCallbackQueue.clear()
+        isHandlingPromoterActivationCallback = false
+        promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationCallbackMarkerArmed = false
+        isPromoterActivationPresented = false
+        let markerCleared = promoterActivationSessionMarkerStore.clear()
+        temporaryPromoterActivationSessionCleanupRequired = !markerCleared
+        if !markerCleared {
+            sessionRestoreCompleted = false
+            sessionRestoreFailed = true
+        }
+        isDeletingAccount = false
+        federatedIdentityHintStore.clearPendingHints()
+        promoterActivationDestinationStore.clear()
+        GoogleSignInBootstrap.clearLocalSession()
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        pendingRootDeepLinkDestinationKey = nil
+        resolveRoute()
     }
 
     func cancelRegistration(requiresSignOut: Bool) {
@@ -332,6 +563,8 @@ final class OnboardingCoordinator: ObservableObject {
             guard let self else { return }
             isCancellingRegistration = false
             if completed.boolValue {
+                federatedIdentityHintStore.clearPendingHints()
+                GoogleSignInBootstrap.clearLocalSession()
                 completedRegistrationSession = nil
                 registrationController.reset()
                 isRegistrationPresented = false
@@ -348,6 +581,12 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func requestGuestAccess() {
+        guard canExposeSessionDuringPromoterActivation else {
+            isGuestDisclosurePresented = false
+            guestAccessGranted = false
+            resolveRoute()
+            return
+        }
         guard !requiresProtectedAuthentication else {
             isGuestDisclosurePresented = false
             guestAccessGranted = false
@@ -359,6 +598,12 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func confirmGuestAccess() {
+        guard canExposeSessionDuringPromoterActivation else {
+            isGuestDisclosurePresented = false
+            guestAccessGranted = false
+            resolveRoute()
+            return
+        }
         guard !requiresProtectedAuthentication else {
             isGuestDisclosurePresented = false
             guestAccessGranted = false
@@ -376,6 +621,11 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func dismissAuthentication() {
+        guard canExposeSessionDuringPromoterActivation else {
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+            isAuthenticationPresented = false
+            return
+        }
         guard !requiresProtectedAuthentication else {
             isAuthenticationPresented = true
             return
@@ -412,6 +662,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private var hasCompleteAccount: Bool {
+        guard canExposeSessionDuringPromoterActivation else { return false }
         guard AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) else { return false }
@@ -420,6 +671,13 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func handleAuthState(_ state: AuthUiState) {
+        guard canExposeSessionDuringPromoterActivation else {
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isAuthenticationPresented = false
+            isRegistrationPresented = false
+            return
+        }
         guard AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) else {
@@ -457,7 +715,7 @@ final class OnboardingCoordinator: ObservableObject {
             return
         }
         if state.hasSession, let session = state.currentSession {
-            interruptedAuthJourneyStore.clear(.registration)
+            interruptedAuthJourneyStore.clearRegistration()
             interruptedRegistrationEmail = nil
             resumeIncompleteRegistration(session)
             return
@@ -467,6 +725,8 @@ final class OnboardingCoordinator: ObservableObject {
 
     private func applyStandardAuthState(_ state: AuthUiState) {
         if state.isAuthenticated {
+            federatedIdentityHintStore.clearPendingHints()
+            interruptedAuthJourneyStore.clearRegistration()
             completedRegistrationSession = state.currentSession
             isAuthenticationPresented = false
             isRegistrationPresented = false
@@ -482,13 +742,20 @@ final class OnboardingCoordinator: ObservableObject {
     private func resumeIncompleteRegistration(_ session: AuthSession) {
         guestAccessGranted = false
         isAuthenticationPresented = false
-        registrationController.resumeIncompleteSession(session: session)
+        resumeRegistrationController(session)
         if launchIntroDecisionCompleted, !shouldPresentLaunchIntro {
             isRegistrationPresented = true
         }
     }
 
     private func resolveRoute() {
+        guard !isDeletingAccount else {
+            return
+        }
+        guard canExposeSessionDuringPromoterActivation else {
+            route = .restoringSession
+            return
+        }
         guard launchIntroDecisionCompleted else {
             route = .restoringSession
             return
@@ -624,7 +891,8 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func presentIncompleteRegistrationIfPossible() {
-        guard launchIntroDecisionCompleted,
+        guard canExposeSessionDuringPromoterActivation,
+              launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
               authState?.isLoading == false,
               authState?.isAuthenticated == false,
@@ -634,7 +902,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         guestAccessGranted = false
         isAuthenticationPresented = false
-        registrationController.resumeIncompleteSession(session: session)
+        resumeRegistrationController(session)
         isRegistrationPresented = true
     }
 
@@ -654,7 +922,266 @@ final class OnboardingCoordinator: ObservableObject {
         }
     }
 
+    private func startSessionBootstrap() {
+        if temporaryPromoterActivationSessionCleanupRequired {
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+            return
+        }
+        switch PromoterActivationSessionPolicy.bootstrapAction(
+            markerState: promoterActivationSessionMarkerStore.state
+        ) {
+        case .proceed:
+            startStandardSessionBootstrap()
+        case .clearTemporarySession:
+            temporaryPromoterActivationSessionCleanupRequired = true
+            resolveRoute()
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+        }
+    }
+
+    private func startStandardSessionBootstrap() {
+        switch AuthSessionBootstrapPolicy.action(hasInstallationMarker: firstLaunchCompleted) {
+        case .clearLocalSession:
+            clearFreshInstallSessionBeforeRestore()
+        case .restoreSession:
+            restoreSessionAfterBootstrap()
+        }
+    }
+
+    private func clearTemporaryPromoterActivationSessionBeforeBootstrap() {
+        guard !isClearingTemporaryPromoterActivationSessionAtBootstrap else { return }
+        isClearingTemporaryPromoterActivationSessionAtBootstrap = true
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            isClearingTemporaryPromoterActivationSessionAtBootstrap = false
+            guard completed.boolValue else {
+                promoterActivationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
+                resolveRoute()
+                return
+            }
+            GoogleSignInBootstrap.clearLocalSession()
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isAuthenticationPresented = false
+            isRegistrationPresented = false
+            guard promoterActivationSessionMarkerStore.clear() else {
+                promoterActivationErrorMessage = strings.authUnavailable
+                resolveRoute()
+                return
+            }
+            temporaryPromoterActivationSessionCleanupRequired = false
+            promoterActivationSessionImported = false
+            promoterActivationErrorMessage = nil
+            startStandardSessionBootstrap()
+        }
+    }
+
+    private func processPendingPromoterActivationCallbackIfPossible() {
+        let bootstrapCompleted = sessionRestoreCompleted && freshInstallSessionCleanupCompleted
+        guard !sessionRestoreFailed, !isDeletingAccount else { return }
+        guard let callbackURL = promoterActivationCallbackQueue.beginNextIfReady(
+            sessionBootstrapCompleted: bootstrapCompleted,
+            authOperationLoading: authState?.isLoading != false,
+            callbackInProgress: isHandlingPromoterActivationCallback,
+            cleanupRequired: temporaryPromoterActivationSessionCleanupRequired,
+            activationPresented: isPromoterActivationPresented
+        ) else {
+            return
+        }
+        beginPromoterActivationCallback(callbackURL)
+    }
+
+    private func beginPromoterActivationCallback(_ callbackURL: URL) {
+        guard !isDeletingAccount else { return }
+        let callbackGeneration = promoterActivationCallbackGeneration
+        isHandlingPromoterActivationCallback = true
+        promoterActivationSessionImported = false
+        promoterActivationCallbackMarkerArmed = false
+        promoterActivationContext = nil
+        promoterActivationErrorMessage = nil
+        isPromoterActivationPresented = false
+        isGuestDisclosurePresented = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        resolveRoute()
+
+        let markerAction = PromoterActivationSessionPolicy.callbackMarkerAction(
+            hasExistingSession: authState?.currentSession != nil,
+            hasPkceCode: PromoterActivationLinkRoutingPolicy.hasPkceCode(callbackURL)
+        )
+        switch markerAction {
+        case .callSharedWithoutMarker:
+            callSharedPromoterActivationCallback(
+                callbackURL,
+                callbackGeneration: callbackGeneration
+            )
+        case .persistBeforeShared:
+            persistPromoterActivationMarkerThenCallShared(
+                callbackURL,
+                callbackGeneration: callbackGeneration
+            )
+        }
+    }
+
+    private func persistPromoterActivationMarkerThenCallShared(
+        _ callbackURL: URL,
+        callbackGeneration: Int
+    ) {
+        temporaryPromoterActivationSessionCleanupRequired = true
+        let persistenceSucceeded = promoterActivationSessionMarkerStore.persist()
+        promoterActivationCallbackMarkerArmed = persistenceSucceeded
+        let rollbackSucceeded = persistenceSucceeded || promoterActivationSessionMarkerStore.clear()
+        let markerPersistenceAction = PromoterActivationSessionPolicy.markerPersistenceAction(
+            persistenceSucceeded: persistenceSucceeded,
+            rollbackSucceeded: rollbackSucceeded
+        )
+        switch markerPersistenceAction {
+        case .callShared:
+            callSharedPromoterActivationCallback(
+                callbackURL,
+                callbackGeneration: callbackGeneration
+            )
+        case .exposeErrorWithoutCallingShared:
+            temporaryPromoterActivationSessionCleanupRequired = false
+            isHandlingPromoterActivationCallback = false
+            _ = promoterActivationCallbackQueue.completeInFlight()
+            promoterActivationErrorMessage = strings.authUnavailable
+            resolveRoute()
+        case .clearTemporarySessionBeforeExposingError:
+            _ = promoterActivationCallbackQueue.completeInFlight()
+            failClosedPromoterActivationCallback()
+        }
+    }
+
+    private func callSharedPromoterActivationCallback(
+        _ callbackURL: URL,
+        callbackGeneration: Int
+    ) {
+        authController.handlePromoterActivationCallback(callbackUrl: callbackURL.absoluteString) { [weak self] context in
+            guard let self else { return }
+            guard callbackGeneration == promoterActivationCallbackGeneration,
+                  !isDeletingAccount else {
+                return
+            }
+            _ = promoterActivationCallbackQueue.completeInFlight()
+            handlePromoterActivationCallbackResult(context)
+        }
+    }
+
+    private func handlePromoterActivationCallbackResult(
+        _ context: PromoterActivationContext?
+    ) {
+        let resolutionAction = PromoterActivationSessionPolicy.callbackResolutionAction(
+            contextAvailable: context != nil,
+            sessionImportedForActivation: context?.sessionImportedForActivation ?? false,
+            markerArmed: promoterActivationCallbackMarkerArmed
+        )
+        switch resolutionAction {
+        case .keepMarkerBeforeExposingReady:
+            guard let context,
+                  promoterActivationSessionMarkerStore.state == .marked else {
+                failClosedPromoterActivationCallback()
+                return
+            }
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isHandlingPromoterActivationCallback = false
+            promoterActivationSessionImported = true
+            promoterActivationCallbackMarkerArmed = false
+            promoterActivationContext = context
+            isPromoterActivationPresented = true
+            resolveRoute()
+        case .clearMarkerBeforeExposingReady:
+            guard let context else {
+                failClosedPromoterActivationCallback()
+                return
+            }
+            guard clearProvisionalPromoterActivationSessionMarker() else {
+                failClosedPromoterActivationCallback()
+                return
+            }
+            isHandlingPromoterActivationCallback = false
+            promoterActivationSessionImported = false
+            promoterActivationCallbackMarkerArmed = false
+            promoterActivationContext = context
+            isPromoterActivationPresented = true
+            resolveRoute()
+        case .exposeReadyWithoutMarker:
+            guard let context else {
+                failClosedPromoterActivationCallback()
+                return
+            }
+            isHandlingPromoterActivationCallback = false
+            promoterActivationSessionImported = false
+            promoterActivationCallbackMarkerArmed = false
+            promoterActivationContext = context
+            isPromoterActivationPresented = true
+            resolveRoute()
+        case .exposeErrorWithoutMarker:
+            isHandlingPromoterActivationCallback = false
+            promoterActivationSessionImported = false
+            promoterActivationCallbackMarkerArmed = false
+            promoterActivationContext = nil
+            isPromoterActivationPresented = false
+            promoterActivationErrorMessage = authState?.errorMessage ?? strings.authPromoterInviteInvalid
+            resolveRoute()
+        case .clearTemporarySessionBeforeExposingError:
+            failClosedPromoterActivationCallback()
+        }
+    }
+
+    private func clearProvisionalPromoterActivationSessionMarker() -> Bool {
+        guard promoterActivationSessionMarkerStore.clear() else { return false }
+        temporaryPromoterActivationSessionCleanupRequired = false
+        promoterActivationCallbackMarkerArmed = false
+        return true
+    }
+
+    private func failClosedPromoterActivationCallback() {
+        temporaryPromoterActivationSessionCleanupRequired = true
+        if promoterActivationSessionMarkerStore.state != .marked {
+            _ = promoterActivationSessionMarkerStore.persist()
+        }
+        promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationCallbackMarkerArmed = false
+        isPromoterActivationPresented = false
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        shouldPresentRegistrationAfterAuthenticationDismissal = false
+        isGuestDisclosurePresented = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        pendingRootDeepLinkDestinationKey = nil
+        resolveRoute()
+        authController.signOut { [weak self] completed in
+            guard let self else { return }
+            var markerCleared = false
+            if completed.boolValue {
+                GoogleSignInBootstrap.clearLocalSession()
+                markerCleared = promoterActivationSessionMarkerStore.clear()
+            }
+            switch PromoterActivationSessionPolicy.failClosedCleanupAction(
+                signOutSucceeded: completed.boolValue,
+                markerCleared: markerCleared
+            ) {
+            case .cleanupCompleted:
+                temporaryPromoterActivationSessionCleanupRequired = false
+            case .keepCleanupRequired:
+                temporaryPromoterActivationSessionCleanupRequired = true
+            }
+            isHandlingPromoterActivationCallback = false
+            promoterActivationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
+            resolveRoute()
+        }
+    }
+
     private func clearFreshInstallSessionBeforeRestore() {
+        sessionRestoreCompleted = false
+        sessionRestoreFailed = false
+        federatedIdentityHintStore.clearPendingHints()
+        promoterActivationDestinationStore.clear()
+        GoogleSignInBootstrap.clearLocalSession()
         authController.signOut { [weak self] completed in
             guard let self else { return }
             guard completed.boolValue else {
@@ -662,7 +1189,8 @@ final class OnboardingCoordinator: ObservableObject {
                 guestAccessGranted = false
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
-                sessionRestoreCompleted = true
+                sessionRestoreCompleted = false
+                sessionRestoreFailed = true
                 resolveRoute()
                 return
             }
@@ -673,12 +1201,64 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func restoreSessionAfterBootstrap() {
-        authController.restoreSession { [weak self] _ in
+        sessionRestoreCompleted = false
+        sessionRestoreFailed = false
+        resolveRoute()
+        authController.restoreSession { [weak self] result in
             guard let self else { return }
+            guard result.isReady else {
+                completedRegistrationSession = nil
+                guestAccessGranted = false
+                isAuthenticationPresented = false
+                isRegistrationPresented = false
+                sessionRestoreCompleted = false
+                sessionRestoreFailed = true
+                resolveRoute()
+                return
+            }
             sessionRestoreCompleted = true
+            sessionRestoreFailed = false
             resolveRoute()
             presentInterruptedRegistrationSignInIfPossible()
+            processPendingPromoterActivationCallbackIfPossible()
         }
+    }
+
+    func retrySessionRestore() {
+        guard sessionRestoreFailed, !isDeletingAccount else { return }
+        sessionRestoreFailed = false
+        if temporaryPromoterActivationSessionCleanupRequired {
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+        } else if !freshInstallSessionCleanupCompleted {
+            clearFreshInstallSessionBeforeRestore()
+        } else {
+            restoreSessionAfterBootstrap()
+        }
+    }
+
+    private func invalidatePromoterActivationCallbacksForAccountDeletion() {
+        promoterActivationCallbackGeneration += 1
+        promoterActivationCallbackQueue.clear()
+        let callbackCouldHaveImportedSession =
+            promoterActivationCallbackMarkerArmed ||
+            promoterActivationSessionImported ||
+            promoterActivationSessionMarkerStore.state != .absent
+        if callbackCouldHaveImportedSession {
+            temporaryPromoterActivationSessionCleanupRequired = true
+            if promoterActivationSessionMarkerStore.state != .marked {
+                _ = promoterActivationSessionMarkerStore.persist()
+            }
+        }
+        isHandlingPromoterActivationCallback = false
+        promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationCallbackMarkerArmed = false
+        promoterActivationErrorMessage = nil
+        isPromoterActivationPresented = false
+        isGuestDisclosurePresented = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        pendingRootDeepLinkDestinationKey = nil
     }
 
     private func markFirstLaunchCompletedIfEligible() {
@@ -722,7 +1302,8 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func presentInterruptedRegistrationSignInIfPossible() {
-        guard interruptedAuthJourneyStore.current == .registration,
+        guard canExposeSessionDuringPromoterActivation,
+              interruptedAuthJourneyStore.current == .registration,
               sessionRestoreCompleted,
               launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
@@ -737,7 +1318,8 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func presentPasswordRecoveryIfPossible() {
-        guard launchIntroDecisionCompleted,
+        guard canExposeSessionDuringPromoterActivation,
+              launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
               authState?.isLoading == false,
               authState?.hasPasswordRecoverySession == true else {
@@ -751,6 +1333,29 @@ final class OnboardingCoordinator: ObservableObject {
     private func normalizedEmail(_ email: String?) -> String? {
         let candidate = email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return candidate.isEmpty ? nil : candidate
+    }
+
+    private func closePromoterActivation() {
+        promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationErrorMessage = nil
+        isPromoterActivationPresented = false
+        resolveRoute()
+        processPendingPromoterActivationCallbackIfPossible()
+    }
+
+    private func resumeRegistrationController(_ session: AuthSession) {
+        if interruptedAuthJourneyStore.current?.resumesAtIdentity == true {
+            interruptedAuthJourneyStore.mark(.socialRegistrationIdentity)
+            let hints = federatedIdentityHintStore.pendingHints()
+            registrationController.resumeIncompleteSocialSession(
+                session: session,
+                suggestedFirstName: hints?.firstName,
+                suggestedLastName: hints?.lastName
+            )
+        } else {
+            registrationController.resumeIncompleteSession(session: session)
+        }
     }
 }
 

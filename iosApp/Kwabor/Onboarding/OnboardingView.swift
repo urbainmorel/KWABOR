@@ -10,7 +10,7 @@ struct OnboardingView: View {
             case .intro:
                 IntroView(coordinator: coordinator)
             case .restoringSession:
-                SessionRestoreView(bridge: coordinator.bridge)
+                SessionRestoreView(coordinator: coordinator)
             case .authentication:
                 OnboardingLandingView(coordinator: coordinator)
             case .notificationPriming:
@@ -20,11 +20,20 @@ struct OnboardingView: View {
                     bridge: coordinator.bridge,
                     isGuestSession: coordinator.isGuestSession,
                     strings: coordinator.strings,
+                    accountSecurityController: coordinator.authController,
+                    federatedIdentityHintStore: coordinator.federatedIdentityHintStore,
+                    latestAccountSecurityError: { coordinator.authState?.errorMessage },
                     isSigningOutAccount: coordinator.isSigningOutAccount,
                     accountSignOutErrorMessage: coordinator.accountSignOutErrorMessage,
                     onProtectedDestinationSelected: coordinator.presentAuthentication,
                     onSignOut: coordinator.signOutCurrentAccount,
-                    onDismissSignOutError: coordinator.clearAccountSignOutError
+                    onDismissSignOutError: coordinator.clearAccountSignOutError,
+                    onAccountDeletionStateChanged: {
+                        coordinator.accountDeletionStateChanged(isInProgress: $0)
+                    },
+                    onAccountDeleted: coordinator.accountDeletionCompleted,
+                    rootDeepLinkDestinationKey: coordinator.pendingRootDeepLinkDestinationKey,
+                    onRootDeepLinkConsumed: coordinator.consumeRootDeepLinkDestination
                 )
             }
         }
@@ -39,6 +48,30 @@ struct OnboardingView: View {
             onDismiss: coordinator.registrationPresentationDismissed
         ) {
             RegistrationFlowView(coordinator: coordinator)
+        }
+        .fullScreenCover(isPresented: $coordinator.isPromoterActivationPresented) {
+            if let context = coordinator.promoterActivationContext {
+                PromoterActivationView(
+                    context: context,
+                    controller: coordinator.authController,
+                    strings: coordinator.strings,
+                    identityHintStore: coordinator.federatedIdentityHintStore,
+                    latestAuthError: { coordinator.authState?.errorMessage },
+                    onActivated: coordinator.completePromoterActivation,
+                    onCancel: coordinator.cancelPromoterActivation
+                )
+            }
+        }
+        .alert(
+            coordinator.strings.promoterActivationTitle,
+            isPresented: Binding(
+                get: { coordinator.promoterActivationErrorMessage != nil },
+                set: { if !$0 { coordinator.dismissPromoterActivationError() } }
+            )
+        ) {
+            Button(coordinator.strings.authConfirm, action: coordinator.dismissPromoterActivationError)
+        } message: {
+            Text(coordinator.promoterActivationErrorMessage ?? coordinator.strings.authPromoterInviteInvalid)
         }
     }
 }
@@ -214,14 +247,32 @@ private struct OnboardingLandingView: View {
 }
 
 private struct SessionRestoreView: View {
-    let bridge: KwaborSharedBridge
+    @ObservedObject var coordinator: OnboardingCoordinator
 
     var body: some View {
         VStack(spacing: KwaborDesignTokens.Spacing.lg) {
-            ProgressView()
-            Text(bridge.appName())
-                .font(.headline)
+            if coordinator.sessionRestoreFailed {
+                Image(systemName: "exclamationmark.shield")
+                    .font(.largeTitle)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                    .accessibilityHidden(true)
+                Text(coordinator.strings.authUnavailable)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                Button(coordinator.strings.retry) {
+                    coordinator.retrySessionRestore()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(KwaborDesignTokens.ColorToken.ink950)
+                .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            } else {
+                ProgressView()
+                    .accessibilityLabel(coordinator.bridge.appName())
+                Text(coordinator.bridge.appName())
+                    .font(.headline)
+            }
         }
+        .padding(KwaborDesignTokens.Spacing.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(KwaborDesignTokens.ColorToken.paper50)
     }

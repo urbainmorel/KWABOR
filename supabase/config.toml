@@ -362,6 +362,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+[functions.account-delete]
+# The platform validates the JWT before @supabase/server applies auth='user'.
+# The handler also confirms the live Auth user before privileged deletion work.
+verify_jwt = true
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

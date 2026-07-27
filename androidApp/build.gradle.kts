@@ -95,6 +95,15 @@ fun ApplicationBuildType.configureKwaborEnvironment(
             environmentKey = "KWABOR_SUPABASE_PUBLISHABLE_KEY",
         ).asBuildConfigString(),
     )
+    buildConfigField(
+        "String",
+        "KWABOR_GOOGLE_WEB_CLIENT_ID",
+        kwaborConfigForEnvironment(
+            environment = environment,
+            localSuffix = "google.webClientId",
+            environmentKey = "KWABOR_GOOGLE_WEB_CLIENT_ID",
+        ).asBuildConfigString(),
+    )
     resValue("string", "app_name", appLabel)
 }
 
@@ -248,6 +257,8 @@ dependencies {
     implementation(compose.runtime)
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.10.0")
     implementation("androidx.media3:media3-exoplayer:1.10.1")
@@ -257,6 +268,7 @@ dependencies {
     implementation("com.google.firebase:firebase-config")
     implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.google.firebase:firebase-perf")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-ktor3:3.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")

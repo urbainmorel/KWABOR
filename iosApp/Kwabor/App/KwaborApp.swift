@@ -1,5 +1,6 @@
-import Shared
 import Foundation
+import GoogleSignIn
+import Shared
 import SwiftUI
 
 @main
@@ -9,6 +10,7 @@ struct KwaborApp: App {
 
     @MainActor
     init() {
+        GoogleSignInBootstrap.configureIfPossible()
         let observability = FirebaseObservability()
         let compositionRoot = IosKwaborCompositionRoot(
             environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
@@ -30,6 +32,11 @@ struct KwaborApp: App {
     var body: some Scene {
         WindowGroup {
             OnboardingView(coordinator: coordinator)
+                .onOpenURL { url in
+                    if !GIDSignIn.sharedInstance.handle(url) {
+                        _ = coordinator.handleIncomingUrl(url)
+                    }
+                }
         }
     }
 }

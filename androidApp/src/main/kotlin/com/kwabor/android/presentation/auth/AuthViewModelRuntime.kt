@@ -24,12 +24,17 @@ internal class AuthViewModelRuntime(
     val accessState = MutableStateFlow(AuthAccessUiState())
     val registrationState = MutableStateFlow(initialRegistrationUiState())
     val passwordRecoveryState = MutableStateFlow(initialPasswordRecoveryUiState())
+    val promoterActivationState = MutableStateFlow(PromoterActivationUiState())
     val platformState = MutableStateFlow(AuthPlatformUiState())
     val sessionRestoreComplete = MutableStateFlow(false)
+    val sessionRestoreStatus = MutableStateFlow(AuthSessionRestoreStatus.InProgress)
     val effectChannel = Channel<AuthEffect>(capacity = Channel.BUFFERED)
     val platformEffectChannel = Channel<AuthPlatformEffect>(capacity = Channel.BUFFERED)
 
     var operationJob: Job? = null
+    var sessionRestoreJob: Job? = null
+    var accountDeletionJob: Job? = null
+    var promoterActivationJob: Job? = null
     var otpCountdownJob: Job? = null
     var recoveryCountdownJob: Job? = null
     var passwordRecoveryRequestedEmail: String? = null
@@ -60,6 +65,10 @@ internal data class AuthViewModelDependencies(
     val notificationPermissionPolicy: com.kwabor.android.auth.NotificationPermissionPolicy,
     val notificationPrimingStore: com.kwabor.android.auth.NotificationPrimingStore,
     val authJourneyStore: com.kwabor.android.auth.AuthJourneyStore,
+    val promoterActivationSessionStore: com.kwabor.android.auth.PromoterActivationSessionStore,
+    val googleIdentityProvider: com.kwabor.android.auth.GoogleIdentityProvider,
+    val googleIdentityUnavailableMessage: String,
+    val idempotencyKeyProvider: com.kwabor.android.auth.IdempotencyKeyProvider,
     val clockProvider: com.kwabor.shared.domain.core.ClockProvider,
     val applyObservabilityConsent: (com.kwabor.shared.domain.observability.ObservabilityConsent) -> Boolean,
 )

@@ -42,6 +42,10 @@
     <string name="auth_sign_in_password_support">Connexion pour %1$s</string>
     <string name="auth_sign_in_continue">Continuer</string>
     <string name="auth_sign_in_submit">Se connecter</string>
+    <string name="auth_google_continue">Continuer avec Google</string>
+    <string name="auth_google_loading">Connexion Google en cours</string>
+    <string name="auth_google_unavailable">La connexion Google est indisponible pour le moment. Vous pouvez continuer par email.</string>
+    <string name="auth_method_separator">ou</string>
     <string name="auth_forgot_password">Mot de passe oublié ?</string>
     <string name="auth_no_account">Vous n’avez pas encore de compte ?</string>
     <string name="auth_create_account">S’inscrire</string>
@@ -65,5 +69,26 @@
     <string name="profile_sign_out_title">Se déconnecter ?</string>
     <string name="profile_sign_out_support">Vous reviendrez à l’accueil en mode invité. Vos données de compte resteront enregistrées.</string>
     <string name="profile_sign_out_confirm">Se déconnecter</string>
+    <string name="profile_delete_account">Supprimer mon compte</string>
+    <string name="profile_delete_account_title">Supprimer définitivement le compte ?</string>
+    <string name="profile_delete_account_support">Cette action est irréversible. Vos données Kwabor seront supprimées après vérification de votre identité.</string>
+    <string name="profile_delete_account_confirmation_prompt">Saisissez %1$s pour confirmer la suppression.</string>
+    <string name="profile_delete_account_password_support">Saisissez votre mot de passe pour confirmer.</string>
+    <string name="profile_delete_account_google_support">Réauthentifiez-vous avec Google pour confirmer la suppression.</string>
+    <string name="profile_delete_account_confirm">Supprimer définitivement</string>
+    <string name="profile_delete_account_apple_device">Ce compte utilise Apple. Supprimez-le depuis Kwabor sur votre appareil iOS.</string>
+    <string name="promoter_activation_loading">Vérification de votre invitation…</string>
+    <string name="promoter_activation_closing">Fermeture sécurisée de l’invitation…</string>
+    <string name="promoter_activation_title">Activez votre compte %1$s</string>
+    <string name="promoter_activation_support">Confirmez votre identité avec votre mot de passe ou avec Google. Votre établissement est déjà prérempli.</string>
+    <string name="promoter_activation_password">Confirmer avec mon mot de passe</string>
+    <string name="promoter_activation_error_title">Invitation indisponible</string>
+    <string name="promoter_activation_retry">Réessayer</string>
+    <string name="promoter_activation_success_title">Compte %1$s activé</string>
+    <string name="promoter_activation_success_support">Votre accès Promoteur et votre établissement sont prêts. Vous pouvez maintenant continuer vers l’accueil.</string>
+    <string name="promoter_activation_home">Retour à l’accueil</string>
+    <string name="auth_session_restore_error_title">Sécurisation de la session interrompue</string>
+    <string name="auth_session_restore_error_support">Kwabor doit terminer la fermeture de la session temporaire avant toute connexion. Vérifiez votre accès au réseau, puis réessayez.</string>
     <string name="common_cancel">Annuler</string>
+    <string name="common_close">Fermer</string>
 </resources>

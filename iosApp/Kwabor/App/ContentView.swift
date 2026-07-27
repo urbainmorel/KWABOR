@@ -5,31 +5,52 @@ struct ContentView: View {
     let bridge: KwaborSharedBridge
     let isGuestSession: Bool
     let strings: OnboardingStrings
+    let accountSecurityController: IosAuthController?
+    let federatedIdentityHintStore: FederatedIdentityHintPersisting?
+    let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let onProtectedDestinationSelected: () -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onAccountDeletionStateChanged: (Bool) -> Void
+    let onAccountDeleted: () -> Void
+    let rootDeepLinkDestinationKey: String?
+    let onRootDeepLinkConsumed: () -> Void
     @State private var selectedDestination = RootDestination.home
 
     init(
         bridge: KwaborSharedBridge,
         isGuestSession: Bool = false,
         strings: OnboardingStrings? = nil,
+        accountSecurityController: IosAuthController? = nil,
+        federatedIdentityHintStore: FederatedIdentityHintPersisting? = nil,
+        latestAccountSecurityError: @escaping () -> String? = { nil },
         isSigningOutAccount: Bool = false,
         accountSignOutErrorMessage: String? = nil,
         onProtectedDestinationSelected: @escaping () -> Void = {},
         onSignOut: @escaping () -> Void = {},
-        onDismissSignOutError: @escaping () -> Void = {}
+        onDismissSignOutError: @escaping () -> Void = {},
+        onAccountDeletionStateChanged: @escaping (Bool) -> Void = { _ in },
+        onAccountDeleted: @escaping () -> Void = {},
+        rootDeepLinkDestinationKey: String? = nil,
+        onRootDeepLinkConsumed: @escaping () -> Void = {}
     ) {
         self.bridge = bridge
         self.isGuestSession = isGuestSession
         self.strings = strings ?? bridge.onboardingStrings()
+        self.accountSecurityController = accountSecurityController
+        self.federatedIdentityHintStore = federatedIdentityHintStore
+        self.latestAccountSecurityError = latestAccountSecurityError
         self.isSigningOutAccount = isSigningOutAccount
         self.accountSignOutErrorMessage = accountSignOutErrorMessage
         self.onProtectedDestinationSelected = onProtectedDestinationSelected
         self.onSignOut = onSignOut
         self.onDismissSignOutError = onDismissSignOutError
+        self.onAccountDeletionStateChanged = onAccountDeletionStateChanged
+        self.onAccountDeleted = onAccountDeleted
+        self.rootDeepLinkDestinationKey = rootDeepLinkDestinationKey
+        self.onRootDeepLinkConsumed = onRootDeepLinkConsumed
     }
 
     var body: some View {
@@ -40,10 +61,15 @@ struct ContentView: View {
                         destination: destination,
                         bridge: bridge,
                         strings: strings,
+                        accountSecurityController: accountSecurityController,
+                        federatedIdentityHintStore: federatedIdentityHintStore,
+                        latestAccountSecurityError: latestAccountSecurityError,
                         isSigningOutAccount: isSigningOutAccount,
                         accountSignOutErrorMessage: accountSignOutErrorMessage,
                         onSignOut: onSignOut,
-                        onDismissSignOutError: onDismissSignOutError
+                        onDismissSignOutError: onDismissSignOutError,
+                        onAccountDeletionStateChanged: onAccountDeletionStateChanged,
+                        onAccountDeleted: onAccountDeleted
                     )
                 }
                 .tabItem {
@@ -52,16 +78,13 @@ struct ContentView: View {
                 .tag(destination)
             }
         }
-        .onOpenURL { url in
-            guard let routeKey = bridge.rootDestinationKeyForDeepLink(rawUrl: url.absoluteString),
-                  let destination = RootDestination(rawValue: routeKey) else {
-                return
-            }
-            requestDestination(destination)
-        }
+        .onAppear(perform: applyPendingRootDeepLink)
+        .onChange(of: rootDeepLinkDestinationKey) { _, _ in applyPendingRootDeepLink() }
         .onChange(of: isGuestSession) { _, isGuest in
             if isGuest {
                 selectedDestination = .home
+            } else {
+                applyPendingRootDeepLink()
             }
         }
     }
@@ -74,11 +97,27 @@ struct ContentView: View {
     }
 
     private func requestDestination(_ destination: RootDestination) {
+        _ = selectDestinationIfAllowed(destination)
+    }
+
+    @discardableResult
+    private func selectDestinationIfAllowed(_ destination: RootDestination) -> Bool {
         guard destination == .home || !isGuestSession else {
             onProtectedDestinationSelected()
-            return
+            return false
         }
         selectedDestination = destination
+        return true
+    }
+
+    private func applyPendingRootDeepLink() {
+        guard let rootDeepLinkDestinationKey,
+              let destination = RootDestination(rawValue: rootDeepLinkDestinationKey) else {
+            return
+        }
+        if selectDestinationIfAllowed(destination) {
+            onRootDeepLinkConsumed()
+        }
     }
 }
 
@@ -86,12 +125,36 @@ private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
+    let accountSecurityController: IosAuthController?
+    let federatedIdentityHintStore: FederatedIdentityHintPersisting?
+    let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onAccountDeletionStateChanged: (Bool) -> Void
+    let onAccountDeleted: () -> Void
 
     var body: some View {
+        Group {
+            if destination == .profile {
+                ScrollView {
+                    destinationContent
+                        .frame(maxWidth: profileContentMaxWidth, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .padding(KwaborDesignTokens.Spacing.xxl)
+                }
+            } else {
+                destinationContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(KwaborDesignTokens.Spacing.xxl)
+            }
+        }
+        .background(KwaborDesignTokens.ColorToken.paper50)
+        .navigationTitle(destination.label(using: bridge))
+    }
+
+    private var destinationContent: some View {
         VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
             Text(bridge.appName())
                 .font(.system(size: 14, weight: .semibold))
@@ -113,18 +176,26 @@ private struct RootDestinationContent: View {
                     onSignOut: onSignOut,
                     onDismissError: onDismissSignOutError
                 )
+                if let accountSecurityController, let federatedIdentityHintStore {
+                    AccountDeletionSection(
+                        controller: accountSecurityController,
+                        strings: strings,
+                        identityHintStore: federatedIdentityHintStore,
+                        latestAuthError: latestAccountSecurityError,
+                        onDeletionStateChanged: onAccountDeletionStateChanged,
+                        onDeleted: onAccountDeleted
+                    )
+                }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .padding(KwaborDesignTokens.Spacing.xxl)
-        .background(KwaborDesignTokens.ColorToken.paper50)
-        .navigationTitle(destination.label(using: bridge))
     }
 
     private var title: String {
         destination == .home ? bridge.homeTitle() : destination.label(using: bridge)
     }
 }
+
+private let profileContentMaxWidth: CGFloat = 560
 
 private struct AccountSessionSection: View {
     let strings: OnboardingStrings

@@ -34,6 +34,12 @@
 		1A000001000000000000007B /* PasswordRecoveryFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000007C /* PasswordRecoveryFlowView.swift */; };
 		1A000001000000000000007D /* InterruptedAuthJourneyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000007E /* InterruptedAuthJourneyStore.swift */; };
 		1A0000010000000000000080 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000081 /* LaunchScreen.storyboard */; };
+		1A0000010000000000000083 /* FederatedSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000082 /* FederatedSignIn.swift */; };
+		1A0000010000000000000087 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000085 /* GoogleSignIn */; };
+		1A0000010000000000000088 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000086 /* GoogleSignInSwift */; };
+		1A000001000000000000008A /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000089 /* AccountDeletionView.swift */; };
+		1A000001000000000000008C /* PromoterActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008B /* PromoterActivationView.swift */; };
+		1A000001000000000000008E /* PromoterActivationSessionMarker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008D /* PromoterActivationSessionMarker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +73,10 @@
 		1A000001000000000000007C /* PasswordRecoveryFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordRecoveryFlowView.swift; sourceTree = "<group>"; };
 		1A000001000000000000007E /* InterruptedAuthJourneyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterruptedAuthJourneyStore.swift; sourceTree = "<group>"; };
 		1A0000010000000000000081 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		1A0000010000000000000082 /* FederatedSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FederatedSignIn.swift; sourceTree = "<group>"; };
+		1A0000010000000000000089 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
+		1A000001000000000000008B /* PromoterActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationView.swift; sourceTree = "<group>"; };
+		1A000001000000000000008D /* PromoterActivationSessionMarker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationSessionMarker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +90,8 @@
 				1A0000010000000000000049 /* FirebaseCrashlytics in Frameworks */,
 				1A0000010000000000000050 /* FirebasePerformance in Frameworks */,
 				1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */,
+				1A0000010000000000000087 /* GoogleSignIn in Frameworks */,
+				1A0000010000000000000088 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -180,6 +192,10 @@
 				1A000001000000000000007A /* SignInFlowView.swift */,
 				1A000001000000000000007C /* PasswordRecoveryFlowView.swift */,
 				1A000001000000000000007E /* InterruptedAuthJourneyStore.swift */,
+				1A0000010000000000000082 /* FederatedSignIn.swift */,
+				1A0000010000000000000089 /* AccountDeletionView.swift */,
+				1A000001000000000000008B /* PromoterActivationView.swift */,
+				1A000001000000000000008D /* PromoterActivationSessionMarker.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -218,6 +234,8 @@
 				1A0000010000000000000055 /* FirebaseCrashlytics */,
 				1A0000010000000000000056 /* FirebasePerformance */,
 				1A0000010000000000000057 /* FirebaseRemoteConfig */,
+				1A0000010000000000000085 /* GoogleSignIn */,
+				1A0000010000000000000086 /* GoogleSignInSwift */,
 			);
 			productName = Kwabor;
 			productReference = 1A0000010000000000000009 /* Kwabor.app */;
@@ -258,6 +276,7 @@
 			mainGroup = 1A0000010000000000000011;
 			packageReferences = (
 				1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				1A0000010000000000000084 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			productRefGroup = 1A0000010000000000000014 /* Products */;
 			projectDirPath = "";
@@ -342,6 +361,10 @@
 				1A0000010000000000000079 /* SignInFlowView.swift in Sources */,
 				1A000001000000000000007B /* PasswordRecoveryFlowView.swift in Sources */,
 				1A000001000000000000007D /* InterruptedAuthJourneyStore.swift in Sources */,
+				1A0000010000000000000083 /* FederatedSignIn.swift in Sources */,
+				1A000001000000000000008A /* AccountDeletionView.swift in Sources */,
+				1A000001000000000000008C /* PromoterActivationView.swift in Sources */,
+				1A000001000000000000008E /* PromoterActivationSessionMarker.swift in Sources */,
 				1A0000010000000000000070 /* RegistrationPermissionServices.swift in Sources */,
 				1A0000010000000000000072 /* RegistrationStore.swift in Sources */,
 				1A0000010000000000000074 /* RegistrationFlowView.swift in Sources */,
@@ -357,6 +380,14 @@
 			requirement = {
 				kind = exactVersion;
 				version = 12.16.0;
+			};
+		};
+		1A0000010000000000000084 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = exactVersion;
+				version = 9.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -386,6 +417,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		1A0000010000000000000085 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A0000010000000000000084 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		1A0000010000000000000086 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A0000010000000000000084 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 

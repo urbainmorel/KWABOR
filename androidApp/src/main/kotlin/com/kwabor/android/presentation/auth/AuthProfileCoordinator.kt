@@ -10,7 +10,14 @@ internal class AuthProfileCoordinator(
     private val runtime: AuthViewModelRuntime,
     private val dependencies: AuthViewModelDependencies,
 ) {
-    fun handle(intent: AuthIntent.ProfileField) {
+    fun handle(intent: AuthIntent.Profile) {
+        when (intent) {
+            is AuthIntent.ProfileField -> handleField(intent)
+            is AuthIntent.ProfileProgress -> handleProgress(intent)
+        }
+    }
+
+    private fun handleField(intent: AuthIntent.ProfileField) {
         when (intent) {
             is AuthIntent.ChangeFirstName -> runtime.reduce(RegistrationIntent.UpdateFirstName(intent.firstName))
             is AuthIntent.ChangeLastName -> runtime.reduce(RegistrationIntent.UpdateLastName(intent.lastName))
@@ -36,7 +43,7 @@ internal class AuthProfileCoordinator(
         }
     }
 
-    fun handle(intent: AuthIntent.ProfileProgress) {
+    private fun handleProgress(intent: AuthIntent.ProfileProgress) {
         when (intent) {
             AuthIntent.ContinueFromIdentity -> runtime.reduce(RegistrationIntent.ContinueFromIdentity)
             AuthIntent.ContinueFromCity -> runtime.reduce(RegistrationIntent.ContinueFromCity)
@@ -77,6 +84,12 @@ internal class AuthProfileCoordinator(
                 updatedState.step == RegistrationStep.NotificationPriming &&
                 session?.accountSetupStatus == AccountSetupStatus.Complete
             ) {
+                if (!dependencies.authJourneyStore.clear()) {
+                    runtime.registrationState.value = updatedState.copy(
+                        errorMessage = runtime.strings.authInvalidInput,
+                    )
+                    return@launch
+                }
                 runtime.authState.value = runtime.authState.value.copy(currentSession = session, errorMessage = null)
                 if (dependencies.notificationPrimingStore.isResolved()) {
                     runtime.reduce(RegistrationIntent.FinishNotificationPriming)

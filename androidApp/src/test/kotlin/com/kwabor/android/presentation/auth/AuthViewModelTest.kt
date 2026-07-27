@@ -1,19 +1,27 @@
 package com.kwabor.android.presentation.auth
 
 import com.kwabor.android.auth.AuthJourneyStore
+import com.kwabor.android.auth.GoogleIdentityProvider
+import com.kwabor.android.auth.GoogleIdentityResult
+import com.kwabor.android.auth.IdempotencyKeyProvider
 import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.android.auth.NotificationPermissionPolicy
 import com.kwabor.android.auth.NotificationPrimingStore
+import com.kwabor.android.auth.PromoterActivationSessionStore
 import com.kwabor.android.auth.RegistrationLocationResult
 import com.kwabor.android.auth.RegistrationLocationService
+import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.AuthSessionPurpose
+import com.kwabor.shared.domain.auth.AuthenticationMethod
 import com.kwabor.shared.domain.auth.CompleteOnboardingRequest
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
+import com.kwabor.shared.domain.auth.PromoterActivationContext
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
+import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
@@ -38,6 +46,8 @@ import com.kwabor.shared.presentation.auth.PasswordRecoveryStep
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.RegistrationReducer
 import com.kwabor.shared.presentation.auth.RegistrationStep
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.produceIn
@@ -51,9 +61,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AuthViewModelTest {
-    private val strings = stringsFor(AppLocale.French)
-
+class AuthViewModelOnboardingTest {
     @Test
     fun incompleteRestoredSessionResumesRegistrationAndNeverAuthenticates() = runTest {
         val repository = RegistrationAuthRepository(currentSession = onboardingSession())
@@ -170,7 +178,9 @@ class AuthViewModelTest {
     fun observabilityConsentIsPersistedBeforeOnboardingRpcStarts() = runTest {
         var consentPersisted = false
         val repository = RegistrationAuthRepository(
-            onCompleteOnboarding = { assertTrue(consentPersisted) },
+            hooks = RegistrationAuthHooks(
+                onCompleteOnboarding = { assertTrue(consentPersisted) },
+            ),
         )
         val viewModel = createViewModel(
             repository = repository,
@@ -348,7 +358,9 @@ class AuthViewModelTest {
     @Test
     fun latestObservabilityConsentIsAppliedBeforeEveryOnboardingSubmissionIncludingFailure() = runTest {
         val appliedConsents = mutableListOf<ObservabilityConsent>()
-        val repository = RegistrationAuthRepository(onboardingCompletionFailuresRemaining = 1)
+        val repository = RegistrationAuthRepository(
+            failurePlan = RegistrationAuthFailurePlan(onboardingCompletionFailures = 1),
+        )
         val viewModel = createViewModel(
             repository = repository,
             scope = this,
@@ -411,7 +423,9 @@ class AuthViewModelTest {
 
     @Test
     fun retryRequirementsDoesNotResubmitPassword() = runTest {
-        val repository = RegistrationAuthRepository(failFirstLegalDocumentsLoad = true)
+        val repository = RegistrationAuthRepository(
+            failurePlan = RegistrationAuthFailurePlan(failFirstLegalDocumentsLoad = true),
+        )
         val viewModel = createViewModel(repository = repository, scope = this)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.OpenRegistration())
@@ -434,58 +448,1091 @@ class AuthViewModelTest {
         assertTrue(viewModel.registrationState.value.termsDocument != null)
         assertEquals(1, repository.passwordUpdateCount)
     }
+}
 
-    private fun TestScope.createViewModel(
-        repository: RegistrationAuthRepository,
-        scope: TestScope,
-        overrides: AuthTestOverrides = AuthTestOverrides(),
-    ): AuthViewModel {
-        val clock = object : ClockProvider {
-            override fun nowEpochMilliseconds(): Long = TEST_EPOCH_MILLISECONDS + scope.testScheduler.currentTime
-        }
-        return AuthViewModel(
-            dependencies = AuthViewModelDependencies(
-                authPresenter = AuthPresenter(repository),
-                registrationPresenter = RegistrationPresenter(
-                    repository,
-                    RegistrationCatalogRepository(),
-                    clock,
-                    RegistrationReducer(),
-                ),
-                passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
-                locationService = overrides.locationService,
-                notificationPermissionPolicy = overrides.notificationPermissionPolicy,
-                notificationPrimingStore = overrides.notificationPrimingStore,
-                authJourneyStore = overrides.authJourneyStore,
-                clockProvider = clock,
-                applyObservabilityConsent = overrides.applyConsent,
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModelFederatedSecurityTest {
+    private val strings = stringsFor(AppLocale.French)
+
+    @Test
+    fun googleSignInUsesNonceAndResumesEditableIdentityWithServerHints() = runTest {
+        val journeyStore = FakeAuthJourneyStore()
+        val googleProvider = FakeGoogleIdentityProvider(
+            GoogleIdentityResult.Success(
+                idToken = TEST_GOOGLE_ID_TOKEN,
+                nonce = TEST_GOOGLE_RAW_NONCE,
+                profileHint = com.kwabor.android.auth.GoogleProfileHint("Afi", "Soglo"),
             ),
-            strings = strings,
-            coroutineScope = this,
+        )
+        val socialSession = onboardingSession().copy(
+            authenticationMethod = AuthenticationMethod.Google,
+            suggestedFirstName = "Afi",
+            suggestedLastName = "Soglo",
+        )
+        val repository = RegistrationAuthRepository(
+            authBehavior = RegistrationAuthBehavior(signInSession = socialSession),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                authJourneyStore = journeyStore,
+                googleIdentityProvider = googleProvider,
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ContinueWithGoogle)
+        advanceUntilIdle()
+
+        assertEquals(TEST_GOOGLE_ID_TOKEN, repository.lastSocialSignInRequest?.idToken)
+        assertEquals(TEST_GOOGLE_RAW_NONCE, repository.lastSocialSignInRequest?.rawNonce)
+        assertEquals(RegistrationStep.Identity, viewModel.registrationState.value.step)
+        assertEquals("Afi", viewModel.registrationState.value.firstName)
+        assertEquals("Soglo", viewModel.registrationState.value.lastName)
+        assertEquals(InterruptedAuthJourney.SocialRegistration, journeyStore.read())
+    }
+
+    @Test
+    fun cancelledGooglePickerIsNotDisplayedAsAnError() = runTest {
+        val viewModel = createViewModel(
+            repository = RegistrationAuthRepository(),
+            scope = this,
+            overrides = AuthTestOverrides(
+                googleIdentityProvider = FakeGoogleIdentityProvider(GoogleIdentityResult.Cancelled),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenSignIn())
+        viewModel.onIntent(AuthIntent.ContinueWithGoogle)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.accessState.value.isLoading)
+        assertEquals(null, viewModel.accessState.value.errorMessage)
+    }
+
+    @Test
+    fun socialRegistrationRestoresIdentityFromPrivateJourneyOrigin() = runTest {
+        val journeyStore = FakeAuthJourneyStore(InterruptedAuthJourney.SocialRegistration)
+        val socialSession = onboardingSession().copy(
+            authenticationMethod = AuthenticationMethod.Google,
+            suggestedFirstName = "Afi",
+            suggestedLastName = "Soglo",
+        )
+        val viewModel = createViewModel(
+            repository = RegistrationAuthRepository(currentSession = socialSession),
+            scope = this,
+            overrides = AuthTestOverrides(
+                authJourneyStore = journeyStore,
+            ),
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(RegistrationStep.Identity, viewModel.registrationState.value.step)
+        assertEquals("Afi", viewModel.registrationState.value.firstName)
+        assertEquals("Soglo", viewModel.registrationState.value.lastName)
+        assertEquals(InterruptedAuthJourney.SocialRegistration, journeyStore.read())
+    }
+
+    @Test
+    fun accountDeletionReusesPrivateIdempotencyKeyAfterAmbiguousFailure() = runTest {
+        val probe = AccountDeletionProbe(failFirstAttempt = true)
+        val viewModel = createAccountDeletionViewModel(probe)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.RequestAccountDeletion)
+        submitPasswordAccountDeletion(viewModel, strings.authDeleteAccountConfirmationPhrase)
+        submitPasswordAccountDeletion(viewModel, strings.authDeleteAccountConfirmationPhrase)
+
+        assertEquals(2, probe.requests.size)
+        assertEquals(probe.requests.first().idempotencyKey, probe.requests.last().idempotencyKey)
+        assertEquals(1, probe.generatedKeyCount)
+        assertTrue(viewModel.state.value.hasSession)
+        assertEquals(AuthEffect.AccountDeleted, viewModel.effects.first())
+        viewModel.onIntent(AuthIntent.AccountDeletionNavigationHandled)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun accountDeletionRequiresExactConfirmationBeforeCreatingIdempotencyKey() = runTest {
+        val probe = AccountDeletionProbe()
+        val viewModel = createAccountDeletionViewModel(probe)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.RequestAccountDeletion)
+        submitPasswordAccountDeletion(viewModel, confirmation = "supprimer")
+
+        assertEquals(0, probe.requests.size)
+        assertEquals(0, probe.generatedKeyCount)
+        assertTrue(viewModel.accessState.value.accountDeletionDialogVisible)
+        assertEquals(strings.authInvalidInput, viewModel.accessState.value.accountDeletionErrorMessage)
+        assertTrue(
+            isAccountDeletionConfirmationValid(
+                value = "  ${strings.authDeleteAccountConfirmationPhrase}  ",
+                expected = strings.authDeleteAccountConfirmationPhrase,
+            ),
+        )
+        assertFalse(
+            isAccountDeletionConfirmationValid(
+                value = "supprimer",
+                expected = strings.authDeleteAccountConfirmationPhrase,
+            ),
+        )
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModelPromoterSessionSafetyTest {
+
+    @Test
+    fun initialRestoreFailureWithoutCallbackIsFailClosedAndRetryable() = runTest {
+        val repository = RegistrationAuthRepository(
+            failurePlan = RegistrationAuthFailurePlan(currentSessionFailures = 1),
+        )
+        val viewModel = createViewModel(repository = repository, scope = this)
+        advanceUntilIdle()
+
+        assertSessionRestoreIsBlocked(viewModel)
+        assertEquals(0, repository.promoterCallbackCallCount)
+
+        viewModel.onIntent(AuthIntent.OpenSignIn())
+        assertEquals(AuthSurface.SessionRestoreFailure, viewModel.platformState.value.surface)
+
+        viewModel.onIntent(AuthIntent.RetrySessionRestore)
+        advanceUntilIdle()
+
+        assertEquals(AuthSessionRestoreStatus.Ready, viewModel.sessionRestoreStatus.value)
+        assertTrue(viewModel.isSessionRestoreComplete.value)
+        assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
+        assertEquals(2, repository.getCurrentSessionCallCount)
+    }
+
+    @Test
+    fun coldStartRevokesPendingImportedPromoterSessionBeforeRestoring() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(pending = true, operationEvents = events)
+        val googleIdentityProvider = FakeGoogleIdentityProvider()
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                promoterActivationSessionStore = store,
+                googleIdentityProvider = googleIdentityProvider,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("marker-read", "sign-out", "marker-clear", "get-current-session"),
+            events,
+        )
+        assertEquals(1, repository.signOutCallCount)
+        assertEquals(1, repository.getCurrentSessionCallCount)
+        assertEquals(1, googleIdentityProvider.clearCredentialStateCallCount)
+        assertFalse(store.pending)
+        assertTrue(viewModel.isSessionRestoreComplete.value)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun coldStartKeepsMarkerAndBlocksRestoreWhenImportedSessionRevocationFails() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(pending = true, operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            authBehavior = RegistrationAuthBehavior(signOutFailure = DomainError.NetworkUnavailable()),
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-read", "sign-out"), events)
+        assertEquals(0, repository.getCurrentSessionCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertTrue(store.pending)
+        assertTrue(viewModel.isSessionRestoreComplete.value)
+        assertEquals(AuthSessionRestoreStatus.Failed, viewModel.sessionRestoreStatus.value)
+        assertEquals(AuthSurface.SessionRestoreFailure, viewModel.platformState.value.surface)
+        assertFalse(viewModel.state.value.hasSession)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+    }
+
+    @Test
+    fun coldStartBlocksRestoreUntilRevokedSessionMarkerCanBeCleared() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(
+            pending = true,
+            clearSucceeds = false,
+            operationEvents = events,
+        )
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                operationEvents = events,
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = false))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-read", "sign-out", "marker-clear"), events)
+        assertEquals(0, repository.getCurrentSessionCallCount)
+        assertTrue(store.pending)
+        assertSessionRestoreIsBlocked(viewModel)
+
+        viewModel.onIntent(AuthIntent.OpenSignIn())
+
+        assertEquals(AuthSurface.SessionRestoreFailure, viewModel.platformState.value.surface)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+
+        store.clearSucceeds = true
+        viewModel.onIntent(AuthIntent.RetrySessionRestore)
+        advanceUntilIdle()
+
+        assertPromoterCallbackReady(viewModel, repository)
+        assertEquals(AuthSessionRestoreStatus.Ready, viewModel.sessionRestoreStatus.value)
+    }
+
+    @Test
+    fun importedPromoterCallbackPersistsMarkerBeforeReady() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-mark", "promoter-callback"), events)
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+        assertTrue(store.pending)
+    }
+
+    @Test
+    fun invalidPromoterCallbackIsRejectedBeforeProvisionalMarkerOrShared() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(
+            AuthIntent.OpenPromoterActivation(
+                "$TEST_PROMOTER_CALLBACK#access_token=forbidden&refresh_token=forbidden",
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(events.isEmpty())
+        assertEquals(0, store.markCallCount)
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+    }
+
+    @Test
+    fun provisionalMarkerSurvivesCancellationInsideSharedCallback() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    assertTrue(store.pending)
+                    throw CancellationException("Simulated process interruption")
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-mark", "promoter-callback"), events)
+        assertEquals(PromoterActivationStage.Loading, viewModel.promoterActivationState.value.stage)
+        assertEquals(1, repository.promoterCallbackCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertTrue(store.pending)
+    }
+
+    @Test
+    fun promoterCallbackErrorClearsImportedSessionAndMarkerBeforeError() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-mark", "promoter-callback", "sign-out", "marker-clear"), events)
+        assertEquals(1, repository.signOutCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertFalse(store.pending)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun markerWriteFailureClearsProvisionalMarkerAndNeverCallsShared() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(
+            markSucceeds = false,
+            operationEvents = events,
+        )
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-mark", "marker-clear"), events)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+        assertEquals(0, repository.signOutCallCount)
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertFalse(store.pending)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun provisionalMarkerWriteAndClearFailureBlocksWithoutCallingShared() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(
+            markSucceeds = false,
+            clearSucceeds = false,
+            operationEvents = events,
+        )
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                promoterActivationSessionStore = store,
+            ),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("marker-mark", "marker-clear", "sign-out", "marker-clear"),
+            events,
+        )
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(1, repository.signOutCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+        assertTrue(store.pending)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModelPromoterActivationTest {
+    @Test
+    fun preexistingSessionNeverTouchesProvisionalMarkerStorage() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(
+            clearSucceeds = false,
+            operationEvents = events,
+        )
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = false))
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                promoterActivationSessionStore = store,
+            ),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("promoter-callback"), events)
+        assertEquals(0, repository.signOutCallCount)
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+        assertFalse(store.pending)
+        assertTrue(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun callbackErrorClearFailureBlocksAndCleansBeforeError() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(
+            clearSucceeds = false,
+            operationEvents = events,
+        )
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("marker-mark", "promoter-callback", "sign-out", "marker-clear"),
+            events,
+        )
+        assertEquals(1, repository.signOutCallCount)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+        assertTrue(store.pending)
+        assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun preexistingPromoterSessionDoesNotArmProvisionalMarkerBeforeReady() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = false))
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                promoterActivationSessionStore = store,
+            ),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(listOf("promoter-callback"), events)
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+
+        viewModel.onIntent(AuthIntent.CancelPromoterActivation)
+        advanceUntilIdle()
+
+        assertEquals(0, store.markCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertEquals(0, repository.signOutCallCount)
+        assertTrue(viewModel.state.value.isAuthenticated)
+    }
+
+    @Test
+    fun promoterCallbackNeverEntersStateAndCompletionCarriesTypedDestination() = runTest {
+        val viewModel = createViewModel(
+            repository = successfulPromoterRepository(sessionImportedForActivation = false),
+            scope = this,
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+        assertFalse(viewModel.promoterActivationState.value.toString().contains(TEST_PROMOTER_INVITE_TOKEN))
+
+        viewModel.onIntent(AuthIntent.ActivatePromoterWithPassword(TEST_PASSWORD))
+        advanceUntilIdle()
+        assertEquals(PromoterActivationStage.Completed, viewModel.promoterActivationState.value.stage)
+
+        viewModel.onIntent(AuthIntent.FinishPromoterActivation)
+        advanceUntilIdle()
+
+        assertEquals(
+            AuthEffect.PromoterActivationCompleted(TEST_ORGANIZATION_ID, TEST_LISTING_ID),
+            viewModel.effects.first(),
         )
     }
 
-    private suspend fun TestScope.completeRegistrationUntilObservability(viewModel: AuthViewModel) {
-        viewModel.onIntent(AuthIntent.OpenRegistration())
-        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
-        viewModel.onIntent(AuthIntent.RequestOtp)
+    @Test
+    fun promoterCancellationRevokesSessionImportedForActivation() = runTest {
+        val scenario = createPromoterCancellationScenario(sessionImportedForActivation = true)
+        openAndCancelPromoterActivation(
+            viewModel = scenario.viewModel,
+            callbackUrl = TEST_PROMOTER_PKCE_CALLBACK,
+        )
+
+        assertEquals(1, scenario.repository.signOutCallCount)
+        assertEquals(1, scenario.store.markCallCount)
+        assertEquals(1, scenario.store.clearCallCount)
+        assertFalse(scenario.store.pending)
+        assertEquals(AuthSurface.Hidden, scenario.viewModel.platformState.value.surface)
+    }
+
+    @Test
+    fun promoterCancellationPreservesPreexistingSession() = runTest {
+        val scenario = createPromoterCancellationScenario(sessionImportedForActivation = false)
+        openAndCancelPromoterActivation(
+            viewModel = scenario.viewModel,
+            callbackUrl = TEST_PROMOTER_CALLBACK,
+        )
+
+        assertEquals(0, scenario.repository.signOutCallCount)
+        assertEquals(0, scenario.store.markCallCount)
+        assertEquals(0, scenario.store.clearCallCount)
+        assertTrue(scenario.viewModel.state.value.isAuthenticated)
+        assertEquals(AuthSurface.Hidden, scenario.viewModel.platformState.value.surface)
+    }
+
+    private fun TestScope.createPromoterCancellationScenario(
+        sessionImportedForActivation: Boolean,
+    ): PromoterCancellationScenario {
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession().takeUnless { sessionImportedForActivation },
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(
+                        promoterActivationContext(sessionImportedForActivation),
+                    )
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(
+                    resolved = !sessionImportedForActivation,
+                ),
+                promoterActivationSessionStore = store,
+            ),
+        )
+        return PromoterCancellationScenario(
+            repository = repository,
+            store = store,
+            viewModel = viewModel,
+        )
+    }
+
+    private suspend fun TestScope.openAndCancelPromoterActivation(viewModel: AuthViewModel, callbackUrl: String) {
         advanceUntilIdle()
-        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
         advanceUntilIdle()
-        viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD))
+        viewModel.onIntent(AuthIntent.CancelPromoterActivation)
         advanceUntilIdle()
-        viewModel.onIntent(AuthIntent.ChangeFirstName("Afi"))
-        viewModel.onIntent(AuthIntent.ChangeLastName("Soglo"))
-        viewModel.onIntent(AuthIntent.ContinueFromIdentity)
-        viewModel.onIntent(AuthIntent.SelectCity(TEST_CITY_ID))
-        viewModel.onIntent(AuthIntent.ContinueFromCity)
-        viewModel.onIntent(AuthIntent.SelectCurrency(KwaborCurrency.Eur))
-        viewModel.onIntent(AuthIntent.ContinueFromCurrency)
-        LegalDocumentType.entries.forEach { type ->
-            viewModel.onIntent(AuthIntent.ChangeLegalAcceptance(type, accepted = true))
-        }
-        viewModel.onIntent(AuthIntent.ContinueFromLegal)
-        assertEquals(RegistrationStep.Observability, viewModel.registrationState.value.step)
+    }
+
+    @Test
+    fun successfulImportedPromoterActivationClearsMarkerBeforeCompletion() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+                onPromoterActivation = {
+                    DomainResult.Success(
+                        PromoterActivationResult(
+                            session = completeSession(),
+                            organizationId = TEST_ORGANIZATION_ID,
+                            listingId = TEST_LISTING_ID,
+                        ),
+                    )
+                },
+                operationEvents = events,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+        events.clear()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.ActivatePromoterWithPassword(TEST_PASSWORD))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("marker-mark", "promoter-callback", "promoter-activate", "marker-clear"),
+            events,
+        )
+        assertEquals(PromoterActivationStage.Completed, viewModel.promoterActivationState.value.stage)
+        assertFalse(store.pending)
+        assertTrue(viewModel.state.value.isAuthenticated)
+    }
+
+    @Test
+    fun successfulPromoterActivationStaysFailClosedUntilMarkerClearCanBeRetried() = runTest {
+        val store = FakePromoterActivationSessionStore(clearSucceeds = false)
+        val viewModel = createViewModel(
+            repository = successfulPromoterRepository(sessionImportedForActivation = true),
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.ActivatePromoterWithPassword(TEST_PASSWORD))
+        advanceUntilIdle()
+
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+        assertFalse(viewModel.state.value.hasSession)
+        assertTrue(store.pending)
+
+        store.clearSucceeds = true
+        viewModel.onIntent(AuthIntent.RetryPromoterActivationLink)
+        advanceUntilIdle()
+
+        assertEquals(PromoterActivationStage.Completed, viewModel.promoterActivationState.value.stage)
+        assertEquals(2, store.clearCallCount)
+        assertFalse(store.pending)
+        assertTrue(viewModel.state.value.isAuthenticated)
+    }
+
+    @Test
+    fun importedPromoterCancellationRetriesMarkerClearBeforeClosing() = runTest {
+        val store = FakePromoterActivationSessionStore(clearSucceeds = false)
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.CancelPromoterActivation)
+        advanceUntilIdle()
+
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(store.pending)
+        assertEquals(AuthSurface.PromoterActivation, viewModel.platformState.value.surface)
+
+        store.clearSucceeds = true
+        viewModel.onIntent(AuthIntent.RetryPromoterActivationLink)
+        advanceUntilIdle()
+
+        assertEquals(2, repository.signOutCallCount)
+        assertEquals(2, store.clearCallCount)
+        assertFalse(store.pending)
+        assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
+    }
+
+    @Test
+    fun importedPromoterCancellationKeepsMarkerWhenSignOutFails() = runTest {
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            authBehavior = RegistrationAuthBehavior(signOutFailure = DomainError.NetworkUnavailable()),
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.CancelPromoterActivation)
+        advanceUntilIdle()
+
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
+        assertTrue(viewModel.promoterActivationState.value.retryAvailable)
+        assertEquals(1, repository.signOutCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertTrue(store.pending)
+        assertEquals(AuthSurface.PromoterActivation, viewModel.platformState.value.surface)
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModelPromoterConcurrencyTest {
+    private val strings = stringsFor(AppLocale.French)
+
+    @Test
+    fun promoterCallbackCannotCancelAccountDeletionInProgress() = runTest {
+        val deletion = BlockedAccountDeletion()
+        val promoterStore = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = false))
+                },
+                onAccountDeletion = deletion::delete,
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                promoterActivationSessionStore = promoterStore,
+            ),
+        )
+        val effects = viewModel.effects.produceIn(backgroundScope)
+        advanceUntilIdle()
+
+        startPasswordAccountDeletion(viewModel, strings.authDeleteAccountConfirmationPhrase)
+        assertTrue(deletion.started.isCompleted)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        runCurrent()
+
+        assertFalse(deletion.cancelled)
+        assertTrue(viewModel.accessState.value.accountDeletionInProgress)
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(0, promoterStore.markCallCount)
+
+        deletion.allowCompletion.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(deletion.cancelled)
+        assertEquals(AuthEffect.AccountDeleted, effects.receive())
+    }
+
+    @Test
+    fun promoterCallbackWaitsForSlowRestoreAndIsProcessedExactlyOnce() = runTest {
+        val restoreStarted = CompletableDeferred<Unit>()
+        val allowRestoreToComplete = CompletableDeferred<Unit>()
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onGetCurrentSession = {
+                    restoreStarted.complete(Unit)
+                    allowRestoreToComplete.await()
+                },
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        runCurrent()
+        assertTrue(restoreStarted.isCompleted)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        runCurrent()
+
+        assertFalse(viewModel.isSessionRestoreComplete.value)
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertEquals(0, store.markCallCount)
+
+        allowRestoreToComplete.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.isSessionRestoreComplete.value)
+        assertEquals(1, repository.promoterCallbackCallCount)
+        assertEquals(1, store.markCallCount)
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+    }
+
+    @Test
+    fun promoterCallbackWaitsForSignOutNavigationWithoutCancellingSignOut() = runTest {
+        val signOutStarted = CompletableDeferred<Unit>()
+        val allowSignOut = CompletableDeferred<Unit>()
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                onSignOut = {
+                    signOutStarted.complete(Unit)
+                    allowSignOut.await()
+                },
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = true))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+            ),
+        )
+        val effects = viewModel.effects.produceIn(backgroundScope)
+        advanceUntilIdle()
+
+        viewModel.confirmSignOut()
+        runCurrent()
+        assertTrue(signOutStarted.isCompleted)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        runCurrent()
+
+        assertEquals(0, repository.promoterCallbackCallCount)
+        assertTrue(viewModel.accessState.value.signOutInProgress)
+
+        allowSignOut.complete(Unit)
+        runCurrent()
+
+        assertEquals(AuthEffect.SignedOut, effects.receive())
+        assertEquals(0, repository.promoterCallbackCallCount)
+
+        viewModel.onIntent(AuthIntent.SignOutNavigationHandled)
+        advanceUntilIdle()
+
+        assertPromoterCallbackReady(viewModel, repository)
+    }
+
+    @Test
+    fun promoterCallbackWaitsForPasswordSignInOperation() = runTest {
+        val signInStarted = CompletableDeferred<Unit>()
+        val allowSignIn = CompletableDeferred<Unit>()
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onSignInWithEmail = {
+                    signInStarted.complete(Unit)
+                    allowSignIn.await()
+                },
+                onPromoterCallback = {
+                    DomainResult.Success(promoterActivationContext(sessionImportedForActivation = false))
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+            ),
+        )
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.OpenSignIn())
+        viewModel.onIntent(AuthIntent.ChangeSignInEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.ContinueFromSignInEmail)
+        viewModel.onIntent(AuthIntent.SubmitSignInPassword(TEST_PASSWORD))
+        runCurrent()
+        assertTrue(signInStarted.isCompleted)
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        runCurrent()
+
+        assertEquals(0, repository.promoterCallbackCallCount)
+
+        allowSignIn.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repository.promoterCallbackCallCount)
+        assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+    }
+
+    @Test
+    fun pkceKillWindowNeverArmsCleanupForPreexistingSession() = runTest {
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    throw CancellationException("Simulated process interruption")
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                promoterActivationSessionStore = store,
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(TEST_PROMOTER_CALLBACK, repository.lastPromoterCallbackUrl)
+        assertEquals(0, store.markCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertFalse(store.pending)
+        assertTrue(viewModel.state.value.isAuthenticated)
+
+        val restartedViewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+                promoterActivationSessionStore = store,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(0, repository.signOutCallCount)
+        assertTrue(restartedViewModel.state.value.isAuthenticated)
+    }
+
+    @Test
+    fun pkceKillWindowArmsCleanupWithoutPreexistingSession() = runTest {
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository(
+            hooks = RegistrationAuthHooks(
+                onPromoterCallback = {
+                    throw CancellationException("Simulated process interruption")
+                },
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_PKCE_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(1, store.markCallCount)
+        assertTrue(store.pending)
+
+        val restartedViewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, repository.signOutCallCount)
+        assertFalse(store.pending)
+        assertFalse(restartedViewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun tokenOnlyCallbackNeverArmsTemporarySessionCleanup() = runTest {
+        val store = FakePromoterActivationSessionStore()
+        val repository = RegistrationAuthRepository()
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(promoterActivationSessionStore = store),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenPromoterActivation(TEST_PROMOTER_CALLBACK))
+        advanceUntilIdle()
+
+        assertEquals(1, repository.promoterCallbackCallCount)
+        assertEquals(0, store.markCallCount)
+        assertEquals(0, store.clearCallCount)
+        assertFalse(store.pending)
+        assertEquals(PromoterActivationStage.Error, viewModel.promoterActivationState.value.stage)
     }
 }
 
@@ -684,36 +1731,168 @@ class AuthViewModelPostAuthenticationTest {
         assertFalse(viewModel.platformState.value.locationPermissionRequestInFlight)
         assertEquals(RegistrationLocationStatus.Unavailable, viewModel.platformState.value.locationStatus)
     }
+}
 
-    private fun TestScope.createViewModel(
-        repository: RegistrationAuthRepository,
-        scope: TestScope,
-        overrides: AuthTestOverrides = AuthTestOverrides(),
-    ): AuthViewModel {
-        val clock = object : ClockProvider {
-            override fun nowEpochMilliseconds(): Long = TEST_EPOCH_MILLISECONDS + scope.testScheduler.currentTime
-        }
-        return AuthViewModel(
-            dependencies = AuthViewModelDependencies(
-                authPresenter = AuthPresenter(repository),
-                registrationPresenter = RegistrationPresenter(
-                    repository,
-                    RegistrationCatalogRepository(),
-                    clock,
-                    RegistrationReducer(),
-                ),
-                passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
-                locationService = overrides.locationService,
-                notificationPermissionPolicy = overrides.notificationPermissionPolicy,
-                notificationPrimingStore = overrides.notificationPrimingStore,
-                authJourneyStore = overrides.authJourneyStore,
-                clockProvider = clock,
-                applyObservabilityConsent = overrides.applyConsent,
-            ),
-            strings = strings,
-            coroutineScope = this,
-        )
+private class AccountDeletionProbe(
+    private val failFirstAttempt: Boolean = false,
+) {
+    val requests = mutableListOf<AccountDeletionRequest>()
+    var generatedKeyCount = 0
+        private set
+
+    val idempotencyKeyProvider = IdempotencyKeyProvider {
+        generatedKeyCount += 1
+        TEST_IDEMPOTENCY_KEY
     }
+
+    suspend fun delete(request: AccountDeletionRequest): DomainResult<Unit> {
+        requests += request
+        return if (failFirstAttempt && requests.size == 1) {
+            DomainResult.Failure(DomainError.NetworkUnavailable())
+        } else {
+            DomainResult.Success(Unit)
+        }
+    }
+}
+
+private fun TestScope.createAccountDeletionViewModel(probe: AccountDeletionProbe): AuthViewModel = createViewModel(
+    repository = RegistrationAuthRepository(
+        currentSession = completeSession(),
+        hooks = RegistrationAuthHooks(onAccountDeletion = probe::delete),
+    ),
+    scope = this,
+    overrides = AuthTestOverrides(
+        notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
+        idempotencyKeyProvider = probe.idempotencyKeyProvider,
+    ),
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private suspend fun TestScope.submitPasswordAccountDeletion(viewModel: AuthViewModel, confirmation: String) {
+    viewModel.onIntent(
+        AuthIntent.DeleteAccountWithPassword(
+            password = TEST_PASSWORD,
+            confirmation = confirmation,
+        ),
+    )
+    advanceUntilIdle()
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun TestScope.startPasswordAccountDeletion(viewModel: AuthViewModel, confirmation: String) {
+    viewModel.onIntent(AuthIntent.RequestAccountDeletion)
+    viewModel.onIntent(
+        AuthIntent.DeleteAccountWithPassword(
+            password = TEST_PASSWORD,
+            confirmation = confirmation,
+        ),
+    )
+    runCurrent()
+}
+
+private data class PromoterCancellationScenario(
+    val repository: RegistrationAuthRepository,
+    val store: FakePromoterActivationSessionStore,
+    val viewModel: AuthViewModel,
+)
+
+private fun successfulPromoterRepository(sessionImportedForActivation: Boolean): RegistrationAuthRepository =
+    RegistrationAuthRepository(
+        hooks = RegistrationAuthHooks(
+            onPromoterCallback = {
+                DomainResult.Success(
+                    promoterActivationContext(sessionImportedForActivation),
+                )
+            },
+            onPromoterActivation = { request ->
+                assertEquals(TEST_PROMOTER_INVITE_TOKEN, request.inviteToken)
+                DomainResult.Success(
+                    PromoterActivationResult(
+                        session = completeSession(),
+                        organizationId = TEST_ORGANIZATION_ID,
+                        listingId = TEST_LISTING_ID,
+                    ),
+                )
+            },
+        ),
+    )
+
+private class BlockedAccountDeletion {
+    val started = CompletableDeferred<Unit>()
+    val allowCompletion = CompletableDeferred<Unit>()
+    var cancelled = false
+        private set
+
+    suspend fun delete(request: AccountDeletionRequest): DomainResult<Unit> {
+        check(request.idempotencyKey.isNotBlank())
+        started.complete(Unit)
+        try {
+            allowCompletion.await()
+        } catch (exception: CancellationException) {
+            cancelled = true
+            throw exception
+        }
+        return DomainResult.Success(Unit)
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun TestScope.createViewModel(
+    repository: RegistrationAuthRepository,
+    scope: TestScope,
+    overrides: AuthTestOverrides = AuthTestOverrides(),
+): AuthViewModel {
+    val clock = object : ClockProvider {
+        override fun nowEpochMilliseconds(): Long = TEST_EPOCH_MILLISECONDS + scope.testScheduler.currentTime
+    }
+    return AuthViewModel(
+        dependencies = AuthViewModelDependencies(
+            authPresenter = AuthPresenter(repository),
+            registrationPresenter = RegistrationPresenter(
+                repository,
+                RegistrationCatalogRepository(),
+                clock,
+                RegistrationReducer(),
+            ),
+            passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
+            locationService = overrides.locationService,
+            notificationPermissionPolicy = overrides.notificationPermissionPolicy,
+            notificationPrimingStore = overrides.notificationPrimingStore,
+            authJourneyStore = overrides.authJourneyStore,
+            promoterActivationSessionStore = overrides.promoterActivationSessionStore,
+            googleIdentityProvider = overrides.googleIdentityProvider,
+            googleIdentityUnavailableMessage = TEST_GOOGLE_UNAVAILABLE_MESSAGE,
+            idempotencyKeyProvider = overrides.idempotencyKeyProvider,
+            clockProvider = clock,
+            applyObservabilityConsent = overrides.applyConsent,
+        ),
+        strings = stringsFor(AppLocale.French),
+        coroutineScope = this,
+    )
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private suspend fun TestScope.completeRegistrationUntilObservability(viewModel: AuthViewModel) {
+    viewModel.onIntent(AuthIntent.OpenRegistration())
+    viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+    viewModel.onIntent(AuthIntent.RequestOtp)
+    advanceUntilIdle()
+    viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+    advanceUntilIdle()
+    viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD))
+    advanceUntilIdle()
+    viewModel.onIntent(AuthIntent.ChangeFirstName("Afi"))
+    viewModel.onIntent(AuthIntent.ChangeLastName("Soglo"))
+    viewModel.onIntent(AuthIntent.ContinueFromIdentity)
+    viewModel.onIntent(AuthIntent.SelectCity(TEST_CITY_ID))
+    viewModel.onIntent(AuthIntent.ContinueFromCity)
+    viewModel.onIntent(AuthIntent.SelectCurrency(KwaborCurrency.Eur))
+    viewModel.onIntent(AuthIntent.ContinueFromCurrency)
+    LegalDocumentType.entries.forEach { type ->
+        viewModel.onIntent(AuthIntent.ChangeLegalAcceptance(type, accepted = true))
+    }
+    viewModel.onIntent(AuthIntent.ContinueFromLegal)
+    assertEquals(RegistrationStep.Observability, viewModel.registrationState.value.step)
 }
 
 private data class AuthTestOverrides(
@@ -723,8 +1902,66 @@ private data class AuthTestOverrides(
     val notificationPermissionPolicy: NotificationPermissionPolicy = NotificationPermissionPolicy { false },
     val notificationPrimingStore: NotificationPrimingStore = FakeNotificationPrimingStore(resolved = false),
     val authJourneyStore: AuthJourneyStore = FakeAuthJourneyStore(),
+    val promoterActivationSessionStore: PromoterActivationSessionStore =
+        FakePromoterActivationSessionStore(),
+    val googleIdentityProvider: GoogleIdentityProvider = FakeGoogleIdentityProvider(),
+    val idempotencyKeyProvider: IdempotencyKeyProvider = IdempotencyKeyProvider { TEST_IDEMPOTENCY_KEY },
     val applyConsent: (ObservabilityConsent) -> Boolean = { true },
 )
+
+private class FakePromoterActivationSessionStore(
+    var pending: Boolean = false,
+    var markSucceeds: Boolean = true,
+    var clearSucceeds: Boolean = true,
+    private val operationEvents: MutableList<String>? = null,
+) : PromoterActivationSessionStore {
+    var readCallCount: Int = 0
+        private set
+    var markCallCount: Int = 0
+        private set
+    var clearCallCount: Int = 0
+        private set
+
+    override fun hasPendingImportedSession(): Boolean {
+        readCallCount += 1
+        operationEvents?.add("marker-read")
+        return pending
+    }
+
+    override fun markImportedSessionPending(): Boolean {
+        markCallCount += 1
+        operationEvents?.add("marker-mark")
+        pending = true
+        return markSucceeds
+    }
+
+    override fun clear(): Boolean {
+        clearCallCount += 1
+        operationEvents?.add("marker-clear")
+        if (clearSucceeds) pending = false
+        return clearSucceeds
+    }
+}
+
+private class FakeGoogleIdentityProvider(
+    private val result: GoogleIdentityResult = GoogleIdentityResult.Unavailable,
+) : GoogleIdentityProvider {
+    override val isConfigured: Boolean = result !is GoogleIdentityResult.Unavailable
+
+    var clearCredentialStateCallCount: Int = 0
+        private set
+    var acquireIdTokenCallCount: Int = 0
+        private set
+
+    override suspend fun acquireIdToken(): GoogleIdentityResult {
+        acquireIdTokenCallCount += 1
+        return result
+    }
+
+    override suspend fun clearCredentialState() {
+        clearCredentialStateCallCount += 1
+    }
+}
 
 private data class RegistrationAuthBehavior(
     val signInSession: AuthSession = completeSession(),
@@ -732,16 +1969,41 @@ private data class RegistrationAuthBehavior(
     val signOutFailure: DomainError? = null,
 )
 
+private data class RegistrationAuthFailurePlan(
+    val currentSessionFailures: Int = 0,
+    val failFirstLegalDocumentsLoad: Boolean = false,
+    val onboardingCompletionFailures: Int = 0,
+)
+
+private data class RegistrationAuthHooks(
+    val onGetCurrentSession: suspend () -> Unit = {},
+    val onSignInWithEmail: suspend () -> Unit = {},
+    val onSignOut: suspend () -> Unit = {},
+    val onCompleteOnboarding: () -> Unit = {},
+    val onPromoterCallback: suspend (String) -> DomainResult<PromoterActivationContext> = {
+        DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+    },
+    val onPromoterActivation: (PromoterActivationRequest) -> DomainResult<PromoterActivationResult> = {
+        DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+    },
+    val onAccountDeletion: suspend (AccountDeletionRequest) -> DomainResult<Unit> = {
+        DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+    },
+    val operationEvents: MutableList<String>? = null,
+)
+
 private class RegistrationAuthRepository(
     currentSession: AuthSession? = null,
     private val verifiedSession: AuthSession = onboardingSession(),
-    private val failFirstLegalDocumentsLoad: Boolean = false,
-    private var onboardingCompletionFailuresRemaining: Int = 0,
-    private val onCompleteOnboarding: () -> Unit = {},
     private val authBehavior: RegistrationAuthBehavior = RegistrationAuthBehavior(),
+    failurePlan: RegistrationAuthFailurePlan = RegistrationAuthFailurePlan(),
+    private val hooks: RegistrationAuthHooks = RegistrationAuthHooks(),
 ) : AuthRepository {
     private var session: AuthSession? = currentSession
     private var legalDocumentsLoadCount = 0
+    private var getCurrentSessionFailuresRemaining = failurePlan.currentSessionFailures
+    private val failFirstLegalDocumentsLoad = failurePlan.failFirstLegalDocumentsLoad
+    private var onboardingCompletionFailuresRemaining = failurePlan.onboardingCompletionFailures
 
     var signOutCalled = false
         private set
@@ -757,8 +2019,25 @@ private class RegistrationAuthRepository(
         private set
     var signOutCallCount = 0
         private set
+    var getCurrentSessionCallCount = 0
+        private set
+    var promoterCallbackCallCount = 0
+        private set
+    var lastPromoterCallbackUrl: String? = null
+        private set
+    var lastSocialSignInRequest: SocialSignInRequest? = null
+        private set
 
-    override suspend fun getCurrentSession(): DomainResult<AuthSession?> = DomainResult.Success(session)
+    override suspend fun getCurrentSession(): DomainResult<AuthSession?> {
+        getCurrentSessionCallCount += 1
+        hooks.operationEvents?.add("get-current-session")
+        hooks.onGetCurrentSession()
+        if (getCurrentSessionFailuresRemaining > 0) {
+            getCurrentSessionFailuresRemaining -= 1
+            return DomainResult.Failure(DomainError.NetworkUnavailable())
+        }
+        return DomainResult.Success(session)
+    }
 
     override suspend fun requestEmailOtp(email: String): DomainResult<Unit> = DomainResult.Success(Unit)
 
@@ -783,7 +2062,7 @@ private class RegistrationAuthRepository(
 
     override suspend fun completeOnboarding(request: CompleteOnboardingRequest): DomainResult<AuthSession> {
         completeOnboardingCallCount += 1
-        onCompleteOnboarding()
+        hooks.onCompleteOnboarding()
         if (onboardingCompletionFailuresRemaining > 0) {
             onboardingCompletionFailuresRemaining -= 1
             return DomainResult.Failure(DomainError.NetworkUnavailable())
@@ -795,6 +2074,7 @@ private class RegistrationAuthRepository(
 
     override suspend fun signInWithEmail(email: String, password: String): DomainResult<AuthSession> {
         signInCallCount += 1
+        hooks.onSignInWithEmail()
         session = authBehavior.signInSession
         return DomainResult.Success(authBehavior.signInSession)
     }
@@ -820,15 +2100,35 @@ private class RegistrationAuthRepository(
         return DomainResult.Success(Unit)
     }
 
-    override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> =
-        DomainResult.Success(completeSession())
+    override suspend fun signInWithSocialProvider(request: SocialSignInRequest): DomainResult<AuthSession> {
+        lastSocialSignInRequest = request
+        return DomainResult.Success(authBehavior.signInSession)
+    }
 
-    override suspend fun activatePromoterInvite(request: PromoterActivationRequest): DomainResult<AuthSession> =
-        DomainResult.Failure(DomainError.Validation("error.auth.unused"))
+    override suspend fun handlePromoterActivationCallback(
+        callbackUrl: String,
+    ): DomainResult<PromoterActivationContext> {
+        promoterCallbackCallCount += 1
+        lastPromoterCallbackUrl = callbackUrl
+        hooks.operationEvents?.add("promoter-callback")
+        return hooks.onPromoterCallback(callbackUrl)
+    }
+
+    override suspend fun activatePromoterInvite(
+        request: PromoterActivationRequest,
+    ): DomainResult<PromoterActivationResult> {
+        hooks.operationEvents?.add("promoter-activate")
+        return hooks.onPromoterActivation(request)
+    }
+
+    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<Unit> =
+        hooks.onAccountDeletion(request)
 
     override suspend fun signOut(): DomainResult<Unit> {
         signOutCallCount += 1
         signOutCalled = true
+        hooks.operationEvents?.add("sign-out")
+        hooks.onSignOut()
         authBehavior.signOutFailure?.let { return DomainResult.Failure(it) }
         session = null
         return DomainResult.Success(Unit)
@@ -906,6 +2206,23 @@ private class RegistrationCatalogRepository : CatalogRepository {
 
 private fun <T> unexpected(): DomainResult<T> = DomainResult.Failure(DomainError.Unexpected())
 
+private fun assertSessionRestoreIsBlocked(viewModel: AuthViewModel) {
+    assertTrue(viewModel.isSessionRestoreComplete.value)
+    assertEquals(AuthSessionRestoreStatus.Failed, viewModel.sessionRestoreStatus.value)
+    assertEquals(AuthSurface.SessionRestoreFailure, viewModel.platformState.value.surface)
+    assertFalse(viewModel.state.value.hasSession)
+}
+
+private fun AuthViewModel.confirmSignOut() {
+    onIntent(AuthIntent.RequestSignOut)
+    onIntent(AuthIntent.ConfirmSignOut)
+}
+
+private fun assertPromoterCallbackReady(viewModel: AuthViewModel, repository: RegistrationAuthRepository) {
+    assertEquals(1, repository.promoterCallbackCallCount)
+    assertEquals(PromoterActivationStage.Ready, viewModel.promoterActivationState.value.stage)
+}
+
 private fun legalDocument(type: LegalDocumentType): LegalDocumentRevision = LegalDocumentRevision(
     id = "document-${type.name}",
     type = type,
@@ -914,6 +2231,15 @@ private fun legalDocument(type: LegalDocumentType): LegalDocumentRevision = Lega
     url = "https://kwabor.test/legal/${type.name.lowercase()}",
     effectiveAtEpochMilliseconds = TEST_EPOCH_MILLISECONDS,
 )
+
+private fun promoterActivationContext(sessionImportedForActivation: Boolean): PromoterActivationContext =
+    PromoterActivationContext(
+        inviteToken = TEST_PROMOTER_INVITE_TOKEN,
+        organizationId = TEST_ORGANIZATION_ID,
+        listingId = TEST_LISTING_ID,
+        businessName = "Chez Afi",
+        sessionImportedForActivation = sessionImportedForActivation,
+    )
 
 private fun onboardingSession(): AuthSession = AuthSession(
     userId = "user-1",
@@ -932,4 +2258,15 @@ private const val TEST_EMAIL = "user@kwabor.test"
 private const val TEST_OTP = "123456"
 private const val TEST_PASSWORD = "mot-de-passe-solide"
 private const val TEST_CITY_ID = "cotonou"
+private const val TEST_GOOGLE_UNAVAILABLE_MESSAGE = "Connexion Google indisponible"
+private const val TEST_IDEMPOTENCY_KEY = "00000000-0000-4000-8000-000000000001"
+private const val TEST_GOOGLE_ID_TOKEN = "google-id-token"
+private const val TEST_GOOGLE_RAW_NONCE = "google-raw-nonce"
+private val TEST_PROMOTER_INVITE_TOKEN = "a".repeat(64)
+private val TEST_PROMOTER_CALLBACK =
+    "kwabor://auth/promoter-activate?token=$TEST_PROMOTER_INVITE_TOKEN"
+private val TEST_PROMOTER_PKCE_CALLBACK =
+    "$TEST_PROMOTER_CALLBACK&code=${"b".repeat(32)}"
+private const val TEST_ORGANIZATION_ID = "organization-1"
+private const val TEST_LISTING_ID = "listing-1"
 private const val TEST_EPOCH_MILLISECONDS = 1_783_800_000_000L
