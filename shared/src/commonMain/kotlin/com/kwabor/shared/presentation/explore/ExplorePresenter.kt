@@ -184,6 +184,7 @@ private fun ExploreUiState.handleInteractionFailure(
         pendingAuthInteraction = PendingExploreAuthInteraction(
             listingId = failure.listingId,
             kind = failure.kind,
+            suggestedCityId = listings.firstOrNull { listing -> listing.id == failure.listingId }?.cityId,
         ),
     )
     is DomainError.NetworkUnavailable -> queueOfflineInteraction(
@@ -255,6 +256,7 @@ private fun ListingSummary.toExploreListingItem(
     sponsored = sponsoredUntilEpochMilliseconds?.let { it > nowEpochMilliseconds } ?: false,
     liked = interaction?.likedByViewer ?: false,
     favorited = interaction?.favoritedByViewer ?: false,
+    cityId = cityId,
 )
 
 private fun ExploreLoadRequest.errorState(strings: KwaborStrings, error: DomainError): ExploreUiState =

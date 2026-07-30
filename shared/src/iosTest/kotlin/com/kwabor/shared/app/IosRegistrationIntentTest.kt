@@ -11,7 +11,7 @@ class IosRegistrationIntentTest {
 
         assertFalse(IosRegistrationVerifyOtpIntent(otp).toString().contains(otp))
         assertFalse(
-            IosRegistrationSetInitialPasswordIntent(password, password).toString().contains(password),
+            IosRegistrationSetInitialPasswordIntent(password).toString().contains(password),
         )
     }
 }

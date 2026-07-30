@@ -158,11 +158,11 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - ADR-0017 et les runbooks environnement/onboarding documentent le provisionnement propriétaire OAuth/Supabase/Apple, les frontières de confidentialité et la réconciliation des suppressions interrompues.
 - Validation locale AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; reset Supabase complet, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente.
 - Les premiers builds Xcode de la PR `#33` ont détecté l'export incomplet des chaînes AUTH-005 vers Swift, le nom importé du code d'annulation Google Sign-In et un masquage de propriété Promoteur. Les correctifs conservent un pont KMP typé sans texte dupliqué ; le run final `30294633454` du commit `578f8c4` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release sous Xcode 16.4 en 19 min 27 s.
+- AUTH-UX-001 refond le parcours d'inscription sur `codex/auth-onboarding-ux` : intro interactive, quatre écrans email maximum, profil final compact, un écran après Google/Apple, softwall contextuelle avec `suggestedCityId`, reprise Like/Favori unique et suppression des permissions/consentements automatiques avant l'accueil. Le DTO/RPC/RLS Supabase reste inchangé ; l'ADR-0018 trace la décision.
 
 ## Tâche en cours
 
-Clôture atomique AUTH-005 uniquement. Aucun développement de BRAND-002 ni d'une tranche V1 suivante
-ne doit commencer dans cette exécution.
+Finalisation et validation locale de AUTH-UX-001 sur `codex/auth-onboarding-ux`.
 
 ## Blocages / limites
 
@@ -179,7 +179,7 @@ ne doit commencer dans cette exécution.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le propriétaire a signalé que le monogramme du splash système Android n'est pas visuellement fidèle au master : les dérivés de lancement par densité sont trop petits puis réagrandis. BRAND-002 doit remplacer ce chemin par le master haute définition exact et produire des captures multi-API avant toute autre tranche produit. Le wordmark complet Android/iOS reste verrouillé bit pour bit ; la validation perceptuelle du raccord splash → wordmark → première frame, de l'autoplay silencieux, du reduced-motion, du lifecycle/fallback et de Remote Config réel sur appareils physiques demeure obligatoire avant bêta.
-- Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B et l'activation de Firebase Remote Config Realtime API ; le consentement observabilité est désormais branché dans AUTH-003.
+- Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B, l'activation de Firebase Remote Config Realtime API et un consentement accordé depuis les futurs Réglages ; l'inscription ne collecte plus ce consentement.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
@@ -188,7 +188,6 @@ ne doit commencer dans cette exécution.
 
 ## Prochaine tâche logique
 
-L'exécution s'arrête à la clôture atomique AUTH-005, conformément à l'instruction propriétaire.
-Au prochain ordre, BRAND-002 restera la tranche prioritaire sur une branche séparée avec le
-monogramme officiel exact et ses captures. ENV-001B/OBS-001B reprendra lorsque le propriétaire
-aura provisionné les environnements distants.
+Faire valider AUTH-UX-001 par la CI macOS, puis reprendre BRAND-002 sur une branche séparée avec le
+monogramme officiel exact et ses captures. ENV-001B/OBS-001B reprendra lorsque le propriétaire aura
+provisionné les environnements distants.

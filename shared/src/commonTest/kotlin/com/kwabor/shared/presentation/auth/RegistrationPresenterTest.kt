@@ -28,23 +28,33 @@ import com.kwabor.shared.domain.core.PageRequest
 import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
-import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.i18n.stringsFor
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class RegistrationPresenterTest {
     private val strings = stringsFor(AppLocale.French)
 
     @Test
-    fun notificationPrimingStateIsExposedWithoutDependingOnPlatformEnumNaming() {
-        assertFalse(initialRegistrationUiState().isNotificationPriming)
+    fun progressAdaptsToEmailAndFederatedPaths() {
+        assertEquals(null, initialRegistrationUiState().progress)
         assertEquals(
-            true,
-            initialRegistrationUiState().copy(step = RegistrationStep.NotificationPriming).isNotificationPriming,
+            RegistrationProgress(current = 2, total = 4),
+            initialRegistrationUiState().copy(
+                step = RegistrationStep.Otp,
+                method = RegistrationMethod.Email,
+            ).progress,
+        )
+        assertEquals(
+            RegistrationProgress(current = 1, total = 1),
+            initialRegistrationUiState().copy(
+                step = RegistrationStep.Profile,
+                method = RegistrationMethod.Federated,
+            ).progress,
         )
     }
 
@@ -115,16 +125,16 @@ class RegistrationPresenterTest {
     }
 
     @Test
-    fun setInitialPassword_validatesConfirmationWithoutRetainingSecret() = runTest {
+    fun setInitialPasswordUsesOneSecretWithoutRetainingIt() = runTest {
         val repository = FakeRegistrationAuthRepository()
         val presenter = presenter(repository, FakeClock())
         val state = initialRegistrationUiState().copy(step = RegistrationStep.Password)
 
-        val mismatch = presenter.setInitialPassword(state, "password123", "different", strings)
-        val accepted = presenter.setInitialPassword(state, "password123", "password123", strings)
+        val tooShort = presenter.setInitialPassword(state, "short", strings)
+        val accepted = presenter.setInitialPassword(state, "password123", strings)
 
-        assertEquals(strings.registrationPasswordMismatch, mismatch.errorMessage)
-        assertEquals(RegistrationStep.Identity, accepted.step)
+        assertEquals(strings.registrationPasswordTooShort, tooShort.errorMessage)
+        assertEquals(RegistrationStep.Profile, accepted.step)
         assertEquals("password123", repository.initialPassword)
         assertFalse(accepted.toString().contains("password123"))
     }
@@ -138,17 +148,57 @@ class RegistrationPresenterTest {
 
         val result = presenter.loadRequirements(initialRegistrationUiState(), strings)
 
-        assertEquals(strings.registrationLegalUnavailable, result.errorMessage)
+        assertEquals(strings.registrationLegalUnavailable, result.requirementsErrorMessage)
         assertEquals(1, result.cities.size)
+        assertEquals(RegistrationRequirementsStatus.Failed, result.requirementsStatus)
     }
 
     @Test
-    fun completeOnboarding_sendsExplicitDocumentIdsAndWaitsForNotificationPriming() = runTest {
+    fun requirementsPreselectOnlyAValidSuggestedCity() = runTest {
+        val presenter = presenter(FakeRegistrationAuthRepository(), FakeClock())
+
+        val valid = presenter.loadRequirements(
+            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "cotonou")),
+            strings,
+        )
+        val invalid = presenter.loadRequirements(
+            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "unknown")),
+            strings,
+        )
+
+        assertEquals("cotonou", valid.selectedCityId)
+        assertEquals(null, invalid.selectedCityId)
+        assertEquals(RegistrationRequirementsStatus.Ready, valid.requirementsStatus)
+    }
+
+    @Test
+    fun delayedRequirementsMergePreservesLiveProfileInput() = runTest {
+        val presenter = presenter(FakeRegistrationAuthRepository(), FakeClock())
+        val liveState = initialRegistrationUiState().copy(
+            firstName = "Afi",
+            lastName = "Soglo",
+            selectedCityId = "cotonou",
+            termsAccepted = true,
+        )
+        val loadedRequirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
+
+        val merged = liveState.mergeRequirementsFrom(loadedRequirements)
+
+        assertEquals("Afi", merged.firstName)
+        assertEquals("Soglo", merged.lastName)
+        assertEquals("cotonou", merged.selectedCityId)
+        assertTrue(merged.termsAccepted)
+        assertEquals(RegistrationRequirementsStatus.Ready, merged.requirementsStatus)
+    }
+
+    @Test
+    fun completeOnboardingSendsExplicitDocumentIdsAndCompletesImmediately() = runTest {
         val repository = FakeRegistrationAuthRepository()
         val presenter = presenter(repository, FakeClock())
         val requirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
         val ready = requirements.copy(
-            step = RegistrationStep.Observability,
+            step = RegistrationStep.Profile,
+            method = RegistrationMethod.Email,
             firstName = " Afi ",
             lastName = " Kwabor ",
             selectedCityId = "cotonou",
@@ -156,11 +206,6 @@ class RegistrationPresenterTest {
             termsAccepted = true,
             privacyAccepted = true,
             ugcAccepted = true,
-            observabilityConsent = ObservabilityConsent(
-                analyticsAllowed = true,
-                diagnosticsAllowed = false,
-                remoteConfigurationAllowed = true,
-            ),
         )
 
         val completed = presenter.completeOnboarding(ready, strings)
@@ -170,39 +215,45 @@ class RegistrationPresenterTest {
         assertEquals("privacy-id", request.privacyDocumentId)
         assertEquals("ugc-id", request.ugcDocumentId)
         assertEquals("Afi", request.firstName)
-        assertEquals(RegistrationStep.NotificationPriming, completed.step)
+        assertEquals(RegistrationStep.Completed, completed.step)
         assertEquals(AccountSetupStatus.Complete, completed.currentSession?.accountSetupStatus)
-        assertEquals(
-            RegistrationStep.Completed,
-            presenter.reducer.reduce(completed, RegistrationIntent.FinishNotificationPriming, strings).step,
-        )
     }
 
     @Test
-    fun legalAndLocationTransitionsRemainBlockingUntilValid() {
+    fun compactProfileValidationBlocksEveryRequiredValue() = runTest {
         val presenter = presenter(FakeRegistrationAuthRepository(), FakeClock())
+        val requirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
 
         val identityBlocked = presenter.reducer.reduce(
-            initialRegistrationUiState(),
-            RegistrationIntent.ContinueFromIdentity,
+            requirements.copy(step = RegistrationStep.Profile),
+            RegistrationIntent.CompleteProfile,
             strings,
         )
         val cityBlocked = presenter.reducer.reduce(
-            initialRegistrationUiState().copy(step = RegistrationStep.City),
-            RegistrationIntent.ContinueFromCity,
+            requirements.copy(
+                step = RegistrationStep.Profile,
+                firstName = "Afi",
+                lastName = "Soglo",
+            ),
+            RegistrationIntent.CompleteProfile,
             strings,
         )
         val legalBlocked = presenter.reducer.reduce(
-            initialRegistrationUiState().copy(step = RegistrationStep.Legal),
-            RegistrationIntent.ContinueFromLegal,
+            requirements.copy(
+                step = RegistrationStep.Profile,
+                firstName = "Afi",
+                lastName = "Soglo",
+                selectedCityId = "cotonou",
+            ),
+            RegistrationIntent.CompleteProfile,
             strings,
         )
         val nameTooLong = presenter.reducer.reduce(
-            initialRegistrationUiState().copy(
+            requirements.copy(
                 firstName = "A".repeat(MAX_ONBOARDING_NAME_LENGTH + 1),
                 lastName = "Soglo",
             ),
-            RegistrationIntent.ContinueFromIdentity,
+            RegistrationIntent.CompleteProfile,
             strings,
         )
 

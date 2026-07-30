@@ -1,6 +1,10 @@
 package com.kwabor.android.presentation.explore
 
 import androidx.lifecycle.ViewModel
+import com.kwabor.shared.domain.observability.AnalyticsContext
+import com.kwabor.shared.domain.observability.AnalyticsEntityType
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.explore.ExploreChip
 import com.kwabor.shared.presentation.explore.ExploreInteractionKind
@@ -38,13 +42,17 @@ internal sealed interface ExploreIntent {
 }
 
 internal sealed interface ExploreEffect {
-    data object AuthenticationRequired : ExploreEffect
+    data class AuthenticationRequired(
+        val kind: ExploreInteractionKind,
+        val suggestedCityId: String?,
+    ) : ExploreEffect
 }
 
 internal class ExploreViewModel(
     private val presenter: ExplorePresenter,
     private val strings: KwaborStrings,
     private val coroutineScope: CoroutineScope,
+    private val track: (AnalyticsEvent) -> Unit = {},
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(initialExploreUiState(strings))
     val state: StateFlow<ExploreUiState> = mutableState.asStateFlow()
@@ -92,7 +100,7 @@ internal class ExploreViewModel(
         }
     }
 
-    private fun toggle(listingId: String, kind: ExploreInteractionKind) {
+    private fun toggle(listingId: String, kind: ExploreInteractionKind, isReplay: Boolean = false) {
         coroutineScope.launch {
             val currentState = mutableState.value
             val updatedState = when (kind) {
@@ -100,15 +108,31 @@ internal class ExploreViewModel(
                 ExploreInteractionKind.Favorite -> presenter.toggleFavorite(currentState, listingId, strings)
             }
             mutableState.value = updatedState
-            if (updatedState.pendingAuthInteraction != null) {
-                effectChannel.send(ExploreEffect.AuthenticationRequired)
+            if (isReplay && updatedState.pendingAuthInteraction == null) {
+                track(
+                    AnalyticsEvent(
+                        name = AnalyticsEventName.ProtectedActionReplayed,
+                        context = AnalyticsContext(
+                            entityType = AnalyticsEntityType.Place,
+                            entityId = listingId,
+                        ),
+                    ),
+                )
+            }
+            updatedState.pendingAuthInteraction?.let { pending ->
+                effectChannel.send(
+                    ExploreEffect.AuthenticationRequired(
+                        kind = pending.kind,
+                        suggestedCityId = pending.suggestedCityId,
+                    ),
+                )
             }
         }
     }
 
     private fun replayPendingInteraction() {
         val pending = mutableState.value.pendingAuthInteraction ?: return
-        toggle(listingId = pending.listingId, kind = pending.kind)
+        toggle(listingId = pending.listingId, kind = pending.kind, isReplay = true)
     }
 
     private fun clearPendingAuthentication() {

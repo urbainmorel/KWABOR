@@ -30,6 +30,7 @@ internal class AuthViewModel(
         countdownCoordinator,
         dependencies.authJourneyStore,
         sessionCoordinator,
+        dependencies.track,
     )
     private val signInCoordinator = AuthSignInCoordinator(runtime, dependencies, sessionCoordinator)
     private val federatedCoordinator = AuthFederatedCoordinator(runtime, dependencies, sessionCoordinator)
@@ -44,7 +45,7 @@ internal class AuthViewModel(
         dependencies = dependencies,
     )
     private val profileCoordinator = AuthProfileCoordinator(runtime, dependencies)
-    private val platformCoordinator = AuthPlatformCoordinator(runtime, dependencies)
+    private val platformCoordinator = AuthPlatformCoordinator(runtime)
 
     val state: StateFlow<AuthUiState> = runtime.authState.asStateFlow()
     val accessState: StateFlow<AuthAccessUiState> = runtime.accessState.asStateFlow()

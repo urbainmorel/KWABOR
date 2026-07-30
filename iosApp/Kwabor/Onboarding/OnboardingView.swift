@@ -13,8 +13,6 @@ struct OnboardingView: View {
                 SessionRestoreView(coordinator: coordinator)
             case .authentication:
                 OnboardingLandingView(coordinator: coordinator)
-            case .notificationPriming:
-                RestoredSessionNotificationPrimingView(coordinator: coordinator)
             case .home:
                 ContentView(
                     bridge: coordinator.bridge,
@@ -107,25 +105,24 @@ private struct IntroView: View {
                 }
             }
 
+            KwaborDesignTokens.ColorToken.ink950
+                .opacity(KwaborDesignTokens.Alpha.scrimHigh)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+
             VStack {
                 HStack {
-                    Spacer()
                     Button(coordinator.strings.introSkip) {
                         coordinator.completeIntro(skipped: true)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(KwaborDesignTokens.ColorToken.ink950)
+                    Spacer()
                 }
                 Spacer()
-                if reducedMotion || coordinator.introVideoURL == nil {
-                    Button(coordinator.strings.introContinue) {
-                        coordinator.completeIntro(skipped: false)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(KwaborDesignTokens.ColorToken.ink950)
-                }
             }
             .padding(KwaborDesignTokens.Spacing.xxl)
+            OnboardingEntryActions(coordinator: coordinator)
         }
         .onAppear { coordinator.introDisplayed() }
         .onChange(of: coordinator.introVideoURL) { _, _ in
@@ -176,49 +173,57 @@ private struct OnboardingLandingView: View {
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
-            VStack {
-                HStack {
-                    Spacer()
-                    Text(coordinator.strings.languageLabel)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                }
-                Spacer()
-                VStack(spacing: KwaborDesignTokens.Spacing.lg) {
-                    Text(coordinator.strings.title)
-                        .font(.largeTitle.bold())
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                    Text(coordinator.strings.subtitle)
-                        .font(.title3)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                    Button(coordinator.strings.signUp) {
-                        coordinator.presentRegistration()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(KwaborDesignTokens.ColorToken.ink950)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .disabled(coordinator.requiresProtectedAuthentication)
-
-                    Button(coordinator.strings.signIn) {
-                        coordinator.presentAuthentication()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-
-                    Button(coordinator.strings.continueWithoutAccount) {
-                        coordinator.requestGuestAccess()
-                    }
-                    .foregroundStyle(.white)
-                    .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .disabled(coordinator.requiresProtectedAuthentication)
-                }
-            }
-            .padding(KwaborDesignTokens.Spacing.xxl)
+            OnboardingEntryActions(coordinator: coordinator)
         }
+    }
+}
+
+private struct OnboardingEntryActions: View {
+    @ObservedObject var coordinator: OnboardingCoordinator
+
+    var body: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Text(coordinator.strings.languageLabel)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+            VStack(spacing: KwaborDesignTokens.Spacing.lg) {
+                Text(coordinator.strings.title)
+                    .font(.largeTitle.bold())
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                Text(coordinator.strings.subtitle)
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                Button(coordinator.strings.signUp) {
+                    coordinator.presentRegistration()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(KwaborDesignTokens.ColorToken.ink950)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(coordinator.requiresProtectedAuthentication)
+
+                Button(coordinator.strings.signIn) {
+                    coordinator.presentAuthentication()
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+
+                Button(coordinator.strings.continueWithoutAccount) {
+                    coordinator.requestGuestAccess()
+                }
+                .foregroundStyle(.white)
+                .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(coordinator.requiresProtectedAuthentication)
+            }
+        }
+        .padding(KwaborDesignTokens.Spacing.xxl)
         .alert(
             coordinator.strings.continueWithoutAccount,
             isPresented: guestDisclosureBinding

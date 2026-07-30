@@ -18,25 +18,24 @@ internal enum class AuthEntryPoint {
     SoftWall,
 }
 
-internal enum class RegistrationLocationStatus {
-    Idle,
-    Loading,
-    PermissionDenied,
-    LocationDisabled,
-    Unavailable,
-    OutsideBenin,
+internal enum class AuthProtectedAction {
+    Like,
+    Favorite,
+    Other,
 }
+
+internal data class AuthSoftWallContext(
+    val action: AuthProtectedAction,
+    val suggestedCityId: String?,
+)
 
 internal data class AuthPlatformUiState(
     val surface: AuthSurface = AuthSurface.Hidden,
     val entryPoint: AuthEntryPoint = AuthEntryPoint.Landing,
-    val locationStatus: RegistrationLocationStatus = RegistrationLocationStatus.Idle,
-    val locationPermissionRequestInFlight: Boolean = false,
+    val softWallContext: AuthSoftWallContext? = null,
+    val softWallErrorMessage: String? = null,
     val otpResendSecondsRemaining: Int = 0,
     val legalDocumentOpenFailed: Boolean = false,
-    val observabilityConsentPersistenceFailed: Boolean = false,
-    val notificationPermissionRequestInFlight: Boolean = false,
-    val notificationPrimingPersistenceFailed: Boolean = false,
     val federatedSignInInProgress: Boolean = false,
 )
 
@@ -105,7 +104,7 @@ internal sealed interface AuthIntent {
 
     sealed interface Platform : AuthIntent
 
-    data object OpenSoftWall : Journey
+    data class OpenSoftWall(val context: AuthSoftWallContext) : Journey
 
     data class OpenRegistration(val entryPoint: AuthEntryPoint = AuthEntryPoint.Landing) : Journey
 
@@ -139,8 +138,8 @@ internal sealed interface AuthIntent {
 
     data object ResendOtp : Credentials
 
-    class SubmitPassword(val password: String, val confirmation: String) : Credentials {
-        override fun toString(): String = "SubmitPassword(password=<redacted>, confirmation=<redacted>)"
+    class SubmitPassword(val password: String) : Credentials {
+        override fun toString(): String = "SubmitPassword(password=<redacted>)"
     }
 
     data object RetryRequirements : Credentials
@@ -215,35 +214,11 @@ internal sealed interface AuthIntent {
 
     data class ChangeLegalAcceptance(val type: LegalDocumentType, val accepted: Boolean) : ProfileField
 
-    data class ChangeAnalyticsConsent(val accepted: Boolean) : ProfileField
-
-    data class ChangeDiagnosticsConsent(val accepted: Boolean) : ProfileField
-
-    data class ChangeRemoteConfigurationConsent(val accepted: Boolean) : ProfileField
-
-    data object ContinueFromIdentity : ProfileProgress
-
-    data object ContinueFromCity : ProfileProgress
-
-    data object ContinueFromCurrency : ProfileProgress
-
-    data object ContinueFromLegal : ProfileProgress
-
-    data object CompleteOnboarding : ProfileProgress
-
-    data object RequestLocation : Platform
-
-    data class LocationPermissionResult(val granted: Boolean) : Platform
+    data object CompleteProfile : ProfileProgress
 
     data class OpenLegalDocument(val type: LegalDocumentType) : Platform
 
     data object LegalDocumentOpenFailed : Platform
-
-    data object EnableNotifications : Platform
-
-    data object SkipNotifications : Platform
-
-    data class NotificationPermissionResult(val granted: Boolean) : Platform
 }
 
 internal sealed interface AuthEffect {
@@ -262,9 +237,5 @@ internal sealed interface AuthEffect {
 }
 
 internal sealed interface AuthPlatformEffect {
-    data object RequestLocationPermission : AuthPlatformEffect
-
-    data object RequestNotificationPermission : AuthPlatformEffect
-
     data class OpenLegalDocument(val url: String) : AuthPlatformEffect
 }

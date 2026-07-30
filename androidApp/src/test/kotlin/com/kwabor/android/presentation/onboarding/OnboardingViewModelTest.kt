@@ -4,6 +4,7 @@ import com.kwabor.android.onboarding.FirstLaunchStore
 import com.kwabor.android.onboarding.IntroLaunchDecision
 import com.kwabor.android.onboarding.IntroLaunchRequest
 import com.kwabor.android.onboarding.IntroMediaSource
+import com.kwabor.android.onboarding.IntroPresentationReason
 import com.kwabor.android.onboarding.PendingRemoteIntro
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -117,14 +118,16 @@ class OnboardingViewModelTest {
 
     @Test
     fun signupAndSigninEmitDistinctEffects() = runTest {
+        val signUpStore = FakeFirstLaunchStore()
         val signUpViewModel = createViewModel(
-            store = FakeFirstLaunchStore(),
+            store = signUpStore,
             events = mutableListOf(),
             scope = this,
         )
         signUpViewModel.onIntent(OnboardingIntent.SignUpSelected)
 
         assertEquals(OnboardingEffect.OpenRegistration, signUpViewModel.effects.first())
+        assertEquals(IntroPresentationReason.CtaSelected, signUpStore.lastCompletionReason)
 
         val signInViewModel = createViewModel(
             store = FakeFirstLaunchStore(),
@@ -170,11 +173,13 @@ private class FakeFirstLaunchStore(
 ) : FirstLaunchStore {
     var pending: PendingRemoteIntro? = null
     var lastPresentedRevision = 0L
+    var lastCompletionReason: IntroPresentationReason? = null
 
     override fun isBundledIntroRequired(): Boolean = !bundledIntroSeen
 
-    override fun markBundledIntroSeen() {
+    override fun markBundledIntroSeen(reason: IntroPresentationReason) {
         bundledIntroSeen = true
+        lastCompletionReason = reason
     }
 
     override fun pendingRemoteIntro(): PendingRemoteIntro? = pending
@@ -185,9 +190,10 @@ private class FakeFirstLaunchStore(
         pending = intro
     }
 
-    override fun markRemoteIntroPresented(revision: Long) {
+    override fun markRemoteIntroPresented(revision: Long, reason: IntroPresentationReason) {
         lastPresentedRevision = maxOf(lastPresentedRevision, revision)
         pending = pending?.takeIf { it.revision > revision }
+        lastCompletionReason = reason
     }
 
     override fun clearPendingRemoteIntro() {

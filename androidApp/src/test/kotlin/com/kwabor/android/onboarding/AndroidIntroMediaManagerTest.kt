@@ -245,7 +245,7 @@ private class FakeFirstLaunchStore(
 
     override fun isBundledIntroRequired(): Boolean = bundledIntroRequired
 
-    override fun markBundledIntroSeen() {
+    override fun markBundledIntroSeen(reason: IntroPresentationReason) {
         bundledIntroRequired = false
     }
 
@@ -262,7 +262,7 @@ private class FakeFirstLaunchStore(
         }
     }
 
-    override fun markRemoteIntroPresented(revision: Long) {
+    override fun markRemoteIntroPresented(revision: Long, reason: IntroPresentationReason) {
         lastPresentedRevision = maxOf(lastPresentedRevision, revision)
         if (pending?.revision != null && requireNotNull(pending).revision <= revision) {
             pending = null

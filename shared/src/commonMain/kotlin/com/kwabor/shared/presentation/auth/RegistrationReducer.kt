@@ -26,10 +26,6 @@ class RegistrationReducer {
                 errorMessage = null,
             )
             is RegistrationIntent.UpdateLegalAcceptance -> state.updateLegalAcceptance(intent.type, intent.accepted)
-            is RegistrationIntent.UpdateObservabilityConsent -> state.copy(
-                observabilityConsent = intent.consent,
-                errorMessage = null,
-            )
         }
 
     private fun reduceNavigation(
@@ -37,14 +33,7 @@ class RegistrationReducer {
         intent: RegistrationIntent.Navigation,
         strings: KwaborStrings,
     ): RegistrationUiState = when (intent) {
-        RegistrationIntent.ContinueFromIdentity -> state.continueFromIdentity(strings)
-        RegistrationIntent.ContinueFromCity -> state.continueFromCity(strings)
-        RegistrationIntent.ContinueFromCurrency -> state.copy(step = RegistrationStep.Legal, errorMessage = null)
-        RegistrationIntent.ContinueFromLegal -> state.continueFromLegal(strings)
-        RegistrationIntent.FinishNotificationPriming -> state.copy(
-            step = RegistrationStep.Completed,
-            errorMessage = null,
-        )
+        RegistrationIntent.CompleteProfile -> state.validateProfile(strings)
         RegistrationIntent.GoBack -> state.goBack()
     }
 }
@@ -65,40 +54,27 @@ private fun RegistrationUiState.updateLegalAcceptance(
     LegalDocumentType.UgcLicense -> copy(ugcAccepted = accepted, errorMessage = null)
 }
 
-private fun RegistrationUiState.continueFromIdentity(strings: KwaborStrings): RegistrationUiState = when {
+private fun RegistrationUiState.validateProfile(strings: KwaborStrings): RegistrationUiState = when {
+    !requirementsReady -> copy(errorMessage = strings.registrationLegalUnavailable)
     firstName.isBlank() || lastName.isBlank() -> copy(errorMessage = strings.registrationNameRequired)
     firstName.trim().length > MAX_ONBOARDING_NAME_LENGTH ||
         lastName.trim().length > MAX_ONBOARDING_NAME_LENGTH -> copy(
         errorMessage = strings.registrationNameTooLong,
     )
-    else -> copy(step = RegistrationStep.City, errorMessage = null)
+    selectedCityId == null -> copy(errorMessage = strings.registrationCityRequired)
+    !termsAccepted || !privacyAccepted || !ugcAccepted -> copy(errorMessage = strings.registrationLegalRequired)
+    else -> copy(errorMessage = null)
 }
-
-private fun RegistrationUiState.continueFromCity(strings: KwaborStrings): RegistrationUiState =
-    if (selectedCityId == null) {
-        copy(errorMessage = strings.registrationCityRequired)
-    } else {
-        copy(step = RegistrationStep.Currency, errorMessage = null)
-    }
-
-private fun RegistrationUiState.continueFromLegal(strings: KwaborStrings): RegistrationUiState =
-    if (!termsAccepted || !privacyAccepted || !ugcAccepted) {
-        copy(errorMessage = strings.registrationLegalRequired)
-    } else {
-        copy(step = RegistrationStep.Observability, errorMessage = null)
-    }
 
 private fun RegistrationUiState.goBack(): RegistrationUiState = copy(
     step = when (step) {
         RegistrationStep.Email -> RegistrationStep.Email
         RegistrationStep.Otp -> RegistrationStep.Email
         RegistrationStep.Password -> RegistrationStep.Otp
-        RegistrationStep.Identity -> RegistrationStep.Password
-        RegistrationStep.City -> RegistrationStep.Identity
-        RegistrationStep.Currency -> RegistrationStep.City
-        RegistrationStep.Legal -> RegistrationStep.Currency
-        RegistrationStep.Observability -> RegistrationStep.Legal
-        RegistrationStep.NotificationPriming -> RegistrationStep.NotificationPriming
+        RegistrationStep.Profile -> when (method) {
+            RegistrationMethod.Email -> RegistrationStep.Password
+            RegistrationMethod.Federated, null -> RegistrationStep.Profile
+        }
         RegistrationStep.Completed -> RegistrationStep.Completed
     },
     errorMessage = null,

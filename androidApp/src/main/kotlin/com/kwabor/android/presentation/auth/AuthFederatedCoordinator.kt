@@ -7,9 +7,16 @@ import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.auth.SocialAuthProvider
 import com.kwabor.shared.domain.auth.SocialSignInRequest
+import com.kwabor.shared.domain.observability.AnalyticsAuthMethod
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
+import com.kwabor.shared.presentation.auth.RegistrationMethod
+import com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus
+import com.kwabor.shared.presentation.auth.RegistrationStartContext
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
+import com.kwabor.shared.presentation.auth.mergeRequirementsFrom
 import kotlinx.coroutines.launch
 
 internal class AuthFederatedCoordinator(
@@ -32,6 +39,13 @@ internal class AuthFederatedCoordinator(
         ) {
             return
         }
+        if (sourceSurface == AuthSurface.SoftWall) prepareSoftWallRegistration()
+        dependencies.track(
+            AnalyticsEvent(
+                name = AnalyticsEventName.AuthMethod,
+                authMethod = AnalyticsAuthMethod.Google,
+            ),
+        )
         publishLoading(sourceSurface, loading = true)
         runtime.operationJob?.cancel()
         runtime.operationJob = runtime.coroutineScope.launch {
@@ -98,22 +112,58 @@ internal class AuthFederatedCoordinator(
             return
         }
         var registrationState = initialRegistrationUiState().copy(
-            step = RegistrationStep.Identity,
+            step = RegistrationStep.Profile,
+            method = RegistrationMethod.Federated,
             email = session.email.orEmpty(),
             firstName = session.suggestedFirstName.orEmpty(),
             lastName = session.suggestedLastName.orEmpty(),
             currentSession = session,
         )
-        registrationState = runtime.registrationPresenter.loadRequirements(registrationState, runtime.strings)
+        val preparedState = runtime.registrationState.value
+        registrationState = if (preparedState.requirementsStatus == RegistrationRequirementsStatus.Ready) {
+            registrationState.copy(
+                startContext = preparedState.startContext,
+                requirementsStatus = preparedState.requirementsStatus,
+                cities = preparedState.cities,
+                selectedCityId = preparedState.selectedCityId,
+                termsDocument = preparedState.termsDocument,
+                privacyDocument = preparedState.privacyDocument,
+                ugcDocument = preparedState.ugcDocument,
+            )
+        } else {
+            runtime.registrationPresenter.loadRequirements(
+                registrationState.copy(startContext = preparedState.startContext),
+                runtime.strings,
+            )
+        }
         runtime.registrationState.value = registrationState
         runtime.platformState.value = runtime.platformState.value.copy(surface = AuthSurface.Registration)
+    }
+
+    private fun prepareSoftWallRegistration() {
+        val context = runtime.platformState.value.softWallContext
+        runtime.registrationState.value = initialRegistrationUiState(
+            RegistrationStartContext(suggestedCityId = context?.suggestedCityId),
+        )
+        runtime.registrationRequirementsJob?.cancel()
+        runtime.registrationState.value = runtime.registrationState.value.copy(
+            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsErrorMessage = null,
+        )
+        runtime.registrationRequirementsJob = runtime.coroutineScope.launch {
+            val loadedRequirements = runtime.registrationPresenter.loadRequirements(
+                runtime.registrationState.value,
+                runtime.strings,
+            )
+            runtime.registrationState.value = runtime.registrationState.value.mergeRequirementsFrom(loadedRequirements)
+        }
     }
 
     private fun isLoading(surface: AuthSurface): Boolean = when (surface) {
         AuthSurface.SignIn -> runtime.accessState.value.isLoading
         AuthSurface.Registration -> runtime.registrationState.value.isLoading
+        AuthSurface.SoftWall -> runtime.platformState.value.federatedSignInInProgress
         AuthSurface.Hidden,
-        AuthSurface.SoftWall,
         AuthSurface.PasswordRecovery,
         AuthSurface.PromoterActivation,
         AuthSurface.SessionRestoreFailure,
@@ -123,6 +173,7 @@ internal class AuthFederatedCoordinator(
     private fun publishLoading(surface: AuthSurface, loading: Boolean) {
         runtime.platformState.value = runtime.platformState.value.copy(
             federatedSignInInProgress = loading,
+            softWallErrorMessage = null,
         )
         when (surface) {
             AuthSurface.SignIn -> runtime.accessState.value = runtime.accessState.value.copy(
@@ -135,8 +186,8 @@ internal class AuthFederatedCoordinator(
                 errorMessage = null,
                 noticeMessage = null,
             )
+            AuthSurface.SoftWall -> Unit
             AuthSurface.Hidden,
-            AuthSurface.SoftWall,
             AuthSurface.PasswordRecovery,
             AuthSurface.PromoterActivation,
             AuthSurface.SessionRestoreFailure,
@@ -163,8 +214,10 @@ internal class AuthFederatedCoordinator(
                 errorMessage = message,
                 noticeMessage = null,
             )
+            AuthSurface.SoftWall -> runtime.platformState.value = runtime.platformState.value.copy(
+                softWallErrorMessage = message,
+            )
             AuthSurface.Hidden,
-            AuthSurface.SoftWall,
             AuthSurface.PasswordRecovery,
             AuthSurface.PromoterActivation,
             AuthSurface.SessionRestoreFailure,
@@ -174,9 +227,8 @@ internal class AuthFederatedCoordinator(
 }
 
 private fun AuthSurface.acceptsFederatedAuthentication(): Boolean = when (this) {
-    AuthSurface.SignIn, AuthSurface.Registration -> true
+    AuthSurface.SignIn, AuthSurface.Registration, AuthSurface.SoftWall -> true
     AuthSurface.Hidden,
-    AuthSurface.SoftWall,
     AuthSurface.PasswordRecovery,
     AuthSurface.PromoterActivation,
     AuthSurface.SessionRestoreFailure,

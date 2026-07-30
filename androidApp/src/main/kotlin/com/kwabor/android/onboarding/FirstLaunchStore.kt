@@ -6,7 +6,7 @@ import androidx.core.content.edit
 internal interface FirstLaunchStore {
     fun isBundledIntroRequired(): Boolean
 
-    fun markBundledIntroSeen()
+    fun markBundledIntroSeen(reason: IntroPresentationReason = IntroPresentationReason.PlaybackCompleted)
 
     fun pendingRemoteIntro(): PendingRemoteIntro?
 
@@ -14,9 +14,18 @@ internal interface FirstLaunchStore {
 
     fun markRemoteIntroPending(intro: PendingRemoteIntro)
 
-    fun markRemoteIntroPresented(revision: Long)
+    fun markRemoteIntroPresented(
+        revision: Long,
+        reason: IntroPresentationReason = IntroPresentationReason.PlaybackCompleted,
+    )
 
     fun clearPendingRemoteIntro()
+}
+
+internal enum class IntroPresentationReason(val storageValue: String) {
+    PlaybackCompleted(storageValue = "playback_completed"),
+    Skipped(storageValue = "skipped"),
+    CtaSelected(storageValue = "cta_selected"),
 }
 
 internal data class PendingRemoteIntro(
@@ -30,8 +39,11 @@ internal class SharedPreferencesFirstLaunchStore(context: Context) : FirstLaunch
 
     override fun isBundledIntroRequired(): Boolean = !preferences.getBoolean(INTRO_SEEN_KEY, false)
 
-    override fun markBundledIntroSeen() {
-        preferences.edit { putBoolean(INTRO_SEEN_KEY, true) }
+    override fun markBundledIntroSeen(reason: IntroPresentationReason) {
+        preferences.edit {
+            putBoolean(INTRO_SEEN_KEY, true)
+            putString(INTRO_COMPLETION_REASON_KEY, reason.storageValue)
+        }
     }
 
     override fun pendingRemoteIntro(): PendingRemoteIntro? {
@@ -68,11 +80,12 @@ internal class SharedPreferencesFirstLaunchStore(context: Context) : FirstLaunch
         }
     }
 
-    override fun markRemoteIntroPresented(revision: Long) {
+    override fun markRemoteIntroPresented(revision: Long, reason: IntroPresentationReason) {
         if (revision <= NO_REMOTE_REVISION) return
         val latestPresentedRevision = maxOf(lastPresentedRemoteRevision(), revision)
         preferences.edit {
             putLong(LAST_PRESENTED_REMOTE_REVISION_KEY, latestPresentedRevision)
+            putString(INTRO_COMPLETION_REASON_KEY, reason.storageValue)
             if (preferences.getLong(PENDING_REMOTE_REVISION_KEY, NO_REMOTE_REVISION) <= revision) {
                 remove(PENDING_REMOTE_REVISION_KEY)
                 remove(PENDING_REMOTE_SHA256_KEY)
@@ -100,6 +113,7 @@ private fun String?.isSha256(): Boolean = this != null && SHA256_PATTERN.matches
 
 private const val PREFERENCES_NAME = "kwabor_first_launch"
 private const val INTRO_SEEN_KEY = "intro_seen_v1"
+private const val INTRO_COMPLETION_REASON_KEY = "intro_completion_reason"
 private const val PENDING_REMOTE_REVISION_KEY = "pending_remote_intro_revision"
 private const val PENDING_REMOTE_SHA256_KEY = "pending_remote_intro_sha256"
 private const val PENDING_REMOTE_FILE_NAME_KEY = "pending_remote_intro_file_name"

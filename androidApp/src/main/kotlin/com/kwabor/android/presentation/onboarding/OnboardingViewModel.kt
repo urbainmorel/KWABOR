@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.kwabor.android.onboarding.FirstLaunchStore
 import com.kwabor.android.onboarding.IntroLaunchDecision
 import com.kwabor.android.onboarding.IntroMediaSource
+import com.kwabor.android.onboarding.IntroPresentationReason
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import kotlinx.coroutines.CoroutineScope
@@ -75,11 +76,20 @@ internal class OnboardingViewModel(
     fun onIntent(intent: OnboardingIntent) {
         when (intent) {
             OnboardingIntent.IntroDisplayed -> trackIntroDisplayOnce()
-            OnboardingIntent.IntroCompleted -> completeIntro(skipped = false)
-            OnboardingIntent.IntroSkipped -> completeIntro(skipped = true)
-            OnboardingIntent.SignUpSelected -> openAuthentication(OnboardingEffect.OpenRegistration)
-            OnboardingIntent.SignInSelected -> openAuthentication(OnboardingEffect.OpenSignIn)
-            OnboardingIntent.GuestSelected -> updateState { it.copy(isGuestDisclosureVisible = true) }
+            OnboardingIntent.IntroCompleted -> completeIntro(IntroPresentationReason.PlaybackCompleted)
+            OnboardingIntent.IntroSkipped -> completeIntro(IntroPresentationReason.Skipped)
+            OnboardingIntent.SignUpSelected -> {
+                completeIntro(IntroPresentationReason.CtaSelected)
+                openAuthentication(OnboardingEffect.OpenRegistration)
+            }
+            OnboardingIntent.SignInSelected -> {
+                completeIntro(IntroPresentationReason.CtaSelected)
+                openAuthentication(OnboardingEffect.OpenSignIn)
+            }
+            OnboardingIntent.GuestSelected -> {
+                completeIntro(IntroPresentationReason.CtaSelected)
+                updateState { it.copy(isGuestDisclosureVisible = true) }
+            }
             OnboardingIntent.GuestConfirmed -> updateState {
                 it.copy(isGuestDisclosureVisible = false, isGuestSession = true)
             }
@@ -99,14 +109,14 @@ internal class OnboardingViewModel(
         track(AnalyticsEvent(name = AnalyticsEventName.IntroVideoShown))
     }
 
-    private fun completeIntro(skipped: Boolean) {
+    private fun completeIntro(reason: IntroPresentationReason) {
         if (!mutableState.value.isIntroRequired) return
         when (val mediaSource = mutableState.value.introMediaSource) {
-            IntroMediaSource.Bundled -> firstLaunchStore.markBundledIntroSeen()
-            is IntroMediaSource.Remote -> firstLaunchStore.markRemoteIntroPresented(mediaSource.revision)
+            IntroMediaSource.Bundled -> firstLaunchStore.markBundledIntroSeen(reason)
+            is IntroMediaSource.Remote -> firstLaunchStore.markRemoteIntroPresented(mediaSource.revision, reason)
         }
         mutableState.value = mutableState.value.copy(isIntroRequired = false)
-        if (skipped) {
+        if (reason == IntroPresentationReason.Skipped) {
             track(AnalyticsEvent(name = AnalyticsEventName.IntroVideoSkipped))
         }
     }
