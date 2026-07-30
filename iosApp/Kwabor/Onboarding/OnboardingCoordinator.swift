@@ -302,37 +302,18 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func trackRegistrationEmailMethod() {
-        observability.track(registrationAnalyticsEvent(name: .authMethod, authMethod: .email))
+        observability.track(telemetry.registrationEmailMethodEvent)
     }
 
     func trackRegistrationOtpValidated() {
-        observability.track(registrationAnalyticsEvent(name: .registrationOtpValidated))
+        observability.track(telemetry.registrationOtpValidatedEvent)
     }
 
     func trackRegistrationProfileResult(_ succeeded: Bool) {
         observability.track(
-            registrationAnalyticsEvent(
-                name: succeeded ? .registrationProfileSucceeded : .registrationProfileFailed
-            )
-        )
-    }
-
-    private func registrationAnalyticsEvent(
-        name: AnalyticsEventName,
-        authMethod: AnalyticsAuthMethod? = nil
-    ) -> AnalyticsEvent {
-        AnalyticsEvent(
-            name: name,
-            context: AnalyticsContext(
-                cityId: nil,
-                entityType: .notApplicable,
-                entityId: nil,
-                sessionSource: .organic,
-                locale: .french,
-                displayCurrency: .xof
-            ),
-            authMethod: authMethod,
-            socialPostType: nil
+            succeeded
+                ? telemetry.registrationProfileSucceededEvent
+                : telemetry.registrationProfileFailedEvent
         )
     }
 
@@ -374,8 +355,10 @@ final class OnboardingCoordinator: ObservableObject {
         onCompleted: @escaping (Bool) -> Void
     ) {
         if isRegistrationPresented {
-            let authMethod: AnalyticsAuthMethod = credential.provider == .apple ? .apple : .google
-            observability.track(registrationAnalyticsEvent(name: .authMethod, authMethod: authMethod))
+            let methodEvent = credential.provider == .apple
+                ? telemetry.registrationAppleMethodEvent
+                : telemetry.registrationGoogleMethodEvent
+            observability.track(methodEvent)
         }
         let replacesInterruptedRegistration = interruptedAuthJourneyStore.current == .registration
         if replacesInterruptedRegistration {
