@@ -38,6 +38,13 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] V1-GOV-001 — Transformer `PRD.md` §5.1 en feuille de route traçable, accepter les ADR Room/IA/Firebase/FedaPay et protéger `main`.
 - [x] PR-V1-GOV-001 — PR `#18` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 
+### Stabilisation du dépôt
+
+- [ ] STAB-001 — Fusionner ou fermer proprement la PR parallèle `#34`, puis resynchroniser l'état documentaire après décision.
+- [ ] STAB-002 — Retirer les messages techniques et désactiver visuellement toute action sans implémentation réelle après validation des racines V1.
+- [x] STAB-003 — Corriger les templates et runbooks locaux, permettre le build sans fichier fournisseur, verrouiller le wrapper Gradle et refuser en CI les secrets ou artefacts mobiles suivis.
+- [ ] PR-STAB-003 — PR brouillon empilée `#37` publiée ; obtenir les gates GitHub vertes, la revue humaine puis la fusionner après `#36`.
+
 ### Architecture et environnements
 
 - [x] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.

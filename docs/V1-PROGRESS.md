@@ -10,7 +10,8 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/arch-004-dispatcher-boundary` |
+| Branche active | `codex/stab-003-repo-integrity` |
+| PR de stabilisation | `#37`, brouillon empilé sur `#36` |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
@@ -33,9 +34,23 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - 180 tests partagés, 112 tests JVM Android, compilation Kotlin iOS Simulator, Spotless, Detekt, lint, `check` et APK debug sont verts sur ARCH-004.
 - Deux re-revues indépendantes d'ARCH-004 ne relèvent aucun P0/P1/P2.
 - Le run GitHub `30564229960` d'ARCH-004 a passé `quality`/pgTAP en 4 min 43 s et le build iOS simulateur en 21 min 59 s.
+- STAB-003 validée localement : inventaires et runbooks cohérents, plugins Firebase Android conditionnels, secrets et artefacts mobiles ignorés dans tout sous-dossier, wrapper Gradle 9.4.1 officiel verrouillé et vérificateur d'intégrité branché à la CI.
+- Le wrapper a été téléchargé et exécuté depuis un cache vide ; les vérificateurs dépôt/média/marque, Spotless, Detekt, lint, `check`, la compilation Kotlin iOS Simulator et 292 tests Android/shared sont verts. Les APK debug/staging ont été produits sans variable `KWABOR_*` ni fichier Firebase.
+- Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; la PR brouillon empilée `#37` est publiée.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
+
+### STAB-003 — Intégrité d'un clone vierge
+
+Objectifs :
+
+- garder des templates exhaustifs mais sans secret et documenter leur routage réel ;
+- permettre les builds locaux non distribuables sans fichier fournisseur Firebase ;
+- verrouiller la distribution et les launchers Gradle officiels ;
+- refuser en CI tout écart de template, wrapper, ignore ou artefact sensible suivi.
+
+État : implémentation, validations locales, deux revues indépendantes, commit, push et publication de la PR brouillon empilée `#37` terminés. Les gates GitHub, la revue humaine et la fusion après `#36` restent ouvertes. La checklist production « clone vierge et setup documenté » reste ouverte jusqu'à DOC-001 et au provisionnement propriétaire.
 
 ### ARCH-004 — Frontière d’exécution du domaine
 
@@ -64,11 +79,12 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Exécuter la préflight avant tout déploiement sur une base persistante.
-4. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
-5. Faire valider le périmètre V1 minimal et la navigation.
-6. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-7. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+3. Retargeter, relire puis fusionner la PR STAB-003 `#37`.
+4. Exécuter la préflight avant tout déploiement sur une base persistante.
+5. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
+6. Faire valider le périmètre V1 minimal et la navigation.
+7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
+8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
 
 ## Décisions techniques actées pendant la reprise
 
@@ -89,6 +105,7 @@ Objectifs :
 - Le lint PostgreSQL signale des fonctions fournies par PostGIS ; aucun diagnostic ne concerne `public` ou `app_private`.
 - La passe Gradle complète ARCH-004 a duré 9 min 39 s à froid puis 1 min 25 s avec les caches chauds sur le poste Windows.
 - Les tests Kotlin iOS sont compilés mais marqués `SKIPPED` sur Windows ; la preuve d’exécution native doit rester une gate macOS.
+- Le disque Windows est arrivé à saturation pendant la première revalidation STAB-003. Seuls le cache wrapper temporaire incomplet et les sorties `androidApp/build`/`shared/build`, entièrement régénérables, ont été supprimés ; le wrapper depuis cache vide puis la porte qualité ont ensuite terminé avec succès.
 
 ## Décisions produit en attente
 

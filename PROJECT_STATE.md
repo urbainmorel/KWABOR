@@ -166,11 +166,14 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - La gate `verifyDomainPurity`, rattachée à `check`, refuse tout fichier domaine dans un source set plateforme et tout import autre que Kotlin ou intra-domain. Un test négatif contrôlé a prouvé les deux refus avant suppression des probes.
 - Validation locale ARCH-004 : 180 tests partagés et 112 tests JVM Android sans échec, compilation Kotlin iOS Simulator, `spotlessCheck`, `detekt`, lint, `check`, APK debug et `git diff --check` verts ; deux re-revues indépendantes ne relèvent aucun P0/P1/P2.
 - Validation CI ARCH-004 sur le commit `ea856a0` : le run `30564229960` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release en 21 min 59 s.
+- STAB-003 est implémentée dans la PR brouillon empilée `#37` : les inventaires Android/iOS et runbooks reflètent les contrats réels, les plugins Firebase Android ne sont appliqués qu'après injection du fichier fournisseur, et les artefacts sensibles ou générés sont ignorés quel que soit leur sous-dossier.
+- Le wrapper officiel Gradle 9.4.1 est régénéré et verrouillé par checksums de distribution, JAR et launchers. `tools/verify-repository-integrity.py`, exécuté en CI, refuse les templates incomplets ou préremplis, les propriétés wrapper divergentes et les secrets/artefacts mobiles suivis par Git.
+- Validation locale STAB-003 : vérificateurs dépôt/média/marque et `git diff --check` verts, wrapper téléchargé et exécuté depuis un cache vide, `spotlessCheck`, `detekt`, lint, `check`, compilation Kotlin iOS Simulator et 292 tests Android/shared verts en 8 min 04 s. Les APK debug et staging ont été produits sans variable `KWABOR_*` ni configuration Firebase ; deux revues indépendantes finales ne relèvent aucun P0/P1/P2.
 
 ## Tâche en cours
 
-Clôture séquencée de la stabilisation : obtenir la revue humaine puis fusionner la PR `#35`, et enfin retargeter, relire puis fusionner la PR `#36` vers `main`.
-La PR d'authentification `#34` reste séparée et ne doit pas être mélangée à cette branche.
+Clôture séquencée de la stabilisation : obtenir la revue humaine puis fusionner `#35`, retargeter si nécessaire puis fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
+La PR d'authentification `#34` reste séparée et doit être fusionnée ou fermée explicitement dans STAB-001 sans mélanger ses changements à cette pile.
 
 ## Blocages / limites
 
@@ -178,6 +181,7 @@ La PR d'authentification `#34` reste séparée et ne doit pas être mélangée �
 - La navigation, les CTA factices, Explore iOS, le détail, l'administration opérateur, les contenus réels et le pipeline média bloquent encore une V1 commercialement exploitable.
 - SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, validée par CI, fusionnée puis déployée.
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
+- STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-004 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
