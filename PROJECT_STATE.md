@@ -169,6 +169,7 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - STAB-003 est implémentée dans la PR brouillon empilée `#37` : les inventaires Android/iOS et runbooks reflètent les contrats réels, les plugins Firebase Android ne sont appliqués qu'après injection du fichier fournisseur, et les artefacts sensibles ou générés sont ignorés quel que soit leur sous-dossier.
 - Le wrapper officiel Gradle 9.4.1 est régénéré et verrouillé par checksums de distribution, JAR et launchers. `tools/verify-repository-integrity.py`, exécuté en CI, refuse les templates incomplets ou préremplis, les propriétés wrapper divergentes et les secrets/artefacts mobiles suivis par Git.
 - Validation locale STAB-003 : vérificateurs dépôt/média/marque et `git diff --check` verts, wrapper téléchargé et exécuté depuis un cache vide, `spotlessCheck`, `detekt`, lint, `check`, compilation Kotlin iOS Simulator et 292 tests Android/shared verts en 8 min 04 s. Les APK debug et staging ont été produits sans variable `KWABOR_*` ni configuration Firebase ; deux revues indépendantes finales ne relèvent aucun P0/P1/P2.
+- Validation CI STAB-003 sur le commit `c275699` : le run `30573401220` a passé le nouveau contrôle d'intégrité, `quality`/pgTAP en 4 min 55 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release en 19 min 26 s.
 
 ## Tâche en cours
 

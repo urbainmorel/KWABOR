@@ -11,7 +11,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
 | Branche active | `codex/stab-003-repo-integrity` |
-| PR de stabilisation | `#37`, brouillon empilé sur `#36` |
+| PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
@@ -36,7 +36,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Le run GitHub `30564229960` d'ARCH-004 a passé `quality`/pgTAP en 4 min 43 s et le build iOS simulateur en 21 min 59 s.
 - STAB-003 validée localement : inventaires et runbooks cohérents, plugins Firebase Android conditionnels, secrets et artefacts mobiles ignorés dans tout sous-dossier, wrapper Gradle 9.4.1 officiel verrouillé et vérificateur d'intégrité branché à la CI.
 - Le wrapper a été téléchargé et exécuté depuis un cache vide ; les vérificateurs dépôt/média/marque, Spotless, Detekt, lint, `check`, la compilation Kotlin iOS Simulator et 292 tests Android/shared sont verts. Les APK debug/staging ont été produits sans variable `KWABOR_*` ni fichier Firebase.
-- Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; la PR brouillon empilée `#37` est publiée.
+- Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; le run `30573401220` de la PR brouillon empilée `#37` a passé `quality`/pgTAP en 4 min 55 s et le build iOS simulateur en 19 min 26 s.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
@@ -50,7 +50,7 @@ Objectifs :
 - verrouiller la distribution et les launchers Gradle officiels ;
 - refuser en CI tout écart de template, wrapper, ignore ou artefact sensible suivi.
 
-État : implémentation, validations locales, deux revues indépendantes, commit, push et publication de la PR brouillon empilée `#37` terminés. Les gates GitHub, la revue humaine et la fusion après `#36` restent ouvertes. La checklist production « clone vierge et setup documenté » reste ouverte jusqu'à DOC-001 et au provisionnement propriétaire.
+État : implémentation, validations locales, deux revues indépendantes, commit, push, publication et CI GitHub de la PR brouillon empilée `#37` terminés. La revue humaine et la fusion après `#36` restent ouvertes. La checklist production « clone vierge et setup documenté » reste ouverte jusqu'à DOC-001 et au provisionnement propriétaire.
 
 ### ARCH-004 — Frontière d’exécution du domaine
 
