@@ -82,7 +82,7 @@ EXCEPTION
 END;
 $$;
 
-SELECT plan(101);
+SELECT plan(103);
 
 INSERT INTO auth.users (id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 VALUES
@@ -621,8 +621,8 @@ SELECT is(
       AND 'authenticated' = ANY (policy.roles)
       AND policy.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
   ),
-  28,
-  'the audited authenticated product mutation policy set is complete'
+  27,
+  'the audited authenticated mutation policy set excludes RPC-only membership creation'
 );
 
 SELECT is(
@@ -637,7 +637,7 @@ SELECT is(
         in coalesce(policy.qual, '') || ' ' || coalesce(policy.with_check, '')
       ) > 0
   ),
-  28,
+  27,
   'every authenticated product mutation policy requires completed onboarding'
 );
 
@@ -1055,8 +1055,8 @@ SELECT ok(
   'an incomplete verified admin cannot create organization members'
 );
 
-SELECT is(
-  tests.affected_rows_as(
+SELECT ok(
+  tests.statement_fails_as(
     'authenticated',
     'dddddddd-0000-4000-8000-000000000004',
     $sql$
@@ -1065,8 +1065,31 @@ SELECT is(
       WHERE id = '41000000-0000-4000-8000-000000000002'
     $sql$
   ),
+  'organization membership lifecycle fields are never directly client-writable'
+);
+
+SELECT is(
+  tests.affected_rows_as(
+    'authenticated',
+    'dddddddd-0000-4000-8000-000000000004',
+    $sql$
+      UPDATE public.organization_members
+      SET role = 'moderateur'
+      WHERE id = '41000000-0000-4000-8000-000000000002'
+    $sql$
+  ),
   0::bigint,
-  'an incomplete verified admin cannot update organization members'
+  'an incomplete verified admin cannot use the remaining role-only update grant'
+);
+
+SELECT is(
+  (
+    SELECT role::text
+    FROM public.organization_members
+    WHERE id = '41000000-0000-4000-8000-000000000002'
+  ),
+  'editeur',
+  'the incomplete-admin role update leaves the membership unchanged'
 );
 
 SELECT ok(
