@@ -2,7 +2,7 @@
 
 ## Phase actuelle
 
-Livraison V1 production — socle production livré, verticales produit actives.
+Reprise V1 — audit de préparation terminé, stabilisation sécurité prioritaire en cours.
 
 ## Dernière tâche terminée
 
@@ -158,14 +158,22 @@ Livraison V1 production — socle production livré, verticales produit actives.
 - ADR-0017 et les runbooks environnement/onboarding documentent le provisionnement propriétaire OAuth/Supabase/Apple, les frontières de confidentialité et la réconciliation des suppressions interrompues.
 - Validation locale AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; reset Supabase complet, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente.
 - Les premiers builds Xcode de la PR `#33` ont détecté l'export incomplet des chaînes AUTH-005 vers Swift, le nom importé du code d'annulation Google Sign-In et un masquage de propriété Promoteur. Les correctifs conservent un pont KMP typé sans texte dupliqué ; le run final `30294633454` du commit `578f8c4` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release sous Xcode 16.4 en 19 min 27 s.
+- L'audit V1 du 30 juillet 2026 confronte code, PRD/DESIGN, données, tests, CI, distribution et exploitation dans `docs/audits/2026-07-30-v1-production-readiness.md`. L'avancement réel est estimé à 25–30 % du PRD V1 actuel et la préparation production à 15–20 %.
+- SEC-001A est implémentée localement sur `codex/sec-001-authorization-guardrails` : onboarding Google/Apple, grants Social/équipes/claims/signalements, RPC de modération, cohérence taxonomique et matrice Guide/Promoteur/Institution sont durcis par migrations forward-only séparées.
+- Le hotfix OAuth/ACL ne dépend plus de la validation taxonomique fail-closed. Le runbook `docs/runbooks/security-authorization-preflight.md` impose sauvegarde, audit humain des anciennes lignes d’autorité et validation de la taxonomie avant tout déploiement persistant.
+- Validation locale SEC-001A : 2 migrations appliquées, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. La PR et la CI GitHub restent à produire.
 
 ## Tâche en cours
 
-Clôture atomique AUTH-005 uniquement. Aucun développement de BRAND-002 ni d'une tranche V1 suivante
-ne doit commencer dans cette exécution.
+Clôture atomique SEC-001A : revue finale, commits, publication en PR brouillon et validation CI.
+La PR d'authentification `#34` reste séparée et ne doit pas être mélangée à cette branche.
 
 ## Blocages / limites
 
+- Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
+- La navigation, les CTA factices, Explore iOS, le détail, l'administration opérateur, les contenus réels et le pipeline média bloquent encore une V1 commercialement exploitable.
+- SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, validée par CI, fusionnée puis déployée.
+- Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-004 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
@@ -188,7 +196,6 @@ ne doit commencer dans cette exécution.
 
 ## Prochaine tâche logique
 
-L'exécution s'arrête à la clôture atomique AUTH-005, conformément à l'instruction propriétaire.
-Au prochain ordre, BRAND-002 restera la tranche prioritaire sur une branche séparée avec le
-monogramme officiel exact et ses captures. ENV-001B/OBS-001B reprendra lorsque le propriétaire
-aura provisionné les environnements distants.
+Publier SEC-001A et obtenir les checks `quality` et `iOS simulator build` verts. Après fusion,
+faire valider le périmètre/navigation V1 avant de supprimer les parcours factices et de commencer
+le résumé catalogue paginé. BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.

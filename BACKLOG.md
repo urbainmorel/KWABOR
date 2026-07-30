@@ -4,6 +4,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ## En cours
 
+- [x] AUDIT-V1-001 — Auditer l’état réel Android/iOS/Supabase, reconstruire le chemin critique et publier `docs/audits/2026-07-30-v1-production-readiness.md`.
 - [x] FND-001 — Créer le scaffold KMP minimal compilable.
 - [x] FND-002 — Formaliser les ADR fondateurs.
 - [x] FND-003 — Installer le shell Compose partagé.
@@ -132,6 +133,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.
+  - [x] SEC-001A — Fermer les contournements OAuth/onboarding, Social, membres, claims, signalements et classification des fiches ; hotfix ACL séparé de la taxonomie et 316 assertions pgTAP locales vertes.
+  - [ ] SEC-001B — Faire relire, publier, valider par CI puis fusionner SEC-001A.
+  - [ ] SEC-001C — Exécuter la préflight des données historiques, prouver sauvegarde/restauration et approuver toute quarantaine avant déploiement persistant.
+  - [ ] SEC-001D — Qualifier Storage, rate limiting, secrets, advisors et tests IDOR restants sur staging.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
 - [ ] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
