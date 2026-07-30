@@ -50,7 +50,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] ARCH-003 — Introduire les ViewModels Auth/Explore, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
 - [x] PR-ARCH-003 — PR `#23` mergée après tests de flux, `quality`, pgTAP et `iOS simulator build` verts.
 - [x] ARCH-004 — Sortir `DispatcherProvider` du domaine, déplacer son binding dans la composition root et verrouiller les imports/emplacements du domaine via `verifyDomainPurity`.
-- [ ] PR-ARCH-004 — Obtenir la CI et la revue humaine, puis fusionner la PR empilée `#36` après la PR de sécurité `#35`.
+- [ ] PR-ARCH-004 — PR empilée `#36` publiée avec CI verte ; obtenir la revue humaine puis la fusionner après la PR de sécurité `#35`.
 - [x] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.
 - [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.

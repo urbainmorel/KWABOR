@@ -165,10 +165,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - ARCH-004 est implémentée dans la PR brouillon empilée `#36` : le contrat et l'implémentation de dispatchers quittent le domaine pour `shared.app`, le binding Koin appartient désormais à la composition root et les consommateurs Android/iOS conservent la même injection déterministe.
 - La gate `verifyDomainPurity`, rattachée à `check`, refuse tout fichier domaine dans un source set plateforme et tout import autre que Kotlin ou intra-domain. Un test négatif contrôlé a prouvé les deux refus avant suppression des probes.
 - Validation locale ARCH-004 : 180 tests partagés et 112 tests JVM Android sans échec, compilation Kotlin iOS Simulator, `spotlessCheck`, `detekt`, lint, `check`, APK debug et `git diff --check` verts ; deux re-revues indépendantes ne relèvent aucun P0/P1/P2.
+- Validation CI ARCH-004 sur le commit `ea856a0` : le run `30564229960` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release en 21 min 59 s.
 
 ## Tâche en cours
 
-Clôture séquencée de la stabilisation : terminer la CI et la revue de la PR `#36`, obtenir la revue humaine puis fusionner la PR `#35`, et enfin retargeter/fusionner `#36` vers `main`.
+Clôture séquencée de la stabilisation : obtenir la revue humaine puis fusionner la PR `#35`, et enfin retargeter, relire puis fusionner la PR `#36` vers `main`.
 La PR d'authentification `#34` reste séparée et ne doit pas être mélangée à cette branche.
 
 ## Blocages / limites

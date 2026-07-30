@@ -11,7 +11,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
 | Branche active | `codex/arch-004-dispatcher-boundary` |
-| PR d’architecture | `#36`, brouillon empilé sur `#35`, CI en cours |
+| PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
@@ -32,6 +32,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - `verifyDomainPurity` refuse le domaine dans un source set plateforme et tout import non Kotlin/non intra-domain ; son test négatif contrôlé et sa passe positive sont prouvés.
 - 180 tests partagés, 112 tests JVM Android, compilation Kotlin iOS Simulator, Spotless, Detekt, lint, `check` et APK debug sont verts sur ARCH-004.
 - Deux re-revues indépendantes d'ARCH-004 ne relèvent aucun P0/P1/P2.
+- Le run GitHub `30564229960` d'ARCH-004 a passé `quality`/pgTAP en 4 min 43 s et le build iOS simulateur en 21 min 59 s.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
@@ -44,7 +45,7 @@ Objectifs :
 - enregistrer l'implémentation par la composition root Koin, hors des modules data ;
 - empêcher la réintroduction d'imports externes ou de sources plateforme dans le domaine.
 
-État : implémentation, validations locales, deux re-revues, commit, push et publication de la PR brouillon empilée `#36` terminés. La CI GitHub, la revue humaine et la fusion après `#35` restent ouvertes.
+État : implémentation, validations locales, deux re-revues, commit, push, publication et CI GitHub de la PR brouillon empilée `#36` terminés. La revue humaine et la fusion après `#35` restent ouvertes.
 
 ### SEC-001A — Guardrails d’autorisation
 
@@ -61,14 +62,13 @@ Objectifs :
 
 ## Prochaines tâches
 
-1. Terminer les checks GitHub de la PR `#36` et corriger tout écart macOS.
-2. Obtenir la revue humaine puis fusionner la PR `#35`.
-3. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-4. Exécuter la préflight avant tout déploiement sur une base persistante.
-5. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
-6. Faire valider le périmètre V1 minimal et la navigation.
-7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+1. Obtenir la revue humaine puis fusionner la PR `#35`.
+2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
+3. Exécuter la préflight avant tout déploiement sur une base persistante.
+4. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
+5. Faire valider le périmètre V1 minimal et la navigation.
+6. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
+7. Commencer le résumé catalogue paginé et supprimer le N+1 média.
 
 ## Décisions techniques actées pendant la reprise
 
