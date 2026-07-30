@@ -47,8 +47,9 @@ Quand un asset de lancement ou son pipeline change, la CI appelle aussi
 fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`, puis publie vidéos,
 planches-contact et métadonnées pendant 7 jours. L'APK de preuve utilise une URL réservée
 `.invalid` et une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou
-si l'intro embarquée n'est pas exposée après le splash. Ces preuves automatisées ne remplacent pas la
-revue perceptuelle finale sur appareils Pixel/Samsung et iOS.
+si aucune surface onboarding configurée (intro ou landing) n'est exposée après le splash. Ces
+preuves automatisées ne remplacent pas la revue perceptuelle finale sur appareils Pixel/Samsung et
+iOS.
 
 ## Clé d'upload production
 

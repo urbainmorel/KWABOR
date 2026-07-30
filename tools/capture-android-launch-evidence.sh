@@ -13,10 +13,12 @@ apk_path="${2:-androidApp/build/outputs/apk/debug/androidApp-debug.apk}"
 package_name="com.kwabor.android"
 activity_name="${package_name}/.MainActivity"
 evidence_root="build/brand-evidence/api-${api_level}"
-recording_seconds=10
-minimum_recording_seconds=9
+recording_seconds=15
+minimum_recording_seconds=14
 intro_accessibility_label="Découvrir le Bénin avec Kwabor"
 configuration_unavailable_message="Kwabor est indisponible pour le moment. Réessayez plus tard."
+landing_title="Découvrez le Bénin"
+landing_sign_in="Se connecter"
 
 declare -a density_profiles=(
   "mdpi:160:360x780:360x780"
@@ -142,8 +144,13 @@ for profile in "${density_profiles[@]}"; do
     echo "Brand evidence reached the unavailable-configuration screen" >&2
     exit 1
   fi
-  if ! grep -Fq "${intro_accessibility_label}" "${capture_directory}/window.xml"; then
-    echo "Brand evidence did not reach the bundled intro screen" >&2
+  if grep -Fq "${intro_accessibility_label}" "${capture_directory}/window.xml"; then
+    echo "intro" >"${capture_directory}/post-launch-state.txt"
+  elif grep -Fq "${landing_title}" "${capture_directory}/window.xml" &&
+    grep -Fq "${landing_sign_in}" "${capture_directory}/window.xml"; then
+    echo "onboarding-landing" >"${capture_directory}/post-launch-state.txt"
+  else
+    echo "Brand evidence did not reach a valid configured onboarding surface" >&2
     exit 1
   fi
 
@@ -181,7 +188,7 @@ for profile in "${density_profiles[@]}"; do
     -loglevel error \
     -y \
     -i "${local_video}" \
-    -vf "fps=10,scale=180:-2,tile=10x10" \
+    -vf "fps=10,scale=180:-2,tile=15x10" \
     -frames:v 1 \
     "${capture_directory}/contact-sheet.png"
 

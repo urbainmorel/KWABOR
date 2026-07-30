@@ -26,9 +26,10 @@ low-resolution intermediate.
 
 .github/workflows/android-launch-evidence.yml automates that matrix on API 30, 31 and 36. For
 each API, `tools/capture-android-launch-evidence.sh` performs fresh installs at `mdpi`, `xhdpi` and
-`xxxhdpi`, records the ten-second cold start and produces a contact sheet plus device metadata.
+`xxxhdpi`, records the fifteen-second cold start and produces a contact sheet plus device metadata.
 The evidence APK uses only a reserved `.invalid` URL and a non-secret placeholder key; the capture
-fails unless `MainActivity` stays resumed and reaches the bundled intro accessibility surface.
+fails unless `MainActivity` stays resumed and reaches either the bundled intro or the configured
+onboarding landing surface.
 The workflow is called by CI only when a launch asset or its verification pipeline changes; its
 artifacts are retained for 7 days. A human must still review every sequence before release.
 

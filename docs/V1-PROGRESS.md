@@ -39,6 +39,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; le run `30573401220` de la PR brouillon empilée `#37` a passé `quality`/pgTAP en 4 min 55 s et le build iOS simulateur en 19 min 26 s.
 - BRAND-002 corrige le réagrandissement du splash Android : canevas 288 dp séparés du launcher 108 dp, cinq densités dérivées directement du master 1254 px, hashes/géométrie/câblage XML verrouillés et iOS inchangé.
 - Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte. Les captures API 30/31/36 restent à obtenir et relire en CI.
+- Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
