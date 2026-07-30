@@ -27,8 +27,8 @@ import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
 import com.kwabor.android.presentation.explore.ExploreViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
+import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.app.KwaborCompositionRoot
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor

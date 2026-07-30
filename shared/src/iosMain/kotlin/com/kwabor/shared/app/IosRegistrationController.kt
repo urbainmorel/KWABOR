@@ -6,7 +6,6 @@ import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.GeoPoint
 import com.kwabor.shared.domain.catalog.isWithinBeninBounds
 import com.kwabor.shared.domain.catalog.nearestCity
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.observability.ObservabilityConsent

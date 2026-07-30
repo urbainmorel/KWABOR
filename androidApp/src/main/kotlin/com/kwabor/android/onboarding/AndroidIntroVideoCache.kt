@@ -6,7 +6,7 @@ import android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileMain
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
-import com.kwabor.shared.domain.core.DispatcherProvider
+import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.domain.observability.RemoteIntroVideo
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive

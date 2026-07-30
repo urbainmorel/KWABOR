@@ -4,7 +4,7 @@ import com.kwabor.android.observability.AndroidObservabilityBackend
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.observability.ObservabilityConsentStore
 import com.kwabor.android.observability.PerformanceTrace
-import com.kwabor.shared.domain.core.DispatcherProvider
+import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent

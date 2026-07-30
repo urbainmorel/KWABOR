@@ -77,3 +77,60 @@ tasks.named("detekt") {
         "detektIosSimulatorArm64Test",
     )
 }
+
+val verifyDomainPurity by tasks.registering {
+    group = "verification"
+    description = "Fails when domain code leaves commonMain or imports another project layer or external library."
+
+    val domainSources =
+        fileTree("src") {
+            include("*Main/kotlin/com/kwabor/shared/domain/**/*.kt")
+        }
+    inputs.files(domainSources)
+
+    doLast {
+        val platformDomainSources =
+            domainSources
+                .mapNotNull { sourceFile ->
+                    val relativePath = sourceFile.relativeTo(projectDir).invariantSeparatorsPath
+                    if (relativePath.startsWith("src/commonMain/")) {
+                        null
+                    } else {
+                        "$relativePath: platform-specific domain sources are forbidden"
+                    }
+                }
+                .sorted()
+        val forbiddenImports =
+            domainSources
+                .flatMap { sourceFile ->
+                    sourceFile.readLines().mapIndexedNotNull { index, line ->
+                        val trimmedLine = line.trim()
+                        if (!trimmedLine.startsWith("import ")) {
+                            return@mapIndexedNotNull null
+                        }
+                        val importTarget =
+                            trimmedLine
+                                .removePrefix("import ")
+                                .substringBefore(" as ")
+                        val isAllowed =
+                            importTarget.startsWith("kotlin.") ||
+                                importTarget.startsWith("com.kwabor.shared.domain.")
+                        if (isAllowed) {
+                            null
+                        } else {
+                            "${sourceFile.relativeTo(projectDir).invariantSeparatorsPath}:${index + 1}: $trimmedLine"
+                        }
+                    }
+                }
+                .sorted()
+        val violations = platformDomainSources + forbiddenImports
+
+        check(violations.isEmpty()) {
+            "The domain must remain pure Kotlin. Forbidden dependencies:\n${violations.joinToString("\n")}"
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyDomainPurity)
+}

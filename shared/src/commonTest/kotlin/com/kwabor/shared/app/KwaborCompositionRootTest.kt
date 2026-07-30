@@ -74,6 +74,7 @@ class KwaborCompositionRootTest {
 
         try {
             assertIs<DataCatalogRepository>(root.catalogRepository)
+            assertIs<DefaultDispatcherProvider>(root.dispatcherProvider)
             assertIs<DataOrganizationRepository>(root.organizationRepository)
             assertIs<ExplorePresenter>(root.explorePresenter)
             assertNull(root.authRepository)

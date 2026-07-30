@@ -6,8 +6,8 @@ import com.kwabor.android.onboarding.AndroidIntroMediaManager
 import com.kwabor.android.onboarding.AndroidIntroVideoCache
 import com.kwabor.android.onboarding.FirstLaunchStore
 import com.kwabor.android.onboarding.SharedPreferencesFirstLaunchStore
+import com.kwabor.shared.app.DefaultDispatcherProvider
 import com.kwabor.shared.app.createAndroidKwaborCompositionRootOrNull
-import com.kwabor.shared.domain.core.DefaultDispatcherProvider
 
 class KwaborApplication : Application() {
     lateinit var observability: AndroidObservabilityController

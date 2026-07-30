@@ -1,7 +1,7 @@
 package com.kwabor.android.onboarding
 
 import com.kwabor.android.observability.AndroidObservabilityController
-import com.kwabor.shared.domain.core.DispatcherProvider
+import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.RemoteIntroVideo
 import kotlinx.coroutines.CancellationException

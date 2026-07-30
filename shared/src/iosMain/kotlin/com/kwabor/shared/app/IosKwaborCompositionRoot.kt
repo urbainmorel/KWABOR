@@ -2,7 +2,6 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
-import com.kwabor.shared.domain.core.DefaultDispatcherProvider
 
 class IosKwaborCompositionRoot(
     environmentName: String?,

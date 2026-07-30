@@ -1,4 +1,4 @@
-package com.kwabor.shared.domain.core
+package com.kwabor.shared.app
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

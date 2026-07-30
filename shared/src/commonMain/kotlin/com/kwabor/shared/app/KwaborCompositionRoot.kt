@@ -8,7 +8,6 @@ import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
@@ -52,6 +51,7 @@ internal fun createKwaborCompositionRootOrNull(
         supabasePublishableKey = supabasePublishableKey,
     ) ?: return null
     val rootModule = module {
+        single<DispatcherProvider> { DefaultDispatcherProvider() }
         includes(
             coreDataModule(
                 environment = environment,
