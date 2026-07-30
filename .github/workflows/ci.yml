@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
 
+      - name: Verify repository integrity
+        run: python3 tools/verify-repository-integrity.py
+
       - name: Ensure ffprobe is available
         shell: bash
         run: |

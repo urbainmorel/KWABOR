@@ -90,10 +90,12 @@ Le workflow `iOS archive artifact` s'exécute uniquement depuis `main`, dans le 
 |---|---|---|
 | `KWABOR_SUPABASE_URL` | Variable | URL publique du projet ciblé |
 | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable | clé publishable du projet ciblé |
+| `KWABOR_FIREBASE_PROJECT_ID` | Variable | project ID Firebase exact du tier |
 | `KWABOR_GOOGLE_IOS_CLIENT_ID` | Variable | client OAuth iOS `*.apps.googleusercontent.com` |
 | `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Variable | client OAuth Web/serveur distinct, configuré dans Supabase |
 | `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Variable | schéma callback exact dérivé du client iOS |
 | `KWABOR_IOS_DEVELOPMENT_TEAM` | Variable | Team ID Apple sur 10 caractères |
+| `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Secret | `GoogleService-Info.plist` du tier encodé en Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Secret | certificat + clé privée exportés en `.p12`, encodés Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Secret | mot de passe du `.p12` |
 | `KWABOR_IOS_PROVISIONING_PROFILE_BASE64` | Secret | profil App Store encodé Base64 |

@@ -69,7 +69,13 @@ Les GitHub Environments `staging` et `production` doivent fournir les variables 
 dans Supabase et doit respecter `*.apps.googleusercontent.com` ; une valeur absente ou mal formée
 arrête le workflow avant le build.
 
-### Secrets production
+### Configuration Firebase staging et production
+
+Chaque GitHub Environment doit contenir le secret `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64`, encodé
+depuis le `google-services.json` de ce même environnement. Le workflow le décode dans le checkout,
+vérifie le project ID et le package `com.kwabor.android`, puis le supprime même après échec.
+
+### Secrets de signature production
 
 Dans le GitHub Environment `production`, créer les secrets suivants :
 

@@ -4,8 +4,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("com.google.firebase.crashlytics")
-    id("com.google.firebase.firebase-perf")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
@@ -14,6 +12,8 @@ plugins {
 val firebaseConfigFile = layout.projectDirectory.file("google-services.json").asFile
 if (firebaseConfigFile.isFile) {
     pluginManager.apply("com.google.gms.google-services")
+    pluginManager.apply("com.google.firebase.crashlytics")
+    pluginManager.apply("com.google.firebase.firebase-perf")
 }
 
 val aggregateArtifactTaskNames = setOf("assemble", "bundle", "build")

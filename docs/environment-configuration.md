@@ -16,13 +16,13 @@ Toute autre valeur est rejetée par le build Android et par la composition root 
 
 | Clé | Sensibilité | Android local | iOS local | GitHub Environment |
 |---|---|---|---|---|
-| `KWABOR_ENVIRONMENT` | Publique | `kwabor.environment` | `KWABOR_ENVIRONMENT` | Variable |
-| `KWABOR_SUPABASE_URL` | Publique | `kwabor.supabase.url` | `KWABOR_SUPABASE_URL` | Variable |
-| `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Publique | `kwabor.supabase.publishableKey` | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable |
+| `KWABOR_ENVIRONMENT` | Publique | `kwabor.environment` | fixé par `Debug`/`Staging`/`Release` | Variable |
+| `KWABOR_SUPABASE_URL` | Publique | `kwabor.supabase.url` | `KWABOR_SUPABASE_URL_<TIER>` | Variable |
+| `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Publique | `kwabor.supabase.publishableKey` | `KWABOR_SUPABASE_PUBLISHABLE_KEY_<TIER>` | Variable |
 | `KWABOR_GOOGLE_WEB_CLIENT_ID` | Publique | client OAuth Web attendu par Supabase | — | Variable staging/production |
-| `KWABOR_GOOGLE_IOS_CLIENT_ID` | Publique | — | client OAuth iOS qualifié par tier | Variable staging/production |
-| `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Publique | — | client OAuth Web attendu par Supabase | Variable staging/production |
-| `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Publique | — | schéma callback dérivé du client iOS | Variable staging/production |
+| `KWABOR_GOOGLE_IOS_CLIENT_ID` | Publique | — | `KWABOR_GOOGLE_IOS_CLIENT_ID_<TIER>` | Variable staging/production |
+| `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Publique | — | `KWABOR_GOOGLE_SERVER_CLIENT_ID_<TIER>` | Variable staging/production |
+| `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Publique | — | `KWABOR_GOOGLE_REVERSED_CLIENT_ID_<TIER>` | Variable staging/production |
 | `KWABOR_VERSION_CODE` | Publique | `kwabor.versionCode` | — | Entrée du workflow Android |
 | `KWABOR_VERSION_NAME` | Publique | `kwabor.versionName` | — | Entrée du workflow Android |
 | `KWABOR_ANDROID_KEYSTORE_BASE64` | Secret | — | — | Secret production |
@@ -42,13 +42,33 @@ La clé Supabase publishable et les fichiers de configuration Firebase identifie
 
 Les secrets serveur — service role Supabase, Firebase Admin, FedaPay, OpenAI, OpenRouter, Gemini et Open Exchange Rates — restent exclusivement dans Supabase Secrets ou dans le coffre du fournisseur qui exécute le serveur. Ils ne sont jamais déclarés dans un build mobile.
 
+## Validation d'un clone vierge
+
+`.env.example` inventorie les entrées externes, mais aucun outil du dépôt ne le charge automatiquement.
+Un clone vierge doit passer les contrôles suivants sans copier de template, sans fichier fournisseur et
+sans secret :
+
+```powershell
+python -B tools/verify-repository-integrity.py
+.\gradlew.bat check :androidApp:assembleDebug :androidApp:assembleStaging --console=plain
+```
+
+Le premier contrôle rapproche les templates Android/iOS du contrat, refuse les artefacts sensibles
+suivis par Git et vérifie les checksums officiels du wrapper Gradle. Les builds sans configuration
+distante restent volontairement non distribuables : les intégrations Supabase, OAuth et Firebase sont
+inactives, et `bundleRelease` échoue tant que la signature propriétaire complète n'est pas injectée.
+La validation Xcode non signée équivalente est décrite dans [Release iOS](ios-release.md).
+
 ## Configuration locale
 
 ### Android
 
 1. Copier `local.properties.example` vers `local.properties`.
-2. Renseigner le tier et ses valeurs Supabase publiques.
-3. Ne jamais versionner `local.properties` ni `androidApp/google-services.json`.
+2. Renseigner le tier, ses valeurs Supabase publiques et `kwabor.google.webClientId` si Google Sign-In
+   doit être testé.
+3. Pour tester Firebase, placer le `google-services.json` du même tier dans `androidApp/`; le build
+   local reste possible sans ce fichier, avec les fonctions Firebase désactivées.
+4. Ne jamais versionner `local.properties` ni `google-services.json`.
 
 Les clés génériques `kwabor.supabase.*` ne sont reprises que par le tier déclaré dans `kwabor.environment`. Les clés qualifiées `kwabor.development.supabase.*`, `kwabor.staging.supabase.*` et `kwabor.production.supabase.*` permettent de valider plusieurs variants sans réutilisation croisée. Une valeur d'environnement inconnue bloque le build.
 
@@ -224,7 +244,7 @@ d'écriture sur ce timestamp ou sur les preuves juridiques.
 
 L'authentification Firebase CLI locale est expirée. Le propriétaire doit exécuter `npx firebase-tools login --reauth`, choisir l'organisation Google Cloud et créer deux projets isolés. Dans chacun, il enregistre une app Android `com.kwabor.android` et une app iOS `com.kwabor.ios`, puis conserve les fichiers générés hors Git.
 
-Avant activation des SDK dans `OBS-001`, vérifier pour chaque environnement :
+Avant de rendre les SDK opérationnels sur un environnement, vérifier :
 
 - projet et app mobile cohérents ;
 - APNs configuré uniquement avec les credentials Apple du propriétaire ;
