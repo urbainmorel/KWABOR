@@ -80,31 +80,39 @@ class OnboardingStrings internal constructor(
     val passwordRecoverySuccess: String = auth.passwordRecoverySuccess
     val passwordRecoveryBackToSignIn: String = auth.passwordRecoveryBackToSignIn
     val registrationTitle: String = registration.registrationTitle
+    val registrationStepProgress: String = registration.registrationStepProgress
+    val registrationFinalStep: String = registration.registrationFinalStep
+    val registrationEditEmail: String = registration.registrationEditEmail
     val registrationPassword: String = registration.registrationPassword
+    val registrationPasswordShow: String = registration.registrationPasswordShow
+    val registrationPasswordHide: String = registration.registrationPasswordHide
     val registrationPasswordConfirmation: String = registration.registrationPasswordConfirmation
-    val registrationIdentityTitle: String = registration.registrationIdentityTitle
+    val registrationIdentityTitle: String = registration.legacy.registrationIdentityTitle
+    val registrationProfileTitle: String = registration.registrationProfileTitle
+    val registrationProfileSupport: String = registration.registrationProfileSupport
     val registrationCityTitle: String = registration.registrationCityTitle
-    val registrationUseLocation: String = registration.registrationUseLocation
-    val registrationLocationPermissionDenied: String = registration.registrationLocationPermissionDenied
-    val registrationLocationUnavailable: String = registration.registrationLocationUnavailable
-    val registrationLocationOutsideBenin: String = registration.registrationLocationOutsideBenin
+    val registrationUseLocation: String = registration.legacy.registrationUseLocation
+    val registrationLocationPermissionDenied: String = registration.legacy.registrationLocationPermissionDenied
+    val registrationLocationUnavailable: String = registration.legacy.registrationLocationUnavailable
+    val registrationLocationOutsideBenin: String = registration.legacy.registrationLocationOutsideBenin
     val registrationCurrencyTitle: String = registration.registrationCurrencyTitle
     val registrationLegalTitle: String = registration.registrationLegalTitle
     val registrationTermsAcceptance: String = registration.registrationTermsAcceptance
     val registrationPrivacyAcceptance: String = registration.registrationPrivacyAcceptance
     val registrationUgcAcceptance: String = registration.registrationUgcAcceptance
-    val registrationObservabilityTitle: String = registration.registrationObservabilityTitle
-    val registrationObservabilitySupport: String = registration.registrationObservabilitySupport
-    val registrationAnalyticsConsent: String = registration.registrationAnalyticsConsent
-    val registrationDiagnosticsConsent: String = registration.registrationDiagnosticsConsent
-    val registrationRemoteConfigConsent: String = registration.registrationRemoteConfigConsent
-    val registrationNotificationTitle: String = registration.registrationNotificationTitle
-    val registrationNotificationSupport: String = registration.registrationNotificationSupport
-    val registrationNotificationEnable: String = registration.registrationNotificationEnable
-    val registrationLater: String = registration.registrationLater
+    val registrationObservabilityTitle: String = registration.legacy.registrationObservabilityTitle
+    val registrationObservabilitySupport: String = registration.legacy.registrationObservabilitySupport
+    val registrationAnalyticsConsent: String = registration.legacy.registrationAnalyticsConsent
+    val registrationDiagnosticsConsent: String = registration.legacy.registrationDiagnosticsConsent
+    val registrationRemoteConfigConsent: String = registration.legacy.registrationRemoteConfigConsent
+    val registrationNotificationTitle: String = registration.legacy.registrationNotificationTitle
+    val registrationNotificationSupport: String = registration.legacy.registrationNotificationSupport
+    val registrationNotificationEnable: String = registration.legacy.registrationNotificationEnable
+    val registrationLater: String = registration.legacy.registrationLater
     val registrationContinue: String = registration.registrationContinue
     val registrationBack: String = registration.registrationBack
     val registrationOtpWait: String = registration.registrationOtpWait
+    val registrationOtpResendCountdown: String = registration.registrationOtpResendCountdown
     val registrationOtpExpired: String = registration.registrationOtpExpired
     val registrationPasswordTooShort: String = registration.registrationPasswordTooShort
     val registrationPasswordMismatch: String = registration.registrationPasswordMismatch
@@ -114,6 +122,8 @@ class OnboardingStrings internal constructor(
     val registrationLegalRequired: String = registration.registrationLegalRequired
     val registrationLegalUnavailable: String = registration.registrationLegalUnavailable
     val registrationComplete: String = registration.registrationComplete
+    val registrationCompleteDefault: String = registration.registrationCompleteDefault
+    val registrationCompleteContextual: String = registration.registrationCompleteContextual
     val settings: SettingsStrings = settings
 }
 
@@ -202,31 +212,25 @@ internal data class OnboardingSecurityStrings(
 
 internal data class OnboardingRegistrationStrings(
     val registrationTitle: String,
+    val registrationStepProgress: String,
+    val registrationFinalStep: String,
+    val registrationEditEmail: String,
     val registrationPassword: String,
+    val registrationPasswordShow: String,
+    val registrationPasswordHide: String,
     val registrationPasswordConfirmation: String,
-    val registrationIdentityTitle: String,
+    val registrationProfileTitle: String,
+    val registrationProfileSupport: String,
     val registrationCityTitle: String,
-    val registrationUseLocation: String,
-    val registrationLocationPermissionDenied: String,
-    val registrationLocationUnavailable: String,
-    val registrationLocationOutsideBenin: String,
     val registrationCurrencyTitle: String,
     val registrationLegalTitle: String,
     val registrationTermsAcceptance: String,
     val registrationPrivacyAcceptance: String,
     val registrationUgcAcceptance: String,
-    val registrationObservabilityTitle: String,
-    val registrationObservabilitySupport: String,
-    val registrationAnalyticsConsent: String,
-    val registrationDiagnosticsConsent: String,
-    val registrationRemoteConfigConsent: String,
-    val registrationNotificationTitle: String,
-    val registrationNotificationSupport: String,
-    val registrationNotificationEnable: String,
-    val registrationLater: String,
     val registrationContinue: String,
     val registrationBack: String,
     val registrationOtpWait: String,
+    val registrationOtpResendCountdown: String,
     val registrationOtpExpired: String,
     val registrationPasswordTooShort: String,
     val registrationPasswordMismatch: String,
@@ -236,6 +240,26 @@ internal data class OnboardingRegistrationStrings(
     val registrationLegalRequired: String,
     val registrationLegalUnavailable: String,
     val registrationComplete: String,
+    val registrationCompleteDefault: String,
+    val registrationCompleteContextual: String,
+    val legacy: OnboardingLegacyRegistrationStrings,
+)
+
+internal data class OnboardingLegacyRegistrationStrings(
+    val registrationIdentityTitle: String,
+    val registrationUseLocation: String,
+    val registrationLocationPermissionDenied: String,
+    val registrationLocationUnavailable: String,
+    val registrationLocationOutsideBenin: String,
+    val registrationObservabilityTitle: String,
+    val registrationObservabilitySupport: String,
+    val registrationAnalyticsConsent: String,
+    val registrationDiagnosticsConsent: String,
+    val registrationRemoteConfigConsent: String,
+    val registrationNotificationTitle: String,
+    val registrationNotificationSupport: String,
+    val registrationNotificationEnable: String,
+    val registrationLater: String,
 )
 
 internal fun KwaborStrings.toOnboardingStrings(): OnboardingStrings = OnboardingStrings(
@@ -333,31 +357,25 @@ private fun KwaborStrings.toOnboardingSecurityStrings(): OnboardingSecurityStrin
 private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrationStrings =
     OnboardingRegistrationStrings(
         registrationTitle = registrationTitle,
+        registrationStepProgress = registrationStepProgress,
+        registrationFinalStep = registrationFinalStep,
+        registrationEditEmail = registrationEditEmail,
         registrationPassword = registrationPassword,
+        registrationPasswordShow = registrationPasswordShow,
+        registrationPasswordHide = registrationPasswordHide,
         registrationPasswordConfirmation = registrationPasswordConfirmation,
-        registrationIdentityTitle = registrationIdentityTitle,
+        registrationProfileTitle = registrationProfileTitle,
+        registrationProfileSupport = registrationProfileSupport,
         registrationCityTitle = registrationCityTitle,
-        registrationUseLocation = registrationUseLocation,
-        registrationLocationPermissionDenied = registrationLocationPermissionDenied,
-        registrationLocationUnavailable = registrationLocationUnavailable,
-        registrationLocationOutsideBenin = registrationLocationOutsideBenin,
         registrationCurrencyTitle = registrationCurrencyTitle,
         registrationLegalTitle = registrationLegalTitle,
         registrationTermsAcceptance = registrationTermsAcceptance,
         registrationPrivacyAcceptance = registrationPrivacyAcceptance,
         registrationUgcAcceptance = registrationUgcAcceptance,
-        registrationObservabilityTitle = registrationObservabilityTitle,
-        registrationObservabilitySupport = registrationObservabilitySupport,
-        registrationAnalyticsConsent = registrationAnalyticsConsent,
-        registrationDiagnosticsConsent = registrationDiagnosticsConsent,
-        registrationRemoteConfigConsent = registrationRemoteConfigConsent,
-        registrationNotificationTitle = registrationNotificationTitle,
-        registrationNotificationSupport = registrationNotificationSupport,
-        registrationNotificationEnable = registrationNotificationEnable,
-        registrationLater = registrationLater,
         registrationContinue = registrationContinue,
         registrationBack = registrationBack,
         registrationOtpWait = registrationOtpWait,
+        registrationOtpResendCountdown = registrationOtpResendCountdown,
         registrationOtpExpired = registrationOtpExpired,
         registrationPasswordTooShort = registrationPasswordTooShort,
         registrationPasswordMismatch = registrationPasswordMismatch,
@@ -367,4 +385,25 @@ private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrat
         registrationLegalRequired = registrationLegalRequired,
         registrationLegalUnavailable = registrationLegalUnavailable,
         registrationComplete = registrationComplete,
+        registrationCompleteDefault = registrationCompleteDefault,
+        registrationCompleteContextual = registrationCompleteContextual,
+        legacy = toOnboardingLegacyRegistrationStrings(),
+    )
+
+private fun KwaborStrings.toOnboardingLegacyRegistrationStrings(): OnboardingLegacyRegistrationStrings =
+    OnboardingLegacyRegistrationStrings(
+        registrationIdentityTitle = registrationIdentityTitle,
+        registrationUseLocation = registrationUseLocation,
+        registrationLocationPermissionDenied = registrationLocationPermissionDenied,
+        registrationLocationUnavailable = registrationLocationUnavailable,
+        registrationLocationOutsideBenin = registrationLocationOutsideBenin,
+        registrationObservabilityTitle = registrationObservabilityTitle,
+        registrationObservabilitySupport = registrationObservabilitySupport,
+        registrationAnalyticsConsent = registrationAnalyticsConsent,
+        registrationDiagnosticsConsent = registrationDiagnosticsConsent,
+        registrationRemoteConfigConsent = registrationRemoteConfigConsent,
+        registrationNotificationTitle = registrationNotificationTitle,
+        registrationNotificationSupport = registrationNotificationSupport,
+        registrationNotificationEnable = registrationNotificationEnable,
+        registrationLater = registrationLater,
     )

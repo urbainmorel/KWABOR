@@ -38,6 +38,8 @@ import com.kwabor.android.presentation.auth.AuthAccessUiState
 import com.kwabor.android.presentation.auth.AuthEffect
 import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthPlatformUiState
+import com.kwabor.android.presentation.auth.AuthProtectedAction
+import com.kwabor.android.presentation.auth.AuthSoftWallContext
 import com.kwabor.android.presentation.auth.AuthSurface
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.PromoterActivationUiState
@@ -52,6 +54,7 @@ import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
+import com.kwabor.android.ui.screens.auth.AuthSheetState
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.detail.CatalogDetailPlatformDependencies
 import com.kwabor.android.ui.screens.detail.CatalogDetailSheet
@@ -136,14 +139,19 @@ private fun KwaborThemedContent(
             runtimeState = runtimeState,
         )
     }
-    SoftWallOverlay(state.authPlatform.surface, strings, dependencies.authViewModel)
+    SoftWallOverlay(state.authPlatform, strings, dependencies.authViewModel)
 }
 
 @Composable
-private fun SoftWallOverlay(surface: AuthSurface, strings: KwaborStrings, authViewModel: AuthViewModel) {
-    if (surface != AuthSurface.SoftWall) return
+private fun SoftWallOverlay(platformState: AuthPlatformUiState, strings: KwaborStrings, authViewModel: AuthViewModel) {
+    if (platformState.surface != AuthSurface.SoftWall) return
     AuthSheet(
         strings = strings,
+        state = AuthSheetState(
+            context = platformState.softWallContext,
+            errorMessage = platformState.softWallErrorMessage,
+            federatedSignInInProgress = platformState.federatedSignInInProgress,
+        ),
         actions = remember(authViewModel) { authViewModel.sheetActions() },
     )
 }
@@ -187,13 +195,9 @@ private class KwaborCollectedState(
         get() = RegistrationScreenState(
             registration = registration,
             surface = authPlatform.surface,
-            locationStatus = authPlatform.locationStatus,
-            locationPermissionRequestInFlight = authPlatform.locationPermissionRequestInFlight,
+            softWallContext = authPlatform.softWallContext,
             otpResendSecondsRemaining = authPlatform.otpResendSecondsRemaining,
             legalDocumentOpenFailed = authPlatform.legalDocumentOpenFailed,
-            observabilityConsentPersistenceFailed = authPlatform.observabilityConsentPersistenceFailed,
-            notificationPermissionRequestInFlight = authPlatform.notificationPermissionRequestInFlight,
-            notificationPrimingPersistenceFailed = authPlatform.notificationPrimingPersistenceFailed,
             federatedSignInInProgress = authPlatform.federatedSignInInProgress,
         )
 
@@ -348,7 +352,7 @@ private fun KwaborEntryContent(
         OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
         OnboardingEntry.Intro -> KwaborIntroRoute(
             strings = strings,
-            staticFallbackRequired = state.onboarding.isStaticIntroFallbackRequired,
+            state = state.onboarding,
             viewModel = dependencies.onboardingViewModel,
             launchSplashExited = state.launchSplashExited,
         )
@@ -555,8 +559,15 @@ private fun ExploreEffectHandler(dependencies: HomeShellDependencies) {
     LaunchedEffect(dependencies.exploreViewModel, dependencies.authViewModel) {
         dependencies.exploreViewModel.effects.collect { effect ->
             when (effect) {
-                ExploreEffect.AuthenticationRequired -> {
-                    dependencies.authViewModel.onIntent(AuthIntent.OpenSoftWall)
+                is ExploreEffect.AuthenticationRequired -> {
+                    dependencies.authViewModel.onIntent(
+                        AuthIntent.OpenSoftWall(
+                            AuthSoftWallContext(
+                                action = effect.kind.toProtectedAction(),
+                                suggestedCityId = effect.suggestedCityId,
+                            ),
+                        ),
+                    )
                 }
                 ExploreEffect.RequestLocationPermission -> {
                     locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -642,7 +653,14 @@ private val rootDestinationRequester =
                 navController.navigateToRoot(destination)
             } else {
                 onAuthenticationRequired(destination)
-                authViewModel.onIntent(AuthIntent.OpenSoftWall)
+                authViewModel.onIntent(
+                    AuthIntent.OpenSoftWall(
+                        AuthSoftWallContext(
+                            action = AuthProtectedAction.Other,
+                            suggestedCityId = null,
+                        ),
+                    ),
+                )
             }
         }
     }

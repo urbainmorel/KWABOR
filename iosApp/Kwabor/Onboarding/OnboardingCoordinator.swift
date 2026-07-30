@@ -8,7 +8,6 @@ final class OnboardingCoordinator: ObservableObject {
         case intro
         case restoringSession
         case authentication
-        case notificationPriming
         case home
     }
 
@@ -31,7 +30,7 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var isSigningOutAccount = false
     @Published private(set) var sessionRestoreFailed = false
     @Published private(set) var isDeletingAccount = false
-    @Published private(set) var isRequestingNotificationsAfterSessionRestore = false
+    @Published private(set) var contextualAuthenticationCancellationRevision = 0
 
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
@@ -40,9 +39,6 @@ final class OnboardingCoordinator: ObservableObject {
     let registrationController: IosRegistrationController
     let federatedIdentityHintStore: FederatedIdentityHintPersisting
     let promoterActivationDestinationStore: PromoterActivationDestinationPersisting
-    let registrationLocationProvider: RegistrationLocationProviding
-    let registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting
-    let registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting
     let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
 
     var isGuestSession: Bool {
@@ -135,6 +131,7 @@ final class OnboardingCoordinator: ObservableObject {
     private var isClearingTemporaryPromoterActivationSessionAtBootstrap = false
     private var freshInstallSessionCleanupCompleted: Bool
     private let promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting
+    private var contextualAuthJourney: ContextualAuthJourney?
 
     init(
         bridge: KwaborSharedBridge,
@@ -145,9 +142,6 @@ final class OnboardingCoordinator: ObservableObject {
         federatedIdentityHintStore: FederatedIdentityHintPersisting = KeychainFederatedIdentityHintStore(),
         promoterActivationDestinationStore: PromoterActivationDestinationPersisting =
             KeychainPromoterActivationDestinationStore(),
-        registrationLocationProvider: RegistrationLocationProviding? = nil,
-        registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting? = nil,
-        registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
         userDefaults: UserDefaults = .standard,
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting? = nil,
         promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting =
@@ -163,11 +157,6 @@ final class OnboardingCoordinator: ObservableObject {
         self.promoterActivationDestinationStore = promoterActivationDestinationStore
         self.observability = observability
         observabilityConsent = observability.consent
-        self.registrationLocationProvider = registrationLocationProvider ?? CoreLocationRegistrationService()
-        self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester ??
-            UserNotificationRegistrationService()
-        self.registrationNotificationPrimingStore = registrationNotificationPrimingStore ??
-            UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
         self.interruptedAuthJourneyStore = interruptedAuthJourneyStore ??
             UserDefaultsInterruptedAuthJourneyStore(userDefaults: userDefaults)
         self.promoterActivationSessionMarkerStore = promoterActivationSessionMarkerStore
@@ -226,10 +215,15 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func completeIntro(skipped: Bool) {
+        completeIntro(reason: skipped ? .skipped : .playbackCompleted)
+    }
+
+    private func completeIntro(reason: IntroCompletionReason) {
         guard !launchIntroCompleted else { return }
         launchIntroCompleted = true
+        introStore.markCompletion(reason: reason.rawValue)
         markFirstLaunchCompletedIfEligible()
-        if skipped {
+        if reason == .skipped {
             observability.track(telemetry.skippedEvent)
         }
         resolveRoute()
@@ -245,16 +239,49 @@ final class OnboardingCoordinator: ObservableObject {
 
     func presentAuthentication() {
         guard !requiresProtectedAuthentication else { return }
+        completeLaunchIntroForSelectedAction()
         isAuthenticationPresented = true
     }
 
+    @discardableResult
+    func presentContextualAuthentication(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        presentAuthentication()
+        return isAuthenticationPresented
+    }
+
     func presentRegistration() {
+        presentRegistration(suggestedCityId: nil)
+    }
+
+    func presentRegistration(suggestedCityId: String?) {
         guard !requiresProtectedAuthentication else { return }
+        completeLaunchIntroForSelectedAction()
         registrationCancellationErrorMessage = nil
         if authState?.hasSession != true {
             registrationController.reset()
+            registrationController.prepare(suggestedCityId: suggestedCityId)
         }
         isRegistrationPresented = true
+    }
+
+    @discardableResult
+    func presentContextualRegistration(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        presentRegistration(suggestedCityId: suggestedCityId)
+        return isRegistrationPresented
+    }
+
+    func prepareContextualFederatedAuthentication(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        return true
+    }
+
+    func cancelContextualSoftWall() {
+        cancelContextualAuthJourney()
     }
 
     func presentRegistrationFromAuthentication() {
@@ -275,29 +302,12 @@ final class OnboardingCoordinator: ObservableObject {
             isAuthenticationPresented = true
             return
         }
-        guard shouldPresentRegistrationAfterAuthenticationDismissal else { return }
+        guard shouldPresentRegistrationAfterAuthenticationDismissal else {
+            cancelContextualAuthJourney()
+            return
+        }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
-        presentRegistration()
-    }
-
-    @discardableResult
-    func applyRegistrationObservabilityConsent(_ userId: String?, _ consent: ObservabilityConsent) -> Bool {
-        guard !isCancellingRegistration, !isDeletingAccount, !isSigningOutAccount else {
-            _ = revokeObservabilityConsent()
-            return false
-        }
-        guard let userId = normalizedSessionUserId(userId) else {
-            bindObservability(to: nil)
-            registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
-            return false
-        }
-        registrationCancellationErrorMessage = nil
-        let persisted = observability.updateConsent(consent, ownerUserId: userId)
-        observabilityConsent = observability.consent
-        if !persisted {
-            registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
-        }
-        return persisted
+        presentRegistration(suggestedCityId: contextualAuthJourney?.suggestedCityId)
     }
 
     func updateObservabilityConsent(_ category: ObservabilityConsentCategory, allowed: Bool) {
@@ -337,7 +347,6 @@ final class OnboardingCoordinator: ObservableObject {
             observabilityConsentErrorMessage = strings.settings.privacyPersistenceError
         }
     }
-
     func completeRegistration(_ session: AuthSession) {
         guard let userId = normalizedSessionUserId(session.userId) else {
             registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
@@ -354,11 +363,47 @@ final class OnboardingCoordinator: ObservableObject {
         registrationCancellationErrorMessage = nil
         completedRegistrationSession = session
         guestAccessGranted = false
+        completeContextualAuthJourney()
         isAuthenticationPresented = false
         isRegistrationPresented = false
         registrationController.reset()
         resolveRoute()
         refreshSessionState()
+    }
+
+    func trackRegistrationEmailMethod() {
+        observability.track(registrationAnalyticsEvent(name: .authMethod, authMethod: .email))
+    }
+
+    func trackRegistrationOtpValidated() {
+        observability.track(registrationAnalyticsEvent(name: .registrationOtpValidated))
+    }
+
+    func trackRegistrationProfileResult(_ succeeded: Bool) {
+        observability.track(
+            registrationAnalyticsEvent(
+                name: succeeded ? .registrationProfileSucceeded : .registrationProfileFailed
+            )
+        )
+    }
+
+    private func registrationAnalyticsEvent(
+        name: AnalyticsEventName,
+        authMethod: AnalyticsAuthMethod? = nil
+    ) -> AnalyticsEvent {
+        AnalyticsEvent(
+            name: name,
+            context: AnalyticsContext(
+                cityId: nil,
+                entityType: .notApplicable,
+                entityId: nil,
+                sessionSource: .organic,
+                locale: .french,
+                displayCurrency: .xof
+            ),
+            authMethod: authMethod,
+            socialPostType: nil
+        )
     }
 
     func handleExistingRegistrationAccount(email: String?) {
@@ -399,6 +444,10 @@ final class OnboardingCoordinator: ObservableObject {
         _ credential: FederatedAuthCredential,
         onCompleted: @escaping (Bool) -> Void
     ) {
+        if isRegistrationPresented {
+            let authMethod: AnalyticsAuthMethod = credential.provider == .apple ? .apple : .google
+            observability.track(registrationAnalyticsEvent(name: .authMethod, authMethod: authMethod))
+        }
         let replacesInterruptedRegistration = interruptedAuthJourneyStore.current == .registration
         if replacesInterruptedRegistration {
             isReplacingInterruptedRegistrationSession = true
@@ -681,6 +730,7 @@ final class OnboardingCoordinator: ObservableObject {
         guard requiresSignOut else {
             registrationController.reset()
             isRegistrationPresented = false
+            cancelContextualAuthJourney()
             resolveRoute()
             return
         }
@@ -695,6 +745,7 @@ final class OnboardingCoordinator: ObservableObject {
                 completedRegistrationSession = nil
                 registrationController.reset()
                 isRegistrationPresented = false
+                cancelContextualAuthJourney()
                 resolveRoute()
             } else {
                 registrationCancellationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
@@ -705,6 +756,7 @@ final class OnboardingCoordinator: ObservableObject {
     func registrationPresentationDismissed() {
         guard !isRegistrationPresented, authState?.hasSession != true else { return }
         registrationController.reset()
+        cancelContextualAuthJourney()
     }
 
     @discardableResult
@@ -771,6 +823,7 @@ final class OnboardingCoordinator: ObservableObject {
             resolveRoute()
             return
         }
+        completeLaunchIntroForSelectedAction()
         isGuestDisclosurePresented = true
     }
 
@@ -809,32 +862,16 @@ final class OnboardingCoordinator: ObservableObject {
         }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
         isAuthenticationPresented = false
-    }
-
-    func enableNotificationsAfterSessionRestore() {
-        guard route == .notificationPriming,
-              !isRequestingNotificationsAfterSessionRestore else {
-            return
-        }
-        isRequestingNotificationsAfterSessionRestore = true
-        let requester = registrationNotificationPermissionRequester
-        Task { [weak self, requester] in
-            _ = await requester.requestPermission()
-            guard let self else { return }
-            completeNotificationsAfterSessionRestore()
-        }
-    }
-
-    func skipNotificationsAfterSessionRestore() {
-        guard route == .notificationPriming,
-              !isRequestingNotificationsAfterSessionRestore else {
-            return
-        }
-        completeNotificationsAfterSessionRestore()
+        cancelContextualAuthJourney()
     }
 
     private var shouldPresentLaunchIntro: Bool {
         !launchIntroCompleted && launchBundledIntroRevision != nil
+    }
+
+    private func completeLaunchIntroForSelectedAction() {
+        guard shouldPresentLaunchIntro else { return }
+        completeIntro(reason: .ctaSelected)
     }
 
     private var hasCompleteAccount: Bool {
@@ -928,6 +965,7 @@ final class OnboardingCoordinator: ObservableObject {
             federatedIdentityHintStore.clearPendingHints()
             interruptedAuthJourneyStore.clearRegistration()
             completedRegistrationSession = session
+            completeContextualAuthJourney()
             isAuthenticationPresented = false
             isRegistrationPresented = false
         } else if state.hasSession, let session = state.currentSession {
@@ -964,13 +1002,6 @@ final class OnboardingCoordinator: ObservableObject {
             route = .intro
             return
         }
-        if sessionRestoreCompleted,
-           hasCompleteAccount,
-           !registrationNotificationPrimingStore.isResolved {
-            route = .notificationPriming
-            return
-        }
-
         let routeKey = bridge.onboardingEntryKey(
             firstLaunchCompleted: firstLaunchCompleted,
             sessionRestoreCompleted: sessionRestoreCompleted,
@@ -987,12 +1018,6 @@ final class OnboardingCoordinator: ObservableObject {
         default:
             route = .authentication
         }
-    }
-
-    private func completeNotificationsAfterSessionRestore() {
-        registrationNotificationPrimingStore.markResolved()
-        isRequestingNotificationsAfterSessionRestore = false
-        resolveRoute()
     }
 
     private func presentIncompleteRegistrationIfPossible() {
@@ -1526,13 +1551,34 @@ final class OnboardingCoordinator: ObservableObject {
             registrationController.resumeIncompleteSocialSession(
                 session: session,
                 suggestedFirstName: hints?.firstName,
-                suggestedLastName: hints?.lastName
+                suggestedLastName: hints?.lastName,
+                suggestedCityId: contextualAuthJourney?.suggestedCityId
             )
         } else {
             registrationController.resumeIncompleteSession(session: session)
         }
     }
+
+    private func completeContextualAuthJourney() {
+        contextualAuthJourney = nil
+    }
+
+    private func cancelContextualAuthJourney() {
+        guard contextualAuthJourney != nil else { return }
+        contextualAuthJourney = nil
+        contextualAuthenticationCancellationRevision += 1
+    }
 }
 
 private let bundledIntroName = "KwaborIntro"
 private let mp4Extension = "mp4"
+
+private enum IntroCompletionReason: String {
+    case playbackCompleted = "playback_completed"
+    case skipped
+    case ctaSelected = "cta_selected"
+}
+
+private struct ContextualAuthJourney {
+    let suggestedCityId: String?
+}

@@ -1,9 +1,11 @@
 package com.kwabor.android.presentation.auth
 
 import com.kwabor.shared.domain.auth.AccountSetupStatus
-import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.presentation.auth.RegistrationIntent
 import com.kwabor.shared.presentation.auth.RegistrationStep
+import com.kwabor.shared.presentation.auth.RegistrationUiState
 import kotlinx.coroutines.launch
 
 internal class AuthProfileCoordinator(
@@ -21,96 +23,63 @@ internal class AuthProfileCoordinator(
         when (intent) {
             is AuthIntent.ChangeFirstName -> runtime.reduce(RegistrationIntent.UpdateFirstName(intent.firstName))
             is AuthIntent.ChangeLastName -> runtime.reduce(RegistrationIntent.UpdateLastName(intent.lastName))
-            is AuthIntent.SelectCity -> {
-                runtime.reduce(RegistrationIntent.SelectCity(intent.cityId))
-                runtime.platformState.value = runtime.platformState.value.copy(
-                    locationStatus = RegistrationLocationStatus.Idle,
-                )
-            }
+            is AuthIntent.SelectCity -> runtime.reduce(RegistrationIntent.SelectCity(intent.cityId))
             is AuthIntent.SelectCurrency -> runtime.reduce(RegistrationIntent.SelectCurrency(intent.currency))
             is AuthIntent.ChangeLegalAcceptance -> runtime.reduce(
                 RegistrationIntent.UpdateLegalAcceptance(intent.type, intent.accepted),
             )
-            is AuthIntent.ChangeAnalyticsConsent -> updateObservabilityConsent { consent ->
-                consent.copy(analyticsAllowed = intent.accepted)
-            }
-            is AuthIntent.ChangeDiagnosticsConsent -> updateObservabilityConsent { consent ->
-                consent.copy(diagnosticsAllowed = intent.accepted)
-            }
-            is AuthIntent.ChangeRemoteConfigurationConsent -> updateObservabilityConsent { consent ->
-                consent.copy(remoteConfigurationAllowed = intent.accepted)
-            }
         }
     }
 
     private fun handleProgress(intent: AuthIntent.ProfileProgress) {
         when (intent) {
-            AuthIntent.ContinueFromIdentity -> runtime.reduce(RegistrationIntent.ContinueFromIdentity)
-            AuthIntent.ContinueFromCity -> runtime.reduce(RegistrationIntent.ContinueFromCity)
-            AuthIntent.ContinueFromCurrency -> runtime.reduce(RegistrationIntent.ContinueFromCurrency)
-            AuthIntent.ContinueFromLegal -> runtime.reduce(RegistrationIntent.ContinueFromLegal)
-            AuthIntent.CompleteOnboarding -> completeOnboarding()
+            AuthIntent.CompleteProfile -> completeProfile()
         }
     }
 
-    private fun updateObservabilityConsent(transform: (ObservabilityConsent) -> ObservabilityConsent) {
-        val consent = transform(runtime.registrationState.value.observabilityConsent)
-        runtime.reduce(RegistrationIntent.UpdateObservabilityConsent(consent))
-        val ownerUserId = currentObservabilityOwnerUserId()
-        val persisted = ownerUserId != null && dependencies.applyObservabilityConsent(ownerUserId, consent)
-        runtime.platformState.value = runtime.platformState.value.copy(
-            observabilityConsentPersistenceFailed = !persisted,
-        )
-    }
-
-    private fun completeOnboarding() {
+    private fun completeProfile() {
         if (runtime.registrationState.value.isLoading || runtime.operationJob?.isActive == true) return
-        if (!persistObservabilityConsent()) {
-            runtime.platformState.value = runtime.platformState.value.copy(
-                observabilityConsentPersistenceFailed = true,
-            )
+        val validatedState = runtime.registrationPresenter.reducer.reduce(
+            state = runtime.registrationState.value,
+            intent = RegistrationIntent.CompleteProfile,
+            strings = runtime.strings,
+        )
+        runtime.registrationState.value = validatedState
+        if (validatedState.errorMessage != null) {
+            dependencies.track(AnalyticsEvent(name = AnalyticsEventName.RegistrationProfileFailed))
             return
         }
-        runtime.platformState.value = runtime.platformState.value.copy(
-            observabilityConsentPersistenceFailed = false,
-        )
         runtime.operationJob?.cancel()
         runtime.operationJob = runtime.coroutineScope.launch {
-            val updatedState = runtime.registrationPresenter.completeOnboarding(
-                runtime.registrationState.value,
-                runtime.strings,
-            )
-            runtime.registrationState.value = updatedState
-            val session = updatedState.currentSession
-            if (
-                updatedState.step == RegistrationStep.NotificationPriming &&
-                session?.accountSetupStatus == AccountSetupStatus.Complete
-            ) {
-                if (!dependencies.authJourneyStore.clear()) {
-                    runtime.registrationState.value = updatedState.copy(
-                        errorMessage = runtime.strings.authInvalidInput,
-                    )
-                    return@launch
-                }
-                runtime.authState.value = runtime.authState.value.copy(currentSession = session, errorMessage = null)
-                if (dependencies.notificationPrimingStore.isResolved()) {
-                    runtime.reduce(RegistrationIntent.FinishNotificationPriming)
-                    runtime.completeAuthenticatedJourney()
-                }
-            }
+            submitValidatedProfile(validatedState)
         }
     }
 
-    private fun persistObservabilityConsent(): Boolean {
-        val ownerUserId = currentObservabilityOwnerUserId() ?: return false
-        return dependencies.applyObservabilityConsent(
-            ownerUserId,
-            runtime.registrationState.value.observabilityConsent,
-        )
+    private suspend fun submitValidatedProfile(validatedState: RegistrationUiState) {
+        val updatedState = runtime.registrationPresenter.completeOnboarding(validatedState, runtime.strings)
+        runtime.registrationState.value = updatedState
+        trackProfileResult(updatedState.step)
+        val session = updatedState.currentSession
+        if (
+            updatedState.step != RegistrationStep.Completed ||
+            session?.accountSetupStatus != AccountSetupStatus.Complete
+        ) {
+            return
+        }
+        if (!dependencies.authJourneyStore.clear()) {
+            runtime.registrationState.value = updatedState.copy(errorMessage = runtime.strings.authInvalidInput)
+            return
+        }
+        runtime.authState.value = runtime.authState.value.copy(currentSession = session, errorMessage = null)
+        runtime.completeAuthenticatedJourney()
     }
 
-    private fun currentObservabilityOwnerUserId(): String? =
-        (runtime.registrationState.value.currentSession?.userId ?: runtime.authState.value.currentSession?.userId)
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
+    private fun trackProfileResult(step: RegistrationStep) {
+        val eventName = if (step == RegistrationStep.Completed) {
+            AnalyticsEventName.RegistrationProfileSucceeded
+        } else {
+            AnalyticsEventName.RegistrationProfileFailed
+        }
+        dependencies.track(AnalyticsEvent(name = eventName))
+    }
 }

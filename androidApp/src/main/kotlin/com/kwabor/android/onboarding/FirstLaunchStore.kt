@@ -7,7 +7,6 @@ internal interface FirstLaunchStore {
 
     fun markBundledIntroSeen()
 }
-
 internal class SharedPreferencesFirstLaunchStore(context: Context) : FirstLaunchStore {
     private val preferences = context.getSharedPreferences(FIRST_LAUNCH_PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val stateLock = Any()

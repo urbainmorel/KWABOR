@@ -70,7 +70,7 @@ private fun OnboardingLandingBackground() {
 }
 
 @Composable
-private fun OnboardingLandingContent(strings: KwaborStrings, actions: OnboardingLandingActions) {
+internal fun OnboardingLandingContent(strings: KwaborStrings, actions: OnboardingLandingActions) {
     Column(
         verticalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
@@ -132,7 +132,7 @@ private fun LandingActions(strings: KwaborStrings, actions: OnboardingLandingAct
 }
 
 @Composable
-private fun GuestDisclosureDialog(strings: KwaborStrings, actions: OnboardingLandingActions) {
+internal fun GuestDisclosureDialog(strings: KwaborStrings, actions: OnboardingLandingActions) {
     AlertDialog(
         onDismissRequest = actions.onGuestCancelled,
         title = { Text(strings.onboardingContinueWithoutAccount) },

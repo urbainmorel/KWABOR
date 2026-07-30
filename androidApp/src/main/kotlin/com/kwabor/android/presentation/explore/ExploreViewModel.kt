@@ -3,8 +3,13 @@ package com.kwabor.android.presentation.explore
 import androidx.lifecycle.ViewModel
 import com.kwabor.android.auth.ApproximateLocationResult
 import com.kwabor.android.auth.ApproximateLocationService
+import com.kwabor.shared.domain.observability.AnalyticsContext
+import com.kwabor.shared.domain.observability.AnalyticsEntityType
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.explore.ExploreChip
+import com.kwabor.shared.presentation.explore.ExploreInteractionKind
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.ExploreRuntime
 import com.kwabor.shared.presentation.explore.ExploreTab
@@ -14,7 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import com.kwabor.shared.presentation.explore.ExploreEffect as SharedExploreEffect
 import com.kwabor.shared.presentation.explore.ExploreIntent as SharedExploreIntent
@@ -52,7 +57,10 @@ internal sealed interface ExploreIntent {
 }
 
 internal sealed interface ExploreEffect {
-    data object AuthenticationRequired : ExploreEffect
+    data class AuthenticationRequired(
+        val kind: ExploreInteractionKind,
+        val suggestedCityId: String?,
+    ) : ExploreEffect
 
     data object RequestLocationPermission : ExploreEffect
 }
@@ -62,6 +70,7 @@ internal class ExploreViewModel(
     private val locationService: ApproximateLocationService,
     strings: KwaborStrings,
     private val coroutineScope: CoroutineScope,
+    private val track: (AnalyticsEvent) -> Unit = {},
 ) : ViewModel() {
     private val runtime = ExploreRuntime(
         presenter = presenter,
@@ -69,7 +78,26 @@ internal class ExploreViewModel(
         coroutineScope = coroutineScope,
     )
     val state: StateFlow<ExploreUiState> = runtime.state
-    val effects: Flow<ExploreEffect> = runtime.effects.map { effect -> effect.toAndroidEffect() }
+    val effects: Flow<ExploreEffect> = runtime.effects.transform { effect ->
+        when (effect) {
+            is SharedExploreEffect.AuthenticationRequired -> emit(
+                ExploreEffect.AuthenticationRequired(
+                    kind = effect.kind,
+                    suggestedCityId = effect.suggestedCityId,
+                ),
+            )
+            SharedExploreEffect.RequestLocation -> emit(ExploreEffect.RequestLocationPermission)
+            is SharedExploreEffect.ProtectedActionReplayed -> track(
+                AnalyticsEvent(
+                    name = AnalyticsEventName.ProtectedActionReplayed,
+                    context = AnalyticsContext(
+                        entityType = AnalyticsEntityType.Place,
+                        entityId = effect.listingId,
+                    ),
+                ),
+            )
+        }
+    }
 
     private var locationJob: Job? = null
 
@@ -139,9 +167,4 @@ private fun ExploreIntent.Feed.toSharedIntent(): SharedExploreIntent.Feed = when
     ExploreIntent.Retry -> SharedExploreIntent.Retry
     ExploreIntent.Refresh -> SharedExploreIntent.Refresh
     ExploreIntent.LoadNext -> SharedExploreIntent.LoadNext
-}
-
-private fun SharedExploreEffect.toAndroidEffect(): ExploreEffect = when (this) {
-    SharedExploreEffect.AuthenticationRequired -> ExploreEffect.AuthenticationRequired
-    SharedExploreEffect.RequestLocation -> ExploreEffect.RequestLocationPermission
 }

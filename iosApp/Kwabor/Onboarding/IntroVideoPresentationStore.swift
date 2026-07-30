@@ -37,6 +37,10 @@ struct IntroVideoPresentationStore {
         userDefaults.set(presentedRevision, forKey: presentedBundledRevisionKey)
     }
 
+    func markCompletion(reason: String) {
+        userDefaults.set(reason, forKey: introCompletionReasonKey)
+    }
+
     private var normalizedStoredRevision: Int64 {
         guard userDefaults.object(forKey: presentedBundledRevisionKey) != nil else {
             return noBundledIntroRevision
@@ -65,5 +69,6 @@ struct IntroVideoPresentationStore {
 
 private let legacyIntroSeenKey = "kwabor.first_launch.intro_seen_v1"
 private let presentedBundledRevisionKey = "kwabor.intro.presented_bundled_revision_v1"
+private let introCompletionReasonKey = "kwabor.intro.completion_reason"
 private let legacyBundledIntroBaselineRevision: Int64 = 1
 private let noBundledIntroRevision: Int64 = 0

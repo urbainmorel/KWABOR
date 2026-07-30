@@ -63,7 +63,15 @@ sealed interface ExploreIntent {
 }
 
 sealed interface ExploreEffect {
-    data object AuthenticationRequired : ExploreEffect
+    data class AuthenticationRequired(
+        val kind: ExploreInteractionKind,
+        val suggestedCityId: String?,
+    ) : ExploreEffect
+
+    data class ProtectedActionReplayed(
+        val kind: ExploreInteractionKind,
+        val listingId: String,
+    ) : ExploreEffect
 
     data object RequestLocation : ExploreEffect
 }
@@ -429,8 +437,13 @@ private class ExploreViewerSessionCoordinator(
     private var viewerContextJob: Job? = null
     private var viewerGeneration = 0L
     private var interactionContextGeneration = 0L
+    private var claimedPendingReplay: PendingExploreAuthInteraction? = null
 
-    suspend fun toggle(listingId: String, kind: ExploreInteractionKind) {
+    suspend fun toggle(
+        listingId: String,
+        kind: ExploreInteractionKind,
+        replay: PendingExploreAuthInteraction? = null,
+    ) {
         val launchContext = lifecycleMutex.withLock {
             ExploreInteractionLaunchContext(
                 scope = interactionScope,
@@ -439,12 +452,17 @@ private class ExploreViewerSessionCoordinator(
             )
         }
         launchContext.scope.launch {
-            performToggle(
-                listingId = listingId,
-                kind = kind,
-                viewerAtRequest = launchContext.viewerGeneration,
-                contextAtRequest = launchContext.interactionContextGeneration,
-            )
+            try {
+                performToggle(
+                    listingId = listingId,
+                    kind = kind,
+                    viewerAtRequest = launchContext.viewerGeneration,
+                    contextAtRequest = launchContext.interactionContextGeneration,
+                    replay = replay,
+                )
+            } finally {
+                replay?.let { pending -> releasePendingReplay(pending) }
+            }
         }
     }
 
@@ -465,7 +483,8 @@ private class ExploreViewerSessionCoordinator(
             }
             return
         }
-        toggle(listingId = pending.listingId, kind = pending.kind)
+        if (!claimPendingReplay(pending)) return
+        toggle(listingId = pending.listingId, kind = pending.kind, replay = pending)
     }
 
     suspend fun updateViewerContext(viewerId: String?) {
@@ -479,6 +498,7 @@ private class ExploreViewerSessionCoordinator(
             viewerContext = nextContext
             viewerGeneration += 1
             interactionContextGeneration += 1
+            claimedPendingReplay = null
             resetInteractionScope()
             viewerContextJob?.cancel()
             ExploreViewerTransition.Changed(
@@ -509,9 +529,14 @@ private class ExploreViewerSessionCoordinator(
     }
 
     private suspend fun startViewerTransition(transition: ExploreViewerTransition.Changed) {
-        val pendingToReplay = stateStore.value.pendingAuthInteraction.takeIf {
+        val pendingCandidate = stateStore.value.pendingAuthInteraction.takeIf {
             transition.previous == ExploreViewerContext.Guest &&
                 transition.next is ExploreViewerContext.Authenticated
+        }
+        val pendingToReplay = if (pendingCandidate != null && claimPendingReplay(pendingCandidate)) {
+            pendingCandidate
+        } else {
+            null
         }
         callbacks.invalidateFeed()
         val job = createViewerTransitionJob(transition, pendingToReplay)
@@ -522,28 +547,33 @@ private class ExploreViewerSessionCoordinator(
         transition: ExploreViewerTransition.Changed,
         pendingToReplay: PendingExploreAuthInteraction?,
     ): Job = coroutineScope.launch(start = CoroutineStart.LAZY) {
-        val resetState = stateStore.resetViewerState(
-            canReset = {
-                isCurrentInteraction(
-                    transition.viewerGeneration,
-                    transition.interactionContextGeneration,
-                )
-            },
-        ) ?: return@launch
-        pendingToReplay
-            ?.takeIf { pending -> resetState.listings.any { listing -> listing.id == pending.listingId } }
-            ?.let { pending ->
-                performToggle(
-                    listingId = pending.listingId,
-                    kind = pending.kind,
-                    viewerAtRequest = transition.viewerGeneration,
-                    contextAtRequest = transition.interactionContextGeneration,
-                )
+        try {
+            val resetState = stateStore.resetViewerState(
+                canReset = {
+                    isCurrentInteraction(
+                        transition.viewerGeneration,
+                        transition.interactionContextGeneration,
+                    )
+                },
+            ) ?: return@launch
+            pendingToReplay
+                ?.takeIf { pending -> resetState.listings.any { listing -> listing.id == pending.listingId } }
+                ?.let { pending ->
+                    performToggle(
+                        listingId = pending.listingId,
+                        kind = pending.kind,
+                        viewerAtRequest = transition.viewerGeneration,
+                        contextAtRequest = transition.interactionContextGeneration,
+                        replay = pending,
+                    )
+                }
+            if (!isCurrentInteraction(transition.viewerGeneration, transition.interactionContextGeneration)) {
+                return@launch
             }
-        if (!isCurrentInteraction(transition.viewerGeneration, transition.interactionContextGeneration)) {
-            return@launch
+            callbacks.reloadFeed(stateStore.value.toLoadRequest())
+        } finally {
+            pendingToReplay?.let { pending -> releasePendingReplay(pending) }
         }
-        callbacks.reloadFeed(stateStore.value.toLoadRequest())
     }
 
     private suspend fun installViewerTransitionJob(transition: ExploreViewerTransition.Changed, job: Job) {
@@ -565,6 +595,7 @@ private class ExploreViewerSessionCoordinator(
         kind: ExploreInteractionKind,
         viewerAtRequest: Long,
         contextAtRequest: Long,
+        replay: PendingExploreAuthInteraction? = null,
     ) {
         interactionMutex.withLock {
             if (!isCurrentInteraction(viewerAtRequest, contextAtRequest)) return@withLock
@@ -576,6 +607,13 @@ private class ExploreViewerSessionCoordinator(
             }
             val authenticationRequired = result.pendingAuthInteraction != null &&
                 result.pendingAuthInteraction != before.pendingAuthInteraction
+            val replaySucceeded = replay != null &&
+                result.pendingAuthInteraction == null &&
+                !result.isOffline &&
+                result.queuedInteractions.none { queued ->
+                    queued.listingId == listingId && queued.kind == kind
+                } &&
+                result.hasInteractionChangeComparedTo(before, listingId)
             val committed = stateStore.commitInteraction(
                 result = result,
                 baseline = before,
@@ -585,8 +623,41 @@ private class ExploreViewerSessionCoordinator(
                         stateStore.value.listings.any { listing -> listing.id == listingId }
                 },
             ) ?: return@withLock
-            if (authenticationRequired && committed.pendingAuthInteraction != null) {
-                callbacks.publishEffect(ExploreEffect.AuthenticationRequired)
+            if (authenticationRequired) {
+                committed.pendingAuthInteraction?.let { pending ->
+                    callbacks.publishEffect(
+                        ExploreEffect.AuthenticationRequired(
+                            kind = pending.kind,
+                            suggestedCityId = pending.suggestedCityId,
+                        ),
+                    )
+                }
+            }
+            if (replaySucceeded && replay != null) {
+                callbacks.publishEffect(
+                    ExploreEffect.ProtectedActionReplayed(
+                        kind = replay.kind,
+                        listingId = replay.listingId,
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun claimPendingReplay(pending: PendingExploreAuthInteraction): Boolean =
+        lifecycleMutex.withLock {
+            if (claimedPendingReplay != null) {
+                false
+            } else {
+                claimedPendingReplay = pending
+                true
+            }
+        }
+
+    private suspend fun releasePendingReplay(pending: PendingExploreAuthInteraction) {
+        lifecycleMutex.withLock {
+            if (claimedPendingReplay == pending) {
+                claimedPendingReplay = null
             }
         }
     }

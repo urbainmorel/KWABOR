@@ -15,7 +15,7 @@ import com.kwabor.shared.i18n.KwaborStrings
 @Composable
 internal fun KwaborIntroRoute(
     strings: KwaborStrings,
-    staticFallbackRequired: Boolean,
+    state: OnboardingUiState,
     viewModel: OnboardingViewModel,
     launchSplashExited: Boolean,
 ) {
@@ -23,8 +23,9 @@ internal fun KwaborIntroRoute(
         strings = strings,
         state = IntroScreenState(
             reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
-            staticFallbackRequired = staticFallbackRequired,
+            staticFallbackRequired = state.isStaticIntroFallbackRequired,
             launchSplashExited = launchSplashExited,
+            isGuestDisclosureVisible = state.isGuestDisclosureVisible,
         ),
         actions = IntroScreenActions(
             onDisplayed = { viewModel.onIntent(OnboardingIntent.IntroDisplayed) },
@@ -32,6 +33,7 @@ internal fun KwaborIntroRoute(
             onSkipped = { viewModel.onIntent(OnboardingIntent.IntroSkipped) },
             onPlaybackFailed = { viewModel.onIntent(OnboardingIntent.IntroPlaybackFailed) },
         ),
+        landingActions = viewModel.landingActions(),
     )
 }
 
@@ -40,12 +42,14 @@ internal fun KwaborLandingRoute(strings: KwaborStrings, state: OnboardingUiState
     OnboardingLandingScreen(
         strings = strings,
         isGuestDisclosureVisible = state.isGuestDisclosureVisible,
-        actions = OnboardingLandingActions(
-            onSignUp = { viewModel.onIntent(OnboardingIntent.SignUpSelected) },
-            onSignIn = { viewModel.onIntent(OnboardingIntent.SignInSelected) },
-            onGuestSelected = { viewModel.onIntent(OnboardingIntent.GuestSelected) },
-            onGuestConfirmed = { viewModel.onIntent(OnboardingIntent.GuestConfirmed) },
-            onGuestCancelled = { viewModel.onIntent(OnboardingIntent.GuestCancelled) },
-        ),
+        actions = viewModel.landingActions(),
     )
 }
+
+private fun OnboardingViewModel.landingActions(): OnboardingLandingActions = OnboardingLandingActions(
+    onSignUp = { onIntent(OnboardingIntent.SignUpSelected) },
+    onSignIn = { onIntent(OnboardingIntent.SignInSelected) },
+    onGuestSelected = { onIntent(OnboardingIntent.GuestSelected) },
+    onGuestConfirmed = { onIntent(OnboardingIntent.GuestConfirmed) },
+    onGuestCancelled = { onIntent(OnboardingIntent.GuestCancelled) },
+)

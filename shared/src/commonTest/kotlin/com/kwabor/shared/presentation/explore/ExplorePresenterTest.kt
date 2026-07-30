@@ -188,6 +188,7 @@ class ExplorePresenterTest {
                 id = "listing-1",
                 title = "Listing test",
                 cityLabel = "Cotonou",
+                cityId = "cotonou",
                 coverImageUrl = null,
                 price = null,
                 likesCount = 12,
@@ -249,6 +250,7 @@ class ExplorePresenterTest {
                 cityLabel = "Cotonou",
                 coverImageUrl = null,
                 price = null,
+                cityId = "cotonou",
             ),
         )
 
@@ -260,6 +262,7 @@ class ExplorePresenterTest {
             PendingExploreAuthInteraction(
                 listingId = "listing-1",
                 kind = ExploreInteractionKind.Favorite,
+                suggestedCityId = "cotonou",
             ),
             updatedState.pendingAuthInteraction,
         )

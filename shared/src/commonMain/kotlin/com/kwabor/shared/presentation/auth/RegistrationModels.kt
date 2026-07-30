@@ -5,7 +5,6 @@ import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.money.KwaborCurrency
-import com.kwabor.shared.domain.observability.ObservabilityConsent
 
 sealed interface RegistrationIntent {
     sealed interface Field : RegistrationIntent
@@ -25,19 +24,9 @@ sealed interface RegistrationIntent {
         val accepted: Boolean,
     ) : Field
 
-    data class UpdateObservabilityConsent(val consent: ObservabilityConsent) : Field
-
     sealed interface Navigation : RegistrationIntent
 
-    data object ContinueFromIdentity : Navigation
-
-    data object ContinueFromCity : Navigation
-
-    data object ContinueFromCurrency : Navigation
-
-    data object ContinueFromLegal : Navigation
-
-    data object FinishNotificationPriming : Navigation
+    data object CompleteProfile : Navigation
 
     data object GoBack : Navigation
 }
@@ -46,17 +35,37 @@ enum class RegistrationStep {
     Email,
     Otp,
     Password,
-    Identity,
-    City,
-    Currency,
-    Legal,
-    Observability,
-    NotificationPriming,
+    Profile,
     Completed,
 }
 
+enum class RegistrationMethod {
+    Email,
+    Federated,
+}
+
+enum class RegistrationRequirementsStatus {
+    Idle,
+    Loading,
+    Ready,
+    Failed,
+}
+
+data class RegistrationStartContext(
+    val suggestedCityId: String? = null,
+)
+
+data class RegistrationProgress(
+    val current: Int,
+    val total: Int,
+)
+
 data class RegistrationUiState(
     val step: RegistrationStep = RegistrationStep.Email,
+    val method: RegistrationMethod? = null,
+    val startContext: RegistrationStartContext = RegistrationStartContext(),
+    val requirementsStatus: RegistrationRequirementsStatus = RegistrationRequirementsStatus.Idle,
+    val requirementsErrorMessage: String? = null,
     val email: String = "",
     val firstName: String = "",
     val lastName: String = "",
@@ -69,18 +78,50 @@ data class RegistrationUiState(
     val termsAccepted: Boolean = false,
     val privacyAccepted: Boolean = false,
     val ugcAccepted: Boolean = false,
-    val observabilityConsent: ObservabilityConsent = ObservabilityConsent(),
     val currentSession: AuthSession? = null,
     val resendAvailableAtEpochMilliseconds: Long? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val noticeMessage: String? = null,
 ) {
-    val isNotificationPriming: Boolean
-        get() = step == RegistrationStep.NotificationPriming
+    val progress: RegistrationProgress?
+        get() = when (step) {
+            RegistrationStep.Email -> null
+            RegistrationStep.Otp -> RegistrationProgress(current = 2, total = EMAIL_REGISTRATION_STEP_COUNT)
+            RegistrationStep.Password -> RegistrationProgress(current = 3, total = EMAIL_REGISTRATION_STEP_COUNT)
+            RegistrationStep.Profile -> when (method) {
+                RegistrationMethod.Email -> RegistrationProgress(
+                    current = EMAIL_REGISTRATION_STEP_COUNT,
+                    total = EMAIL_REGISTRATION_STEP_COUNT,
+                )
+                RegistrationMethod.Federated -> RegistrationProgress(current = 1, total = 1)
+                null -> null
+            }
+            RegistrationStep.Completed -> null
+        }
+
+    val requirementsReady: Boolean
+        get() = requirementsStatus == RegistrationRequirementsStatus.Ready &&
+            cities.isNotEmpty() &&
+            termsDocument != null &&
+            privacyDocument != null &&
+            ugcDocument != null
 
     fun canResendOtp(nowEpochMilliseconds: Long): Boolean =
         resendAvailableAtEpochMilliseconds?.let { availableAt -> nowEpochMilliseconds >= availableAt } ?: true
 }
 
-fun initialRegistrationUiState(): RegistrationUiState = RegistrationUiState()
+fun initialRegistrationUiState(context: RegistrationStartContext = RegistrationStartContext()): RegistrationUiState =
+    RegistrationUiState(startContext = context)
+
+fun RegistrationUiState.mergeRequirementsFrom(source: RegistrationUiState): RegistrationUiState = copy(
+    requirementsStatus = source.requirementsStatus,
+    requirementsErrorMessage = source.requirementsErrorMessage,
+    cities = source.cities,
+    selectedCityId = selectedCityId ?: source.selectedCityId,
+    termsDocument = source.termsDocument,
+    privacyDocument = source.privacyDocument,
+    ugcDocument = source.ugcDocument,
+)
+
+private const val EMAIL_REGISTRATION_STEP_COUNT = 4

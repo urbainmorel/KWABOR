@@ -3,18 +3,18 @@ package com.kwabor.shared.app
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.LegalDocumentType
-import com.kwabor.shared.domain.catalog.GeoPoint
-import com.kwabor.shared.domain.catalog.isWithinBeninBounds
-import com.kwabor.shared.domain.catalog.nearestCity
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
-import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.RegistrationIntent
+import com.kwabor.shared.presentation.auth.RegistrationMethod
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
+import com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus
+import com.kwabor.shared.presentation.auth.RegistrationStartContext
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.RegistrationUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
+import com.kwabor.shared.presentation.auth.mergeRequirementsFrom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -35,41 +35,19 @@ data class IosRegistrationSelectCityIntent(val cityId: String) : IosRegistration
 
 data class IosRegistrationSelectCurrencyIntent(val currency: KwaborCurrency) : IosRegistrationFieldIntent
 
-data class IosRegistrationUpdateObservabilityConsentIntent(
-    val consent: ObservabilityConsent,
-) : IosRegistrationFieldIntent
-
-data class IosRegistrationSelectNearestCityIntent(
-    val latitude: Double,
-    val longitude: Double,
-) : IosRegistrationIntent
-
 sealed interface IosRegistrationAsyncIntent : IosRegistrationIntent
 
 data object IosRegistrationRequestOtpIntent : IosRegistrationAsyncIntent
 
 class IosRegistrationVerifyOtpIntent(val otpCode: String) : IosRegistrationAsyncIntent
 
-class IosRegistrationSetInitialPasswordIntent(
-    val password: String,
-    val confirmation: String,
-) : IosRegistrationAsyncIntent
+class IosRegistrationSetInitialPasswordIntent(val password: String) : IosRegistrationAsyncIntent
 
 data object IosRegistrationLoadRequirementsIntent : IosRegistrationAsyncIntent
 
-data object IosRegistrationCompleteOnboardingIntent : IosRegistrationAsyncIntent
+data object IosRegistrationCompleteProfileIntent : IosRegistrationAsyncIntent
 
 sealed interface IosRegistrationNavigationIntent : IosRegistrationIntent
-
-data object IosRegistrationContinueFromIdentityIntent : IosRegistrationNavigationIntent
-
-data object IosRegistrationContinueFromCityIntent : IosRegistrationNavigationIntent
-
-data object IosRegistrationContinueFromCurrencyIntent : IosRegistrationNavigationIntent
-
-data object IosRegistrationContinueFromLegalIntent : IosRegistrationNavigationIntent
-
-data object IosRegistrationFinishNotificationPrimingIntent : IosRegistrationNavigationIntent
 
 data object IosRegistrationGoBackIntent : IosRegistrationNavigationIntent
 
@@ -97,13 +75,16 @@ class IosRegistrationController internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + dispatcherProvider.main)
     private var observer: ((RegistrationUiState) -> Unit)? = null
     private var operationJob: Job? = null
+    private var requirementsJob: Job? = null
     private var state = initialRegistrationUiState()
         set(value) {
             field = value
             observer?.invoke(value)
         }
 
-    val legalAcceptance = IosLegalAcceptanceController(::updateLegalAcceptance)
+    val legalAcceptance = IosLegalAcceptanceController { type, accepted ->
+        reduce(RegistrationIntent.UpdateLegalAcceptance(type, accepted))
+    }
 
     val isConfigured: Boolean get() = presenter != null
 
@@ -113,41 +94,65 @@ class IosRegistrationController internal constructor(
     }
 
     fun resumeIncompleteSession(session: AuthSession?) {
-        resumeIncompleteSession(session = session, resumesAtIdentity = false)
+        resumeIncompleteSession(session = session, resumesAtProfile = false)
     }
 
-    fun resumeIncompleteSocialSession(session: AuthSession?, suggestedFirstName: String?, suggestedLastName: String?) {
+    fun resumeIncompleteSocialSession(
+        session: AuthSession?,
+        suggestedFirstName: String?,
+        suggestedLastName: String?,
+        suggestedCityId: String?,
+    ) {
         resumeIncompleteSession(
             session = session,
-            resumesAtIdentity = true,
+            resumesAtProfile = true,
             suggestedFirstName = suggestedFirstName,
             suggestedLastName = suggestedLastName,
+            suggestedCityId = suggestedCityId,
         )
     }
 
     private fun resumeIncompleteSession(
         session: AuthSession?,
-        resumesAtIdentity: Boolean,
+        resumesAtProfile: Boolean,
         suggestedFirstName: String? = null,
         suggestedLastName: String? = null,
+        suggestedCityId: String? = null,
     ) {
         if (session?.accountSetupStatus != AccountSetupStatus.OnboardingRequired) return
         val isSameSessionInProgress = state.currentSession?.userId == session.userId &&
             state.step != RegistrationStep.Email
-        if (isSameSessionInProgress && (!resumesAtIdentity || state.step != RegistrationStep.Password)) return
+        if (isSameSessionInProgress && (!resumesAtProfile || state.step != RegistrationStep.Password)) return
         operationJob?.cancel()
-        state = initialRegistrationUiState().copy(
-            step = if (resumesAtIdentity) RegistrationStep.Identity else RegistrationStep.Password,
+        requirementsJob?.cancel()
+        state = initialRegistrationUiState(RegistrationStartContext(suggestedCityId)).copy(
+            step = if (resumesAtProfile) RegistrationStep.Profile else RegistrationStep.Password,
+            method = if (resumesAtProfile) RegistrationMethod.Federated else RegistrationMethod.Email,
             email = session.email.orEmpty(),
             firstName = suggestedFirstName ?: session.suggestedFirstName.orEmpty(),
             lastName = suggestedLastName ?: session.suggestedLastName.orEmpty(),
             currentSession = session,
         )
+        dispatchAsync(IosRegistrationLoadRequirementsIntent)
+    }
+
+    fun prepare(suggestedCityId: String?) {
+        if (state.currentSession != null || state.step != RegistrationStep.Email) return
+        if (
+            state.requirementsStatus == RegistrationRequirementsStatus.Loading ||
+            state.requirementsStatus == RegistrationRequirementsStatus.Ready
+        ) {
+            return
+        }
+        state = state.copy(startContext = RegistrationStartContext(suggestedCityId))
+        dispatchAsync(IosRegistrationLoadRequirementsIntent)
     }
 
     fun reset() {
         operationJob?.cancel()
         operationJob = null
+        requirementsJob?.cancel()
+        requirementsJob = null
         state = initialRegistrationUiState()
     }
 
@@ -155,7 +160,6 @@ class IosRegistrationController internal constructor(
         when (intent) {
             is IosRegistrationFieldIntent -> reduce(intent.toSharedIntent())
             is IosRegistrationNavigationIntent -> reduce(intent.toSharedIntent())
-            is IosRegistrationSelectNearestCityIntent -> selectNearestCity(intent)
             is IosRegistrationAsyncIntent -> dispatchAsync(intent)
         }
     }
@@ -169,53 +173,38 @@ class IosRegistrationController internal constructor(
         presenter?.reducer?.reduce(currentState, intent, strings) ?: currentState
     }
 
-    private fun updateLegalAcceptance(type: LegalDocumentType, accepted: Boolean) {
-        reduce(RegistrationIntent.UpdateLegalAcceptance(type, accepted))
-    }
-
-    private fun selectNearestCity(intent: IosRegistrationSelectNearestCityIntent) = updateState { currentState ->
-        val location = GeoPoint(latitude = intent.latitude, longitude = intent.longitude)
-        if (!location.isWithinBeninBounds) {
-            return@updateState currentState.copy(errorMessage = strings.registrationLocationOutsideBenin)
+    private fun dispatchAsync(intent: IosRegistrationAsyncIntent) {
+        if (intent == IosRegistrationLoadRequirementsIntent) {
+            launchRequirementsOperation()
+            return
         }
-        val city = nearestCity(currentState.cities, location)
-            ?: return@updateState currentState.copy(errorMessage = strings.registrationLocationUnavailable)
-        presenter?.reducer?.reduce(
-            state = currentState,
-            intent = RegistrationIntent.SelectCity(city.id),
-            strings = strings,
-        ) ?: currentState
-    }
-
-    private fun dispatchAsync(intent: IosRegistrationAsyncIntent) = launchOperation { currentPresenter, currentState ->
-        when (intent) {
-            IosRegistrationRequestOtpIntent -> currentPresenter.requestOtp(currentState, strings)
-            is IosRegistrationVerifyOtpIntent -> currentPresenter.verifyOtp(currentState, intent.otpCode, strings)
-            is IosRegistrationSetInitialPasswordIntent -> currentPresenter.setPasswordAndLoadRequirements(
-                state = currentState,
-                password = intent.password,
-                confirmation = intent.confirmation,
-            )
-            IosRegistrationLoadRequirementsIntent -> currentPresenter.loadRequirements(currentState, strings)
-            IosRegistrationCompleteOnboardingIntent -> currentPresenter.completeOnboarding(currentState, strings)
+        launchOperation { currentPresenter, currentState ->
+            when (intent) {
+                IosRegistrationRequestOtpIntent -> currentPresenter.requestOtp(currentState, strings)
+                is IosRegistrationVerifyOtpIntent -> currentPresenter.verifyOtp(currentState, intent.otpCode, strings)
+                is IosRegistrationSetInitialPasswordIntent -> currentPresenter.setInitialPassword(
+                    state = currentState,
+                    password = intent.password,
+                    strings = strings,
+                )
+                IosRegistrationLoadRequirementsIntent -> currentState
+                IosRegistrationCompleteProfileIntent -> currentPresenter.completeValidatedProfile(currentState)
+            }
         }
     }
 
-    private suspend fun RegistrationPresenter.setPasswordAndLoadRequirements(
+    private suspend fun RegistrationPresenter.completeValidatedProfile(
         state: RegistrationUiState,
-        password: String,
-        confirmation: String,
     ): RegistrationUiState {
-        val passwordState = setInitialPassword(
+        val validatedState = reducer.reduce(
             state = state,
-            password = password,
-            confirmation = confirmation,
+            intent = RegistrationIntent.CompleteProfile,
             strings = strings,
         )
-        return if (passwordState.step == RegistrationStep.Identity && passwordState.errorMessage == null) {
-            loadRequirements(passwordState, strings)
+        return if (validatedState.errorMessage == null) {
+            completeOnboarding(validatedState, strings)
         } else {
-            passwordState
+            validatedState
         }
     }
 
@@ -231,6 +220,20 @@ class IosRegistrationController internal constructor(
         }
     }
 
+    private fun launchRequirementsOperation() {
+        val currentPresenter = presenter ?: return
+        if (state.requirementsStatus == RegistrationRequirementsStatus.Loading) return
+        requirementsJob?.cancel()
+        state = state.copy(
+            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsErrorMessage = null,
+        )
+        requirementsJob = scope.launch {
+            val loadedRequirements = currentPresenter.loadRequirements(state, strings)
+            state = state.mergeRequirementsFrom(loadedRequirements)
+        }
+    }
+
     private fun updateState(transform: (RegistrationUiState) -> RegistrationUiState) {
         if (state.isLoading) return
         state = transform(state)
@@ -243,14 +246,8 @@ private fun IosRegistrationFieldIntent.toSharedIntent(): RegistrationIntent.Fiel
     is IosRegistrationUpdateLastNameIntent -> RegistrationIntent.UpdateLastName(lastName)
     is IosRegistrationSelectCityIntent -> RegistrationIntent.SelectCity(cityId)
     is IosRegistrationSelectCurrencyIntent -> RegistrationIntent.SelectCurrency(currency)
-    is IosRegistrationUpdateObservabilityConsentIntent -> RegistrationIntent.UpdateObservabilityConsent(consent)
 }
 
 private fun IosRegistrationNavigationIntent.toSharedIntent(): RegistrationIntent.Navigation = when (this) {
-    IosRegistrationContinueFromIdentityIntent -> RegistrationIntent.ContinueFromIdentity
-    IosRegistrationContinueFromCityIntent -> RegistrationIntent.ContinueFromCity
-    IosRegistrationContinueFromCurrencyIntent -> RegistrationIntent.ContinueFromCurrency
-    IosRegistrationContinueFromLegalIntent -> RegistrationIntent.ContinueFromLegal
-    IosRegistrationFinishNotificationPrimingIntent -> RegistrationIntent.FinishNotificationPriming
     IosRegistrationGoBackIntent -> RegistrationIntent.GoBack
 }

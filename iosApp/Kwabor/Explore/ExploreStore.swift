@@ -2,10 +2,22 @@ import Combine
 import Foundation
 import Shared
 
+enum ExploreProtectedAction: Equatable {
+    case like
+    case favorite
+}
+
+struct ExploreAuthenticationRequest: Identifiable {
+    let id: Int
+    let listingID: String
+    let action: ExploreProtectedAction
+    let suggestedCityID: String?
+}
+
 @MainActor
 final class ExploreStore: ObservableObject {
     @Published private(set) var state: ExploreUiState
-    @Published private(set) var authenticationRequestRevision = 0
+    @Published private(set) var authenticationRequest: ExploreAuthenticationRequest?
     @Published private(set) var announcementRevision = 0
 
     let strings: KwaborStrings
@@ -18,6 +30,7 @@ final class ExploreStore: ObservableObject {
     private var lastAnnouncement: String?
     private var lastViewerID: String?
     private var hasAppliedViewerContext = false
+    private var authenticationRequestRevision = 0
 
     private(set) var latestAnnouncement: String?
 
@@ -126,6 +139,11 @@ final class ExploreStore: ObservableObject {
         controller.interactionActions.toggleFavorite(listingId: listingID)
     }
 
+    func clearPendingAuthentication() {
+        authenticationRequest = nil
+        controller.interactionActions.updateViewerContext(viewerId: nil)
+    }
+
     private func observeController() {
         controller.observe(
             stateObserver: { [weak self] updatedState in
@@ -150,15 +168,36 @@ final class ExploreStore: ObservableObject {
             paginationGuard.reset()
         }
         state = updatedState
+        publishAuthenticationRequestIfNeeded(updatedState.pendingAuthInteraction)
         publishAnnouncementIfNeeded(previousState: previousState, updatedState: updatedState)
     }
 
     private func accept(_ effect: IosExploreEffect) {
         if effect.requiresAuthentication {
-            authenticationRequestRevision += 1
+            publishAuthenticationRequestIfNeeded(state.pendingAuthInteraction)
         } else if effect.requestsLocation {
             resolveLocation()
         }
+    }
+
+    private func publishAuthenticationRequestIfNeeded(_ pending: PendingExploreAuthInteraction?) {
+        guard let pending else {
+            authenticationRequest = nil
+            return
+        }
+        let action: ExploreProtectedAction = pending.kind == .like ? .like : .favorite
+        if let current = authenticationRequest,
+           current.listingID == pending.listingId,
+           current.action == action {
+            return
+        }
+        authenticationRequestRevision += 1
+        authenticationRequest = ExploreAuthenticationRequest(
+            id: authenticationRequestRevision,
+            listingID: pending.listingId,
+            action: action,
+            suggestedCityID: pending.suggestedCityId
+        )
     }
 
     private func resolveLocation() {

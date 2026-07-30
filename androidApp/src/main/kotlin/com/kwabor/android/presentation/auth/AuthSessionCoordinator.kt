@@ -4,9 +4,13 @@ import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.presentation.auth.RegistrationIntent
+import com.kwabor.shared.presentation.auth.RegistrationMethod
+import com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus
+import com.kwabor.shared.presentation.auth.RegistrationStartContext
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
+import com.kwabor.shared.presentation.auth.mergeRequirementsFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -20,7 +24,7 @@ internal class AuthSessionCoordinator(
     fun handle(intent: AuthIntent.Journey) {
         if (signOutCoordinator.handle(intent)) return
         when (intent) {
-            AuthIntent.OpenSoftWall -> openSoftWall()
+            is AuthIntent.OpenSoftWall -> openSoftWall(intent.context)
             is AuthIntent.OpenRegistration -> openJourney(AuthSurface.Registration, intent.entryPoint)
             is AuthIntent.OpenSignIn -> openJourney(AuthSurface.SignIn, intent.entryPoint)
             AuthIntent.Dismiss -> cancelJourney()
@@ -44,16 +48,22 @@ internal class AuthSessionCoordinator(
         sessionRestorer.retry()
     }
 
-    private fun openSoftWall() {
+    private fun openSoftWall(context: AuthSoftWallContext) {
         runtime.platformState.value = runtime.platformState.value.copy(
             surface = AuthSurface.SoftWall,
             entryPoint = AuthEntryPoint.SoftWall,
+            softWallContext = context,
         )
     }
 
     private fun openJourney(surface: AuthSurface, entryPoint: AuthEntryPoint) {
         if (runtime.registrationState.value.currentSession == null) {
-            runtime.registrationState.value = initialRegistrationUiState()
+            val suggestedCityId = runtime.platformState.value.softWallContext
+                ?.takeIf { entryPoint == AuthEntryPoint.SoftWall }
+                ?.suggestedCityId
+            runtime.registrationState.value = initialRegistrationUiState(
+                RegistrationStartContext(suggestedCityId = suggestedCityId),
+            )
         }
         if (surface == AuthSurface.SignIn) {
             runtime.accessState.value = AuthAccessUiState()
@@ -61,8 +71,8 @@ internal class AuthSessionCoordinator(
         runtime.platformState.value = runtime.platformState.value.copy(
             surface = surface,
             entryPoint = entryPoint,
-            locationStatus = RegistrationLocationStatus.Idle,
         )
+        if (surface == AuthSurface.Registration) preloadRegistrationRequirements()
     }
 
     private fun cancelJourney() {
@@ -186,18 +196,34 @@ internal class AuthSessionCoordinator(
 
     fun routeAuthenticatedSession(session: AuthSession) {
         runtime.registrationState.value = initialRegistrationUiState().copy(currentSession = session)
-        if (dependencies.notificationPrimingStore.isResolved()) {
-            runtime.completeAuthenticatedJourney()
-            return
-        }
-        runtime.registrationState.value = runtime.registrationState.value.copy(
-            step = RegistrationStep.NotificationPriming,
-        )
-        runtime.platformState.value = runtime.platformState.value.copy(surface = AuthSurface.Registration)
+        runtime.completeAuthenticatedJourney()
     }
 
     private fun hasInterruptedRegistration(): Boolean =
         dependencies.authJourneyStore.read() != InterruptedAuthJourney.None
+
+    private fun preloadRegistrationRequirements() {
+        val status = runtime.registrationState.value.requirementsStatus
+        if (
+            status == RegistrationRequirementsStatus.Loading ||
+            status == RegistrationRequirementsStatus.Ready ||
+            runtime.registrationRequirementsJob?.isActive == true
+        ) {
+            return
+        }
+        runtime.registrationRequirementsJob?.cancel()
+        runtime.registrationState.value = runtime.registrationState.value.copy(
+            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsErrorMessage = null,
+        )
+        runtime.registrationRequirementsJob = runtime.coroutineScope.launch {
+            val loadedRequirements = runtime.registrationPresenter.loadRequirements(
+                runtime.registrationState.value,
+                runtime.strings,
+            )
+            runtime.registrationState.value = runtime.registrationState.value.mergeRequirementsFrom(loadedRequirements)
+        }
+    }
 }
 
 private class AuthSessionRestorer(
@@ -211,6 +237,7 @@ private class AuthSessionRestorer(
         val interruptedJourney = dependencies.authJourneyStore.read()
         runtime.registrationState.value = initialRegistrationUiState().copy(
             step = interruptedJourney.resumeRegistrationStep(),
+            method = interruptedJourney.resumeRegistrationMethod(),
             email = session.email.orEmpty(),
             firstName = session.suggestedFirstName.orEmpty(),
             lastName = session.suggestedLastName.orEmpty(),
@@ -221,15 +248,6 @@ private class AuthSessionRestorer(
             runtime.registrationState.value,
             runtime.strings,
         )
-    }
-
-    private val showNotificationPriming: (AuthSession) -> Unit = { session ->
-        runtime.registrationState.value = initialRegistrationUiState().copy(
-            step = RegistrationStep.NotificationPriming,
-            email = session.email.orEmpty(),
-            currentSession = session,
-        )
-        runtime.platformState.value = AuthPlatformUiState(surface = AuthSurface.Registration)
     }
 
     fun load(onPasswordRecoverySession: suspend (AuthSession) -> Unit) {
@@ -329,17 +347,22 @@ private class AuthSessionRestorer(
                 onExistingAccount(session.email.orEmpty())
             }
             session?.accountSetupStatus == AccountSetupStatus.OnboardingRequired -> resumeIncompleteSession(session)
-            session?.accountSetupStatus == AccountSetupStatus.Complete &&
-                !dependencies.notificationPrimingStore.isResolved() -> showNotificationPriming(session)
         }
     }
 }
 
 private fun InterruptedAuthJourney.resumeRegistrationStep(): RegistrationStep = when (this) {
-    InterruptedAuthJourney.SocialRegistration -> RegistrationStep.Identity
+    InterruptedAuthJourney.SocialRegistration -> RegistrationStep.Profile
     InterruptedAuthJourney.None,
     InterruptedAuthJourney.Registration,
     -> RegistrationStep.Password
+}
+
+private fun InterruptedAuthJourney.resumeRegistrationMethod(): RegistrationMethod = when (this) {
+    InterruptedAuthJourney.SocialRegistration -> RegistrationMethod.Federated
+    InterruptedAuthJourney.None,
+    InterruptedAuthJourney.Registration,
+    -> RegistrationMethod.Email
 }
 
 private class AuthSignOutCoordinator(
@@ -352,7 +375,7 @@ private class AuthSignOutCoordinator(
         AuthIntent.ConfirmSignOut -> true.also { confirm() }
         AuthIntent.SignOutNavigationHandled -> true.also { completeNavigation() }
         AuthIntent.RetrySessionRestore -> false
-        AuthIntent.OpenSoftWall,
+        is AuthIntent.OpenSoftWall,
         is AuthIntent.OpenRegistration,
         is AuthIntent.OpenSignIn,
         AuthIntent.Dismiss,

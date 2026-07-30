@@ -106,16 +106,37 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun guestSelectionConsumesBundledIntroBeforeShowingDisclosure() = runTest {
+        val store = FakeFirstLaunchStore()
+        val viewModel = createViewModel(store = store, events = mutableListOf(), scope = this)
+
+        viewModel.onIntent(OnboardingIntent.GuestSelected)
+
+        assertTrue(store.bundledIntroSeen)
+        assertFalse(viewModel.state.value.isIntroRequired)
+        assertTrue(viewModel.state.value.isGuestDisclosureVisible)
+        assertFalse(viewModel.state.value.isGuestSession)
+    }
+
+    @Test
     fun signupAndSigninEmitDistinctEffects() = runTest {
-        val signUpViewModel = createViewModel(FakeFirstLaunchStore(), mutableListOf(), this)
+        val signUpStore = FakeFirstLaunchStore()
+        val signUpViewModel = createViewModel(
+            store = signUpStore,
+            events = mutableListOf(),
+            scope = this,
+        )
         signUpViewModel.onIntent(OnboardingIntent.SignUpSelected)
 
         assertEquals(OnboardingEffect.OpenRegistration, signUpViewModel.effects.first())
+        assertTrue(signUpStore.bundledIntroSeen)
 
-        val signInViewModel = createViewModel(FakeFirstLaunchStore(), mutableListOf(), this)
+        val signInStore = FakeFirstLaunchStore()
+        val signInViewModel = createViewModel(signInStore, mutableListOf(), this)
         signInViewModel.onIntent(OnboardingIntent.SignInSelected)
 
         assertEquals(OnboardingEffect.OpenSignIn, signInViewModel.effects.first())
+        assertTrue(signInStore.bundledIntroSeen)
     }
 
     private fun createViewModel(

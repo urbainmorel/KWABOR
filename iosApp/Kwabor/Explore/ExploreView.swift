@@ -6,7 +6,7 @@ struct ExploreView: View {
     @ObservedObject var store: ExploreStore
     @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let onListingOpen: (String) -> Void
-    let onAuthenticationRequired: () -> Void
+    let onAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -26,10 +26,9 @@ struct ExploreView: View {
         .sheet(isPresented: citySelectorBinding) {
             ExploreCitySelector(store: store)
         }
-        .onChange(of: store.authenticationRequestRevision) { _, revision in
-            if revision > 0 {
-                onAuthenticationRequired()
-            }
+        .onChange(of: store.authenticationRequest?.id) { _, _ in
+            guard let request = store.authenticationRequest else { return }
+            onAuthenticationRequired(request)
         }
         .onChange(of: store.announcementRevision) { _, _ in
             guard let announcement = store.latestAnnouncement else { return }

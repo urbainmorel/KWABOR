@@ -68,9 +68,18 @@ internal class OnboardingViewModel(
             OnboardingIntent.IntroCompleted -> completeIntro(skipped = false)
             OnboardingIntent.IntroSkipped -> completeIntro(skipped = true)
             OnboardingIntent.IntroPlaybackFailed -> requireStaticIntroFallback()
-            OnboardingIntent.SignUpSelected -> openAuthentication(OnboardingEffect.OpenRegistration)
-            OnboardingIntent.SignInSelected -> openAuthentication(OnboardingEffect.OpenSignIn)
-            OnboardingIntent.GuestSelected -> updateState { it.copy(isGuestDisclosureVisible = true) }
+            OnboardingIntent.SignUpSelected -> {
+                completeIntro(skipped = false)
+                openAuthentication(OnboardingEffect.OpenRegistration)
+            }
+            OnboardingIntent.SignInSelected -> {
+                completeIntro(skipped = false)
+                openAuthentication(OnboardingEffect.OpenSignIn)
+            }
+            OnboardingIntent.GuestSelected -> {
+                completeIntro(skipped = false)
+                updateState { it.copy(isGuestDisclosureVisible = true) }
+            }
             OnboardingIntent.GuestConfirmed -> updateState {
                 it.copy(isGuestDisclosureVisible = false, isGuestSession = true)
             }

@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 
 enum class IosExploreEffect {
     RequireAuthentication,
+    ProtectedActionReplayed,
     RequestLocation,
     ;
 
@@ -27,6 +28,9 @@ enum class IosExploreEffect {
 
     val requestsLocation: Boolean
         get() = this == RequestLocation
+
+    val replaysProtectedAction: Boolean
+        get() = this == ProtectedActionReplayed
 }
 
 class IosExploreFeedActions internal constructor(
@@ -261,6 +265,7 @@ private fun unavailableState(strings: KwaborStrings): ExploreUiState = initialEx
 )
 
 private fun ExploreEffect.toIosEffect(): IosExploreEffect = when (this) {
-    ExploreEffect.AuthenticationRequired -> IosExploreEffect.RequireAuthentication
+    is ExploreEffect.AuthenticationRequired -> IosExploreEffect.RequireAuthentication
+    is ExploreEffect.ProtectedActionReplayed -> IosExploreEffect.ProtectedActionReplayed
     ExploreEffect.RequestLocation -> IosExploreEffect.RequestLocation
 }

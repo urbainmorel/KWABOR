@@ -379,6 +379,7 @@ private fun ListingSummary.toExploreListingItem(
     sponsored = isSponsoredPlacement == true,
     liked = interaction?.likedByViewer ?: false,
     favorited = interaction?.favoritedByViewer ?: false,
+    cityId = cityId,
 )
 
 private fun ExploreUiState.applyInteraction(
@@ -415,6 +416,7 @@ private fun ExploreUiState.handleInteractionFailure(
         pendingAuthInteraction = PendingExploreAuthInteraction(
             listingId = failure.listingId,
             kind = failure.kind,
+            suggestedCityId = listings.firstOrNull { listing -> listing.id == failure.listingId }?.cityId,
         ),
     )
     is DomainError.NetworkUnavailable -> queueOfflineInteraction(

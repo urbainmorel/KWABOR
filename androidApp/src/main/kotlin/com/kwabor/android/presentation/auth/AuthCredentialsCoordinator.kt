@@ -3,8 +3,12 @@ package com.kwabor.android.presentation.auth
 import com.kwabor.android.auth.AuthJourneyStore
 import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.shared.domain.auth.AccountSetupStatus
+import com.kwabor.shared.domain.observability.AnalyticsAuthMethod
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.presentation.auth.RegistrationIntent
-import com.kwabor.shared.presentation.auth.RegistrationStep
+import com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus
+import com.kwabor.shared.presentation.auth.mergeRequirementsFrom
 import kotlinx.coroutines.launch
 
 internal class AuthCredentialsCoordinator(
@@ -12,6 +16,7 @@ internal class AuthCredentialsCoordinator(
     private val countdown: OtpCountdownCoordinator,
     private val authJourneyStore: AuthJourneyStore,
     private val sessionCoordinator: AuthSessionCoordinator,
+    private val track: (AnalyticsEvent) -> Unit,
 ) {
     fun handle(intent: AuthIntent.Credentials) {
         when (intent) {
@@ -20,8 +25,8 @@ internal class AuthCredentialsCoordinator(
             AuthIntent.ResendOtp,
             -> requestOtp()
             is AuthIntent.SubmitOtp -> verifyOtp(intent.code)
-            is AuthIntent.SubmitPassword -> setInitialPassword(intent.password, intent.confirmation)
-            AuthIntent.RetryRequirements -> loadRequirements()
+            is AuthIntent.SubmitPassword -> setInitialPassword(intent.password)
+            AuthIntent.RetryRequirements -> preloadRequirements()
         }
     }
 
@@ -35,8 +40,18 @@ internal class AuthCredentialsCoordinator(
                 state,
                 runtime.strings,
             )
-            runtime.registrationState.value = updatedState
+            runtime.registrationState.value = updatedState.mergeRequirementsFrom(runtime.registrationState.value)
             countdown.start(updatedState.resendAvailableAtEpochMilliseconds)
+            if (state.step == com.kwabor.shared.presentation.auth.RegistrationStep.Email &&
+                updatedState.step == com.kwabor.shared.presentation.auth.RegistrationStep.Otp
+            ) {
+                track(
+                    AnalyticsEvent(
+                        name = AnalyticsEventName.AuthMethod,
+                        authMethod = AnalyticsAuthMethod.Email,
+                    ),
+                )
+            }
         }
     }
 
@@ -57,12 +72,13 @@ internal class AuthCredentialsCoordinator(
                 code,
                 runtime.strings,
             )
-            runtime.registrationState.value = updatedState
+            runtime.registrationState.value = updatedState.mergeRequirementsFrom(runtime.registrationState.value)
             val session = updatedState.currentSession
             if (session == null) {
                 authJourneyStore.clear()
                 return@launch
             }
+            track(AnalyticsEvent(name = AnalyticsEventName.RegistrationOtpValidated))
             if (session.accountSetupStatus == AccountSetupStatus.Complete) {
                 sessionCoordinator.redirectExistingAccountToSignIn(updatedState.email)
                 return@launch
@@ -72,32 +88,41 @@ internal class AuthCredentialsCoordinator(
         }
     }
 
-    private fun setInitialPassword(password: String, confirmation: String) {
+    private fun setInitialPassword(password: String) {
         val state = runtime.registrationState.value
         if (state.isLoading) return
         runtime.registrationState.value = state.copy(isLoading = true, errorMessage = null, noticeMessage = null)
         runtime.operationJob?.cancel()
         runtime.operationJob = runtime.coroutineScope.launch {
-            var updatedState = runtime.registrationPresenter.setInitialPassword(
+            val updatedState = runtime.registrationPresenter.setInitialPassword(
                 state = state,
                 password = password,
-                confirmation = confirmation,
                 strings = runtime.strings,
             )
-            if (updatedState.step == RegistrationStep.Identity) {
-                updatedState = runtime.registrationPresenter.loadRequirements(updatedState, runtime.strings)
-            }
-            runtime.registrationState.value = updatedState
+            runtime.registrationState.value = updatedState.mergeRequirementsFrom(runtime.registrationState.value)
         }
     }
 
-    private fun loadRequirements() {
-        runtime.operationJob?.cancel()
-        runtime.operationJob = runtime.coroutineScope.launch {
-            runtime.registrationState.value = runtime.registrationPresenter.loadRequirements(
+    fun preloadRequirements() {
+        val status = runtime.registrationState.value.requirementsStatus
+        if (
+            status == RegistrationRequirementsStatus.Loading ||
+            status == RegistrationRequirementsStatus.Ready ||
+            runtime.registrationRequirementsJob?.isActive == true
+        ) {
+            return
+        }
+        runtime.registrationRequirementsJob?.cancel()
+        runtime.registrationState.value = runtime.registrationState.value.copy(
+            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsErrorMessage = null,
+        )
+        runtime.registrationRequirementsJob = runtime.coroutineScope.launch {
+            val loadedRequirements = runtime.registrationPresenter.loadRequirements(
                 runtime.registrationState.value,
                 runtime.strings,
             )
+            runtime.registrationState.value = runtime.registrationState.value.mergeRequirementsFrom(loadedRequirements)
         }
     }
 }

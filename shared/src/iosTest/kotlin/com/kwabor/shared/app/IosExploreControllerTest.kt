@@ -3,6 +3,7 @@ package com.kwabor.shared.app
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExploreEffect
+import com.kwabor.shared.presentation.explore.ExploreInteractionKind
 import com.kwabor.shared.presentation.explore.ExploreIntent
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
@@ -143,15 +144,31 @@ class IosExploreControllerTest {
         )
         runCurrent()
 
-        runtime.publishEffect(ExploreEffect.AuthenticationRequired)
+        runtime.publishEffect(
+            ExploreEffect.AuthenticationRequired(
+                kind = ExploreInteractionKind.Favorite,
+                suggestedCityId = "cotonou",
+            ),
+        )
+        runtime.publishEffect(
+            ExploreEffect.ProtectedActionReplayed(
+                kind = ExploreInteractionKind.Favorite,
+                listingId = "listing-1",
+            ),
+        )
         runtime.publishEffect(ExploreEffect.RequestLocation)
         runCurrent()
 
         assertEquals(
-            listOf(IosExploreEffect.RequireAuthentication, IosExploreEffect.RequestLocation),
+            listOf(
+                IosExploreEffect.RequireAuthentication,
+                IosExploreEffect.ProtectedActionReplayed,
+                IosExploreEffect.RequestLocation,
+            ),
             observedEffects,
         )
         assertTrue(observedEffects.first().requiresAuthentication)
+        assertTrue(observedEffects[1].replaysProtectedAction)
         assertTrue(observedEffects.last().requestsLocation)
         controller.close()
     }

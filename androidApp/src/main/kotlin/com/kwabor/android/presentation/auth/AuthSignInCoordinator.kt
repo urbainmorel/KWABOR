@@ -4,6 +4,7 @@ import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.AuthSessionPurpose
+import com.kwabor.shared.presentation.auth.RegistrationMethod
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
@@ -110,7 +111,8 @@ internal class AuthSignInCoordinator(
 
     private suspend fun resumeIncompleteAccount(session: AuthSession) {
         var registrationState = initialRegistrationUiState().copy(
-            step = RegistrationStep.Identity,
+            step = RegistrationStep.Profile,
+            method = RegistrationMethod.Email,
             email = session.email.orEmpty(),
             currentSession = session,
         )

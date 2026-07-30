@@ -20,6 +20,7 @@ struct ContentView: View {
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let onProtectedDestinationSelected: () -> Void
+    let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
     let onAccountDeletionWillStart: () -> Bool
@@ -56,6 +57,7 @@ struct ContentView: View {
         isSigningOutAccount: Bool = false,
         accountSignOutErrorMessage: String? = nil,
         onProtectedDestinationSelected: @escaping () -> Void = {},
+        onExploreAuthenticationRequired: @escaping (ExploreAuthenticationRequest) -> Void = { _ in },
         onSignOut: @escaping () -> Void = {},
         onDismissSignOutError: @escaping () -> Void = {},
         onAccountDeletionWillStart: @escaping () -> Bool = { true },
@@ -87,6 +89,7 @@ struct ContentView: View {
         self.isSigningOutAccount = isSigningOutAccount
         self.accountSignOutErrorMessage = accountSignOutErrorMessage
         self.onProtectedDestinationSelected = onProtectedDestinationSelected
+        self.onExploreAuthenticationRequired = onExploreAuthenticationRequired
         self.onSignOut = onSignOut
         self.onDismissSignOutError = onDismissSignOutError
         self.onAccountDeletionWillStart = onAccountDeletionWillStart
@@ -122,6 +125,7 @@ struct ContentView: View {
                             isSigningOutAccount: isSigningOutAccount,
                             accountSignOutErrorMessage: accountSignOutErrorMessage,
                             onProtectedDestinationSelected: onProtectedDestinationSelected,
+                            onExploreAuthenticationRequired: onExploreAuthenticationRequired,
                             onListingOpen: catalogDetailStore.open,
                             onSignOut: onSignOut,
                             onDismissSignOutError: onDismissSignOutError,
@@ -253,6 +257,7 @@ private struct RootDestinationContent: View {
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let onProtectedDestinationSelected: () -> Void
+    let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onListingOpen: (String) -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
@@ -268,7 +273,7 @@ private struct RootDestinationContent: View {
                     store: exploreStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     onListingOpen: onListingOpen,
-                    onAuthenticationRequired: onProtectedDestinationSelected
+                    onAuthenticationRequired: onExploreAuthenticationRequired
                 )
                 .toolbar(.hidden, for: .navigationBar)
             } else if destination == .profile {

@@ -75,7 +75,7 @@ private fun PromoterActivationReady(
         value = password,
         onValueChange = { password = it },
         label = strings.registrationPassword,
-        enabled = !loading,
+        options = AuthPasswordFieldOptions(enabled = !loading),
     )
     Spacer(Modifier.height(KwaborSpacing.Md))
     AuthPrimaryButton(

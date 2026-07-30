@@ -43,6 +43,7 @@ data class ExploreListingItem(
     val sponsored: Boolean = false,
     val liked: Boolean = false,
     val favorited: Boolean = false,
+    val cityId: String? = null,
 )
 
 enum class ExploreInteractionKind {
@@ -60,6 +61,7 @@ data class QueuedExploreInteraction(
 data class PendingExploreAuthInteraction(
     val listingId: String,
     val kind: ExploreInteractionKind,
+    val suggestedCityId: String? = null,
 )
 
 data class ExploreUiState(

@@ -23,9 +23,9 @@ Toute observabilité optionnelle pilotée par Kwabor est désactivée au premier
 - aucun user ID Firebase, email, nom, téléphone, texte de recherche ou contenu libre n'est accepté par le contrat Analytics.
 
 Les trois préférences de consentement persistées sont indépendantes : mesure d'usage, diagnostics et configuration
-distante. L'écran d'inscription les raccorde dans `AUTH-003` au moment où l'utilisateur confirme ses
-choix, juste avant la finalisation atomique du compte. Paramètres → Confidentialité affiche ensuite
-les trois choix du compte sur Android et iOS et permet de les retirer séparément. Android coupe le
+distante. L'inscription ne demande plus de nouveau consentement et préserve les choix déjà enregistrés ;
+pour un nouveau compte, les trois valeurs restent à `false`. Paramètres → Confidentialité affiche
+les trois choix du compte sur Android et iOS et permet de les modifier ou de les retirer séparément. Android coupe le
 runtime avant ses écritures synchrones ; iOS conserve un enregistrement atomique dans le Keychain,
 avec une empreinte du propriétaire plutôt que son identifiant brut. Tant qu'un choix explicite n'a
 pas été validé, les valeurs restent toutes à `false`. L'absence temporaire de session suspend les
@@ -108,7 +108,8 @@ marqueurs Keychain survivants avant toute restauration Auth. L'ancien FID serveu
 désinstallée n'est plus adressable depuis le nouveau sandbox ; l'app ne crée donc pas un nouvel
 identifiant uniquement pour tenter de supprimer l'ancien. C'est l'unique chemin qui retire localement
 un marqueur FID sans appeler l'API : il s'exécute seulement avant toute configuration Firebase et
-refuse de courir si une suppression est déjà en vol.
+refuse de courir si une suppression est déjà en vol. Aucune permission ou collecte de remplacement
+n'est déclenchée par l'inscription avant l'accueil.
 
 ## Contrat Analytics
 
@@ -126,6 +127,8 @@ Les dimensions émises pour chaque événement sont :
 | `devise_affichage` | XOF, NGN, USD ou EUR |
 
 `auth_method` et `post_type` ne sont acceptés que par leurs événements respectifs et via des enums fermées.
+
+Le parcours simplifié peut émettre `auth_method`, `registration_otp_validated`, `registration_profile_succeeded`, `registration_profile_failed` et `protected_action_replayed`. Les adaptateurs natifs les filtrent avant envoi : si le consentement Analytics n'existe pas déjà, aucun événement ne quitte l'appareil. Aucun OTP, mot de passe, email, nom ou texte libre n'est attaché.
 
 ## Remote Config
 
@@ -207,12 +210,13 @@ Les erreurs non fatales acceptent seulement un `DiagnosticCode` fermé. Aucun me
 ## Déclarations stores à valider
 
 Le Privacy Manifest hôte déclare le nom, l'e-mail, l'identifiant utilisateur, la ville de profil et
-les interactions produit comme liés au compte, sans tracking. Les coordonnées ponctuelles utilisées
-pour proposer une ville restent sur l'appareil. Les likes/favoris servent la fonctionnalité et les
-événements d'usage servent Analytics après consentement. Les manifests réellement agrégés des SDK
-Firebase doivent encore être inventoriés dans l'archive Release et rapprochés du Privacy Report Xcode.
-Les formulaires App Store et Play Data safety doivent reprendre le comportement effectif Analytics,
-Crashlytics, Performance et Remote Config après consentement. Voir
+les interactions produit comme liés au compte, sans tracking. L'inscription ne collecte aucune
+coordonnée ; la localisation approximative demandée plus tard sur action explicite pour proposer une
+ville reste sur l'appareil. Les likes/favoris servent la fonctionnalité et les événements d'usage
+servent Analytics après consentement. Les manifests réellement agrégés des SDK Firebase doivent
+encore être inventoriés dans l'archive Release et rapprochés du Privacy Report Xcode. Les formulaires
+App Store et Play Data safety doivent reprendre le comportement effectif Analytics, Crashlytics,
+Performance et Remote Config après consentement. Voir
 [l'inventaire iOS](audits/2026-08-03-ios-privacy-inventory.md).
 
 Avant la release candidate, le propriétaire doit valider la politique de confidentialité, les libellés de consentement, la durée de conservation, la région Analytics, les réglages de partage Google et les réponses exactes des deux stores. La référence Firebase à réauditer à chaque montée de version est [Prepare for Apple's App Store data disclosure requirements](https://firebase.google.com/docs/ios/app-store-data-collection).

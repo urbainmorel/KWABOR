@@ -57,6 +57,7 @@ import com.kwabor.android.presentation.auth.AuthAccessUiState
 import com.kwabor.android.presentation.auth.isAccountDeletionConfirmationValid
 import com.kwabor.android.ui.screens.auth.AuthInlineMessage
 import com.kwabor.android.ui.screens.auth.AuthPasswordField
+import com.kwabor.android.ui.screens.auth.AuthPasswordFieldOptions
 import com.kwabor.android.ui.screens.auth.GoogleSignInButton
 import com.kwabor.shared.domain.auth.AuthenticationMethod
 import com.kwabor.shared.domain.observability.ObservabilityConsent
@@ -588,7 +589,7 @@ private fun AccountDeletionPasswordField(
         value = form.password,
         onValueChange = onPasswordChanged,
         label = strings.registrationPassword,
-        enabled = enabled,
+        options = AuthPasswordFieldOptions(enabled = enabled),
     )
 }
 

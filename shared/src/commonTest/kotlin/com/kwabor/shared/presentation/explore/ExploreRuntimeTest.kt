@@ -179,7 +179,9 @@ class ExploreRuntimeTest {
 
         runtime.effects.test {
             runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
-            assertIs<ExploreEffect.AuthenticationRequired>(awaitItem())
+            val effect = assertIs<ExploreEffect.AuthenticationRequired>(awaitItem())
+            assertEquals(ExploreInteractionKind.Favorite, effect.kind)
+            assertEquals("cotonou", effect.suggestedCityId)
             assertEquals(RUNTIME_LISTING_ID, runtime.state.value.pendingAuthInteraction?.listingId)
 
             runtime.dispatch(ExploreIntent.ViewerContextChanged(viewerId = null))
@@ -187,6 +189,58 @@ class ExploreRuntimeTest {
 
             assertNull(runtime.state.value.pendingAuthInteraction)
             assertNull(runtime.state.value.interactionMessage)
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun authenticatedTransitionReplaysPendingActionOnceAndPublishesOnlyItsSuccessfulReplay() = runTest {
+        val interactions = RuntimeInteractionRepository(requiresAuthentication = true)
+        val runtime = runtime(interactions = interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(viewerId = null))
+        advanceUntilIdle()
+
+        runtime.effects.test {
+            runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+            assertIs<ExploreEffect.AuthenticationRequired>(awaitItem())
+            interactions.requiresAuthentication = false
+
+            runtime.dispatch(ExploreIntent.ViewerContextChanged(viewerId = "viewer-1"))
+            runtime.dispatch(ExploreIntent.ReplayPendingInteraction)
+            val replayed = assertIs<ExploreEffect.ProtectedActionReplayed>(awaitItem())
+            advanceUntilIdle()
+
+            assertEquals(ExploreInteractionKind.Favorite, replayed.kind)
+            assertEquals(RUNTIME_LISTING_ID, replayed.listingId)
+            assertEquals(2, interactions.favoriteCalls)
+            assertTrue(runtime.state.value.listings.single().favorited)
+            assertNull(runtime.state.value.pendingAuthInteraction)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun failedReplayPublishesAuthenticationAgainButNeverReplaySuccess() = runTest {
+        val interactions = RuntimeInteractionRepository(requiresAuthentication = true)
+        val runtime = runtime(interactions = interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(viewerId = null))
+        advanceUntilIdle()
+
+        runtime.effects.test {
+            runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+            assertIs<ExploreEffect.AuthenticationRequired>(awaitItem())
+
+            runtime.dispatch(ExploreIntent.ViewerContextChanged(viewerId = "viewer-1"))
+            val retryFailure = assertIs<ExploreEffect.AuthenticationRequired>(awaitItem())
+            advanceUntilIdle()
+
+            assertEquals(ExploreInteractionKind.Favorite, retryFailure.kind)
+            assertEquals(2, interactions.favoriteCalls)
+            assertFalse(runtime.state.value.listings.single().favorited)
+            expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
         runtime.close()
@@ -320,6 +374,8 @@ private class RuntimeInteractionRepository(
     var interactionGate: CompletableDeferred<Unit>? = null,
 ) : CatalogInteractionRepository {
     var viewerInteractions: List<ListingViewerInteraction> = emptyList()
+    var favoriteCalls: Int = 0
+        private set
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         selectedInteraction(listingId = listingId, liked = true, favorited = false)
@@ -338,8 +394,10 @@ private class RuntimeInteractionRepository(
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
         selectedInteraction(listingId = listingId, liked = false, favorited = false)
 
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = false, favorited = true)
+    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        favoriteCalls += 1
+        return selectedInteraction(listingId = listingId, liked = false, favorited = true)
+    }
 
     override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
         selectedInteraction(listingId = listingId, liked = false, favorited = false)

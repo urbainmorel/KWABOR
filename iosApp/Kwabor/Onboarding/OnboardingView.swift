@@ -3,9 +3,10 @@ import SwiftUI
 
 struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
-    let exploreStore: ExploreStore
+    @ObservedObject var exploreStore: ExploreStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let catalogDetailStore: CatalogDetailStore
+    @State private var contextualSoftWallRequest: ExploreAuthenticationRequest?
 
     var body: some View {
         Group {
@@ -16,8 +17,6 @@ struct OnboardingView: View {
                 SessionRestoreView(coordinator: coordinator)
             case .authentication:
                 OnboardingLandingView(coordinator: coordinator)
-            case .notificationPriming:
-                RestoredSessionNotificationPrimingView(coordinator: coordinator)
             case .home:
                 ContentView(
                     bridge: coordinator.bridge,
@@ -38,6 +37,7 @@ struct OnboardingView: View {
                     isSigningOutAccount: coordinator.isSigningOutAccount,
                     accountSignOutErrorMessage: coordinator.accountSignOutErrorMessage,
                     onProtectedDestinationSelected: coordinator.presentAuthentication,
+                    onExploreAuthenticationRequired: presentContextualSoftWall,
                     onSignOut: coordinator.signOutCurrentAccount,
                     onDismissSignOutError: coordinator.clearAccountSignOutError,
                     onAccountDeletionWillStart: coordinator.prepareForAccountDeletion,
@@ -100,8 +100,149 @@ struct OnboardingView: View {
         .onChange(of: coordinator.exploreViewerID) { _, viewerID in
             exploreStore.updateViewerContext(viewerID)
         }
+        .onChange(of: exploreStore.authenticationRequest?.id) { _, requestID in
+            if requestID == nil {
+                contextualSoftWallRequest = nil
+            }
+        }
+        .onChange(of: coordinator.contextualAuthenticationCancellationRevision) { _, _ in
+            contextualSoftWallRequest = nil
+            exploreStore.clearPendingAuthentication()
+        }
+        .overlay {
+            if let request = contextualSoftWallRequest,
+               !coordinator.isAuthenticationPresented,
+               !coordinator.isRegistrationPresented {
+                ContextualSoftWallView(
+                    request: request,
+                    coordinator: coordinator,
+                    exploreStrings: exploreStore.strings,
+                    onRegistrationSelected: {
+                        if coordinator.presentContextualRegistration(
+                            suggestedCityId: request.suggestedCityID
+                        ) {
+                            contextualSoftWallRequest = nil
+                        }
+                    },
+                    onAuthenticationSelected: {
+                        if coordinator.presentContextualAuthentication(
+                            suggestedCityId: request.suggestedCityID
+                        ) {
+                            contextualSoftWallRequest = nil
+                        }
+                    },
+                    onFederatedAuthenticationSubmitted: {
+                        contextualSoftWallRequest = nil
+                    },
+                    onLater: {
+                        contextualSoftWallRequest = nil
+                        coordinator.cancelContextualSoftWall()
+                        exploreStore.clearPendingAuthentication()
+                    }
+                )
+                .id(request.id)
+            }
+        }
+    }
+
+    private func presentContextualSoftWall(_ request: ExploreAuthenticationRequest) {
+        contextualSoftWallRequest = request
     }
 }
+
+private struct ContextualSoftWallView: View {
+    let request: ExploreAuthenticationRequest
+    @ObservedObject var coordinator: OnboardingCoordinator
+    let exploreStrings: KwaborStrings
+    let onRegistrationSelected: () -> Void
+    let onAuthenticationSelected: () -> Void
+    let onFederatedAuthenticationSubmitted: () -> Void
+    let onLater: () -> Void
+    @StateObject private var federatedStore: FederatedSignInStore
+
+    init(
+        request: ExploreAuthenticationRequest,
+        coordinator: OnboardingCoordinator,
+        exploreStrings: KwaborStrings,
+        onRegistrationSelected: @escaping () -> Void,
+        onAuthenticationSelected: @escaping () -> Void,
+        onFederatedAuthenticationSubmitted: @escaping () -> Void,
+        onLater: @escaping () -> Void
+    ) {
+        self.request = request
+        self.coordinator = coordinator
+        self.exploreStrings = exploreStrings
+        self.onRegistrationSelected = onRegistrationSelected
+        self.onAuthenticationSelected = onAuthenticationSelected
+        self.onFederatedAuthenticationSubmitted = onFederatedAuthenticationSubmitted
+        self.onLater = onLater
+        _federatedStore = StateObject(
+            wrappedValue: FederatedSignInStore(
+                strings: coordinator.strings,
+                presenterProvider: WindowScenePresentingViewControllerProvider(),
+                identityHintStore: coordinator.federatedIdentityHintStore,
+                attemptPreflight: {
+                    coordinator.prepareContextualFederatedAuthentication(
+                        suggestedCityId: request.suggestedCityID
+                    )
+                },
+                onCredential: { credential, completion in
+                    coordinator.signInWithFederatedCredential(credential) { completed in
+                        if completed {
+                            onFederatedAuthenticationSubmitted()
+                        }
+                        completion(completed)
+                    }
+                }
+            )
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            KwaborDesignTokens.ColorToken.ink950
+                .opacity(KwaborDesignTokens.Alpha.scrimHigh)
+                .ignoresSafeArea()
+            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
+                Text(actionTitle)
+                    .font(.title2.bold())
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+                Text(exploreStrings.signInRequiredForInteraction)
+                    .font(.body)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                FederatedSignInButtons(store: federatedStore, isDisabled: false)
+                Button(coordinator.strings.signUp, action: onRegistrationSelected)
+                    .buttonStyle(.borderedProminent)
+                    .tint(KwaborDesignTokens.ColorToken.ink950)
+                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                Button(coordinator.strings.signIn, action: onAuthenticationSelected)
+                    .buttonStyle(.bordered)
+                    .tint(KwaborDesignTokens.ColorToken.ink950)
+                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                Button(coordinator.strings.registrationLater, action: onLater)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            }
+            .padding(KwaborDesignTokens.Spacing.xxl)
+            .background(KwaborDesignTokens.ColorToken.surface0)
+            .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
+            .padding(KwaborDesignTokens.Spacing.xxl)
+            .frame(maxWidth: contextualSoftWallMaxWidth)
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var actionTitle: String {
+        switch request.action {
+        case .like:
+            exploreStrings.like
+        case .favorite:
+            exploreStrings.favorite
+        }
+    }
+}
+
+private let contextualSoftWallMaxWidth: CGFloat = 520
 
 private struct IntroView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
@@ -134,25 +275,24 @@ private struct IntroView: View {
                 }
             }
 
+            KwaborDesignTokens.ColorToken.ink950
+                .opacity(KwaborDesignTokens.Alpha.scrimHigh)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+
             VStack {
                 HStack {
-                    Spacer()
                     Button(coordinator.strings.introSkip) {
                         coordinator.completeIntro(skipped: true)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(KwaborDesignTokens.ColorToken.ink950)
+                    Spacer()
                 }
                 Spacer()
-                if reducedMotion || coordinator.introVideoURL == nil {
-                    Button(coordinator.strings.introContinue) {
-                        coordinator.completeIntro(skipped: false)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(KwaborDesignTokens.ColorToken.ink950)
-                }
             }
             .padding(KwaborDesignTokens.Spacing.xxl)
+            OnboardingEntryActions(coordinator: coordinator)
         }
         .onAppear { coordinator.introDisplayed() }
         .onChange(of: coordinator.introVideoURL) { _, _ in
@@ -203,49 +343,57 @@ private struct OnboardingLandingView: View {
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
-            VStack {
-                HStack {
-                    Spacer()
-                    Text(coordinator.strings.languageLabel)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                }
-                Spacer()
-                VStack(spacing: KwaborDesignTokens.Spacing.lg) {
-                    Text(coordinator.strings.title)
-                        .font(.largeTitle.bold())
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                    Text(coordinator.strings.subtitle)
-                        .font(.title3)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                    Button(coordinator.strings.signUp) {
-                        coordinator.presentRegistration()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(KwaborDesignTokens.ColorToken.ink950)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .disabled(coordinator.requiresProtectedAuthentication)
-
-                    Button(coordinator.strings.signIn) {
-                        coordinator.presentAuthentication()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-
-                    Button(coordinator.strings.continueWithoutAccount) {
-                        coordinator.requestGuestAccess()
-                    }
-                    .foregroundStyle(.white)
-                    .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .disabled(coordinator.requiresProtectedAuthentication)
-                }
-            }
-            .padding(KwaborDesignTokens.Spacing.xxl)
+            OnboardingEntryActions(coordinator: coordinator)
         }
+    }
+}
+
+private struct OnboardingEntryActions: View {
+    @ObservedObject var coordinator: OnboardingCoordinator
+
+    var body: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Text(coordinator.strings.languageLabel)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+            VStack(spacing: KwaborDesignTokens.Spacing.lg) {
+                Text(coordinator.strings.title)
+                    .font(.largeTitle.bold())
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                Text(coordinator.strings.subtitle)
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                Button(coordinator.strings.signUp) {
+                    coordinator.presentRegistration()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(KwaborDesignTokens.ColorToken.ink950)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(coordinator.requiresProtectedAuthentication)
+
+                Button(coordinator.strings.signIn) {
+                    coordinator.presentAuthentication()
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+
+                Button(coordinator.strings.continueWithoutAccount) {
+                    coordinator.requestGuestAccess()
+                }
+                .foregroundStyle(.white)
+                .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(coordinator.requiresProtectedAuthentication)
+            }
+        }
+        .padding(KwaborDesignTokens.Spacing.xxl)
         .alert(
             coordinator.strings.continueWithoutAccount,
             isPresented: guestDisclosureBinding

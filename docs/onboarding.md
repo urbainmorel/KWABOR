@@ -2,7 +2,7 @@
 
 ## Fondation livrée par AUTH-002
 
-Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Le bouton **Passer** reste immédiatement disponible. Le logo horizontal officiel reste visible entre le lancement natif et la première frame vidéo. Lorsque la réduction des animations est active, l'application affiche l'image de repli statique embarquée et un bouton **Continuer** sans démarrer la vidéo.
+Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Les CTA **S'inscrire**, **Se connecter** et **Continuer sans compte** sont disponibles immédiatement au-dessus de la vidéo ; celle-ci ne bloque jamais l'interaction. **Passer** arrête seulement la lecture et conserve la même surface sur l'image statique. Le logo horizontal officiel reste visible entre le lancement natif et la première frame. Le mouvement réduit, un échec de lecture et les lancements suivants utilisent directement le fallback statique.
 
 Après l'intro, un utilisateur non connecté peut ouvrir le flux OTP ou demander un accès invité. Avant de confirmer cet accès, l'application précise que les prix restent en FCFA et que les interactions nécessitent un compte. L'accès invité ouvre le mur Explore en lecture seule ; toucher une destination protégée conserve le mur souple d'authentification.
 
@@ -12,14 +12,14 @@ L'intro embarquée est affichée une fois par révision installée. La révision
 
 Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
 
-1. email puis OTP de 6 chiffres, avec renvoi après 30 secondes ;
-2. mot de passe d'au moins 8 caractères, jamais conservé dans l'état UI ;
-3. prénom et nom, chacun limité à 80 caractères ;
-4. ville choisie manuellement ou estimée localement depuis une localisation approximative ponctuelle ;
-5. devise d'affichage XOF, NGN, USD ou EUR, XOF restant la devise de stockage et de paiement ;
-6. consultation et acceptation séparée des CGU, de la politique de confidentialité et de la licence UGC actives ;
-7. choix facultatifs et désactivés par défaut pour Analytics, diagnostics et Remote Config ;
-8. finalisation serveur atomique, puis écran d'explication avant la demande système de notifications.
+1. email puis OTP de 6 chiffres, avec collage/autoremplissage natif, soumission automatique, correction de l'email et renvoi après 30 secondes ;
+2. un seul champ de mot de passe d'au moins 8 caractères, compatible gestionnaire de mots de passe et jamais conservé dans l'état UI ;
+3. un écran défilant **Finaliser mon profil** : prénom, nom, ville recherchable, devise XOF par défaut et trois acceptations juridiques séparées avec liens HTTPS et versions visibles ;
+4. finalisation serveur atomique puis fermeture immédiate du tunnel, sans écran succès ni permission.
+
+Le chemin email compte quatre écrans maximum et affiche `2/4`, `3/4`, `4/4` seulement après le choix de méthode. Google et Apple ouvrent directement le profil final avec les noms préremplis et modifiables ; la progression affiche **Dernière étape**. Les villes et documents légaux sont préchargés dès l'ouverture. Une erreur offre un retry ciblé sans perdre les saisies. Une ville n'est suggérée que si la softwall provient d'un lieu dont le `cityId` est valide.
+
+Aucune géolocalisation, permission notification ou demande de consentement d'observabilité n'appartient plus au tunnel. Les nouveaux comptes conservent Analytics, diagnostics et Remote Config à `false` jusqu'à leur future gestion dans Réglages ; l'intro locale reste donc le comportement par défaut.
 
 L'OTP crée une session Supabase avant la fin du profil. Cette session porte le statut `OnboardingRequired` et n'est jamais considérée comme authentifiée par la navigation. La RPC vérifie elle-même que le compte email possède désormais un mot de passe avant toute écriture : un client modifié ne peut donc pas sauter cette étape. Si l'application est interrompue après vérification, elle reprend au minimum à l'étape du mot de passe et ne peut pas ouvrir l'accueil. Quitter le parcours après OTP déclenche d'abord une déconnexion confirmée ; un échec réseau conserve l'écran ouvert et affiche seulement un message utilisateur traduit.
 
@@ -55,11 +55,11 @@ utilise un nonce aléatoire à usage unique ; seuls l'ID token, le nonce brut co
 indices de nom éventuellement fournis sont transmis au data layer partagé. Aucun access token ou
 refresh token Google/Apple n'est demandé, persisté ou envoyé à Analytics.
 
-Un compte complet ouvre la destination protégée attendue. Un compte nouveau ou incomplet reprend la
-révision Nom/Prénom, puis Ville/GPS, Devise, consentements et primer notifications. Les indices de
-nom restent modifiables et ne finalisent jamais le profil à eux seuls. Apple pouvant ne fournir le
-nom qu'à la première autorisation, l'écran de révision reste utilisable sans indice. Une annulation
-du fournisseur ne crée pas de session et ne montre aucun message technique.
+Un compte complet ouvre la destination protégée attendue. Un compte nouveau ou incomplet reprend
+directement **Finaliser mon profil** après Google/Apple, ou le mot de passe/profil selon la session
+email. Les indices de nom restent modifiables et ne finalisent jamais le profil à eux seuls. Apple
+pouvant ne fournir le nom qu'à la première autorisation, le profil final reste utilisable sans
+indice. Une annulation du fournisseur ne crée pas de session et ne montre aucun message technique.
 
 ### Activation Promoteur
 
@@ -141,11 +141,16 @@ tombstones complétés sont techniquement purgés après 30 jours. Cette durée 
 mention dans la
 politique de confidentialité restent une gate juridique avant release candidate.
 
-Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.
+La ville est une préférence de profil obligatoire mais ne déclenche aucun accès GPS pendant
+l'inscription. Les trois consentements d'observabilité déjà enregistrés sont préservés ; aucun
+nouveau choix n'est collecté dans ce parcours. Une session complète restaurée ouvre directement
+l'accueil, sans primer notifications.
 
-Les trois consentements observabilité sont appliqués et persistés par les adaptateurs Firebase natifs lorsque l'utilisateur confirme cette étape, juste avant `complete_user_onboarding`. Ainsi, une réponse réseau perdue après le commit serveur ne peut pas effacer son choix explicite ; chaque nouvelle confirmation réapplique la dernière valeur sélectionnée. Remote Config reste réservé aux futurs flags UX sûrs et n'intervient jamais dans la vidéo d'intro.
-
-La permission notifications n'arrive qu'après le succès serveur et reste non bloquante, qu'elle soit acceptée, refusée ou remise à plus tard ; l'enregistrement du token est réservé à la tranche Notifications. La résolution de cet écran est persistée localement par installation avant d'ouvrir l'accueil. Si l'application est arrêtée après la finalisation serveur mais avant ce choix, une session complète restaurée reprend donc le primer au lieu de le perdre ou de le contourner. Une écriture locale Android en échec conserve l'écran avec une action de retry ; les doubles appuis ne peuvent jamais ouvrir deux demandes système.
+La softwall conserve un contexte minimal : type d'action et `suggestedCityId` facultatif. Elle
+propose directement les fournisseurs, l'email, la connexion existante et **Plus tard**. Après
+authentification, Like ou Favori est rejoué une seule fois puis le contexte est effacé. Une
+annulation explicite ou **Plus tard** l'efface ; une erreur réseau ou fournisseur récupérable le
+conserve.
 
 ## Média embarqué et révision Store
 
@@ -192,8 +197,8 @@ mais ne peut ni choisir, ni télécharger, ni désactiver la vidéo d'intro.
 
 ## Vérification avant livraison
 
-1. Nouvelle installation sans réseau : logo officiel complet sans flash vide, intro locale, bouton Passer et landing visibles.
-2. Réduction des animations active : image de repli statique et bouton Continuer visibles, aucune lecture vidéo.
+1. Nouvelle installation sans réseau : logo officiel complet sans flash vide, intro locale et CTA d'accès immédiatement utilisables.
+2. Réduction des animations active : image de repli statique et mêmes CTA visibles, aucune lecture vidéo.
 3. Confirmation invité : navigation racine disponible ; interaction protégée renvoie vers l'authentification.
 4. Nouveau lancement sans session et sans nouvelle révision embarquée : landing affichée sans rejouer l'intro.
 5. Mise à jour Store avec le même MP4 et la même révision : aucune intro supplémentaire.
@@ -204,12 +209,12 @@ mais ne peut ni choisir, ni télécharger, ni désactiver la vidéo d'intro.
 10. Relance suivante avec la même révision : l'intro ne rejoue pas.
 11. OTP vérifié puis application arrêtée : reprise au mot de passe, jamais à l'accueil.
 12. Annulation après OTP avec déconnexion en échec : parcours maintenu ouvert et session incomplète inutilisable comme compte finalisé.
-13. GPS refusé, indisponible ou hors Bénin : sélection manuelle utilisable sans coordonnée transmise.
-14. Documents juridiques absents, dupliqués, inactifs ou non effectifs : finalisation bloquée sans créer de profil partiel.
-15. Consentements observabilité refusés : aucune collecte ni activation Remote Config ; inscription toujours finalisable et intro embarquée inchangée.
-16. Permission notifications refusée ou différée : compte finalisé et navigation débloquée sans token enregistré.
-17. Application arrêtée après la RPC mais avant le choix notifications : session restaurée sur le primer, puis résolution persistée avant l'accueil.
-18. Double appui sur « Autoriser » : une seule demande système ; échec de persistance locale Android : primer maintenu avec retry.
+13. Inscription générique : aucune ville présélectionnée ; softwall liée à un lieu valide : sa ville est proposée.
+14. Documents juridiques absents, dupliqués, inactifs ou non effectifs : finalisation bloquée avec retry ciblé sans perdre les saisies.
+15. Nouveau compte sans consentement antérieur : aucune collecte ni récupération Remote Config ; inscription toujours finalisable et intro embarquée inchangée.
+16. Finalisation réussie : zéro permission, fermeture immédiate et accueil direct.
+17. Réponse réseau tardive du préchargement : nom, ville, devise et acceptations déjà saisis restent inchangés.
+18. Collage OTP ou double événement UI : une seule vérification envoyée.
 19. « Se connecter » exige le mot de passe et ne déclenche jamais l'OTP d'inscription.
 20. Adresse de récupération inconnue : même confirmation visible qu'une adresse connue, sans fuite d'existence du compte.
 21. OTP Recovery invalide, expiré ou renvoyé trop tôt : état conservé et message utilisateur sûr, sans session authentifiée.
@@ -220,7 +225,7 @@ mais ne peut ni choisir, ni télécharger, ni désactiver la vidéo d'intro.
 26. Google annulé sur Android/iOS : aucun compte créé, aucune erreur technique et destination en attente conservée.
 27. Apple annulé sur iOS : même comportement que Google ; aucun bouton Apple visible sur Android.
 28. ID token absent, nonce absent/réutilisé ou audience d'un autre environnement : authentification refusée sans secret dans les logs.
-29. Nouveau compte Google/Apple : révision du nom puis onboarding complet ; compte existant complet : connexion directe.
+29. Nouveau compte Google/Apple : un seul profil final ; compte existant complet : connexion directe.
 30. Apple sans nom lors d'une reconnexion : révision manuelle toujours disponible et aucun nom précédent attribué à une autre identité.
 31. Invitation Promoteur invalide, expirée, utilisée ou destinée à un autre email : activation refusée sans révéler l'email attendu.
 32. Lien Promoteur reçu avec une session existante : session jamais remplacée ni déconnectée, y compris si le lien est invalide.

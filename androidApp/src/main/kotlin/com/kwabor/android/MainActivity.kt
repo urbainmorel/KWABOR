@@ -21,9 +21,7 @@ import com.kwabor.android.auth.AndroidDeepLinkClassifier
 import com.kwabor.android.auth.AndroidDeepLinkDestination
 import com.kwabor.android.auth.AndroidGoogleIdentityProvider
 import com.kwabor.android.auth.AndroidLegalDocumentLauncher
-import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
 import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
-import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
 import com.kwabor.android.auth.SharedPreferencesPromoterActivationSessionStore
 import com.kwabor.android.auth.UuidIdempotencyKeyProvider
 import com.kwabor.android.detail.AndroidDetailExternalActionLauncher
@@ -149,6 +147,7 @@ class MainActivity : ComponentActivity() {
                     locationService = AndroidApproximateLocationService(applicationContext),
                     strings = strings,
                     coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                    track = (application as KwaborApplication).observability::track,
                 )
             }
         },
@@ -200,9 +199,6 @@ class MainActivity : ComponentActivity() {
                         authPresenter = configuredApp.authPresenters.auth,
                         passwordRecoveryPresenter = configuredApp.authPresenters.passwordRecovery,
                         registrationPresenter = configuredApp.authPresenters.registration,
-                        locationService = AndroidApproximateLocationService(applicationContext),
-                        notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
-                        notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
                         authJourneyStore = SharedPreferencesAuthJourneyStore(applicationContext),
                         promoterActivationSessionStore =
                         SharedPreferencesPromoterActivationSessionStore(applicationContext),
@@ -213,7 +209,7 @@ class MainActivity : ComponentActivity() {
                         googleIdentityUnavailableMessage = getString(R.string.auth_google_unavailable),
                         idempotencyKeyProvider = UuidIdempotencyKeyProvider,
                         clockProvider = configuredApp.compositionRoot.clockProvider,
-                        applyObservabilityConsent = applicationState.observability::updateConsent,
+                        track = applicationState.observability::track,
                         revokeObservabilityConsent = applicationState.observability::revokeAllConsent,
                     ),
                     strings = strings,

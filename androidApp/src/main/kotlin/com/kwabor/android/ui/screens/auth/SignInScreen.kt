@@ -42,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -187,8 +189,10 @@ private fun ColumnScope.SignInPasswordStep(state: AuthAccessUiState, actions: Si
         value = password,
         onValueChange = { updated -> password = updated },
         label = stringResource(R.string.auth_password_label),
-        enabled = !state.isLoading,
-        onDone = { if (password.isNotEmpty()) actions.onSubmitPassword(password) },
+        options = AuthPasswordFieldOptions(
+            enabled = !state.isLoading,
+            onDone = { if (password.isNotEmpty()) actions.onSubmitPassword(password) },
+        ),
     )
     TextButton(
         onClick = actions.onForgotPassword,
@@ -210,23 +214,30 @@ internal fun AuthPasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    enabled: Boolean,
-    onDone: (() -> Unit)? = null,
+    options: AuthPasswordFieldOptions,
 ) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { fieldModifier ->
+                if (options.autofillContentType == null) {
+                    fieldModifier
+                } else {
+                    fieldModifier.contentType(options.autofillContentType)
+                }
+            },
+        enabled = options.enabled,
         singleLine = true,
         label = { Text(label) },
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
-            imeAction = if (onDone == null) ImeAction.Next else ImeAction.Done,
+            imeAction = if (options.onDone == null) ImeAction.Next else ImeAction.Done,
         ),
-        keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
+        keyboardActions = KeyboardActions(onDone = { options.onDone?.invoke() }),
         trailingIcon = {
             IconButton(onClick = { visible = !visible }) {
                 Icon(
@@ -239,6 +250,12 @@ internal fun AuthPasswordField(
         },
     )
 }
+
+internal data class AuthPasswordFieldOptions(
+    val enabled: Boolean,
+    val onDone: (() -> Unit)? = null,
+    val autofillContentType: ContentType? = null,
+)
 
 @Composable
 internal fun AuthPrimaryButton(label: String, loading: Boolean, enabled: Boolean, onClick: () -> Unit) {

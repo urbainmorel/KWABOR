@@ -41,11 +41,18 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.kwabor.android.R
+import com.kwabor.android.design.KwaborAlpha
+import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
-internal fun IntroScreen(strings: KwaborStrings, state: IntroScreenState, actions: IntroScreenActions) {
+internal fun IntroScreen(
+    strings: KwaborStrings,
+    state: IntroScreenState,
+    actions: IntroScreenActions,
+    landingActions: OnboardingLandingActions,
+) {
     DisposableEffect(Unit) {
         actions.onDisplayed()
         onDispose {}
@@ -57,25 +64,36 @@ internal fun IntroScreen(strings: KwaborStrings, state: IntroScreenState, action
             .semantics { contentDescription = strings.introAccessibilityLabel },
     ) {
         IntroPrimaryContent(
-            strings = strings,
             state = state,
             actions = actions,
         )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(KwaborColors.Ink950.copy(alpha = KwaborAlpha.SCRIM_HIGH)),
+        )
+        OnboardingLandingContent(strings = strings, actions = landingActions)
         IntroSkipButton(label = strings.introSkip, onSkipped = actions.onSkipped)
+    }
+    if (state.isGuestDisclosureVisible) {
+        GuestDisclosureDialog(strings = strings, actions = landingActions)
     }
 }
 
 @Composable
 private fun BoxScope.IntroPrimaryContent(
-    strings: KwaborStrings,
     state: IntroScreenState,
     actions: IntroScreenActions,
 ) {
     when (introPrimaryMode(state.reducedMotion, state.staticFallbackRequired)) {
-        IntroPrimaryMode.StaticFallback -> IntroStaticFallback(
-            continueLabel = strings.introContinue,
-            onCompleted = actions.onCompleted,
-        )
+        IntroPrimaryMode.StaticFallback -> {
+            Image(
+                painter = painterResource(R.drawable.kwabor_intro_fallback),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         IntroPrimaryMode.VideoWithContinuity -> {
             IntroVideo(
                 launchSplashExited = state.launchSplashExited,
@@ -83,24 +101,6 @@ private fun BoxScope.IntroPrimaryContent(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-    }
-}
-
-@Composable
-private fun BoxScope.IntroStaticFallback(continueLabel: String, onCompleted: () -> Unit) {
-    Image(
-        painter = painterResource(R.drawable.kwabor_intro_fallback),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize(),
-    )
-    Button(
-        onClick = onCompleted,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(KwaborSpacing.Xxl),
-    ) {
-        Text(continueLabel)
     }
 }
 
@@ -121,7 +121,7 @@ private fun BoxScope.IntroSkipButton(label: String, onSkipped: () -> Unit) {
     Button(
         onClick = onSkipped,
         modifier = Modifier
-            .align(Alignment.TopEnd)
+            .align(Alignment.TopStart)
             .padding(KwaborSpacing.Xl),
     ) {
         Text(
@@ -142,6 +142,7 @@ internal data class IntroScreenState(
     val reducedMotion: Boolean,
     val staticFallbackRequired: Boolean,
     val launchSplashExited: Boolean,
+    val isGuestDisclosureVisible: Boolean,
 )
 
 @Composable

@@ -92,7 +92,8 @@ class ExploreViewModelTest {
         viewModel.onIntent(ExploreIntent.ToggleLike(TEST_LISTING_ID))
         advanceUntilIdle()
 
-        assertIs<ExploreEffect.AuthenticationRequired>(viewModel.effects.first())
+        val effect = assertIs<ExploreEffect.AuthenticationRequired>(viewModel.effects.first())
+        assertEquals(TEST_CITY_ID, effect.suggestedCityId)
         assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
 
         viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
@@ -580,7 +581,7 @@ private fun testListing(id: String = TEST_LISTING_ID): ListingSummary = ListingS
     listingClass = ListingClass.Heritage,
     status = ListingStatus.Published,
     name = "Porte du non-retour",
-    cityId = "cotonou",
+    cityId = TEST_CITY_ID,
     categoryId = "heritage-historique",
     coverImageUrl = null,
     priceFromXof = null,
@@ -591,3 +592,4 @@ private fun testListing(id: String = TEST_LISTING_ID): ListingSummary = ListingS
 )
 
 private const val TEST_LISTING_ID = "ouidah-gate"
+private const val TEST_CITY_ID = "cotonou"
