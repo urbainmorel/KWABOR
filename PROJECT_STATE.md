@@ -161,11 +161,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - L'audit V1 du 30 juillet 2026 confronte code, PRD/DESIGN, données, tests, CI, distribution et exploitation dans `docs/audits/2026-07-30-v1-production-readiness.md`. L'avancement réel est estimé à 25–30 % du PRD V1 actuel et la préparation production à 15–20 %.
 - SEC-001A est implémentée localement sur `codex/sec-001-authorization-guardrails` : onboarding Google/Apple, grants Social/équipes/claims/signalements, RPC de modération, cohérence taxonomique et matrice Guide/Promoteur/Institution sont durcis par migrations forward-only séparées.
 - Le hotfix OAuth/ACL ne dépend plus de la validation taxonomique fail-closed. Le runbook `docs/runbooks/security-authorization-preflight.md` impose sauvegarde, audit humain des anciennes lignes d’autorité et validation de la taxonomie avant tout déploiement persistant.
-- Validation locale SEC-001A : 2 migrations appliquées, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. La PR et la CI GitHub restent à produire.
+- Validation SEC-001A : 2 migrations appliquées localement, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. Les commits `f6593d4`/`4b9e3fd` sont publiés dans la PR brouillon `#35` ; le run `30556043063` a passé `quality` puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release.
 
 ## Tâche en cours
 
-Clôture atomique SEC-001A : revue finale, commits, publication en PR brouillon et validation CI.
+Clôture atomique SEC-001A : obtenir la revue humaine puis fusionner la PR brouillon `#35`.
 La PR d'authentification `#34` reste séparée et ne doit pas être mélangée à cette branche.
 
 ## Blocages / limites
@@ -196,6 +196,6 @@ La PR d'authentification `#34` reste séparée et ne doit pas être mélangée �
 
 ## Prochaine tâche logique
 
-Publier SEC-001A et obtenir les checks `quality` et `iOS simulator build` verts. Après fusion,
-faire valider le périmètre/navigation V1 avant de supprimer les parcours factices et de commencer
+Faire approuver puis fusionner la PR `#35`. Après fusion, faire valider le périmètre/navigation V1
+avant de supprimer les parcours factices et de commencer
 le résumé catalogue paginé. BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.

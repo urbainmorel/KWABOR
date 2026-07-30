@@ -11,6 +11,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
 | Branche active | `codex/sec-001-authorization-guardrails` |
+| PR de stabilisation | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -25,6 +26,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Deux migrations SEC-001A indépendantes appliquées sur la base locale Kwabor.
 - Sept suites pgTAP et 316 assertions réussies.
 - La nouvelle suite de 74 assertions couvre OAuth, grants exacts, RLS, équipes, claims, signalements, RPC de modération et matrice de fiches ; deux assertions renforcent en plus l’onboarding existant.
+- PR brouillon `#35` publiée avec les commits `f6593d4` et `4b9e3fd` ; run CI `30556043063` vert pour `quality` et le build simulateur iOS.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
@@ -40,12 +42,12 @@ Objectifs :
 - imposer la cohérence catégorie/type/sous-type/classe ;
 - empêcher les décisions client sur claims et signalements.
 
-État : implémentation et validations locales terminées ; revue finale, commit, push, PR et CI GitHub à effectuer.
+État : implémentation, deux revues techniques, commits, publication et CI GitHub terminés. La revue humaine, la fusion et la préflight de toute base persistante restent ouvertes.
 
 ## Prochaines tâches
 
-1. Publier SEC-001A en PR brouillon et attendre `quality` + `iOS simulator build`.
-2. Traiter toute revue ou régression CI, puis fusionner.
+1. Obtenir la revue humaine puis fusionner la PR `#35`.
+2. Exécuter la préflight avant tout déploiement sur une base persistante.
 3. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
 4. Faire valider le périmètre V1 minimal et la navigation.
 5. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
