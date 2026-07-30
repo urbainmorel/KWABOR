@@ -80,7 +80,12 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
 - [x] BRAND-001 — Restaurer le wordmark officiel complet au lancement Android/iOS, assurer la continuité jusqu'à la première frame et verrouiller l'intégrité des assets en CI.
-- [ ] BRAND-002 — Remplacer le monogramme Android de lancement rééchantillonné par le master officiel haute définition exact, verrouiller hash/géométrie et fournir les captures multi-API Android ainsi que le contrôle iOS.
+- [ ] BRAND-002 — Remplacer le monogramme Android de lancement rééchantillonné par la source haute définition du dépôt, verrouiller hash/géométrie, faire confirmer le master officiel et fournir les captures multi-API Android ainsi que le contrôle iOS.
+  - [x] Séparer le canevas launcher 108 dp du splash 288 dp et générer les cinq densités directement depuis le master 1254 px.
+  - [x] Verrouiller dimensions, hashes, géométrie, cercle sûr et câblage XML actif ; prouver l'idempotence et les refus négatifs.
+  - [ ] Faire confirmer par le propriétaire de marque que `kwabor_icone_app.png` est le master officiel, ou fournir son remplacement avant validation perceptuelle finale.
+  - [ ] Obtenir et relire les captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi`.
+  - [ ] Valider perceptuellement le raccord complet sur appareils Android Pixel/Samsung et iOS.
 - [x] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.
   - [x] Validations locales finales, reset Supabase, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.

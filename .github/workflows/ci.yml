@@ -6,9 +6,100 @@ on:
     branches: [main, develop]
 
 jobs:
-  quality:
+  brand_evidence_scope:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.changed-files.outputs.required }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect launch asset changes
+        id: changed-files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          required=false
+          while IFS= read -r changed_file; do
+            case "$changed_file" in
+              .github/workflows/ci.yml | \
+              .github/workflows/android-launch-evidence.yml | \
+              androidApp/build.gradle.kts | \
+              androidApp/src/main/AndroidManifest.xml | \
+              androidApp/src/main/kotlin/com/kwabor/android/KwaborApplication.kt | \
+              androidApp/src/main/kotlin/com/kwabor/android/MainActivity.kt | \
+              androidApp/src/main/kotlin/com/kwabor/android/app/KwaborApp.kt | \
+              androidApp/src/main/kotlin/com/kwabor/android/app/KwaborOnboardingRoutes.kt | \
+              androidApp/src/main/kotlin/com/kwabor/android/onboarding/* | \
+              androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/* | \
+              androidApp/src/main/res/drawable-*/kwabor_launch_mark.png | \
+              androidApp/src/main/res/drawable/ic_kwabor_launch_mark.xml | \
+              androidApp/src/main/res/drawable-nodpi/kwabor_launch_wordmark.png | \
+              androidApp/src/main/res/raw/kwabor_intro.mp4 | \
+              androidApp/src/main/res/values/colors.xml | \
+              androidApp/src/main/res/values/styles.xml | \
+              gradle/libs.versions.toml | \
+              kwabor_icone_app.png | \
+              kwabor_2.png | \
+              tools/capture-android-launch-evidence.sh | \
+              tools/generate-brand-assets.ps1 | \
+              tools/verify-onboarding-media.py | \
+              tools/verify-brand-assets.py)
+                required=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only --diff-filter=ACDMRT "$BASE_SHA" "$HEAD_SHA")
+          echo "required=$required" >>"$GITHUB_OUTPUT"
+
+  launch_evidence:
+    needs: brand_evidence_scope
+    if: needs.brand_evidence_scope.outputs.required == 'true'
+    uses: ./.github/workflows/android-launch-evidence.yml
+
+  launch_evidence_gate:
+    name: Android launch evidence gate
+    if: always() && github.event_name == 'pull_request'
+    needs: [brand_evidence_scope, launch_evidence]
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce scoped launch evidence
+        shell: bash
+        env:
+          SCOPE_RESULT: ${{ needs.brand_evidence_scope.result }}
+          EVIDENCE_REQUIRED: ${{ needs.brand_evidence_scope.outputs.required }}
+          EVIDENCE_RESULT: ${{ needs.launch_evidence.result }}
+        run: |
+          if [[ "$SCOPE_RESULT" != "success" ]]; then
+            echo "Launch evidence scope detection did not succeed: $SCOPE_RESULT" >&2
+            exit 1
+          fi
+          if [[ "$EVIDENCE_REQUIRED" == "true" && "$EVIDENCE_RESULT" != "success" ]]; then
+            echo "Required Android launch evidence did not succeed: $EVIDENCE_RESULT" >&2
+            exit 1
+          fi
+          echo "Android launch evidence gate satisfied (required=$EVIDENCE_REQUIRED)."
+
+  quality:
+    if: always()
+    needs: launch_evidence_gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Android launch evidence gate
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          LAUNCH_EVIDENCE_GATE_RESULT: ${{ needs.launch_evidence_gate.result }}
+        run: |
+          if [[ "$LAUNCH_EVIDENCE_GATE_RESULT" != "success" ]]; then
+            echo "Android launch evidence gate did not succeed: $LAUNCH_EVIDENCE_GATE_RESULT" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v7.0.0
 
       - name: Verify repository integrity

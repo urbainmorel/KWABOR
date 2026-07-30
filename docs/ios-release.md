@@ -24,7 +24,7 @@ Le workflow reçoit ces valeurs comme entrées et les valide avant d'importer le
 
 ## Icône et lancement
 
-Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source canonique du symbole carré. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG officiel, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
+Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source de build verrouillée du symbole carré. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Le propriétaire de marque doit encore confirmer qu'il s'agit du master haute définition officiel, ou fournir son remplacement avant la validation perceptuelle finale. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
 
 Le logo horizontal complet utilise séparément `kwabor_2.png`. `LaunchWordmark.imageset/LaunchWordmark.png` en est une copie binaire exacte de 2172 × 724, au ratio 3:1. `LaunchScreen.storyboard` l'affiche centré en `scaleAspectFit`, avec un inset horizontal de 24 points et le fond ink du catalogue. La vue SwiftUI conserve le même wordmark au-dessus du lecteur jusqu'à ce que `AVPlayerLayer.isReadyForDisplay` confirme la première frame. Ce raccord évite tout flash vide sans recadrer, recolorer ou réencoder le logo officiel.
 

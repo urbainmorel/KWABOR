@@ -170,10 +170,16 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Le wrapper officiel Gradle 9.4.1 est régénéré et verrouillé par checksums de distribution, JAR et launchers. `tools/verify-repository-integrity.py`, exécuté en CI, refuse les templates incomplets ou préremplis, les propriétés wrapper divergentes et les secrets/artefacts mobiles suivis par Git.
 - Validation locale STAB-003 : vérificateurs dépôt/média/marque et `git diff --check` verts, wrapper téléchargé et exécuté depuis un cache vide, `spotlessCheck`, `detekt`, lint, `check`, compilation Kotlin iOS Simulator et 292 tests Android/shared verts en 8 min 04 s. Les APK debug et staging ont été produits sans variable `KWABOR_*` ni configuration Firebase ; deux revues indépendantes finales ne relèvent aucun P0/P1/P2.
 - Validation CI STAB-003 sur le commit `c275699` : le run `30573401220` a passé le nouveau contrôle d'intégrité, `quality`/pgTAP en 4 min 55 s, puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release en 19 min 26 s.
+- BRAND-002 sépare désormais les assets launcher 108 dp du splash 288 dp. Les cinq canevas 288/432/576/864/1152 px sont générés directement depuis la source de build 1254 px du dépôt avec la géométrie 75 % existante ; cette source, le wordmark, les dérivés launcher et tous les assets iOS restent bit-identiques. Sa confirmation comme master officiel reste une décision propriétaire ouverte.
+- Le vérificateur standard-library verrouille hashes, dimensions, silhouette claire dans le cercle sûr et XML actif du wrapper/thème SplashScreen. Deux générations sont idempotentes ; les corruptions Android/iOS, la réintroduction `nodpi` et les détournements XML masqués en commentaire sont refusés.
+- Validation locale BRAND-002 : vérificateurs dépôt/média/marque, actionlint/YAML/Bash, `spotlessCheck`, `detekt`, lint, `check`, APK debug hermétique et 292 tests Android/shared verts sans échec. La porte finale Gradle a terminé en 13 min 07 s et trois revues indépendantes ne relèvent aucun P0/P1/P2. La matrice CI dédiée doit encore produire et faire relire les cold starts API 30/31/36 en trois densités avant clôture.
 
 ## Tâche en cours
 
-Clôture séquencée de la stabilisation : obtenir la revue humaine puis fusionner `#35`, retargeter si nécessaire puis fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
+Finaliser BRAND-002 : publier la tranche empilée sur STAB-003, obtenir les neuf séquences
+Android CI et le contrôle iOS sans dérive, puis conserver la gate perceptuelle appareils avant
+bêta. En parallèle, obtenir la revue humaine puis fusionner `#35`, retargeter si nécessaire puis
+fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée et doit être fusionnée ou fermée explicitement dans STAB-001 sans mélanger ses changements à cette pile.
 
 ## Blocages / limites
@@ -196,7 +202,7 @@ La PR d'authentification `#34` reste séparée et doit être fusionnée ou ferm�
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
-- Le propriétaire a signalé que le monogramme du splash système Android n'est pas visuellement fidèle au master : les dérivés de lancement par densité sont trop petits puis réagrandis. BRAND-002 doit remplacer ce chemin par le master haute définition exact et produire des captures multi-API avant toute autre tranche produit. Le wordmark complet Android/iOS reste verrouillé bit pour bit ; la validation perceptuelle du raccord splash → wordmark → première frame, de l'autoplay silencieux, du reduced-motion, du lifecycle/fallback et de Remote Config réel sur appareils physiques demeure obligatoire avant bêta.
+- Le réagrandissement destructeur du monogramme Android est corrigé localement dans BRAND-002, mais la tâche reste ouverte jusqu'aux captures CI multi-API et à la revue perceptuelle sur appareils. Le premier boot API 30 local a été refusé sous le seuil AOSP de 2 Gio ; après restitution d'espace, le build `.invalid`, le boot et l'installation non-streaming ont réussi, mais l'AVD logiciel a dépassé le budget de cold start avec `Status: timeout` après 12,648 s. Le harness a correctement refusé cette séquence et la preuve autoritative reste routée vers les runners KVM. Le wordmark complet Android/iOS reste verrouillé bit pour bit ; la validation du raccord splash → wordmark → première frame, de l'autoplay silencieux, du reduced-motion, du lifecycle/fallback et de Remote Config réel sur appareils physiques demeure obligatoire avant bêta.
 - Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B et l'activation de Firebase Remote Config Realtime API ; le consentement observabilité est désormais branché dans AUTH-003.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
@@ -206,6 +212,7 @@ La PR d'authentification `#34` reste séparée et doit être fusionnée ou ferm�
 
 ## Prochaine tâche logique
 
-Faire approuver puis fusionner la PR `#35`. Après fusion, faire valider le périmètre/navigation V1
-avant de supprimer les parcours factices et de commencer
-le résumé catalogue paginé. BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.
+Publier BRAND-002, obtenir ses preuves CI puis faire approuver et fusionner la pile `#35` → `#36`
+→ `#37` → BRAND-002. Après fusion, faire valider le périmètre/navigation V1 avant de supprimer
+les parcours factices et de commencer le résumé catalogue paginé. La revue appareils BRAND-002 et
+ENV-001B/OBS-001B restent des gates propriétaire.

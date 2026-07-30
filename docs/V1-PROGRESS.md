@@ -10,7 +10,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/stab-003-repo-integrity` |
+| Branche active | `codex/brand-002-launch-master`, empilée sur `codex/stab-003-repo-integrity` |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
@@ -37,9 +37,23 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - STAB-003 validée localement : inventaires et runbooks cohérents, plugins Firebase Android conditionnels, secrets et artefacts mobiles ignorés dans tout sous-dossier, wrapper Gradle 9.4.1 officiel verrouillé et vérificateur d'intégrité branché à la CI.
 - Le wrapper a été téléchargé et exécuté depuis un cache vide ; les vérificateurs dépôt/média/marque, Spotless, Detekt, lint, `check`, la compilation Kotlin iOS Simulator et 292 tests Android/shared sont verts. Les APK debug/staging ont été produits sans variable `KWABOR_*` ni fichier Firebase.
 - Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; le run `30573401220` de la PR brouillon empilée `#37` a passé `quality`/pgTAP en 4 min 55 s et le build iOS simulateur en 19 min 26 s.
+- BRAND-002 corrige le réagrandissement du splash Android : canevas 288 dp séparés du launcher 108 dp, cinq densités dérivées directement du master 1254 px, hashes/géométrie/câblage XML verrouillés et iOS inchangé.
+- Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte. Les captures API 30/31/36 restent à obtenir et relire en CI.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
+
+### BRAND-002 — Fidélité du splash système
+
+Objectifs :
+
+- supprimer tout agrandissement d'un dérivé 108 dp par le système Android ;
+- verrouiller le master, la géométrie et le câblage réellement actif ;
+- produire des cold starts comparables sur API 30/31/36 et trois densités ;
+- confirmer qu'aucun asset ou raccord iOS n'a dérivé.
+
+État : implémentation et validations locales terminées. Le workflow d'évidence reproductible est
+prêt ; sa matrice, la revue des artefacts et le contrôle perceptuel appareils restent ouverts.
 
 ### STAB-003 — Intégrité d'un clone vierge
 
@@ -77,14 +91,15 @@ Objectifs :
 
 ## Prochaines tâches
 
-1. Obtenir la revue humaine puis fusionner la PR `#35`.
-2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Retargeter, relire puis fusionner la PR STAB-003 `#37`.
-4. Exécuter la préflight avant tout déploiement sur une base persistante.
-5. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
-6. Faire valider le périmètre V1 minimal et la navigation.
-7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+1. Publier BRAND-002 et obtenir/revoir sa matrice Android API 30/31/36.
+2. Obtenir la revue humaine puis fusionner la PR `#35`.
+3. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
+4. Retargeter, relire puis fusionner la PR STAB-003 `#37`, puis BRAND-002.
+5. Exécuter la préflight avant tout déploiement sur une base persistante.
+6. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
+7. Faire valider le périmètre V1 minimal et la navigation.
+8. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
+9. Commencer le résumé catalogue paginé et supprimer le N+1 média.
 
 ## Décisions techniques actées pendant la reprise
 
@@ -106,6 +121,7 @@ Objectifs :
 - La passe Gradle complète ARCH-004 a duré 9 min 39 s à froid puis 1 min 25 s avec les caches chauds sur le poste Windows.
 - Les tests Kotlin iOS sont compilés mais marqués `SKIPPED` sur Windows ; la preuve d’exécution native doit rester une gate macOS.
 - Le disque Windows est arrivé à saturation pendant la première revalidation STAB-003. Seuls le cache wrapper temporaire incomplet et les sorties `androidApp/build`/`shared/build`, entièrement régénérables, ont été supprimés ; le wrapper depuis cache vide puis la porte qualité ont ensuite terminé avec succès.
+- La première tentative émulateur API 30 de BRAND-002 a été refusée sous le seuil AOSP de 2 Gio libres. Après restitution d'espace, l'AVD a démarré, le build hermétique et l'installation non-streaming ont réussi, et deux défauts du harness Windows ont été corrigés. L'AVD logiciel a toutefois dépassé le budget de cold start (`Status: timeout`, 12,648 s) ; le script a donc refusé la capture au lieu de produire une fausse preuve. La matrice KVM CI reste la preuve multi-API autoritative.
 
 ## Décisions produit en attente
 

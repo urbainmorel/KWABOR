@@ -339,7 +339,8 @@ La tranche suivante, après validation du périmètre/navigation, touchera princ
 3. Confirmer la visibilité de Social pour un invité si Social reste au périmètre.
 4. Valider l’usage du Supabase Dashboard + RPC opérateur comme administration V1.
 5. Choisir les villes, catégories, volume et responsables éditoriaux du lancement.
-6. Fournir le master haute définition officiel du symbole « K ».
+6. Confirmer que `kwabor_icone_app.png` (1254 × 1254) est le master haute définition officiel du
+   symbole « K » ou fournir son remplacement officiel avant validation perceptuelle finale.
 7. Valider CGU, confidentialité, licence UGC et rétention de suppression.
 8. Provisionner les organisations/plans Supabase et Firebase, OAuth, SMTP, APNs, stores, certificats et clé Android.
 9. Confirmer Android 26 minimum et iOS 17 minimum.

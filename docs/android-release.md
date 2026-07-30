@@ -24,9 +24,9 @@ Le build rejette un code invalide ou un nom hors contrat avant compilation.
 
 ## Identité visuelle et lancement
 
-La source canonique du symbole carré est `kwabor_icone_app.png` à la racine du dépôt. Elle est réservée à l'icône de l'application et au splash système Android. Le symbole n'est jamais redessiné, détouré ou recoloré : le script versionné redimensionne le bitmap officiel opaque en conservant sa silhouette, sa courbe intérieure, ses nuances et sa texture.
+La source de build verrouillée du symbole carré est `kwabor_icone_app.png` à la racine du dépôt. Elle est réservée à l'icône de l'application et au splash système Android. Le symbole n'est jamais redessiné, détouré ou recoloré : le script versionné redimensionne ce bitmap opaque en conservant sa silhouette, sa courbe intérieure, ses nuances et sa texture. Le propriétaire de marque doit encore confirmer qu'il s'agit du master haute définition officiel, ou fournir son remplacement avant la validation perceptuelle finale.
 
-Le splash Android 12+ et le foreground de l'icône adaptative utilisent deux assets distincts, chacun contenant le symbole intégral, au ratio inchangé, centré à 75 % sur le même fond ink `#0E0E0D`. Ce padding est nécessaire pour garder toute la silhouette dans le masque circulaire imposé au lancement par Android.
+Le splash système et le foreground de l'icône adaptative utilisent deux familles d'assets distinctes. Le foreground conserve son canevas intrinsèque de 108 dp. Le splash utilise le canevas Android sans fond d'icône de 288 dp, soit des PNG de 288, 432, 576, 864 et 1152 px de `mdpi` à `xxxhdpi`. Chaque splash est produit directement depuis le master 1254 px en un seul downsampling, avec le symbole centré à 75 % sur le fond ink `#0E0E0D`. Cette géométrie maintient la silhouette claire dans le cercle sûr de 192 dp sans agrandir un dérivé basse définition.
 
 Le logo horizontal complet a un autre master canonique : `kwabor_2.png`. Il est embarqué dans `res/drawable-nodpi/kwabor_launch_wordmark.png` comme copie binaire exacte, en 2172 × 724 au ratio 3:1. Dès que le splash système rend la main, Compose l'affiche centré avec `ContentScale.Fit`, sur le fond `#080707` prélevé aux bords du master, jusqu'à la première frame réellement rendue par le lecteur vidéo. Aucun crop, padding raster, recolorisation ou redessin ne sépare donc le fichier officiel du rendu applicatif.
 
@@ -36,11 +36,19 @@ Les PNG Android/iOS sont régénérables sur Windows avec :
 .\tools\generate-brand-assets.ps1
 ```
 
-La CI verrouille les trois masters, chaque dérivé d'icône et les références plateforme. Le contrôle peut aussi être lancé localement, sans dépendance Python tierce :
+La CI verrouille les trois masters, chaque dérivé d'icône, la géométrie visible, le cercle sûr et le câblage XML actif du SplashScreen. Le contrôle peut aussi être lancé localement, sans dépendance Python tierce :
 
 ```powershell
 python -B tools/verify-brand-assets.py
 ```
+
+Quand un asset de lancement ou son pipeline change, la CI appelle aussi
+`.github/workflows/android-launch-evidence.yml`. Elle enregistre un cold start après installation
+fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`, puis publie vidéos,
+planches-contact et métadonnées pendant 7 jours. L'APK de preuve utilise une URL réservée
+`.invalid` et une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou
+si l'intro embarquée n'est pas exposée après le splash. Ces preuves automatisées ne remplacent pas la
+revue perceptuelle finale sur appareils Pixel/Samsung et iOS.
 
 ## Clé d'upload production
 
