@@ -1,6 +1,7 @@
 # Audit de préparation V1 — 30 juillet 2026
 
 Ce document décrit l’état réellement vérifié de Kwabor et propose le chemin minimal vers une V1 Android/iOS exploitable au Bénin.
+Il conserve les constats de la baseline auditée ; leur clôture postérieure est suivie dans [`docs/V1-PROGRESS.md`](../V1-PROGRESS.md).
 
 ## Synthèse
 

@@ -10,8 +10,9 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/sec-001-authorization-guardrails` |
-| PR de stabilisation | `#35`, brouillon, `quality` et `iOS simulator build` verts |
+| Branche active | `codex/arch-004-dispatcher-boundary` |
+| PR d’architecture | `#36`, brouillon empilé sur `#35`, CI en cours |
+| PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -26,10 +27,24 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Deux migrations SEC-001A indépendantes appliquées sur la base locale Kwabor.
 - Sept suites pgTAP et 316 assertions réussies.
 - La nouvelle suite de 74 assertions couvre OAuth, grants exacts, RLS, équipes, claims, signalements, RPC de modération et matrice de fiches ; deux assertions renforcent en plus l’onboarding existant.
-- PR brouillon `#35` publiée avec les commits `f6593d4` et `4b9e3fd` ; run CI `30556043063` vert pour `quality` et le build simulateur iOS.
+- PR brouillon `#35` publiée avec les commits `f6593d4`, `4b9e3fd` et `12ddba2` ; run final `30557976298` vert pour `quality` et le build simulateur iOS.
+- ARCH-004 validée localement : `DispatcherProvider` et son implémentation vivent dans `shared.app`, le binding Koin vit dans la composition root et le domaine n'importe plus Coroutines.
+- `verifyDomainPurity` refuse le domaine dans un source set plateforme et tout import non Kotlin/non intra-domain ; son test négatif contrôlé et sa passe positive sont prouvés.
+- 180 tests partagés, 112 tests JVM Android, compilation Kotlin iOS Simulator, Spotless, Detekt, lint, `check` et APK debug sont verts sur ARCH-004.
+- Deux re-revues indépendantes d'ARCH-004 ne relèvent aucun P0/P1/P2.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
+
+### ARCH-004 — Frontière d’exécution du domaine
+
+Objectifs :
+
+- conserver Coroutines et les dispatchers dans la couche application ;
+- enregistrer l'implémentation par la composition root Koin, hors des modules data ;
+- empêcher la réintroduction d'imports externes ou de sources plateforme dans le domaine.
+
+État : implémentation, validations locales, deux re-revues, commit, push et publication de la PR brouillon empilée `#36` terminés. La CI GitHub, la revue humaine et la fusion après `#35` restent ouvertes.
 
 ### SEC-001A — Guardrails d’autorisation
 
@@ -46,12 +61,14 @@ Objectifs :
 
 ## Prochaines tâches
 
-1. Obtenir la revue humaine puis fusionner la PR `#35`.
-2. Exécuter la préflight avant tout déploiement sur une base persistante.
-3. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
-4. Faire valider le périmètre V1 minimal et la navigation.
-5. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-6. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+1. Terminer les checks GitHub de la PR `#36` et corriger tout écart macOS.
+2. Obtenir la revue humaine puis fusionner la PR `#35`.
+3. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
+4. Exécuter la préflight avant tout déploiement sur une base persistante.
+5. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
+6. Faire valider le périmètre V1 minimal et la navigation.
+7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
+8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
 
 ## Décisions techniques actées pendant la reprise
 
@@ -63,12 +80,14 @@ Objectifs :
 - La taxonomie d’une fiche est garantie par clé étrangère composite et trigger de rôle.
 - Une incohérence de données existante doit faire échouer la migration plutôt qu’être corrigée silencieusement.
 - Aucun troisième client applicatif n’est introduit pour l’administration.
+- Les dispatchers sont une dépendance de couche application ; le domaine reste Kotlin pur et ne dépend d'aucun SDK asynchrone.
+- La gate d'architecture vérifie des règles déterministes d'emplacement et d'import ; une isolation physique de classpath nécessiterait un module et un ADR séparés.
 
 ## Problèmes rencontrés
 
 - Le conteneur PostgreSQL local `supabase_db_KWABOR` était arrêté avec le code 137. Il a été redémarré sans toucher aux conteneurs d’autres projets.
 - Le lint PostgreSQL signale des fonctions fournies par PostGIS ; aucun diagnostic ne concerne `public` ou `app_private`.
-- La passe Gradle complète dure environ quinze minutes sur le poste Windows.
+- La passe Gradle complète ARCH-004 a duré 9 min 39 s à froid puis 1 min 25 s avec les caches chauds sur le poste Windows.
 - Les tests Kotlin iOS sont compilés mais marqués `SKIPPED` sur Windows ; la preuve d’exécution native doit rester une gate macOS.
 
 ## Décisions produit en attente

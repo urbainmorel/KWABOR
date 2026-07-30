@@ -161,11 +161,14 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - L'audit V1 du 30 juillet 2026 confronte code, PRD/DESIGN, données, tests, CI, distribution et exploitation dans `docs/audits/2026-07-30-v1-production-readiness.md`. L'avancement réel est estimé à 25–30 % du PRD V1 actuel et la préparation production à 15–20 %.
 - SEC-001A est implémentée localement sur `codex/sec-001-authorization-guardrails` : onboarding Google/Apple, grants Social/équipes/claims/signalements, RPC de modération, cohérence taxonomique et matrice Guide/Promoteur/Institution sont durcis par migrations forward-only séparées.
 - Le hotfix OAuth/ACL ne dépend plus de la validation taxonomique fail-closed. Le runbook `docs/runbooks/security-authorization-preflight.md` impose sauvegarde, audit humain des anciennes lignes d’autorité et validation de la taxonomie avant tout déploiement persistant.
-- Validation SEC-001A : 2 migrations appliquées localement, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. Les commits `f6593d4`/`4b9e3fd` sont publiés dans la PR brouillon `#35` ; le run `30556043063` a passé `quality` puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release.
+- Validation SEC-001A : 2 migrations appliquées localement, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. Les commits `f6593d4`/`4b9e3fd`/`12ddba2` sont publiés dans la PR brouillon `#35` ; le run final `30557976298` a passé `quality` puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release.
+- ARCH-004 est implémentée dans la PR brouillon empilée `#36` : le contrat et l'implémentation de dispatchers quittent le domaine pour `shared.app`, le binding Koin appartient désormais à la composition root et les consommateurs Android/iOS conservent la même injection déterministe.
+- La gate `verifyDomainPurity`, rattachée à `check`, refuse tout fichier domaine dans un source set plateforme et tout import autre que Kotlin ou intra-domain. Un test négatif contrôlé a prouvé les deux refus avant suppression des probes.
+- Validation locale ARCH-004 : 180 tests partagés et 112 tests JVM Android sans échec, compilation Kotlin iOS Simulator, `spotlessCheck`, `detekt`, lint, `check`, APK debug et `git diff --check` verts ; deux re-revues indépendantes ne relèvent aucun P0/P1/P2.
 
 ## Tâche en cours
 
-Clôture atomique SEC-001A : obtenir la revue humaine puis fusionner la PR brouillon `#35`.
+Clôture séquencée de la stabilisation : terminer la CI et la revue de la PR `#36`, obtenir la revue humaine puis fusionner la PR `#35`, et enfin retargeter/fusionner `#36` vers `main`.
 La PR d'authentification `#34` reste séparée et ne doit pas être mélangée à cette branche.
 
 ## Blocages / limites
@@ -173,6 +176,7 @@ La PR d'authentification `#34` reste séparée et ne doit pas être mélangée �
 - Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
 - La navigation, les CTA factices, Explore iOS, le détail, l'administration opérateur, les contenus réels et le pipeline média bloquent encore une V1 commercialement exploitable.
 - SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, validée par CI, fusionnée puis déployée.
+- ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release d'AUTH-004 sont confirmées par GitHub Actions macOS sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
