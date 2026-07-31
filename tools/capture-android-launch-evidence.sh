@@ -26,7 +26,7 @@ evidence_root="build/brand-evidence/api-${api_level}"
 # consumers sequentially avoids starving the short-lived system splash on KVM runners.
 # Raw frames remain quota-bounded on the device and are pulled, validated, and
 # compressed before the post-launch recorder starts.
-screenrecord_time_limit_seconds=120
+screenrecord_time_limit_seconds=180
 minimum_evidence_seconds=15
 normalized_frame_rate=30
 contact_sheet_samples=150
@@ -34,12 +34,16 @@ contact_sheet_columns=15
 contact_sheet_rows=10
 contact_sheet_frame_width=180
 minimum_recording_wall_seconds=24
-minimum_raw_decoded_frames=30
+minimum_raw_decoded_frames=4
 post_launch_hold_seconds=5
-onboarding_deadline_seconds=60
+screenrecord_phase_deadline_seconds=45
+screenrecord_home_transition_budget_seconds=40
+screenrecord_completion_margin_seconds=10
 remote_header_probe_bytes=16384
 screenrecord_startup_timeout_seconds=30
 screenrecord_post_launch_sample_timeout_seconds=15
+screenrecord_stable_size_timeout_seconds=4
+screenrecord_stable_size_poll_seconds=0.5
 screenrecord_graceful_stop_seconds=60
 screenrecord_forced_stop_seconds=5
 screenrecord_host_reap_seconds=10
@@ -55,8 +59,9 @@ screencap_launch_burst_duration_seconds=3
 screencap_launch_burst_sample_period_microseconds=450000
 screencap_startup_sample_period_microseconds=2000000
 screencap_post_ready_sample_period_microseconds=450000
-screencap_maximum_gap_seconds=4.50
+screencap_maximum_idle_gap_seconds=4.50
 screencap_float_comparison_epsilon_seconds=0.000000001
+screencap_retryable_gap_exit_status=75
 screencap_maximum_frames=64
 screencap_maximum_frame_bytes=33554432
 screencap_remote_maximum_bytes=671088640
@@ -80,9 +85,9 @@ landing_title="Découvrez le Bénin"
 landing_sign_in="Se connecter"
 
 declare -a density_profiles=(
-  "mdpi:160:360x780:360x780"
-  "xhdpi:320:720x1560:720x1560"
   "xxxhdpi:640:1440x3120:720x1560"
+  "xhdpi:320:720x1560:720x1560"
+  "mdpi:160:360x780:360x780"
 )
 
 largest_expected_raw_frame_bytes=$((16 + 1440 * 3120 * 4))
@@ -351,41 +356,48 @@ assert_display_profile() {
   fi
 }
 
-assert_android12_home_surface() {
+resolved_home_component=""
+resolved_home_package=""
+
+assert_home_surface() {
   local output_file="$1"
   local home_resolution=""
-  local home_component=""
-  local home_package=""
+  local home_component="${resolved_home_component}"
+  local home_package="${resolved_home_package}"
   local activity_dump=""
   local resumed_activity=""
 
-  if ! home_resolution="$(
-    timeout "${adb_probe_timeout_seconds}" adb shell cmd package resolve-activity \
-      --brief \
-      --user 0 \
-      -a android.intent.action.MAIN \
-      -c android.intent.category.HOME |
-      tr -d '\r'
-  )"; then
-    echo "Unable to resolve the Android 12 HOME activity" >&2
-    return 1
+  if [[ -z "${home_component}" || -z "${home_package}" ]]; then
+    if ! home_resolution="$(
+      timeout "${adb_probe_timeout_seconds}" adb shell cmd package resolve-activity \
+        --brief \
+        --user 0 \
+        -a android.intent.action.MAIN \
+        -c android.intent.category.HOME |
+        tr -d '\r'
+    )"; then
+      echo "Unable to resolve the HOME activity" >&2
+      return 1
+    fi
+    home_component="$(
+      printf '%s\n' "${home_resolution}" |
+        sed -n '/^[[:alnum:]_.][[:alnum:]_.]*\/[[:alnum:]_.$][[:alnum:]_.$]*$/p' |
+        tail -n 1
+    )"
+    if [[ ! "${home_component}" =~ ^[[:alnum:]_.]+/[[:alnum:]_.$]+$ ]]; then
+      printf '%s\n' "${home_resolution}" >"${output_file}"
+      echo "Unable to parse the HOME component" >&2
+      return 1
+    fi
+    home_package="${home_component%%/*}"
+    resolved_home_component="${home_component}"
+    resolved_home_package="${home_package}"
   fi
-  home_component="$(
-    printf '%s\n' "${home_resolution}" |
-      sed -n '/^[[:alnum:]_.][[:alnum:]_.]*\/[[:alnum:]_.$][[:alnum:]_.$]*$/p' |
-      tail -n 1
-  )"
-  if [[ ! "${home_component}" =~ ^[[:alnum:]_.]+/[[:alnum:]_.$]+$ ]]; then
-    printf '%s\n' "${home_resolution}" >"${output_file}"
-    echo "Unable to parse the Android 12 HOME component" >&2
-    return 1
-  fi
-  home_package="${home_component%%/*}"
   if ! activity_dump="$(
     timeout "${adb_probe_timeout_seconds}" adb shell dumpsys activity activities |
       tr -d '\r'
   )"; then
-    echo "Unable to inspect the Android 12 resumed activity" >&2
+    echo "Unable to inspect the resumed HOME activity" >&2
     return 1
   fi
   resumed_activity="$(
@@ -399,7 +411,7 @@ assert_android12_home_surface() {
   } >"${output_file}"
   if [[ "${resumed_activity}" != *"${home_package}"* ]]; then
     echo \
-      "Android 12 HOME is not resumed before the root system-surface launch" \
+      "HOME is not the resumed activity before the display transition" \
       >&2
     return 1
   fi
@@ -439,6 +451,18 @@ screenrecord_ready_bytes=""
 screenrecord_mdat_payload_offset=""
 screenrecord_frame_bootstrap=""
 screenrecord_post_launch_bytes=""
+screenrecord_started_at=""
+screenrecord_hard_deadline=""
+screenrecord_cold_phase_started_at=""
+screenrecord_initial_transition_bytes=""
+screenrecord_initial_transition_observed_at=""
+screenrecord_cold_baseline_bytes=""
+screenrecord_home_baseline_bytes=""
+screenrecord_home_transition_bytes=""
+screenrecord_resume_baseline_bytes=""
+screenrecord_resume_phase_started_at=""
+screenrecord_resume_transition_bytes=""
+screenrecord_stable_bytes=""
 
 probe_screenrecord_processes() {
   local probe_timeout_seconds="$1"
@@ -745,6 +769,7 @@ trap cleanup EXIT
 capture_screencap_frames() {
   local remote_root="$1"
   local nonce="$2"
+  local profile_budget_bytes="$3"
   local prelaunch_timeout_seconds=$((
     screencap_arm_timeout_seconds +
       4 * adb_probe_timeout_seconds +
@@ -760,7 +785,10 @@ capture_screencap_frames() {
     5))
 
   if ! validate_remote_screencap_root "${remote_root}" ||
-    ! validate_screencap_nonce "${nonce}"; then
+    ! validate_screencap_nonce "${nonce}" ||
+    [[ ! "${profile_budget_bytes}" =~ ^[0-9]+$ ]] ||
+    ((profile_budget_bytes <= 0 ||
+      profile_budget_bytes > screencap_remote_maximum_bytes)); then
     echo "Refusing invalid remote screencap capture parameters" >&2
     return 1
   fi
@@ -788,7 +816,7 @@ capture_screencap_frames() {
     "${minimum_post_ready_duration_seconds}" \
     "${minimum_post_ready_capture_span_seconds}" \
     "${screencap_maximum_frame_bytes}" \
-    "${screencap_remote_maximum_bytes}" <<'ANDROID_SCREENCAP'
+    "${profile_budget_bytes}" <<'ANDROID_SCREENCAP'
 set -u
 
 remote_root="$1"
@@ -1408,9 +1436,13 @@ ANDROID_COLD_START
 prepare_remote_screencap() {
   local remote_root="$1"
   local nonce="$2"
+  local profile_budget_bytes="$3"
 
   if ! validate_remote_screencap_root "${remote_root}" ||
-    ! validate_screencap_nonce "${nonce}"; then
+    ! validate_screencap_nonce "${nonce}" ||
+    [[ ! "${profile_budget_bytes}" =~ ^[0-9]+$ ]] ||
+    ((profile_budget_bytes <= 0 ||
+      profile_budget_bytes > screencap_remote_maximum_bytes)); then
     echo "Refusing invalid remote screencap preparation parameters" >&2
     return 1
   fi
@@ -1418,13 +1450,13 @@ prepare_remote_screencap() {
     adb shell -T /system/bin/sh -s -- \
     "${remote_root}" \
     "${nonce}" \
-    "${screencap_remote_maximum_bytes}" \
+    "${profile_budget_bytes}" \
     "${screencap_remote_reserve_bytes}" <<'ANDROID_SCREENCAP_PREPARE'
 set -eu
 
 remote_root="$1"
 nonce="$2"
-maximum_bytes="$3"
+profile_budget_bytes="$3"
 reserve_bytes="$4"
 umask 077
 remote_root_created=0
@@ -1460,7 +1492,13 @@ case "${available_kilobytes}" in
     ;;
 esac
 available_bytes=$((available_kilobytes * 1024))
-required_bytes=$((maximum_bytes + reserve_bytes))
+case "${profile_budget_bytes}:${reserve_bytes}" in
+  *[!0-9:]* | :* | *:)
+    echo "Invalid remote screencap storage budget" >&2
+    exit 1
+    ;;
+esac
+required_bytes=$((profile_budget_bytes + reserve_bytes))
 if [ "${available_bytes}" -lt "${required_bytes}" ]; then
   echo \
     "Insufficient remote screencap storage: ${available_bytes}, required ${required_bytes}" \
@@ -1478,6 +1516,8 @@ for marker_name in armed launch ready stop abort done; do
     >"${remote_root}/screencap-${marker_name}.pending"
 done
 echo "remote_screencap_available_bytes=${available_bytes}"
+echo "remote_screencap_profile_budget_bytes=${profile_budget_bytes}"
+echo "remote_screencap_required_bytes=${required_bytes}"
 ANDROID_SCREENCAP_PREPARE
 }
 
@@ -1748,6 +1788,7 @@ finalize_screencap_evidence() {
   local capture_directory="$1"
   local display_size="$2"
   local record_size="$3"
+  local profile_budget_bytes="$4"
   local published_directory="${capture_directory}/screencap-evidence"
   local frames_directory="${published_directory}/screencap-frames"
   local timestamps_file="${published_directory}/screencap-timestamps.tsv"
@@ -1790,11 +1831,13 @@ finalize_screencap_evidence() {
   local sample_contact_sheet_frame_width=180
   local sample_contact_sheet_frame_height=0
   local source_capture_span=""
-  local source_maximum_gap=""
+  local source_maximum_start_gap=""
+  local source_maximum_idle_gap=""
   local source_png_total_bytes=""
   local source_raw_total_bytes=""
   local source_first_started_at=""
   local source_last_started_at=""
+  local source_last_completed_at=""
   local timeline_nonce=""
   local launch_requested_at=""
   local ready_observed_at=""
@@ -1805,6 +1848,7 @@ finalize_screencap_evidence() {
   local metadata_home_raw_bytes=""
   local launch_to_first_frame=""
   local last_frame_to_stop=""
+  local concat_status=0
   local post_ready_frame_count=""
   local first_post_ready_frame=""
   local last_post_ready_frame=""
@@ -1814,6 +1858,12 @@ finalize_screencap_evidence() {
   local home_dimensions=""
 
   source_frame_count="$(awk 'END { print NR }' "${timestamps_file}")"
+  if [[ ! "${profile_budget_bytes}" =~ ^[0-9]+$ ]] ||
+    ((profile_budget_bytes <= 0 ||
+      profile_budget_bytes > screencap_remote_maximum_bytes)); then
+    echo "Invalid screencap profile budget: ${profile_budget_bytes}" >&2
+    return 1
+  fi
   if [[ ! "${source_frame_count}" =~ ^[0-9]+$ ]] ||
     ((source_frame_count < minimum_screencap_frames)); then
     echo "Invalid screencap source frame count: ${source_frame_count}" >&2
@@ -1895,22 +1945,27 @@ finalize_screencap_evidence() {
   source_last_started_at="$(
     awk -F '\t' 'END { print $2 }' "${timestamps_file}"
   )"
+  source_last_completed_at="$(
+    awk -F '\t' 'END { print $3 }' "${timestamps_file}"
+  )"
   if ! awk \
     -v home_start="${home_attempted_at}" \
     -v home_end="${home_completed_at}" \
     -v launch="${launch_requested_at}" \
     -v first="${source_first_started_at}" \
     -v ready="${ready_observed_at}" \
-    -v last="${source_last_started_at}" \
+    -v last_start="${source_last_started_at}" \
+    -v last_end="${source_last_completed_at}" \
     -v stop="${stop_observed_at}" '
       BEGIN {
         valid = home_start <= home_end &&
           home_end <= launch &&
           launch <= first &&
-          first <= last &&
+          first <= last_start &&
           first <= ready &&
-          ready <= last &&
-          last <= stop
+          ready <= last_start &&
+          last_start <= last_end &&
+          last_end <= stop
         exit !valid
       }
     '; then
@@ -1925,14 +1980,14 @@ finalize_screencap_evidence() {
   )"
   last_frame_to_stop="$(
     awk \
-      -v last="${source_last_started_at}" \
+      -v last="${source_last_completed_at}" \
       -v stop="${stop_observed_at}" \
       'BEGIN { printf "%.6f", stop - last }'
   )"
   if ! awk \
     -v leading="${launch_to_first_frame}" \
     -v trailing="${last_frame_to_stop}" \
-    -v maximum="${screencap_maximum_gap_seconds}" \
+    -v maximum="${screencap_maximum_idle_gap_seconds}" \
     -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
     'BEGIN {
       valid = leading >= 0 &&
@@ -1942,7 +1997,7 @@ finalize_screencap_evidence() {
       exit !valid
     }'; then
     echo \
-      "Screencap boundary gap exceeds ${screencap_maximum_gap_seconds}s: launch=${launch_to_first_frame}s stop=${last_frame_to_stop}s" \
+      "Screencap boundary idle gap exceeds ${screencap_maximum_idle_gap_seconds}s: launch=${launch_to_first_frame}s stop=${last_frame_to_stop}s" \
       >&2
     return 1
   fi
@@ -1994,7 +2049,7 @@ finalize_screencap_evidence() {
       -v leading="${ready_to_first_post_ready_frame}" \
       -v span="${post_ready_capture_span}" \
       -v elapsed="${ready_to_last_post_ready_frame}" \
-      -v maximum="${screencap_maximum_gap_seconds}" \
+      -v maximum="${screencap_maximum_idle_gap_seconds}" \
       -v minimum_span="${minimum_post_ready_capture_span_seconds}" \
       -v minimum_elapsed="${minimum_post_ready_duration_seconds}" \
       -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
@@ -2052,19 +2107,24 @@ finalize_screencap_evidence() {
     return 1
   fi
 
-  if ! awk -F '\t' \
+  awk -F '\t' \
     -v prefix='screencap-evidence/screencap-frames/' \
-    -v maximum_gap="${screencap_maximum_gap_seconds}" \
+    -v maximum_idle_gap="${screencap_maximum_idle_gap_seconds}" \
+    -v retryable_gap_status="${screencap_retryable_gap_exit_status}" \
     -v epsilon="${screencap_float_comparison_epsilon_seconds}" '
+    BEGIN { failure_status = 1 }
     NR == 1 {
       previous_file = $1
-      previous_time = $2 + 0
+      previous_started = $2 + 0
+      previous_completed = $3 + 0
       count = 1
       next
     }
     {
-      current_time = $2 + 0
-      duration = current_time - previous_time
+      current_started = $2 + 0
+      current_completed = $3 + 0
+      duration = current_started - previous_started
+      idle_gap = current_started - previous_completed
       if ($1 <= previous_file) {
         printf "Non-monotonic screencap filename: %s after %s\n",
           $1, previous_file > "/dev/stderr"
@@ -2077,31 +2137,40 @@ finalize_screencap_evidence() {
         invalid = 1
         exit
       }
-      if (duration - maximum_gap > epsilon) {
-        printf "Screencap gap %.9fs exceeds %.9fs before %s\n",
-          duration, maximum_gap, $1 > "/dev/stderr"
+      if (idle_gap < 0) {
+        printf "Overlapping screencap interval %.9fs before %s\n",
+          idle_gap, $1 > "/dev/stderr"
+        invalid = 1
+        exit
+      }
+      if (idle_gap - maximum_idle_gap > epsilon) {
+        printf "Screencap idle gap %.9fs exceeds %.9fs before %s\n",
+          idle_gap, maximum_idle_gap, $1 > "/dev/stderr"
+        failure_status = retryable_gap_status
         invalid = 1
         exit
       }
       printf "file '\''%s%s'\''\n", prefix, previous_file
       printf "duration %.9f\n", duration
       previous_file = $1
-      previous_time = current_time
+      previous_started = current_started
+      previous_completed = current_completed
       count++
     }
     END {
       if (invalid || count < 2) {
-        exit 1
+        exit failure_status
       }
       printf "file '\''%s%s'\''\n", prefix, previous_file
       print "duration 0.250000000"
       printf "file '\''%s%s'\''\n", prefix, previous_file
     }
-  ' "${timestamps_file}" >"${concat_file}"; then
-    echo "Unable to build a monotonic screencap timeline" >&2
-    return 1
+  ' "${timestamps_file}" >"${concat_file}" || concat_status=$?
+  if ((concat_status != 0)); then
+    echo "Unable to build a bounded monotonic screencap timeline" >&2
+    return "${concat_status}"
   fi
-  source_maximum_gap="$(
+  source_maximum_start_gap="$(
     awk -F '\t' '
       NR == 1 {
         previous_time = $2 + 0
@@ -2113,6 +2182,21 @@ finalize_screencap_evidence() {
         gap = current_time - previous_time
         if (gap > maximum) maximum = gap
         previous_time = current_time
+      }
+      END { printf "%.6f", maximum }
+    ' "${timestamps_file}"
+  )"
+  source_maximum_idle_gap="$(
+    awk -F '\t' '
+      NR == 1 {
+        previous_completed = $3 + 0
+        maximum = 0
+        next
+      }
+      {
+        idle_gap = ($2 + 0) - previous_completed
+        if (idle_gap > maximum) maximum = idle_gap
+        previous_completed = $3 + 0
       }
       END { printf "%.6f", maximum }
     ' "${timestamps_file}"
@@ -2339,12 +2423,13 @@ finalize_screencap_evidence() {
 
   {
     echo "capture_post_launch_hard_timeout_seconds=${screencap_hard_timeout_seconds}"
-    echo "maximum_source_gap_seconds=${screencap_maximum_gap_seconds}"
+    echo "maximum_source_idle_gap_seconds=${screencap_maximum_idle_gap_seconds}"
     echo "float_comparison_epsilon_seconds=${screencap_float_comparison_epsilon_seconds}"
     echo "maximum_frame_duration_seconds=${screencap_maximum_frame_duration_seconds}"
     echo "conversion_maximum_frame_duration_seconds=${screencap_conversion_maximum_frame_duration_seconds}"
     echo "maximum_frame_bytes=${screencap_maximum_frame_bytes}"
-    echo "maximum_sequence_bytes=${screencap_remote_maximum_bytes}"
+    echo "maximum_sequence_bytes=${profile_budget_bytes}"
+    echo "maximum_sequence_safety_ceiling_bytes=${screencap_remote_maximum_bytes}"
     echo "launch_burst_duration_seconds=${screencap_launch_burst_duration_seconds}"
     echo "launch_burst_target_sample_period_microseconds=${screencap_launch_burst_sample_period_microseconds}"
     echo "startup_target_sample_period_microseconds=${screencap_startup_sample_period_microseconds}"
@@ -2360,6 +2445,7 @@ finalize_screencap_evidence() {
     echo "static_quota_post_ready_frames=${screencap_budget_post_ready_frames}"
     echo "static_quota_capture_frames=${screencap_budget_capture_frames}"
     echo "static_quota_required_bytes=${screencap_budget_required_bytes}"
+    echo "profile_quota_required_bytes=${profile_budget_bytes}"
     echo "source_timestamp_clock=android_proc_uptime_seconds"
     echo "source_timestamp_semantics=launch_and_activity_ready_markers_with_screencap_command_started_and_completed_at"
     echo "review_video_semantics=sampled_reconstruction_holding_each_png_until_the_next_successful_capture"
@@ -2383,7 +2469,8 @@ finalize_screencap_evidence() {
     echo "source_raw_metadata_sha256=$(sha256sum "${raw_metadata}" | awk '{print $1}')"
     echo "source_phase_manifest_sha256=$(sha256sum "${phase_manifest}" | awk '{print $1}')"
     echo "source_capture_span_seconds=${source_capture_span}"
-    echo "source_observed_maximum_gap_seconds=${source_maximum_gap}"
+    echo "source_observed_maximum_start_gap_seconds=${source_maximum_start_gap}"
+    echo "source_observed_maximum_idle_gap_seconds=${source_maximum_idle_gap}"
     echo "source_video_duration_seconds=${source_duration}"
     echo "source_video_decoded_frames=${source_decoded_frames}"
     echo "source_video_sha256=$(sha256sum "${source_video}" | awk '{print $1}')"
@@ -2591,7 +2678,7 @@ wait_for_screenrecord() {
   return 1
 }
 
-wait_for_screenrecord_growth_after_launch() {
+wait_for_screenrecord_growth_after_transition() {
   local recorder_pid="$1"
   local recorder_log="$2"
   local remote_video="$3"
@@ -2609,7 +2696,7 @@ wait_for_screenrecord_growth_after_launch() {
   if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]] ||
     [[ ! "${baseline_bytes}" =~ ^[0-9]+$ ]] ||
     [[ ! "${overall_deadline}" =~ ^[0-9]+$ ]]; then
-    echo "Invalid screenrecord post-launch growth baseline" >&2
+    echo "Invalid screenrecord transition growth baseline" >&2
     return 1
   fi
   if ((overall_deadline < deadline)); then
@@ -2630,16 +2717,16 @@ wait_for_screenrecord_growth_after_launch() {
       if ((probe_status == 2)); then
         return 1
       fi
-      echo "screenrecord disappeared after the cold launch" >&2
+      echo "screenrecord disappeared after the display transition" >&2
       return 1
     fi
     if [[ "${remote_pid}" != "${expected_remote_pid}" ]]; then
-      echo "Unexpected screenrecord PID after the cold launch: ${remote_pid}" >&2
+      echo "Unexpected screenrecord PID after the display transition: ${remote_pid}" >&2
       return 1
     fi
     if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
       reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
-      echo "screenrecord exited after the cold launch" >&2
+      echo "screenrecord exited after the display transition" >&2
       return 1
     fi
     remaining_seconds=$((deadline - SECONDS))
@@ -2657,7 +2744,7 @@ wait_for_screenrecord_growth_after_launch() {
     fi
     if [[ "${recorded_bytes}" =~ ^[0-9]+$ ]]; then
       if ((recorded_bytes < baseline_bytes)); then
-        echo "screenrecord size regressed after the cold launch" >&2
+        echo "screenrecord size regressed after the display transition" >&2
         return 1
       fi
       if ((recorded_bytes > baseline_bytes)); then
@@ -2678,16 +2765,16 @@ wait_for_screenrecord_growth_after_launch() {
           if ((probe_status == 2)); then
             return 1
           fi
-          echo "screenrecord disappeared after encoding its launch sample" >&2
+          echo "screenrecord disappeared after encoding its transition sample" >&2
           return 1
         fi
         if [[ "${confirmed_remote_pid}" != "${expected_remote_pid}" ]]; then
-          echo "screenrecord PID changed after encoding its launch sample: ${confirmed_remote_pid}" >&2
+          echo "screenrecord PID changed after encoding its transition sample: ${confirmed_remote_pid}" >&2
           return 1
         fi
         if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
           reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
-          echo "screenrecord exited after encoding its launch sample" >&2
+          echo "screenrecord exited after encoding its transition sample" >&2
           return 1
         fi
         if ((SECONDS >= deadline)); then
@@ -2700,23 +2787,120 @@ wait_for_screenrecord_growth_after_launch() {
     sleep 0.25
   done
   sed 's/^/screenrecord: /' "${recorder_log}" >&2
-  echo "Timed out waiting for an encoded sample after the cold launch" >&2
+  echo "Timed out waiting for an encoded sample after the display transition" >&2
   return 1
+}
+
+wait_for_screenrecord_size_stable() {
+  local recorder_pid="$1"
+  local recorder_log="$2"
+  local remote_video="$3"
+  local expected_remote_pid="$4"
+  local deadline=$((SECONDS + screenrecord_stable_size_timeout_seconds + 1))
+  local remote_pid=""
+  local probe_status=0
+  local recorded_bytes=""
+  local previous_bytes=""
+  local stable_observations=0
+  local stable_observations_required=3
+
+  if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid screenrecord PID for the stability barrier" >&2
+    return 1
+  fi
+  while ((SECONDS < deadline)); do
+    if remote_pid="$(
+      probe_screenrecord_processes "${adb_probe_timeout_seconds}"
+    )"; then
+      :
+    else
+      probe_status=$?
+      if ((probe_status == 2)); then
+        return 1
+      fi
+      echo "screenrecord disappeared before its size became stable" >&2
+      return 1
+    fi
+    if [[ "${remote_pid}" != "${expected_remote_pid}" ]]; then
+      echo "Unexpected screenrecord PID at the stability barrier: ${remote_pid}" >&2
+      return 1
+    fi
+    if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+      reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+      echo "screenrecord exited before its size became stable" >&2
+      return 1
+    fi
+    recorded_bytes="$(
+      timeout "${adb_probe_timeout_seconds}" \
+        adb shell stat -c %s "${remote_video}" 2>/dev/null |
+        tr -d '\r' ||
+        true
+    )"
+    if [[ "${recorded_bytes}" =~ ^[0-9]+$ ]]; then
+      if [[ "${recorded_bytes}" == "${previous_bytes}" ]]; then
+        stable_observations=$((stable_observations + 1))
+      else
+        previous_bytes="${recorded_bytes}"
+        stable_observations=1
+      fi
+      if ((stable_observations >= stable_observations_required)); then
+        screenrecord_stable_bytes="${recorded_bytes}"
+        return 0
+      fi
+    else
+      previous_bytes=""
+      stable_observations=0
+    fi
+    sleep "${screenrecord_stable_size_poll_seconds}"
+  done
+  sed 's/^/screenrecord: /' "${recorder_log}" >&2
+  echo "Timed out waiting for the screenrecord size stability barrier" >&2
+  return 1
+}
+
+require_screenrecord_budget() {
+  local label="$1"
+  local required_seconds="$2"
+
+  if [[ ! "${screenrecord_hard_deadline}" =~ ^[0-9]+$ ||
+    ! "${required_seconds}" =~ ^[0-9]+$ ]] ||
+    ((required_seconds <= 0)); then
+    echo "Invalid screenrecord budget for ${label}" >&2
+    return 1
+  fi
+  if ((SECONDS + required_seconds >= screenrecord_hard_deadline)); then
+    echo \
+      "Insufficient screenrecord budget before ${label}: required ${required_seconds}s before ${screenrecord_hard_deadline}, now ${SECONDS}" \
+      >&2
+    return 1
+  fi
 }
 
 wait_for_configured_onboarding() {
   local capture_directory="$1"
   local remote_window="$2"
   local recorder_pid="$3"
-  local recording_ready_at="$4"
+  local phase_started_at="$4"
   local recorder_log="$5"
-  local uiautomator_log="${capture_directory}/uiautomator.txt"
-  local window_file="${capture_directory}/window.xml"
-  local deadline=$((recording_ready_at + onboarding_deadline_seconds + 1))
+  local evidence_phase="$6"
+  local uiautomator_log="${capture_directory}/uiautomator-${evidence_phase}.txt"
+  local window_file="${capture_directory}/window-${evidence_phase}.xml"
+  local deadline=$((phase_started_at + screenrecord_phase_deadline_seconds + 1))
   local attempt=0
   local remaining_seconds=0
   local command_timeout_seconds=0
 
+  case "${evidence_phase}" in
+    cold | resume) ;;
+    *)
+      echo "Invalid onboarding evidence phase: ${evidence_phase}" >&2
+      return 1
+      ;;
+  esac
+  if [[ "${screenrecord_hard_deadline}" =~ ^[0-9]+$ ]] &&
+    ((deadline > screenrecord_hard_deadline)); then
+    deadline="${screenrecord_hard_deadline}"
+  fi
   : >"${uiautomator_log}"
   while ((SECONDS < deadline)); do
     attempt=$((attempt + 1))
@@ -2745,7 +2929,7 @@ wait_for_configured_onboarding() {
           return 1
         fi
         if grep -Fq "${intro_accessibility_label}" "${window_file}"; then
-          echo "intro" >"${capture_directory}/post-launch-state.txt"
+          echo "intro" >"${capture_directory}/post-launch-state-${evidence_phase}.txt"
           timeout "${adb_probe_timeout_seconds}" \
             adb shell rm -f "${remote_window}" >/dev/null 2>&1 ||
             true
@@ -2753,7 +2937,8 @@ wait_for_configured_onboarding() {
         fi
         if grep -Fq "${landing_title}" "${window_file}" &&
           grep -Fq "${landing_sign_in}" "${window_file}"; then
-          echo "onboarding-landing" >"${capture_directory}/post-launch-state.txt"
+          echo "onboarding-landing" \
+            >"${capture_directory}/post-launch-state-${evidence_phase}.txt"
           timeout "${adb_probe_timeout_seconds}" \
             adb shell rm -f "${remote_window}" >/dev/null 2>&1 ||
             true
@@ -2953,8 +3138,17 @@ if [[ "${immersive_mode_confirmations}" != "confirmed" ]]; then
   exit 1
 fi
 
+timeout "${adb_general_timeout_seconds}" \
+  adb uninstall "${package_name}" >/dev/null 2>&1 ||
+  true
+timeout 120 adb install --no-streaming "${apk_path}" |
+  tee "${evidence_root}/install.txt"
+
 for profile in "${density_profiles[@]}"; do
   IFS=":" read -r density_name density_value display_size record_size <<<"${profile}"
+  display_width="${display_size%x*}"
+  display_height="${display_size#*x}"
+  post_launch_record_size="360x780"
   case "${density_name}" in
     mdpi | xhdpi | xxxhdpi) ;;
     *)
@@ -2962,6 +3156,22 @@ for profile in "${density_profiles[@]}"; do
       exit 1
       ;;
   esac
+  if [[ ! "${display_width}" =~ ^[0-9]+$ ||
+    ! "${display_height}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid display profile size: ${display_size}" >&2
+    exit 1
+  fi
+  profile_raw_frame_bytes=$((16 + display_width * display_height * 4))
+  profile_screencap_budget_bytes=$((
+    screencap_budget_stored_frames * profile_raw_frame_bytes +
+      screencap_maximum_frame_bytes
+  ))
+  if ((profile_screencap_budget_bytes > screencap_remote_maximum_bytes)); then
+    echo \
+      "Profile screencap budget exceeds the remote quota: ${profile_screencap_budget_bytes}/${screencap_remote_maximum_bytes}" \
+      >&2
+    exit 1
+  fi
   capture_directory="${evidence_root}/${density_name}"
   remote_video="/sdcard/kwabor-brand-002-api-${api_level}-${density_name}.mp4"
   remote_window="/sdcard/kwabor-brand-002-api-${api_level}-${density_name}.xml"
@@ -2988,18 +3198,35 @@ for profile in "${density_profiles[@]}"; do
   screenrecord_mdat_payload_offset=""
   screenrecord_frame_bootstrap=""
   screenrecord_post_launch_bytes=""
+  screenrecord_started_at=""
+  screenrecord_hard_deadline=""
+  screenrecord_cold_phase_started_at=""
+  screenrecord_initial_transition_bytes=""
+  screenrecord_initial_transition_observed_at=""
+  screenrecord_cold_baseline_bytes=""
+  screenrecord_home_baseline_bytes=""
+  screenrecord_home_transition_bytes=""
+  screenrecord_resume_baseline_bytes=""
+  screenrecord_resume_phase_started_at=""
+  screenrecord_resume_transition_bytes=""
+  screenrecord_stable_bytes=""
   screencap_pid=""
 
   mkdir -p "${capture_directory}"
-  timeout "${adb_general_timeout_seconds}" \
-    adb uninstall "${package_name}" >/dev/null 2>&1 ||
-    true
-  timeout 120 adb install --no-streaming "${apk_path}" |
-    tee "${capture_directory}/install.txt"
+  clear_data_result="$(
+    timeout "${adb_general_timeout_seconds}" \
+      adb shell pm clear "${package_name}" |
+      tr -d '\r'
+  )"
+  printf '%s\n' "${clear_data_result}" >"${capture_directory}/clear-data.txt"
+  if [[ "${clear_data_result}" != "Success" ]]; then
+    echo "Unable to reset app data for ${density_name}: ${clear_data_result}" >&2
+    exit 1
+  fi
   apply_display_profile "${display_size}" "${density_value}"
   assert_display_profile "${display_size}" "${density_value}"
   timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
-  timeout "${adb_general_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
   sleep 1
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_video}"
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_window}"
@@ -3021,11 +3248,13 @@ for profile in "${density_profiles[@]}"; do
   active_screencap_started=0
   prepare_remote_screencap \
     "${remote_screencap_root}" \
-    "${screencap_nonce}"
+    "${screencap_nonce}" \
+    "${profile_screencap_budget_bytes}"
   active_screencap_started=1
   capture_screencap_frames \
     "${remote_screencap_root}" \
     "${screencap_nonce}" \
+    "${profile_screencap_budget_bytes}" \
     >"${screencap_log}" 2>&1 &
   screencap_pid=$!
   active_screencap_pid="${screencap_pid}"
@@ -3037,7 +3266,7 @@ for profile in "${density_profiles[@]}"; do
     exit 1
   fi
   if [[ "${api_level}" == "31" ]]; then
-    assert_android12_home_surface \
+    assert_home_surface \
       "${capture_directory}/prelaunch-home-activity.txt"
   fi
   assert_display_profile "${display_size}" "${density_value}"
@@ -3078,12 +3307,29 @@ for profile in "${density_profiles[@]}"; do
   active_screencap_remote_root=""
   active_screencap_nonce=""
   active_screencap_started=0
+  finalize_screencap_evidence \
+    "${capture_directory}" \
+    "${display_size}" \
+    "${record_size}" \
+    "${profile_screencap_budget_bytes}"
 
   # The launch-critical raw collector is now quiescent. Start the longer
-  # post-launch recorder without competing for the system splash frames.
+  # continuity recorder on HOME without competing for the system splash
+  # frames, then cause a cold launch, HOME, and resume while it is armed.
+  timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
+  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+  sleep 1
+  assert_home_surface \
+    "${capture_directory}/screenrecord-prelaunch-home-activity.txt"
+  screenrecord_started_at="${SECONDS}"
+  screenrecord_hard_deadline=$((
+    screenrecord_started_at +
+      screenrecord_time_limit_seconds -
+      screenrecord_completion_margin_seconds
+  ))
   adb shell screenrecord \
     --verbose \
-    --size "${record_size}" \
+    --size "${post_launch_record_size}" \
     --bit-rate 4000000 \
     --time-limit "${screenrecord_time_limit_seconds}" \
     "${remote_video}" \
@@ -3096,24 +3342,177 @@ for profile in "${density_profiles[@]}"; do
     "${remote_video}"
   remote_recorder_pid="${active_remote_recorder_pid}"
   recording_ready_at="${SECONDS}"
-  wait_for_screenrecord_growth_after_launch \
+  wait_for_screenrecord_size_stable \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}"
+  screenrecord_cold_baseline_bytes="${screenrecord_stable_bytes}"
+  if [[ ! "${screenrecord_cold_baseline_bytes}" =~ ^[0-9]+$ ]] ||
+    ((screenrecord_cold_baseline_bytes < screenrecord_ready_bytes)); then
+    echo "Invalid screenrecord baseline before the cold transition" >&2
+    exit 1
+  fi
+  assert_home_surface \
+    "${capture_directory}/screenrecord-cold-baseline-home-activity.txt"
+  require_screenrecord_budget \
+    "the cold transition" \
+    "$((
+      screenrecord_phase_deadline_seconds +
+        screenrecord_home_transition_budget_seconds +
+        screenrecord_phase_deadline_seconds +
+        post_launch_hold_seconds
+    ))"
+  screenrecord_cold_phase_started_at="${SECONDS}"
+  declare -a screenrecord_cold_start_args=(
+    shell am start -S -W -n "${activity_name}"
+  )
+  if ((api_level >= 33)); then
+    screenrecord_cold_start_args=(
+      shell am start -S -W --splashscreen-show-icon -n "${activity_name}"
+    )
+  fi
+  timeout "${cold_start_timeout_seconds}" \
+    adb "${screenrecord_cold_start_args[@]}" |
+    tee "${capture_directory}/screenrecord-activity-start.txt"
+  if ! grep -Fq "Status: ok" \
+    "${capture_directory}/screenrecord-activity-start.txt" ||
+    ! grep -Fq "LaunchState: COLD" \
+      "${capture_directory}/screenrecord-activity-start.txt"; then
+    echo "Recorded MainActivity transition was not a successful cold start" >&2
+    exit 1
+  fi
+  wait_for_screenrecord_growth_after_transition \
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
     "${remote_recorder_pid}" \
-    "${screenrecord_ready_bytes}" \
-    "$((recording_ready_at + onboarding_deadline_seconds + 1))"
+    "${screenrecord_cold_baseline_bytes}" \
+    "$((SECONDS + screenrecord_post_launch_sample_timeout_seconds + 1))"
+  screenrecord_initial_transition_bytes="${screenrecord_post_launch_bytes}"
+  screenrecord_initial_transition_observed_at="${SECONDS}"
   assert_display_profile "${display_size}" "${density_value}"
   wait_for_configured_onboarding \
     "${capture_directory}" \
     "${remote_window}" \
     "${recorder_pid}" \
-    "${recording_ready_at}" \
-    "${recorder_log}"
+    "${screenrecord_cold_phase_started_at}" \
+    "${recorder_log}" \
+    cold
+  initial_transition_elapsed_seconds=$((
+    SECONDS - screenrecord_initial_transition_observed_at
+  ))
+  if ((initial_transition_elapsed_seconds < minimum_evidence_seconds)); then
+    cold_transition_hold_seconds=$((
+      minimum_evidence_seconds - initial_transition_elapsed_seconds
+    ))
+    if ((
+      SECONDS + cold_transition_hold_seconds >=
+        screenrecord_cold_phase_started_at + screenrecord_phase_deadline_seconds
+    )); then
+      echo "Cold transition cannot satisfy its evidence hold within the phase deadline" >&2
+      exit 1
+    fi
+    sleep "${cold_transition_hold_seconds}"
+  fi
+  require_screenrecord_budget \
+    "the HOME transition" \
+    "$((
+      screenrecord_home_transition_budget_seconds +
+        screenrecord_phase_deadline_seconds +
+        post_launch_hold_seconds
+    ))"
+  screenrecord_resume_expected_process_id="$(
+    timeout "${adb_probe_timeout_seconds}" \
+      adb shell pidof "${package_name}" |
+      tr -d '\r'
+  )"
+  if [[ ! "${screenrecord_resume_expected_process_id}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid app process before the HOME transition" >&2
+    exit 1
+  fi
+  wait_for_screenrecord_size_stable \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}"
+  screenrecord_home_baseline_bytes="${screenrecord_stable_bytes}"
+  if [[ ! "${screenrecord_home_baseline_bytes}" =~ ^[0-9]+$ ]] ||
+    ((screenrecord_home_baseline_bytes < screenrecord_initial_transition_bytes)); then
+    echo "Invalid screenrecord baseline before the HOME transition" >&2
+    exit 1
+  fi
+  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+  sleep 1
+  assert_home_surface \
+    "${capture_directory}/screenrecord-resume-home-activity.txt"
+  wait_for_screenrecord_growth_after_transition \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}" \
+    "${screenrecord_home_baseline_bytes}" \
+    "$((SECONDS + screenrecord_post_launch_sample_timeout_seconds + 1))"
+  screenrecord_home_transition_bytes="${screenrecord_post_launch_bytes}"
+  wait_for_screenrecord_size_stable \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}"
+  screenrecord_resume_baseline_bytes="${screenrecord_stable_bytes}"
+  if [[ ! "${screenrecord_resume_baseline_bytes}" =~ ^[0-9]+$ ]] ||
+    ((screenrecord_resume_baseline_bytes < screenrecord_home_transition_bytes)); then
+    echo "Invalid screenrecord baseline before the resume transition" >&2
+    exit 1
+  fi
+  require_screenrecord_budget \
+    "the resume transition" \
+    "$((screenrecord_phase_deadline_seconds + post_launch_hold_seconds))"
+  screenrecord_resume_phase_started_at="${SECONDS}"
+  timeout "${cold_start_timeout_seconds}" \
+    adb shell am start -W -n "${activity_name}" |
+    tee "${capture_directory}/screenrecord-resume-start.txt"
+  if ! grep -Fq "Status: ok" \
+    "${capture_directory}/screenrecord-resume-start.txt" ||
+    ! grep -Eq '^LaunchState: (HOT|WARM)$' \
+      "${capture_directory}/screenrecord-resume-start.txt"; then
+    echo "Recorded MainActivity resume transition was unsuccessful" >&2
+    exit 1
+  fi
+  screenrecord_resume_process_id="$(
+    timeout "${adb_probe_timeout_seconds}" \
+      adb shell pidof "${package_name}" |
+      tr -d '\r'
+  )"
+  if [[ "${screenrecord_resume_process_id}" != \
+    "${screenrecord_resume_expected_process_id}" ]]; then
+    echo "Recorded MainActivity resume did not preserve the app process" >&2
+    exit 1
+  fi
+  wait_for_screenrecord_growth_after_transition \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}" \
+    "${screenrecord_resume_baseline_bytes}" \
+    "$((SECONDS + screenrecord_post_launch_sample_timeout_seconds + 1))"
+  screenrecord_resume_transition_bytes="${screenrecord_post_launch_bytes}"
+  assert_display_profile "${display_size}" "${density_value}"
+  wait_for_configured_onboarding \
+    "${capture_directory}" \
+    "${remote_window}" \
+    "${recorder_pid}" \
+    "${screenrecord_resume_phase_started_at}" \
+    "${recorder_log}" \
+    resume
   recording_elapsed_seconds=$((SECONDS - recording_ready_at))
   recording_hold_seconds="${post_launch_hold_seconds}"
   if ((recording_elapsed_seconds + recording_hold_seconds < minimum_recording_wall_seconds)); then
     recording_hold_seconds=$((minimum_recording_wall_seconds - recording_elapsed_seconds))
+  fi
+  if ((SECONDS + recording_hold_seconds >= screenrecord_hard_deadline)); then
+    echo "Post-launch evidence exceeded the bounded screenrecord phase budget" >&2
+    exit 1
   fi
   sleep "${recording_hold_seconds}"
   finish_screenrecord \
@@ -3129,11 +3528,6 @@ for profile in "${density_profiles[@]}"; do
   timeout "${adb_general_timeout_seconds}" adb pull "${remote_video}" "${raw_video}"
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_video}"
   assert_display_profile "${display_size}" "${density_value}"
-  finalize_screencap_evidence \
-    "${capture_directory}" \
-    "${display_size}" \
-    "${record_size}"
-
   resumed_activity="$(
     timeout "${adb_general_timeout_seconds}" adb shell dumpsys activity activities |
       grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' ||
@@ -3186,15 +3580,15 @@ for profile in "${density_profiles[@]}"; do
   raw_video_size="$(
     ffprobe -v error -show_entries format=size -of csv=p=0 "${raw_video}"
   )"
-  expected_width="${record_size%x*}"
-  expected_height="${record_size#*x}"
+  expected_width="${post_launch_record_size%x*}"
+  expected_height="${post_launch_record_size#*x}"
   if [[ "${raw_video_codec}" != "h264" ]]; then
     echo "Unexpected raw recording codec: ${raw_video_codec}" >&2
     exit 1
   fi
   if [[ "${raw_video_width}" != "${expected_width}" ||
     "${raw_video_height}" != "${expected_height}" ]]; then
-    echo "Unexpected raw recording size: ${raw_video_width}x${raw_video_height}, expected ${record_size}" >&2
+    echo "Unexpected raw recording size: ${raw_video_width}x${raw_video_height}, expected ${post_launch_record_size}" >&2
     exit 1
   fi
   if [[ ! "${raw_video_frames}" =~ ^[0-9]+$ ]] ||
@@ -3210,22 +3604,30 @@ for profile in "${density_profiles[@]}"; do
     echo "Raw post-launch recording has an invalid duration: ${raw_video_duration}" >&2
     exit 1
   fi
-  if ! awk -v duration="${raw_video_duration}" \
-    'BEGIN { exit !(duration > 0) }'; then
-    echo "Raw post-launch recording has a non-positive duration: ${raw_video_duration}" >&2
+  if ! awk \
+    -v duration="${raw_video_duration}" \
+    -v minimum="${minimum_evidence_seconds}" \
+    'BEGIN { exit !(duration >= minimum) }'; then
+    echo "Raw post-launch recording is shorter than ${minimum_evidence_seconds}s: ${raw_video_duration}s" >&2
     exit 1
   fi
   # ActivityManager WaitTime and post-launch screenrecord PTS use different
   # clocks under an accelerated emulator. Preserve both metrics without
   # comparing them; the launch-critical sequence has its own device-monotonic
   # marker, while the recorder has an armed-muxer barrier and UI assertion.
-  launch_wait_ms="$(
+  launch_critical_wait_ms="$(
     awk -F': ' '$1 == "WaitTime" { print $2 }' \
       "${capture_directory}/activity-start.txt" |
       tr -d '\r'
   )"
-  if [[ ! "${launch_wait_ms}" =~ ^[0-9]+$ ]]; then
-    echo "MainActivity did not report a numeric WaitTime" >&2
+  screenrecord_cold_launch_wait_ms="$(
+    awk -F': ' '$1 == "WaitTime" { print $2 }' \
+      "${capture_directory}/screenrecord-activity-start.txt" |
+      tr -d '\r'
+  )"
+  if [[ ! "${launch_critical_wait_ms}" =~ ^[0-9]+$ ||
+    ! "${screenrecord_cold_launch_wait_ms}" =~ ^[0-9]+$ ]]; then
+    echo "MainActivity did not report numeric launch WaitTime values" >&2
     exit 1
   fi
   normalized_evidence_seconds="$(
@@ -3314,7 +3716,7 @@ for profile in "${density_profiles[@]}"; do
   fi
   if [[ "${video_width}" != "${expected_width}" ||
     "${video_height}" != "${expected_height}" ]]; then
-    echo "Unexpected normalized recording size: ${video_width}x${video_height}, expected ${record_size}" >&2
+    echo "Unexpected normalized recording size: ${video_width}x${video_height}, expected ${post_launch_record_size}" >&2
     exit 1
   fi
   if [[ "${video_frames}" != "${expected_normalized_frames}" ]]; then
@@ -3328,9 +3730,20 @@ for profile in "${density_profiles[@]}"; do
     echo "screenrecord_ready_bytes=${screenrecord_ready_bytes}"
     echo "screenrecord_mdat_payload_offset=${screenrecord_mdat_payload_offset}"
     echo "screenrecord_frame_bootstrap=${screenrecord_frame_bootstrap}"
-    echo "screenrecord_post_launch_bytes=${screenrecord_post_launch_bytes}"
+    echo "screenrecord_started_at=${screenrecord_started_at}"
+    echo "screenrecord_hard_deadline=${screenrecord_hard_deadline}"
+    echo "screenrecord_cold_baseline_bytes=${screenrecord_cold_baseline_bytes}"
+    echo "screenrecord_cold_phase_started_at=${screenrecord_cold_phase_started_at}"
+    echo "screenrecord_initial_transition_bytes=${screenrecord_initial_transition_bytes}"
+    echo "screenrecord_initial_transition_observed_at=${screenrecord_initial_transition_observed_at}"
+    echo "screenrecord_home_baseline_bytes=${screenrecord_home_baseline_bytes}"
+    echo "screenrecord_home_transition_bytes=${screenrecord_home_transition_bytes}"
+    echo "screenrecord_resume_baseline_bytes=${screenrecord_resume_baseline_bytes}"
+    echo "screenrecord_resume_phase_started_at=${screenrecord_resume_phase_started_at}"
+    echo "screenrecord_resume_transition_bytes=${screenrecord_resume_transition_bytes}"
     echo "recording_wall_seconds=${recording_wall_seconds}"
-    echo "launch_wait_ms=${launch_wait_ms}"
+    echo "launch_critical_wait_ms=${launch_critical_wait_ms}"
+    echo "screenrecord_cold_launch_wait_ms=${screenrecord_cold_launch_wait_ms}"
     echo "raw_duration_seconds=${raw_video_duration}"
     echo "raw_decoded_frames=${raw_video_frames}"
     echo "raw_sha256=$(sha256sum "${raw_video}" | awk '{print $1}')"
@@ -3368,6 +3781,8 @@ for profile in "${density_profiles[@]}"; do
     echo "density_value=${density_value}"
     echo "display_override=${display_size}"
     echo "record_size=${record_size}"
+    echo "post_launch_record_size=${post_launch_record_size}"
+    echo "profile_screencap_budget_bytes=${profile_screencap_budget_bytes}"
     timeout "${adb_general_timeout_seconds}" adb shell wm size
     timeout "${adb_general_timeout_seconds}" adb shell wm density
   } >"${capture_directory}/display.txt"

@@ -54,9 +54,10 @@ python -B tools/verify-brand-assets.py
 ```
 
 Quand un asset de lancement ou son pipeline change, la CI appelle aussi
-`.github/workflows/android-launch-evidence.yml`. Elle enregistre un cold start après installation
-fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`. La capture brute AOSP de
-l'écran composé est d'abord armée par une frame HOME. Le même shell appareil horodate ensuite
+`.github/workflows/android-launch-evidence.yml`. Elle installe un APK frais sur les API 30, 31 et
+36, puis réinitialise complètement ses données avant chacun des profils `xxxhdpi`, `xhdpi` et
+`mdpi`. La capture brute AOSP de l'écran composé est d'abord armée par une frame HOME. Le même
+shell appareil horodate ensuite
 `/proc/uptime`, publie le marqueur et exécute le cold start. Android 12 ne fournit pas l'option
 shell de forçage du splash à icône : son job API 31 utilise donc l'image AOSP standard rootable,
 exige `adb shell id -u == 0` et vérifie que HOME est au premier plan avant le lancement. Le
@@ -70,16 +71,30 @@ cible de 450 ms pendant au moins cinq secondes. Le même shell publie successive
 renommages atomiques, l'horodatage de ce retour, le marqueur `ready` et la demande d'arrêt ; le
 worker n'honore cette dernière qu'après le burst final. Celui-ci doit contenir au moins quatre
 captures postérieures au marqueur et couvrir au moins 2,5 secondes. Chaque commande est bornée à
-trois secondes ; les intervalles observés
-restent limités à 4,5 secondes. L'en-tête, le format, les dimensions et la taille exacte de chaque
-frame sont vérifiés avant conversion PNG côté hôte. Le budget statique `xxxhdpi` est de
-608 633 344 octets, sous le quota de 640 Mio, avec 128 Mio supplémentaires réservés au système.
-Les données brutes sont supprimées après production d'un manifeste SHA-256, puis l'ensemble
-validé est publié par un unique renommage atomique de répertoire.
+trois secondes ; le temps réellement inactif entre la fin d'une capture valide et le début de la
+suivante reste limité à 4,5 secondes. Un dépassement rejette toute la séquence et autorise une seule
+recapture complète ; aucune frame du premier essai n'est réutilisée. L'en-tête, le format, les
+dimensions et la taille exacte de chaque frame sont vérifiés avant conversion PNG côté hôte. Les
+budgets statiques sont de 608 633 344 octets en `xxxhdpi`, 177 324 544 en `xhdpi` et 69 497 344 en
+`mdpi`, chacun contrôlé avec 128 Mio supplémentaires réservés au système et sous le quota de
+sécurité de 640 Mio. Le profil le plus lourd passe en premier. Les données brutes sont supprimées
+après production d'un manifeste SHA-256, puis l'ensemble validé est publié par un unique renommage
+atomique de répertoire.
 
-Le `screenrecord` long démarre seulement après cette séquence critique afin de ne pas lui disputer
-SurfaceFlinger. Il conserve au moins 24 secondes de continuité post-lancement et une assertion UI
-confirme l'intro ou le landing configuré. La CI publie les vidéos source et de revue, les
+Le `screenrecord` long démarre seulement après la validation et la compression de cette séquence
+critique afin de ne pas lui disputer SurfaceFlinger. Cette preuve de continuité, distincte de la
+preuve launch native, est encodée en 360×780 pour rester sous les capacités AVC logicielles des
+images AOSP. Recorder armé sur une surface HOME attestée pour chaque API, la CI fige une baseline
+MP4 stable, provoque un second cold start puis, au moins quinze secondes plus tard, une transition
+vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester actif et le MP4 doit
+croître séparément après le cold start, après HOME et après la reprise. Une nouvelle baseline stable
+avant chaque transition empêche d'attribuer à celle-ci des octets encore produits par la phase
+précédente ; le processus applicatif doit aussi rester identique entre HOME et la reprise. Les phases
+partagent un deadline global borné sous la limite AOSP de 180 secondes et conservent dix secondes
+pour finaliser le conteneur. La preuve exige enfin un H.264 décodable d'au moins quatre frames VFR,
+au moins quinze secondes PTS, vingt-quatre secondes murales et une assertion UI distincte après le
+cold start puis après la reprise, confirmant l'intro ou le landing configuré. La CI
+publie les vidéos source et de revue, les
 planches-contact, la frame HOME et les métadonnées pendant 7 jours ; en cas d'échec de cadence,
 les PNG déjà validés restent disponibles pour le diagnostic. Une planche montre chaque
 échantillon exactement une fois et un manifeste distingue `startup` de `post-ready`. La vidéo et
