@@ -96,7 +96,11 @@ baseline est un snapshot de taille validé au plus près de l'action, supérieur
 octet déjà prouvé, et encadré par deux contrôles du même PID distant et du processus hôte. La
 croissance strictement supérieure qui suit, les assertions d'activité/UI et la validation finale du
 MP4 prouvent ensemble que le flux traverse chaque transition ; le processus applicatif doit aussi
-rester identique entre HOME et la reprise. Les phases
+rester identique entre HOME et la reprise. API 30/31 exigent un `LaunchState` `HOT` ou `WARM` pour
+cette reprise. API 36 accepte aussi `UNKNOWN (0)` uniquement si `am start` émet exactement
+l'avertissement indiquant que la tâche courante a été ramenée au premier plan ; cette exception
+Android 16 reste corroborée par le même PID, la croissance du flux, l'activité reprise et l'état UI.
+Les phases
 partagent un deadline global borné sous la limite AOSP de 180 secondes et conservent dix secondes
 pour finaliser le conteneur. La preuve exige enfin un H.264 décodable d'au moins quatre frames VFR,
 au moins quinze secondes PTS, vingt-quatre secondes murales et une assertion UI distincte après le

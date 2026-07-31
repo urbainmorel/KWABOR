@@ -3552,10 +3552,26 @@ for profile in "${density_profiles[@]}"; do
   timeout "${cold_start_timeout_seconds}" \
     adb shell am start -W -n "${activity_name}" |
     tee "${capture_directory}/screenrecord-resume-start.txt"
-  if ! grep -Fq "Status: ok" \
-    "${capture_directory}/screenrecord-resume-start.txt" ||
-    ! grep -Eq '^LaunchState: (HOT|WARM)$' \
-      "${capture_directory}/screenrecord-resume-start.txt"; then
+  screenrecord_resume_start_file="${capture_directory}/screenrecord-resume-start.txt"
+  if ! grep -Fxq "Status: ok" "${screenrecord_resume_start_file}"; then
+    echo "Recorded MainActivity resume transition was unsuccessful" >&2
+    exit 1
+  fi
+  if grep -Eq '^LaunchState: (HOT|WARM)$' \
+    "${screenrecord_resume_start_file}"; then
+    :
+  elif [[ "${api_level}" == "36" ]] &&
+    grep -Fxq 'LaunchState: UNKNOWN (0)' \
+      "${screenrecord_resume_start_file}" &&
+    grep -Fxq \
+      'Warning: Activity not started, its current task has been brought to the front' \
+      "${screenrecord_resume_start_file}"; then
+    # Android 16 can report UNKNOWN when am start merely brings the existing
+    # task to the foreground. Accept only that exact platform response; the
+    # unchanged PID, recorder growth, resumed activity and UI checks below
+    # must still corroborate the transition.
+    :
+  else
     echo "Recorded MainActivity resume transition was unsuccessful" >&2
     exit 1
   fi
