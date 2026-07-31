@@ -42,7 +42,11 @@ screenrecord_completion_margin_seconds=10
 remote_header_probe_bytes=16384
 screenrecord_startup_timeout_seconds=30
 screenrecord_post_launch_sample_timeout_seconds=15
-screenrecord_stable_size_timeout_seconds=4
+# Three stability observations each perform bounded process and file-size ADB
+# probes. The initial barrier can tolerate their declared timeout on a busy
+# emulator; the two transition barriers stay inside the reserved HOME budget.
+screenrecord_initial_stable_size_timeout_seconds=20
+screenrecord_transition_stable_size_timeout_seconds=4
 screenrecord_stable_size_poll_seconds=0.5
 screenrecord_graceful_stop_seconds=60
 screenrecord_forced_stop_seconds=5
@@ -1094,6 +1098,7 @@ while :; do
     [ -n "${ready_observed_at}" ] &&
     [ -n "${first_captured_at}" ] &&
     [ -n "${first_post_ready_captured_at}" ] &&
+    [ "${captured_frames}" -ge "${minimum_frames}" ] &&
     [ "${post_ready_frames}" -ge "${minimum_post_ready_frames}" ] &&
     awk \
       -v first="${first_captured_at}" \
@@ -1987,19 +1992,24 @@ finalize_screencap_evidence() {
   if ! awk \
     -v leading="${launch_to_first_frame}" \
     -v trailing="${last_frame_to_stop}" \
+    'BEGIN {
+      exit !(leading >= 0 && trailing >= 0)
+    }'; then
+    echo "Negative screencap boundary interval" >&2
+    return 1
+  fi
+  if ! awk \
+    -v leading="${launch_to_first_frame}" \
+    -v trailing="${last_frame_to_stop}" \
     -v maximum="${screencap_maximum_idle_gap_seconds}" \
     -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
     'BEGIN {
-      valid = leading >= 0 &&
-        trailing >= 0 &&
-        leading - maximum <= epsilon &&
-        trailing - maximum <= epsilon
-      exit !valid
+      exit !(leading - maximum <= epsilon && trailing - maximum <= epsilon)
     }'; then
     echo \
       "Screencap boundary idle gap exceeds ${screencap_maximum_idle_gap_seconds}s: launch=${launch_to_first_frame}s stop=${last_frame_to_stop}s" \
       >&2
-    return 1
+    return "${screencap_retryable_gap_exit_status}"
   fi
 
   post_ready_frame_count="$(
@@ -2049,13 +2059,11 @@ finalize_screencap_evidence() {
       -v leading="${ready_to_first_post_ready_frame}" \
       -v span="${post_ready_capture_span}" \
       -v elapsed="${ready_to_last_post_ready_frame}" \
-      -v maximum="${screencap_maximum_idle_gap_seconds}" \
       -v minimum_span="${minimum_post_ready_capture_span_seconds}" \
       -v minimum_elapsed="${minimum_post_ready_duration_seconds}" \
       -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
       'BEGIN {
         valid = leading >= 0 &&
-          leading - maximum <= epsilon &&
           span - minimum_span >= -epsilon &&
           elapsed - minimum_elapsed >= -epsilon
         exit !valid
@@ -2064,6 +2072,16 @@ finalize_screencap_evidence() {
       "Insufficient post-ready screencap burst: frames=${post_ready_frame_count} leading=${ready_to_first_post_ready_frame}s span=${post_ready_capture_span}s elapsed=${ready_to_last_post_ready_frame}s" \
       >&2
     return 1
+  fi
+  if ! awk \
+    -v leading="${ready_to_first_post_ready_frame}" \
+    -v maximum="${screencap_maximum_idle_gap_seconds}" \
+    -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
+    'BEGIN { exit !(leading - maximum <= epsilon) }'; then
+    echo \
+      "Screencap ready boundary idle gap exceeds ${screencap_maximum_idle_gap_seconds}s: ${ready_to_first_post_ready_frame}s" \
+      >&2
+    return "${screencap_retryable_gap_exit_status}"
   fi
 
   if ! awk -F '\t' \
@@ -2796,7 +2814,8 @@ wait_for_screenrecord_size_stable() {
   local recorder_log="$2"
   local remote_video="$3"
   local expected_remote_pid="$4"
-  local deadline=$((SECONDS + screenrecord_stable_size_timeout_seconds + 1))
+  local stability_timeout_seconds="$5"
+  local deadline=""
   local remote_pid=""
   local probe_status=0
   local recorded_bytes=""
@@ -2804,10 +2823,13 @@ wait_for_screenrecord_size_stable() {
   local stable_observations=0
   local stable_observations_required=3
 
-  if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]]; then
-    echo "Invalid screenrecord PID for the stability barrier" >&2
+  if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]] ||
+    [[ ! "${stability_timeout_seconds}" =~ ^[0-9]+$ ]] ||
+    ((stability_timeout_seconds <= 0)); then
+    echo "Invalid screenrecord stability barrier parameters" >&2
     return 1
   fi
+  deadline=$((SECONDS + stability_timeout_seconds + 1))
   while ((SECONDS < deadline)); do
     if remote_pid="$(
       probe_screenrecord_processes "${adb_probe_timeout_seconds}"
@@ -3346,7 +3368,8 @@ for profile in "${density_profiles[@]}"; do
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
-    "${remote_recorder_pid}"
+    "${remote_recorder_pid}" \
+    "${screenrecord_initial_stable_size_timeout_seconds}"
   screenrecord_cold_baseline_bytes="${screenrecord_stable_bytes}"
   if [[ ! "${screenrecord_cold_baseline_bytes}" =~ ^[0-9]+$ ]] ||
     ((screenrecord_cold_baseline_bytes < screenrecord_ready_bytes)); then
@@ -3435,7 +3458,8 @@ for profile in "${density_profiles[@]}"; do
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
-    "${remote_recorder_pid}"
+    "${remote_recorder_pid}" \
+    "${screenrecord_transition_stable_size_timeout_seconds}"
   screenrecord_home_baseline_bytes="${screenrecord_stable_bytes}"
   if [[ ! "${screenrecord_home_baseline_bytes}" =~ ^[0-9]+$ ]] ||
     ((screenrecord_home_baseline_bytes < screenrecord_initial_transition_bytes)); then
@@ -3458,7 +3482,8 @@ for profile in "${density_profiles[@]}"; do
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
-    "${remote_recorder_pid}"
+    "${remote_recorder_pid}" \
+    "${screenrecord_transition_stable_size_timeout_seconds}"
   screenrecord_resume_baseline_bytes="${screenrecord_stable_bytes}"
   if [[ ! "${screenrecord_resume_baseline_bytes}" =~ ^[0-9]+$ ]] ||
     ((screenrecord_resume_baseline_bytes < screenrecord_home_transition_bytes)); then
