@@ -176,12 +176,12 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Le premier run BRAND-002 `30585538585` a correctement bloqué `quality` : les trois APIs ont construit et lancé l'app configurée, mais l'assertion exigeait à tort que l'intro soit encore la surface active après dix secondes alors que le landing onboarding était déjà affiché. La vidéo partielle API 30 confirme le raccord jusqu'à l'intro ; les fenêtres API 31/36 sont trop courtes pour une conclusion perceptuelle. Le harness enregistre désormais quinze secondes et accepte explicitement intro ou landing, sans relâcher le refus de l'écran de configuration.
 - La PR brouillon empilée `#38` contient aussi REMOTE-INTRO-001 : première installation embarquée/offline, média distant compatible précaché après consentement, présenté une fois au lancement suivant, puis mis en quarantaine ou purgé de façon durable. Les octets éditoriaux compatibles changent sans release Store ; une évolution du lecteur, du contrat, du fallback, du consentement ou du comportement exige une release.
 - Le run final `30654047648` du commit `4606309` a passé les sept checks, dont les trois jobs API 30/31/36 et les configurations iOS simulateur. Ses neuf cellules sont techniquement intègres, mais la revue perceptuelle rejette la matrice : wordmark absent de la preuve API30/xhdpi et API31/xxxhdpi, monogramme absent de la preuve API30/mdpi et API30/xxxhdpi. Il s'agit de trous de preuve, pas d'une preuve que l'app saute ces surfaces.
+- Le run de clôture `30661731938` du commit `94a31d5` passe les sept checks, dont `quality`, API 30/31/36 et les configurations iOS simulateur. Les neuf cellules sont techniquement intègres ; leur preuve continue de premier lancement montre perceptuellement HOME → monogramme → wordmark complet → intro. Le harnais conserve sa tolérance de cadence à 4,5 secondes, borne à trois essais les seuls transitoires `75/124` et n'accepte `UNKNOWN (0)` qu'avec le statut réussi, l'avertissement AOSP exact et les contrôles PID/activité/UI/flux aval.
 
 ## Tâche en cours
 
-Finaliser BRAND-002 : relancer les neuf séquences Android après correction du protocole continu,
-obtenir une preuve perceptuellement recevable et conserver la gate appareils avant bêta. En
-parallèle, obtenir la revue humaine puis fusionner `#35`, retargeter si nécessaire puis
+Conserver les gates propriétaire/appareils de BRAND-002, puis obtenir la revue humaine et
+fusionner `#35`, retargeter si nécessaire puis
 fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
@@ -193,7 +193,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
-- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release cumulées jusqu'à la PR `#38` sont confirmées par le run GitHub Actions macOS `30654047648` sous Xcode 16.4.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release cumulées jusqu'à la PR `#38` sont confirmées par le run GitHub Actions macOS `30661731938` sous Xcode 16.4.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
@@ -205,7 +205,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
-- Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002, mais la tâche reste ouverte : la matrice KVM `30654047648` est techniquement verte puis perceptuellement rejetée sur quatre cellules faute de frames requises. Le protocole réinitialise désormais l'app avant la preuve continue afin que celle-ci couvre aussi le premier lancement. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
+- Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - Le remplacement distant de l'intro ne devient opérationnel qu'après le provisionnement Firebase ENV-001B/OBS-001B, l'activation de Firebase Remote Config Realtime API, un stockage/CDN HTTPS immuable avec IAM minimal et une preuve appareils ; le consentement observabilité est branché dans AUTH-003. La provenance, les droits de diffusion et l'approbation éditoriale de chaque média restent une gate.
 - ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
@@ -215,8 +215,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Valider le correctif de preuve BRAND-002, relancer et relire la matrice, puis faire approuver et
-fusionner la pile `#35` → `#36` → `#37` → `#38`. Après fusion, faire valider le
+Faire approuver et fusionner la pile `#35` → `#36` → `#37` → `#38`. Après fusion, faire valider le
 périmètre/navigation V1 avant de supprimer
 les parcours factices et de commencer le résumé catalogue paginé. La revue appareils BRAND-002 et
 ENV-001B/OBS-001B restent des gates propriétaire.

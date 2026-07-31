@@ -77,7 +77,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] AUTH-002 — Livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
 - [x] PR-AUTH-002 — PR `#29` mergée après vérification média, `quality`, pgTAP et les trois configurations `iOS simulator build` vertes.
 - [x] REMOTE-INTRO-001 — Permettre le remplacement éditorial distant d'octets vidéo compatibles sans nouvelle release Store, avec première installation embarquée/offline, consentement, précache, affichage au lancement suivant, quarantaine et purge durable.
-- [ ] PR-REMOTE-INTRO-001 — PR brouillon empilée `#38` publiée sur `#37`, run final `30654047648` vert ; revue humaine et fusion de la pile restantes.
+- [ ] PR-REMOTE-INTRO-001 — PR brouillon empilée `#38` publiée sur `#37`, run final `30661731938` vert ; revue humaine et fusion de la pile restantes.
   - [ ] Confirmer la provenance, les droits de diffusion et l'approbation éditoriale de chaque média distant avant publication.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
@@ -87,8 +87,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Séparer le canevas launcher 108 dp du splash 288 dp et générer les cinq densités directement depuis le master 1254 px.
   - [x] Verrouiller dimensions, hashes, géométrie, cercle sûr et câblage XML actif ; prouver l'idempotence et les refus négatifs.
   - [ ] Faire confirmer par le propriétaire de marque que `kwabor_icone_app.png` est le master officiel, ou fournir son remplacement avant validation perceptuelle finale.
-  - [x] Produire et auditer les neuf captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi` — run `30654047648` vert, intégrité technique 9/9, revue perceptuelle rejetée.
-  - [ ] Produire une matrice perceptuellement recevable : le run `30654047648` ne montre pas le wordmark sur API30/xhdpi et API31/xxxhdpi, ni le monogramme sur API30/mdpi et API30/xxxhdpi.
+  - [x] Produire et auditer les neuf captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi` — run `30661731938` vert et intégrité technique 9/9.
+  - [x] Produire une matrice perceptuellement recevable : les neuf preuves continues du run `30661731938` montrent HOME → monogramme → wordmark complet → intro.
   - [ ] Valider perceptuellement le raccord complet sur appareils Android Pixel/Samsung et iOS.
 - [x] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.

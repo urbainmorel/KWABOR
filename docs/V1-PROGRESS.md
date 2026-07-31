@@ -14,7 +14,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
-| PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `4606309` |
+| PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -40,7 +40,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; le run `30573401220` de la PR brouillon empilée `#37` a passé `quality`/pgTAP en 4 min 55 s et le build iOS simulateur en 19 min 26 s.
 - BRAND-002 corrige le réagrandissement du splash Android : canevas 288 dp séparés du launcher 108 dp, cinq densités dérivées directement du master 1254 px, hashes/géométrie/câblage XML verrouillés et iOS inchangé.
 - Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte.
-- Le run final `30654047648` du commit `4606309` a produit les neuf cellules API 30/31/36 × `mdpi`/`xhdpi`/`xxxhdpi` et passé ses sept checks. Les archives, hashes, dimensions, états, 36 MP4 et 36 PNG sont techniquement conformes, mais la revue perceptuelle rejette la matrice : wordmark non prouvé sur API30/xhdpi et API31/xxxhdpi ; monogramme non prouvé sur API30/mdpi et API30/xxxhdpi.
+- Le run de clôture `30661731938` du commit `94a31d5` a produit les neuf cellules API 30/31/36 × `mdpi`/`xhdpi`/`xxxhdpi` et passé ses sept checks. Archives, hashes, dimensions, états et médias sont techniquement conformes 9/9 ; les neuf preuves continues montrent perceptuellement HOME → monogramme → wordmark complet → intro.
 - REMOTE-INTRO-001 est implémenté sur Android/iOS/shared dans la PR `#38` : première installation embarquée et offline, média distant compatible précaché après consentement, présenté une fois au lancement suivant, puis mis en quarantaine/purgé en cas d'échec, désactivation ou révocation. Les octets éditoriaux compatibles peuvent changer sans Store ; le lecteur, le contrat, le fallback, le consentement ou le comportement exigent une release. Le canal n'est pas live avant ENV-001B/OBS-001B, CDN HTTPS immuable, IAM minimal et validation appareils.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
@@ -56,10 +56,9 @@ Objectifs :
 - produire des cold starts comparables sur API 30/31/36 et trois densités ;
 - confirmer qu'aucun asset ou raccord iOS n'a dérivé.
 
-État : implémentation, validations locales et CI terminées. La matrice du run `30654047648` est
-techniquement intègre mais perceptuellement rejetée sur quatre cellules faute de frames exigées.
-Le protocole est corrigé pour réinitialiser les données avant la preuve continue ; une nouvelle
-matrice, puis le contrôle perceptuel appareils, restent ouverts.
+État : implémentation, validations locales, CI et matrice KVM perceptuelle 9/9 terminées sur le run
+`30661731938`. Le contrôle Pixel/Samsung/iOS physique et la confirmation propriétaire du master
+restent ouverts avant release.
 
 ### STAB-003 — Intégrité d'un clone vierge
 
@@ -97,15 +96,14 @@ Objectifs :
 
 ## Prochaines tâches
 
-1. Relancer et relire la matrice Android API 30/31/36 après correction de la preuve continue BRAND-002.
-2. Obtenir la revue humaine puis fusionner la PR `#35`.
-3. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-4. Retargeter, relire puis fusionner la PR STAB-003 `#37`, puis BRAND-002.
-5. Exécuter la préflight avant tout déploiement sur une base persistante.
-6. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
-7. Faire valider le périmètre V1 minimal et la navigation.
-8. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-9. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+1. Obtenir la revue humaine puis fusionner la PR `#35`.
+2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
+3. Retargeter, relire puis fusionner la PR STAB-003 `#37`, puis BRAND-002/REMOTE-INTRO `#38`.
+4. Exécuter la préflight avant tout déploiement sur une base persistante.
+5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
+6. Faire valider le périmètre V1 minimal et la navigation.
+7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
+8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
 
 ## Décisions techniques actées pendant la reprise
 
@@ -129,7 +127,7 @@ Objectifs :
 - Les tests Kotlin iOS sont compilés mais marqués `SKIPPED` sur Windows ; la preuve d’exécution native doit rester une gate macOS.
 - Le disque Windows est arrivé à saturation pendant la première revalidation STAB-003. Seuls le cache wrapper temporaire incomplet et les sorties `androidApp/build`/`shared/build`, entièrement régénérables, ont été supprimés ; le wrapper depuis cache vide puis la porte qualité ont ensuite terminé avec succès.
 - La première tentative émulateur API 30 de BRAND-002 a été refusée sous le seuil AOSP de 2 Gio libres. Après restitution d'espace, l'AVD a démarré, le build hermétique et l'installation non-streaming ont réussi, et deux défauts du harness Windows ont été corrigés. L'AVD logiciel a toutefois dépassé le budget de cold start (`Status: timeout`, 12,648 s) ; le script a donc refusé la capture au lieu de produire une fausse preuve. La matrice KVM CI reste la preuve multi-API autoritative.
-- Le run KVM final `30654047648` est vert et ses artefacts sont intègres, mais sa revue humaine a rejeté 4/9 cellules : les acquisitions haute résolution peuvent entourer le bref wordmark ou le monogramme. Le second enregistrement continu conservait en plus l'onboarding déjà consommé par la première passe ; il est désormais précédé d'un nouveau reset applicatif afin de prouver le vrai premier lancement.
+- Le run KVM `30654047648` était vert et ses artefacts intègres, mais sa revue humaine avait rejeté 4/9 cellules : les acquisitions haute résolution pouvaient entourer le bref wordmark ou le monogramme. Le second enregistrement continu conservait en plus l'onboarding déjà consommé par la première passe ; le reset ajouté avant ce flux a permis au run `30661731938` de fermer le trou avec neuf séquences perceptuellement recevables.
 
 ## Décisions produit en attente
 
