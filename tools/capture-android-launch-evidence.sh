@@ -438,6 +438,35 @@ request_home_surface() {
   return "${home_status}"
 }
 
+reset_app_data() {
+  local output_file="$1"
+  local evidence_label="$2"
+  local clear_data_result=""
+  local clear_data_status=0
+
+  if clear_data_result="$(
+    timeout "${adb_general_timeout_seconds}" \
+      adb shell pm clear "${package_name}" |
+      tr -d '\r'
+  )"; then
+    :
+  else
+    clear_data_status=$?
+    printf '%s\n' "${clear_data_result}" >"${output_file}"
+    echo \
+      "Unable to reset app data for ${evidence_label} (status ${clear_data_status})" \
+      >&2
+    return "${clear_data_status}"
+  fi
+  printf '%s\n' "${clear_data_result}" >"${output_file}"
+  if [[ "${clear_data_result}" != "Success" ]]; then
+    echo \
+      "Unable to reset app data for ${evidence_label}: ${clear_data_result}" \
+      >&2
+    return 1
+  fi
+}
+
 apply_display_profile() {
   local expected_size="$1"
   local expected_density="$2"
@@ -3275,16 +3304,9 @@ for profile in "${density_profiles[@]}"; do
   screencap_pid=""
 
   mkdir -p "${capture_directory}"
-  clear_data_result="$(
-    timeout "${adb_general_timeout_seconds}" \
-      adb shell pm clear "${package_name}" |
-      tr -d '\r'
-  )"
-  printf '%s\n' "${clear_data_result}" >"${capture_directory}/clear-data.txt"
-  if [[ "${clear_data_result}" != "Success" ]]; then
-    echo "Unable to reset app data for ${density_name}: ${clear_data_result}" >&2
-    exit 1
-  fi
+  reset_app_data \
+    "${capture_directory}/clear-data.txt" \
+    "${density_name} launch-critical capture"
   apply_display_profile "${display_size}" "${density_value}"
   assert_display_profile "${display_size}" "${density_value}"
   timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
@@ -3375,9 +3397,14 @@ for profile in "${density_profiles[@]}"; do
     "${record_size}" \
     "${profile_screencap_budget_bytes}"
 
-  # The launch-critical raw collector is now quiescent. Start the longer
-  # continuity recorder on HOME without competing for the system splash
-  # frames, then cause a cold launch, HOME, and resume while it is armed.
+  # The launch-critical raw collector is now quiescent. Reset the application
+  # again so the continuous recorder observes the same first-install intro
+  # contract instead of a landing screen persisted by the preceding pass.
+  # This second stream proves the short wordmark interval that high-resolution
+  # screencap calls can legitimately sample around.
+  reset_app_data \
+    "${capture_directory}/screenrecord-clear-data.txt" \
+    "${density_name} continuous first-launch capture"
   timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
   request_home_surface screenrecord-cold
   sleep 1

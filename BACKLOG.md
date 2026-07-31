@@ -62,20 +62,23 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
-  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations.
+  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire, renseigner leurs variables/configurations et provisionner le stockage/CDN HTTPS immuable ainsi que l'IAM minimal de publication du média d'introduction.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [x] PR-IOS-REL-001 — PR `#27` mergée après `quality`, pgTAP et les trois configurations simulateur vertes.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
-  - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et Remote Config sur appareils avec consentement.
+  - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et Remote Config sur appareils avec consentement, y compris la sélection et la révocation du média d'introduction distant.
 - [x] PR-OBS-001A — PR `#28` livrée après tests ciblés, `quality`, pgTAP et les trois configurations iOS simulateur vertes.
 
 ### Auth et onboarding
 
 - [x] AUTH-002 — Livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
 - [x] PR-AUTH-002 — PR `#29` mergée après vérification média, `quality`, pgTAP et les trois configurations `iOS simulator build` vertes.
+- [x] REMOTE-INTRO-001 — Permettre le remplacement éditorial distant d'octets vidéo compatibles sans nouvelle release Store, avec première installation embarquée/offline, consentement, précache, affichage au lancement suivant, quarantaine et purge durable.
+- [ ] PR-REMOTE-INTRO-001 — PR brouillon empilée `#38` publiée sur `#37`, run final `30654047648` vert ; revue humaine et fusion de la pile restantes.
+  - [ ] Confirmer la provenance, les droits de diffusion et l'approbation éditoriale de chaque média distant avant publication.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
@@ -84,7 +87,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Séparer le canevas launcher 108 dp du splash 288 dp et générer les cinq densités directement depuis le master 1254 px.
   - [x] Verrouiller dimensions, hashes, géométrie, cercle sûr et câblage XML actif ; prouver l'idempotence et les refus négatifs.
   - [ ] Faire confirmer par le propriétaire de marque que `kwabor_icone_app.png` est le master officiel, ou fournir son remplacement avant validation perceptuelle finale.
-  - [ ] Obtenir et relire les captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi`.
+  - [x] Produire et auditer les neuf captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi` — run `30654047648` vert, intégrité technique 9/9, revue perceptuelle rejetée.
+  - [ ] Produire une matrice perceptuellement recevable : le run `30654047648` ne montre pas le wordmark sur API30/xhdpi et API31/xxxhdpi, ni le monogramme sur API30/mdpi et API30/xxxhdpi.
   - [ ] Valider perceptuellement le raccord complet sur appareils Android Pixel/Samsung et iOS.
 - [x] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.

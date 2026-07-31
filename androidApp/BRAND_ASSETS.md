@@ -35,13 +35,16 @@ cached remote intro, so a slower cache check cannot expose the generic session-l
 between the system mark and a required intro.
 
 .github/workflows/android-launch-evidence.yml automates that matrix on API 30, 31 and 36. For
-each API, `tools/capture-android-launch-evidence.sh` performs fresh installs at `mdpi`, `xhdpi` and
-`xxxhdpi`, asserts the effective display profile, arms a composited-display capture on the HOME
-frame before launching Kwabor, and retains both that sequence and the raw `screenrecord` stream
-through the configured onboarding surface. The composited sequence spans at least 24 seconds,
-rejects source gaps above 750 ms, and validates every PNG before encoding. It publishes normalized
-review videos and contact sheets from both sources plus device metadata; normalization never
-substitutes for review of the raw streams.
+each API, `tools/capture-android-launch-evidence.sh` resets application data for every `mdpi`,
+`xhdpi` and `xxxhdpi` profile, asserts the effective display profile, arms a composited-display
+capture on the HOME frame before launching Kwabor, and retains both that sequence and the raw
+`screenrecord` stream through the configured onboarding surface. It resets application data again
+before the continuous stream so that stream also covers a virgin first-launch wordmark → intro
+transition; it does not reuse the onboarding completion persisted by the composited pass. The
+composited sequence rejects inactive acquisition gaps above 4.5 seconds and validates every PNG
+before encoding. The continuous recording spans at least 24 seconds of wall time. The workflow
+publishes normalized review videos and contact sheets from both sources plus device metadata;
+normalization never substitutes for review of the raw streams.
 The evidence APK uses only a reserved `.invalid` URL and a non-secret placeholder key; the capture
 fails unless `MainActivity` stays resumed and reaches either the bundled intro or the configured
 onboarding landing surface.

@@ -6,7 +6,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 
 | Élément | État |
 | --- | --- |
-| Date du snapshot | 30 juillet 2026 |
+| Date du snapshot | 31 juillet 2026 |
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
@@ -14,6 +14,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
+| PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `4606309` |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -38,7 +39,9 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Le wrapper a été téléchargé et exécuté depuis un cache vide ; les vérificateurs dépôt/média/marque, Spotless, Detekt, lint, `check`, la compilation Kotlin iOS Simulator et 292 tests Android/shared sont verts. Les APK debug/staging ont été produits sans variable `KWABOR_*` ni fichier Firebase.
 - Deux revues indépendantes finales de STAB-003 ne relèvent aucun P0/P1/P2 ; le run `30573401220` de la PR brouillon empilée `#37` a passé `quality`/pgTAP en 4 min 55 s et le build iOS simulateur en 19 min 26 s.
 - BRAND-002 corrige le réagrandissement du splash Android : canevas 288 dp séparés du launcher 108 dp, cinq densités dérivées directement du master 1254 px, hashes/géométrie/câblage XML verrouillés et iOS inchangé.
-- Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte. Les captures API 30/31/36 restent à obtenir et relire en CI.
+- Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte.
+- Le run final `30654047648` du commit `4606309` a produit les neuf cellules API 30/31/36 × `mdpi`/`xhdpi`/`xxxhdpi` et passé ses sept checks. Les archives, hashes, dimensions, états, 36 MP4 et 36 PNG sont techniquement conformes, mais la revue perceptuelle rejette la matrice : wordmark non prouvé sur API30/xhdpi et API31/xxxhdpi ; monogramme non prouvé sur API30/mdpi et API30/xxxhdpi.
+- REMOTE-INTRO-001 est implémenté sur Android/iOS/shared dans la PR `#38` : première installation embarquée et offline, média distant compatible précaché après consentement, présenté une fois au lancement suivant, puis mis en quarantaine/purgé en cas d'échec, désactivation ou révocation. Les octets éditoriaux compatibles peuvent changer sans Store ; le lecteur, le contrat, le fallback, le consentement ou le comportement exigent une release. Le canal n'est pas live avant ENV-001B/OBS-001B, CDN HTTPS immuable, IAM minimal et validation appareils.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
@@ -53,8 +56,10 @@ Objectifs :
 - produire des cold starts comparables sur API 30/31/36 et trois densités ;
 - confirmer qu'aucun asset ou raccord iOS n'a dérivé.
 
-État : implémentation et validations locales terminées. Le workflow d'évidence reproductible est
-prêt ; sa matrice, la revue des artefacts et le contrôle perceptuel appareils restent ouverts.
+État : implémentation, validations locales et CI terminées. La matrice du run `30654047648` est
+techniquement intègre mais perceptuellement rejetée sur quatre cellules faute de frames exigées.
+Le protocole est corrigé pour réinitialiser les données avant la preuve continue ; une nouvelle
+matrice, puis le contrôle perceptuel appareils, restent ouverts.
 
 ### STAB-003 — Intégrité d'un clone vierge
 
@@ -92,12 +97,12 @@ Objectifs :
 
 ## Prochaines tâches
 
-1. Publier BRAND-002 et obtenir/revoir sa matrice Android API 30/31/36.
+1. Relancer et relire la matrice Android API 30/31/36 après correction de la preuve continue BRAND-002.
 2. Obtenir la revue humaine puis fusionner la PR `#35`.
 3. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
 4. Retargeter, relire puis fusionner la PR STAB-003 `#37`, puis BRAND-002.
 5. Exécuter la préflight avant tout déploiement sur une base persistante.
-6. Clôturer ou fusionner proprement la PR `#34` sans mélanger les branches.
+6. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 7. Faire valider le périmètre V1 minimal et la navigation.
 8. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
 9. Commencer le résumé catalogue paginé et supprimer le N+1 média.
@@ -114,6 +119,7 @@ Objectifs :
 - Aucun troisième client applicatif n’est introduit pour l’administration.
 - Les dispatchers sont une dépendance de couche application ; le domaine reste Kotlin pur et ne dépend d'aucun SDK asynchrone.
 - La gate d'architecture vérifie des règles déterministes d'emplacement et d'import ; une isolation physique de classpath nécessiterait un module et un ADR séparés.
+- Un remplacement d'octets vidéo conforme au contrat média est éditorial et distant ; toute modification du lecteur, du contrat, du fallback, du consentement ou du comportement passe par une release Store.
 
 ## Problèmes rencontrés
 
@@ -123,6 +129,7 @@ Objectifs :
 - Les tests Kotlin iOS sont compilés mais marqués `SKIPPED` sur Windows ; la preuve d’exécution native doit rester une gate macOS.
 - Le disque Windows est arrivé à saturation pendant la première revalidation STAB-003. Seuls le cache wrapper temporaire incomplet et les sorties `androidApp/build`/`shared/build`, entièrement régénérables, ont été supprimés ; le wrapper depuis cache vide puis la porte qualité ont ensuite terminé avec succès.
 - La première tentative émulateur API 30 de BRAND-002 a été refusée sous le seuil AOSP de 2 Gio libres. Après restitution d'espace, l'AVD a démarré, le build hermétique et l'installation non-streaming ont réussi, et deux défauts du harness Windows ont été corrigés. L'AVD logiciel a toutefois dépassé le budget de cold start (`Status: timeout`, 12,648 s) ; le script a donc refusé la capture au lieu de produire une fausse preuve. La matrice KVM CI reste la preuve multi-API autoritative.
+- Le run KVM final `30654047648` est vert et ses artefacts sont intègres, mais sa revue humaine a rejeté 4/9 cellules : les acquisitions haute résolution peuvent entourer le bref wordmark ou le monogramme. Le second enregistrement continu conservait en plus l'onboarding déjà consommé par la première passe ; il est désormais précédé d'un nouveau reset applicatif afin de prouver le vrai premier lancement.
 
 ## Décisions produit en attente
 

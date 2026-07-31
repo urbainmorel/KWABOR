@@ -82,11 +82,15 @@ après production d'un manifeste SHA-256, puis l'ensemble validé est publié pa
 atomique de répertoire.
 
 Le `screenrecord` long démarre seulement après la validation et la compression de cette séquence
-critique afin de ne pas lui disputer SurfaceFlinger. Cette preuve de continuité, distincte de la
-preuve launch native, est encodée en 360×780 pour rester sous les capacités AVC logicielles des
-images AOSP. Recorder armé sur une surface HOME attestée pour chaque API, la CI fige une baseline
-MP4 monotone juste avant l'action, provoque un second cold start puis, au moins quinze secondes plus
-tard, une transition vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester
+critique afin de ne pas lui disputer SurfaceFlinger. La CI réinitialise une seconde fois les données
+applicatives avant de l'armer : cette preuve continue observe donc elle aussi un état applicatif
+vierge de premier lancement et peut rendre visible le bref raccord wordmark → intro même lorsqu'un
+`screencap` haute résolution l'a échantillonné autour. Cette preuve de continuité, distincte de la
+preuve launch
+native, est encodée en 360×780 pour rester sous les capacités AVC logicielles des images AOSP.
+Recorder armé sur une surface HOME attestée pour chaque API, la CI fige une baseline MP4 monotone
+juste avant l'action, provoque un cold start depuis cet état vierge puis, au moins quinze secondes
+plus tard, une transition vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester
 actif et le MP4 doit croître séparément après le cold start, après HOME et après la reprise. Chaque
 baseline est un snapshot de taille validé au plus près de l'action, supérieur ou égal au dernier
 octet déjà prouvé, et encadré par deux contrôles du même PID distant et du processus hôte. La
