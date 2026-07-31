@@ -57,19 +57,35 @@ Quand un asset de lancement ou son pipeline change, la CI appelle aussi
 `.github/workflows/android-launch-evidence.yml`. Elle enregistre un cold start après installation
 fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`. La capture brute AOSP de
 l'écran composé est d'abord armée par une frame HOME. Le même shell appareil horodate ensuite
-`/proc/uptime`, publie le marqueur et exécute le cold start. La séquence RGBA couvre le lancement
-pendant au moins quatre secondes à compter de cette requête, refuse tout intervalle — bornes
-incluses — supérieur à 490 ms et vérifie l'en-tête, le format, les dimensions et la taille exacte
-de chaque frame avant conversion PNG côté hôte. Un stop reçu plus tôt reste en attente jusqu'à
-cette durée minimale. Les données brutes sont supprimées après production d'un manifeste SHA-256,
-puis l'ensemble validé est publié par un unique renommage atomique de répertoire.
+`/proc/uptime`, publie le marqueur et exécute le cold start. Android 12 ne fournit pas l'option
+shell de forçage du splash à icône : son job API 31 utilise donc l'image AOSP standard rootable,
+exige `adb shell id -u == 0` et vérifie que HOME est au premier plan avant le lancement. Le
+framework Android 12 classe cet UID racine comme surface système et sélectionne ainsi le même
+splash à icône qu'un lancement depuis HOME. Sur API 36, `--splashscreen-show-icon` demande
+explicitement `SPLASH_SCREEN_STYLE_ICON` ; API 30 conserve son mécanisme de splash historique.
+
+La séquence RGBA commence par un burst de trois secondes à cible de 450 ms afin d'observer le
+splash court, passe à une cible de deux secondes jusqu'au retour de `am start -W`, puis reprend une
+cible de 450 ms pendant au moins cinq secondes. Le même shell publie successivement, par
+renommages atomiques, l'horodatage de ce retour, le marqueur `ready` et la demande d'arrêt ; le
+worker n'honore cette dernière qu'après le burst final. Celui-ci doit contenir au moins quatre
+captures postérieures au marqueur et couvrir au moins 2,5 secondes. Chaque commande est bornée à
+trois secondes ; les intervalles observés
+restent limités à 4,5 secondes. L'en-tête, le format, les dimensions et la taille exacte de chaque
+frame sont vérifiés avant conversion PNG côté hôte. Le budget statique `xxxhdpi` est de
+608 633 344 octets, sous le quota de 640 Mio, avec 128 Mio supplémentaires réservés au système.
+Les données brutes sont supprimées après production d'un manifeste SHA-256, puis l'ensemble
+validé est publié par un unique renommage atomique de répertoire.
 
 Le `screenrecord` long démarre seulement après cette séquence critique afin de ne pas lui disputer
 SurfaceFlinger. Il conserve au moins 24 secondes de continuité post-lancement et une assertion UI
 confirme l'intro ou le landing configuré. La CI publie les vidéos source et de revue, les
 planches-contact, la frame HOME et les métadonnées pendant 7 jours ; en cas d'échec de cadence,
-les PNG déjà validés restent disponibles pour le diagnostic. Les vidéos normalisées facilitent
-la lecture mais ne remplacent ni les sources horodatées ni les tests déterministes qui imposent
+les PNG déjà validés restent disponibles pour le diagnostic. Une planche montre chaque
+échantillon exactement une fois et un manifeste distingue `startup` de `post-ready`. La vidéo et
+la planche normalisées sont des reconstructions qui maintiennent chaque PNG jusqu'à l'échantillon
+suivant : elles facilitent la lecture, mais ne prouvent pas la persistance intermédiaire. Les
+sources horodatées prouvent les pixels observés ; les tests déterministes imposent séparément
 1 000 ms de splash et 500 ms de wordmark. L'APK de preuve utilise une URL réservée `.invalid` et
 une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou si aucune
 surface onboarding configurée n'est exposée. Ces preuves automatisées ne remplacent pas la revue
