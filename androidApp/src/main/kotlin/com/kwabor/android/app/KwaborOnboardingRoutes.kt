@@ -13,11 +13,17 @@ import com.kwabor.android.ui.screens.onboarding.OnboardingLandingScreen
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
-internal fun KwaborIntroRoute(strings: KwaborStrings, mediaSource: IntroMediaSource, viewModel: OnboardingViewModel) {
+internal fun KwaborIntroRoute(
+    strings: KwaborStrings,
+    mediaSource: IntroMediaSource,
+    viewModel: OnboardingViewModel,
+    launchSplashExited: Boolean,
+) {
     IntroScreen(
         strings = strings,
         mediaSource = mediaSource,
         reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
+        launchSplashExited = launchSplashExited,
         actions = IntroScreenActions(
             onDisplayed = { viewModel.onIntent(OnboardingIntent.IntroDisplayed) },
             onCompleted = { viewModel.onIntent(OnboardingIntent.IntroCompleted) },

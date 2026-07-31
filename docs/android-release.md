@@ -28,7 +28,18 @@ La source de build verrouillée du symbole carré est `kwabor_icone_app.png` à 
 
 Le splash système et le foreground de l'icône adaptative utilisent deux familles d'assets distinctes. Le foreground conserve son canevas intrinsèque de 108 dp. Le splash utilise le canevas Android sans fond d'icône de 288 dp, soit des PNG de 288, 432, 576, 864 et 1152 px de `mdpi` à `xxxhdpi`. Chaque splash est produit directement depuis le master 1254 px en un seul downsampling, avec le symbole centré à 75 % sur le fond ink `#0E0E0D`. Cette géométrie maintient la silhouette claire dans le cercle sûr de 192 dp sans agrandir un dérivé basse définition.
 
-Le logo horizontal complet a un autre master canonique : `kwabor_2.png`. Il est embarqué dans `res/drawable-nodpi/kwabor_launch_wordmark.png` comme copie binaire exacte, en 2172 × 724 au ratio 3:1. Dès que le splash système rend la main, Compose l'affiche centré avec `ContentScale.Fit`, sur le fond `#080707` prélevé aux bords du master, jusqu'à la première frame réellement rendue par le lecteur vidéo. Aucun crop, padding raster, recolorisation ou redessin ne sépare donc le fichier officiel du rendu applicatif.
+Le logo horizontal complet a un autre master canonique : `kwabor_2.png`. Il est embarqué dans `res/drawable-nodpi/kwabor_launch_wordmark.png` comme copie binaire exacte, en 2172 × 724 au ratio 3:1. Dès que le splash système rend la main, l'interface Android l'affiche centré avec `FIT_CENTER`, sur le fond `#080707` prélevé aux bords du master, jusqu'à la première frame réellement rendue par le lecteur vidéo. Aucun crop, padding raster, recolorisation ou redessin ne sépare donc le fichier officiel du rendu applicatif.
+
+Au premier `onCreate`, le symbole système reste affiché au moins 1 000 ms ; une recréation d'Activity
+n'ajoute pas cette attente de lancement à froid. Android 13+ reçoit explicitement la préférence
+`icon_preferred`. La fenêtre et ses barres système restent sur le fond sombre pendant la relève.
+La vidéo est attachée derrière le wordmark, préparée en pause à la position zéro, puis autorisée
+uniquement après le retrait effectif du splash, 500 ms de wordmark dans une fenêtre visible sur
+plusieurs frames et un lifecycle au premier plan. Un passage en arrière-plan ou une surface
+détachée interrompt cette autorisation.
+Lors d'un lancement ultérieur, ce même wordmark couvre aussi la décision locale encore en attente
+sur une éventuelle révision distante en cache. Une vérification lente ne peut donc pas intercaler
+l'écran générique de restauration entre le symbole système et une intro requise.
 
 Les PNG Android/iOS sont régénérables sur Windows avec :
 
@@ -44,12 +55,16 @@ python -B tools/verify-brand-assets.py
 
 Quand un asset de lancement ou son pipeline change, la CI appelle aussi
 `.github/workflows/android-launch-evidence.yml`. Elle enregistre un cold start après installation
-fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`, puis publie vidéos,
-planches-contact et métadonnées pendant 7 jours. L'APK de preuve utilise une URL réservée
-`.invalid` et une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou
-si aucune surface onboarding configurée (intro ou landing) n'est exposée après le splash. Ces
-preuves automatisées ne remplacent pas la revue perceptuelle finale sur appareils Pixel/Samsung et
-iOS.
+fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`. Chaque profil conserve le
+flux `screenrecord` brut. En parallèle, la capture de l'écran composé est armée sur HOME avant le
+cold start, couvre au moins 24 secondes jusqu'à la surface onboarding, refuse tout intervalle
+source supérieur à 750 ms et contrôle les dimensions de chaque PNG avant encodage. La CI publie
+les deux vidéos de revue, leurs planches-contact et les métadonnées pendant 7 jours. Les vidéos
+normalisées facilitent la lecture mais ne remplacent jamais l'examen des flux bruts. L'APK de
+preuve utilise une URL réservée `.invalid` et une clé factice non secrète ; la capture échoue si
+l'activité n'est pas reprise ou si aucune surface onboarding configurée (intro ou landing) n'est
+exposée après le splash. Ces preuves automatisées ne remplacent pas la revue perceptuelle finale
+sur appareils Pixel/Samsung et iOS.
 
 ## Clé d'upload production
 

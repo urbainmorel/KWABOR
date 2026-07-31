@@ -24,9 +24,24 @@ SplashScreen) and the current target API before release. Record a cold start aft
 and verify the sequence system mark → full wordmark → first intro frame without an enlarged
 low-resolution intermediate.
 
+The first Activity creation keeps the system mark for at least 1,000 ms; Activity recreation does
+not add that cold-start hold. API 33+ explicitly requests the icon-preferred system behavior.
+After the platform splash is actually removed, the full wordmark must be drawn in a visible
+window for at least 500 ms across distinct display frames. The intro player is attached behind
+that wordmark, prepared paused at position zero, and may play only when the surface, continuity
+barrier and foreground lifecycle are all ready.
+On returning launches, the same full wordmark also covers any pending local decision about a
+cached remote intro, so a slower cache check cannot expose the generic session-loading surface
+between the system mark and a required intro.
+
 .github/workflows/android-launch-evidence.yml automates that matrix on API 30, 31 and 36. For
 each API, `tools/capture-android-launch-evidence.sh` performs fresh installs at `mdpi`, `xhdpi` and
-`xxxhdpi`, records the fifteen-second cold start and produces a contact sheet plus device metadata.
+`xxxhdpi`, asserts the effective display profile, arms a composited-display capture on the HOME
+frame before launching Kwabor, and retains both that sequence and the raw `screenrecord` stream
+through the configured onboarding surface. The composited sequence spans at least 24 seconds,
+rejects source gaps above 750 ms, and validates every PNG before encoding. It publishes normalized
+review videos and contact sheets from both sources plus device metadata; normalization never
+substitutes for review of the raw streams.
 The evidence APK uses only a reserved `.invalid` URL and a non-secret placeholder key; the capture
 fails unless `MainActivity` stays resumed and reaches either the bundled intro or the configured
 onboarding landing surface.

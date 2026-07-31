@@ -10,6 +10,8 @@ import com.kwabor.shared.app.DefaultDispatcherProvider
 import com.kwabor.shared.app.createAndroidKwaborCompositionRootOrNull
 
 class KwaborApplication : Application() {
+    internal val launchProcessState = LaunchProcessState()
+
     lateinit var observability: AndroidObservabilityController
         private set
     lateinit var introMediaManager: AndroidIntroMediaManager

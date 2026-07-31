@@ -2,6 +2,7 @@ package com.kwabor.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -41,12 +42,26 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<String?>(null)
+    private val launchSplashExited = MutableStateFlow(false)
     private var pendingAuthCallback: String? = null
     private var authViewModel: AuthViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
+        val isFirstActivityInProcess =
+            (application as KwaborApplication).launchProcessState.consumeIsFirstActivityInProcess()
+        val splashGuard = LaunchSplashGuard(
+            nowMillis = SystemClock::uptimeMillis,
+            minimumVisibleDurationMillis = launchSplashMinimumVisibleDurationMillis(
+                isFirstActivityInProcess = isFirstActivityInProcess,
+            ),
+        )
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition(splashGuard::shouldKeepOnScreen)
+        splashScreen.setOnExitAnimationListener { provider ->
+            provider.remove()
+            launchSplashExited.value = true
+        }
         acceptDeepLink(intent)
         val configuredApp = configuredAppOrNull()
         if (configuredApp == null) {
@@ -94,6 +109,7 @@ class MainActivity : ComponentActivity() {
                 dependencies = dependencies,
                 runtimeState = KwaborAppRuntimeState(
                     pendingDeepLink = pendingDeepLink,
+                    launchSplashExited = launchSplashExited,
                     onDeepLinkConsumed = { pendingDeepLink.value = null },
                 ),
             )

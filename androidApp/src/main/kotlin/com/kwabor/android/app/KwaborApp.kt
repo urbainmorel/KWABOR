@@ -49,6 +49,9 @@ import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
+import com.kwabor.android.ui.screens.onboarding.LaunchDecisionPendingScreen
+import com.kwabor.android.ui.screens.onboarding.RestoringLaunchContent
+import com.kwabor.android.ui.screens.onboarding.restoringLaunchContent
 import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
 import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
 import com.kwabor.shared.domain.auth.AuthenticationMethod
@@ -140,6 +143,7 @@ internal data class KwaborAppDependencies(
 
 internal data class KwaborAppRuntimeState(
     val pendingDeepLink: StateFlow<String?>,
+    val launchSplashExited: StateFlow<Boolean>,
     val onDeepLinkConsumed: () -> Unit,
 )
 
@@ -147,6 +151,7 @@ private class KwaborCollectedState(
     val authentication: CollectedAuthenticationState,
     val onboarding: OnboardingUiState,
     val deepLink: String?,
+    val launchSplashExited: Boolean,
 ) {
     val auth: AuthUiState get() = authentication.auth
     val authAccess: AuthAccessUiState get() = authentication.access
@@ -261,6 +266,7 @@ private fun collectKwaborAppState(
     val promoterActivationState by dependencies.authViewModel.promoterActivationState.collectAsStateWithLifecycle()
     val authPlatformState by dependencies.authViewModel.platformState.collectAsStateWithLifecycle()
     val deepLink by runtimeState.pendingDeepLink.collectAsStateWithLifecycle()
+    val launchSplashExited by runtimeState.launchSplashExited.collectAsStateWithLifecycle()
     return KwaborCollectedState(
         authentication = CollectedAuthenticationState(
             auth = authState,
@@ -273,6 +279,7 @@ private fun collectKwaborAppState(
         ),
         onboarding = onboardingState,
         deepLink = deepLink,
+        launchSplashExited = launchSplashExited,
     )
 }
 
@@ -297,11 +304,19 @@ private fun KwaborEntryContent(
     onDeepLinkConsumed: () -> Unit,
 ) {
     when (entry) {
-        OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
+        OnboardingEntry.RestoringSession -> when (
+            restoringLaunchContent(
+                isLaunchDecisionComplete = state.onboarding.isLaunchDecisionComplete,
+            )
+        ) {
+            RestoringLaunchContent.Wordmark -> LaunchDecisionPendingScreen(strings = strings)
+            RestoringLaunchContent.Progress -> SessionRestoreScreen(strings = strings)
+        }
         OnboardingEntry.Intro -> KwaborIntroRoute(
             strings = strings,
             mediaSource = state.onboarding.introMediaSource,
             viewModel = dependencies.onboardingViewModel,
+            launchSplashExited = state.launchSplashExited,
         )
         OnboardingEntry.Authentication -> KwaborLandingRoute(
             strings = strings,

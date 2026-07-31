@@ -4,6 +4,7 @@ package com.kwabor.android.ui.screens.onboarding
 
 import android.content.ContentResolver
 import android.content.Context
+import android.graphics.Canvas
 import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
@@ -49,6 +50,7 @@ internal fun IntroScreen(
     strings: KwaborStrings,
     mediaSource: IntroMediaSource,
     reducedMotion: Boolean,
+    launchSplashExited: Boolean,
     actions: IntroScreenActions,
 ) {
     DisposableEffect(Unit) {
@@ -65,6 +67,7 @@ internal fun IntroScreen(
             strings = strings,
             mediaSource = mediaSource,
             reducedMotion = reducedMotion,
+            launchSplashExited = launchSplashExited,
             onCompleted = actions.onCompleted,
         )
         IntroSkipButton(label = strings.introSkip, onSkipped = actions.onSkipped)
@@ -76,6 +79,7 @@ private fun BoxScope.IntroPrimaryContent(
     strings: KwaborStrings,
     mediaSource: IntroMediaSource,
     reducedMotion: Boolean,
+    launchSplashExited: Boolean,
     onCompleted: () -> Unit,
 ) {
     when (introPrimaryMode(reducedMotion)) {
@@ -99,6 +103,7 @@ private fun BoxScope.IntroPrimaryContent(
             IntroVideo(
                 mediaSource = mediaSource,
                 bundledVideoResource = R.raw.kwabor_intro,
+                launchSplashExited = launchSplashExited,
                 onCompleted = onCompleted,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -142,15 +147,11 @@ internal data class IntroScreenActions(
 private fun IntroVideo(
     mediaSource: IntroMediaSource,
     @RawRes bundledVideoResource: Int,
+    launchSplashExited: Boolean,
     onCompleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val bundledMediaUri = Uri.Builder()
-        .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
-        .authority(context.packageName)
-        .appendPath(bundledVideoResource.toString())
-        .build()
+    val bundledMediaUri = rememberBundledMediaUri(bundledVideoResource)
     var playbackSource by remember(mediaSource) { mutableStateOf(mediaSource) }
     val sourceForPlayer = playbackSource
     val mediaUri = when (sourceForPlayer) {
@@ -161,7 +162,7 @@ private fun IntroVideo(
         mutableStateOf(IntroContinuityVisibility.Visible)
     }
     val player = rememberIntroPlayer(mediaUri)
-    BindIntroPlayerLifecycle(
+    val lifecycleBinding = rememberIntroPlayerLifecycleBinding(
         player = player,
         mediaUri = mediaUri,
         onCompleted = onCompleted,
@@ -178,8 +179,22 @@ private fun IntroVideo(
     IntroPlayerSurface(
         player = player,
         continuityVisibility = continuityVisibility,
+        launchSplashExited = launchSplashExited,
+        lifecycleBinding = lifecycleBinding,
         modifier = modifier,
     )
+}
+
+@Composable
+private fun rememberBundledMediaUri(@RawRes bundledVideoResource: Int): Uri {
+    val context = LocalContext.current
+    return remember(context, bundledVideoResource) {
+        Uri.Builder()
+            .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+            .authority(context.packageName)
+            .appendPath(bundledVideoResource.toString())
+            .build()
+    }
 }
 
 @Composable
@@ -189,30 +204,33 @@ private fun rememberIntroPlayer(mediaUri: Uri): ExoPlayer {
 }
 
 @Composable
-private fun BindIntroPlayerLifecycle(
+private fun rememberIntroPlayerLifecycleBinding(
     player: ExoPlayer,
     mediaUri: Uri,
     onCompleted: () -> Unit,
     onFirstFrameRendered: () -> Unit,
     onFailure: () -> Unit,
-) {
+): IntroPlayerLifecycleBinding {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnCompleted by rememberUpdatedState(onCompleted)
     val currentOnFirstFrameRendered by rememberUpdatedState(onFirstFrameRendered)
     val currentOnFailure by rememberUpdatedState(onFailure)
-    DisposableEffect(player, mediaUri, lifecycle) {
-        val binding = IntroPlayerLifecycleBinding(
+    val binding = remember(player, lifecycle) {
+        IntroPlayerLifecycleBinding(
             player = player,
             lifecycle = lifecycle,
             onCompleted = { currentOnCompleted() },
             onFirstFrameRendered = { currentOnFirstFrameRendered() },
             onFailure = { currentOnFailure() },
         )
+    }
+    DisposableEffect(binding, mediaUri) {
         binding.start(mediaUri)
         onDispose {
             binding.close()
         }
     }
+    return binding
 }
 
 internal enum class IntroContinuityVisibility {
@@ -222,6 +240,77 @@ internal enum class IntroContinuityVisibility {
 
 internal fun IntroContinuityVisibility.afterFirstFrameRendered(): IntroContinuityVisibility =
     IntroContinuityVisibility.Hidden
+
+internal enum class IntroPlayerAttachment {
+    AwaitingContinuityFrame,
+    HoldingContinuityFrame,
+    Ready,
+}
+
+internal const val INTRO_WORDMARK_MINIMUM_VISIBLE_MILLIS = 500L
+
+internal class IntroContinuityBarrier(
+    private val minimumVisibleMillis: Long = INTRO_WORDMARK_MINIMUM_VISIBLE_MILLIS,
+) {
+    var state: IntroPlayerAttachment = IntroPlayerAttachment.AwaitingContinuityFrame
+        private set
+    private var startedAtMillis = 0L
+    private var lastFrameAtMillis = 0L
+    private var distinctFrameCount = 0
+
+    init {
+        require(minimumVisibleMillis >= 0L) {
+            "The minimum wordmark duration cannot be negative."
+        }
+    }
+
+    fun onVisibleFrame(frameTimeMillis: Long): Boolean {
+        require(frameTimeMillis >= 0L) {
+            "The frame time cannot be negative."
+        }
+        return when (state) {
+            IntroPlayerAttachment.AwaitingContinuityFrame -> {
+                beginHoldingAt(frameTimeMillis)
+                false
+            }
+            IntroPlayerAttachment.HoldingContinuityFrame -> continueHoldingAt(frameTimeMillis)
+            IntroPlayerAttachment.Ready -> false
+        }
+    }
+
+    fun reset() {
+        state = IntroPlayerAttachment.AwaitingContinuityFrame
+        startedAtMillis = 0L
+        lastFrameAtMillis = 0L
+        distinctFrameCount = 0
+    }
+
+    private fun beginHoldingAt(frameTimeMillis: Long) {
+        state = IntroPlayerAttachment.HoldingContinuityFrame
+        startedAtMillis = frameTimeMillis
+        lastFrameAtMillis = frameTimeMillis
+        distinctFrameCount = 1
+    }
+
+    private fun continueHoldingAt(frameTimeMillis: Long): Boolean {
+        if (frameTimeMillis < lastFrameAtMillis) {
+            reset()
+            beginHoldingAt(frameTimeMillis)
+            return false
+        }
+        if (frameTimeMillis == lastFrameAtMillis) return false
+        lastFrameAtMillis = frameTimeMillis
+        distinctFrameCount += 1
+        val durationSatisfied = frameTimeMillis - startedAtMillis >= minimumVisibleMillis
+        if (!durationSatisfied || distinctFrameCount < MINIMUM_DISTINCT_FRAME_COUNT) return false
+        state = IntroPlayerAttachment.Ready
+        return true
+    }
+
+    private companion object {
+        const val MINIMUM_DISTINCT_FRAME_COUNT = 2
+    }
+}
 
 internal enum class IntroPlaybackFailureAction {
     UseBundled,
@@ -237,11 +326,21 @@ internal fun IntroMediaSource.failureAction(): IntroPlaybackFailureAction = when
 private fun IntroPlayerSurface(
     player: ExoPlayer,
     continuityVisibility: IntroContinuityVisibility,
+    launchSplashExited: Boolean,
+    lifecycleBinding: IntroPlayerLifecycleBinding,
     modifier: Modifier,
 ) {
     AndroidView(
         factory = ::IntroPlayerView,
-        update = { playerView -> playerView.bind(player, continuityVisibility) },
+        update = { playerView ->
+            playerView.bind(
+                player = player,
+                continuityVisibility = continuityVisibility,
+                launchSplashExited = launchSplashExited,
+                lifecycleBinding = lifecycleBinding,
+            )
+        },
+        onRelease = { playerView -> playerView.release() },
         modifier = modifier,
     )
 }
@@ -258,6 +357,11 @@ private class IntroPlayerView(context: Context) : FrameLayout(context) {
         setBackgroundColor(context.getColor(R.color.kwabor_wordmark_background))
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
+    private val continuityBarrier = IntroContinuityBarrier()
+    private var pendingPlayer: ExoPlayer? = null
+    private var notifiedPlayer: ExoPlayer? = null
+    private var launchSplashExited = false
+    private var lifecycleBinding: IntroPlayerLifecycleBinding? = null
 
     init {
         val matchParent = LayoutParams(
@@ -268,11 +372,105 @@ private class IntroPlayerView(context: Context) : FrameLayout(context) {
         addView(continuityView, LayoutParams(matchParent))
     }
 
-    fun bind(player: ExoPlayer, continuityVisibility: IntroContinuityVisibility) {
-        playerView.player = player
+    fun bind(
+        player: ExoPlayer,
+        continuityVisibility: IntroContinuityVisibility,
+        launchSplashExited: Boolean,
+        lifecycleBinding: IntroPlayerLifecycleBinding,
+    ) {
+        if (pendingPlayer !== player) {
+            resetForPlayer(player)
+        }
+        this.launchSplashExited = launchSplashExited
+        this.lifecycleBinding = lifecycleBinding
         continuityView.visibility = when (continuityVisibility) {
             IntroContinuityVisibility.Visible -> View.VISIBLE
             IntroContinuityVisibility.Hidden -> View.GONE
         }
+        attachPendingPlayer()
+        if (
+            continuityBarrier.state != IntroPlayerAttachment.Ready &&
+            launchSplashExited &&
+            continuityView.visibility == View.VISIBLE
+        ) {
+            postInvalidateOnAnimation()
+        }
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        if (
+            launchSplashExited &&
+            continuityView.visibility == View.VISIBLE &&
+            windowVisibility == View.VISIBLE
+        ) {
+            val continuityPresented = continuityBarrier.onVisibleFrame(drawingTime)
+            if (continuityPresented) {
+                lifecycleBinding?.onContinuityPresented()
+            } else if (continuityBarrier.state != IntroPlayerAttachment.Ready) {
+                postInvalidateOnAnimation()
+            }
+        } else if (continuityBarrier.state != IntroPlayerAttachment.Ready) {
+            continuityBarrier.reset()
+        }
+    }
+
+    private fun attachPendingPlayer() {
+        val player = pendingPlayer ?: return
+        if (playerView.player !== player) {
+            playerView.player = player
+        }
+        if (notifiedPlayer !== player) {
+            notifiedPlayer = player
+            lifecycleBinding?.onPlayerSurfaceAttached()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        attachPendingPlayer()
+        postInvalidateOnAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        if (continuityBarrier.state != IntroPlayerAttachment.Ready) {
+            continuityBarrier.reset()
+        }
+        detachPlayer()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (
+            visibility != View.VISIBLE &&
+            continuityBarrier.state != IntroPlayerAttachment.Ready
+        ) {
+            continuityBarrier.reset()
+        } else if (visibility == View.VISIBLE) {
+            postInvalidateOnAnimation()
+        }
+    }
+
+    fun release() {
+        detachPlayer()
+        pendingPlayer = null
+        lifecycleBinding = null
+        launchSplashExited = false
+        continuityBarrier.reset()
+    }
+
+    private fun resetForPlayer(player: ExoPlayer) {
+        detachPlayer()
+        pendingPlayer = player
+        continuityBarrier.reset()
+    }
+
+    private fun detachPlayer() {
+        if (notifiedPlayer != null) {
+            lifecycleBinding?.onPlayerSurfaceUnavailable()
+            notifiedPlayer = null
+        }
+        playerView.player = null
     }
 }

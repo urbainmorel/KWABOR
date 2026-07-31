@@ -500,6 +500,29 @@ def verify_android_splash_xml() -> None:
     styles_path = "androidApp/src/main/res/values/styles.xml"
     resources = load_xml(styles_path)
     require(resources.tag == "resources", f"Unexpected root element: {styles_path}")
+    application_styles = [
+        style
+        for style in resources.findall("style")
+        if style.attrib.get("name") == "KwaborTheme"
+    ]
+    require(
+        len(application_styles) == 1,
+        f"Expected one KwaborTheme definition in {styles_path}",
+    )
+    application_items = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in application_styles[0].findall("item")
+    }
+    require(
+        application_items.get("android:windowBackground")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:statusBarColor")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:navigationBarColor")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:windowLightStatusBar") == "false",
+        f"KwaborTheme must bridge every launch surface in {styles_path}",
+    )
     starting_styles = [
         style
         for style in resources.findall("style")
@@ -532,8 +555,83 @@ def verify_android_splash_xml() -> None:
             "windowSplashScreenAnimatedIcon": "@drawable/ic_kwabor_launch_mark",
             "windowSplashScreenAnimationDuration": "300",
             "postSplashScreenTheme": "@style/KwaborTheme",
+            "android:statusBarColor": "@color/kwabor_icon_background",
+            "android:navigationBarColor": "@color/kwabor_icon_background",
+            "android:windowLightStatusBar": "false",
         },
         f"Unexpected active SplashScreen wiring in {styles_path}: {items}",
+    )
+
+    styles_v27_path = "androidApp/src/main/res/values-v27/styles.xml"
+    resources_v27 = load_xml(styles_v27_path)
+    application_styles_v27 = [
+        style
+        for style in resources_v27.findall("style")
+        if style.attrib.get("name") == "KwaborTheme"
+    ]
+    require(
+        len(application_styles_v27) == 1,
+        f"Expected one KwaborTheme definition in {styles_v27_path}",
+    )
+    application_items_v27 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in application_styles_v27[0].findall("item")
+    }
+    require(
+        application_styles_v27[0].attrib == application_styles[0].attrib
+        and application_items_v27
+        == {
+            **application_items,
+            "android:windowLightNavigationBar": "false",
+        },
+        f"KwaborTheme must keep API 27+ system bars dark in {styles_v27_path}",
+    )
+    starting_styles_v27 = [
+        style
+        for style in resources_v27.findall("style")
+        if style.attrib.get("name") == "KwaborTheme.Starting"
+    ]
+    require(
+        len(starting_styles_v27) == 1
+        and starting_styles_v27[0].attrib == starting_style.attrib,
+        f"Expected one matching KwaborTheme.Starting in {styles_v27_path}",
+    )
+    starting_items_v27 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in starting_styles_v27[0].findall("item")
+    }
+    require(
+        starting_items_v27
+        == {
+            **items,
+            "android:windowLightNavigationBar": "false",
+        },
+        f"Starting theme must keep API 27+ system bars dark in {styles_v27_path}",
+    )
+
+    styles_v33_path = "androidApp/src/main/res/values-v33/styles.xml"
+    resources_v33 = load_xml(styles_v33_path)
+    starting_styles_v33 = [
+        style
+        for style in resources_v33.findall("style")
+        if style.attrib.get("name") == "KwaborTheme.Starting"
+    ]
+    require(
+        len(starting_styles_v33) == 1,
+        f"Expected one KwaborTheme.Starting definition in {styles_v33_path}",
+    )
+    starting_items_v33 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in starting_styles_v33[0].findall("item")
+    }
+    require(
+        starting_styles_v33[0].attrib == starting_style.attrib
+        and starting_items_v33
+        == {
+            **starting_items_v27,
+            "android:windowSplashScreenBehavior": "icon_preferred",
+        },
+        f"API 33+ must prefer the launch icon in {styles_v33_path}",
     )
 
     colors_path = "androidApp/src/main/res/values/colors.xml"
@@ -585,12 +683,58 @@ def verify_android_splash_xml() -> None:
         "super.onCreate(savedInstanceState)",
         on_create_position,
     )
+    keep_condition_position = activity_source.find(
+        "setKeepOnScreenCondition(",
+        on_create_position,
+    )
+    exit_listener_position = activity_source.find(
+        "setOnExitAnimationListener",
+        on_create_position,
+    )
     require(
         on_create_position >= 0
         and splash_position > on_create_position
         and super_position > splash_position
+        and keep_condition_position > super_position
+        and exit_listener_position > keep_condition_position
         and activity_source.count("installSplashScreen()") == 1,
-        "MainActivity must install SplashScreen exactly once before super.onCreate",
+        "MainActivity must install and retain SplashScreen before its first application frame",
+    )
+    require(
+        activity_source.count("setKeepOnScreenCondition(") == 1,
+        "MainActivity must register exactly one SplashScreen keep condition",
+    )
+    require(
+        activity_source.count("launchProcessState.consumeIsFirstActivityInProcess()") == 1,
+        "MainActivity must apply the brand hold to the first Activity in each process",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/LaunchSplashGuard.kt",
+        "COLD_START_MINIMUM_SPLASH_MILLIS = 1_000L",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "INTRO_WORDMARK_MINIMUM_VISIBLE_MILLIS = 500L",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroPlayerLifecycleBinding.kt",
+        "player.setMediaItem(MediaItem.fromUri(mediaUri), true)",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/app/KwaborApp.kt",
+        "RestoringLaunchContent.Wordmark -> LaunchDecisionPendingScreen(strings = strings)",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
+        "painter = painterResource(R.drawable.kwabor_launch_wordmark)",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
+        "contentScale = ContentScale.Fit",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
+        ".background(colorResource(R.color.kwabor_wordmark_background))",
     )
 
 

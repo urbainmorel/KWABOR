@@ -31,6 +31,7 @@ jobs:
               androidApp/build.gradle.kts | \
               androidApp/src/main/AndroidManifest.xml | \
               androidApp/src/main/kotlin/com/kwabor/android/KwaborApplication.kt | \
+              androidApp/src/main/kotlin/com/kwabor/android/LaunchSplashGuard.kt | \
               androidApp/src/main/kotlin/com/kwabor/android/MainActivity.kt | \
               androidApp/src/main/kotlin/com/kwabor/android/app/KwaborApp.kt | \
               androidApp/src/main/kotlin/com/kwabor/android/app/KwaborOnboardingRoutes.kt | \
@@ -42,6 +43,7 @@ jobs:
               androidApp/src/main/res/raw/kwabor_intro.mp4 | \
               androidApp/src/main/res/values/colors.xml | \
               androidApp/src/main/res/values/styles.xml | \
+              androidApp/src/main/res/values-v*/styles.xml | \
               gradle/libs.versions.toml | \
               kwabor_icone_app.png | \
               kwabor_2.png | \
