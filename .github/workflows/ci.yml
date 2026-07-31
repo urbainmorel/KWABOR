@@ -49,6 +49,7 @@ jobs:
               kwabor_2.png | \
               tools/android-screencap-raw.py | \
               tools/capture-android-launch-evidence.sh | \
+              tools/capture-android-launch-evidence-with-retry.sh | \
               tools/generate-brand-assets.ps1 | \
               tools/verify-onboarding-media.py | \
               tools/verify-brand-assets.py)

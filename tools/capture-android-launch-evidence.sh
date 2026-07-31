@@ -42,12 +42,6 @@ screenrecord_completion_margin_seconds=10
 remote_header_probe_bytes=16384
 screenrecord_startup_timeout_seconds=30
 screenrecord_post_launch_sample_timeout_seconds=15
-# Three stability observations each perform bounded process and file-size ADB
-# probes. The initial barrier can tolerate their declared timeout on a busy
-# emulator; the two transition barriers stay inside the reserved HOME budget.
-screenrecord_initial_stable_size_timeout_seconds=20
-screenrecord_transition_stable_size_timeout_seconds=4
-screenrecord_stable_size_poll_seconds=0.5
 screenrecord_graceful_stop_seconds=60
 screenrecord_forced_stop_seconds=5
 screenrecord_host_reap_seconds=10
@@ -421,6 +415,29 @@ assert_home_surface() {
   fi
 }
 
+request_home_surface() {
+  local transition_label="$1"
+  local home_status=0
+
+  case "${transition_label}" in
+    launch-critical | screenrecord-cold | screenrecord-home) ;;
+    *)
+      echo "Invalid HOME transition label: ${transition_label}" >&2
+      return 1
+      ;;
+  esac
+  if timeout "${adb_probe_timeout_seconds}" \
+    adb shell input keyevent KEYCODE_HOME; then
+    return 0
+  else
+    home_status=$?
+  fi
+  echo \
+    "Unable to request HOME for ${transition_label} (status ${home_status})" \
+    >&2
+  return "${home_status}"
+}
+
 apply_display_profile() {
   local expected_size="$1"
   local expected_density="$2"
@@ -466,7 +483,7 @@ screenrecord_home_transition_bytes=""
 screenrecord_resume_baseline_bytes=""
 screenrecord_resume_phase_started_at=""
 screenrecord_resume_transition_bytes=""
-screenrecord_stable_bytes=""
+screenrecord_baseline_bytes=""
 
 probe_screenrecord_processes() {
   local probe_timeout_seconds="$1"
@@ -2809,75 +2826,98 @@ wait_for_screenrecord_growth_after_transition() {
   return 1
 }
 
-wait_for_screenrecord_size_stable() {
+capture_screenrecord_size_baseline() {
   local recorder_pid="$1"
   local recorder_log="$2"
   local remote_video="$3"
   local expected_remote_pid="$4"
-  local stability_timeout_seconds="$5"
-  local deadline=""
+  local minimum_bytes="$5"
+  local baseline_label="$6"
   local remote_pid=""
+  local confirmed_remote_pid=""
   local probe_status=0
   local recorded_bytes=""
-  local previous_bytes=""
-  local stable_observations=0
-  local stable_observations_required=3
+  local stat_status=0
 
   if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]] ||
-    [[ ! "${stability_timeout_seconds}" =~ ^[0-9]+$ ]] ||
-    ((stability_timeout_seconds <= 0)); then
-    echo "Invalid screenrecord stability barrier parameters" >&2
+    [[ ! "${minimum_bytes}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid screenrecord baseline parameters" >&2
     return 1
   fi
-  deadline=$((SECONDS + stability_timeout_seconds + 1))
-  while ((SECONDS < deadline)); do
-    if remote_pid="$(
-      probe_screenrecord_processes "${adb_probe_timeout_seconds}"
-    )"; then
-      :
-    else
-      probe_status=$?
-      if ((probe_status == 2)); then
-        return 1
-      fi
-      echo "screenrecord disappeared before its size became stable" >&2
+  case "${baseline_label}" in
+    cold | home | resume) ;;
+    *)
+      echo "Invalid screenrecord baseline label: ${baseline_label}" >&2
+      return 1
+      ;;
+  esac
+  if remote_pid="$(
+    probe_screenrecord_processes "${adb_probe_timeout_seconds}"
+  )"; then
+    :
+  else
+    probe_status=$?
+    if ((probe_status == 2)); then
       return 1
     fi
-    if [[ "${remote_pid}" != "${expected_remote_pid}" ]]; then
-      echo "Unexpected screenrecord PID at the stability barrier: ${remote_pid}" >&2
+    echo "screenrecord disappeared before the ${baseline_label} baseline" >&2
+    return 1
+  fi
+  if [[ "${remote_pid}" != "${expected_remote_pid}" ]]; then
+    echo \
+      "Unexpected screenrecord PID at the ${baseline_label} baseline: ${remote_pid}" \
+      >&2
+    return 1
+  fi
+  if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+    reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+    echo "screenrecord exited before the ${baseline_label} baseline" >&2
+    return 1
+  fi
+  if recorded_bytes="$(
+    timeout "${adb_probe_timeout_seconds}" \
+      adb shell stat -c %s "${remote_video}" 2>/dev/null |
+      tr -d '\r'
+  )"; then
+    :
+  else
+    stat_status=$?
+    echo \
+      "Unable to read the ${baseline_label} screenrecord baseline (status ${stat_status})" \
+      >&2
+    return "${stat_status}"
+  fi
+  if [[ ! "${recorded_bytes}" =~ ^[0-9]+$ ]] ||
+    ((recorded_bytes < minimum_bytes)); then
+    echo \
+      "Invalid ${baseline_label} screenrecord baseline: ${recorded_bytes}, expected at least ${minimum_bytes}" \
+      >&2
+    return 1
+  fi
+  if confirmed_remote_pid="$(
+    probe_screenrecord_processes "${adb_probe_timeout_seconds}"
+  )"; then
+    :
+  else
+    probe_status=$?
+    if ((probe_status == 2)); then
       return 1
     fi
-    if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
-      reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
-      echo "screenrecord exited before its size became stable" >&2
-      return 1
-    fi
-    recorded_bytes="$(
-      timeout "${adb_probe_timeout_seconds}" \
-        adb shell stat -c %s "${remote_video}" 2>/dev/null |
-        tr -d '\r' ||
-        true
-    )"
-    if [[ "${recorded_bytes}" =~ ^[0-9]+$ ]]; then
-      if [[ "${recorded_bytes}" == "${previous_bytes}" ]]; then
-        stable_observations=$((stable_observations + 1))
-      else
-        previous_bytes="${recorded_bytes}"
-        stable_observations=1
-      fi
-      if ((stable_observations >= stable_observations_required)); then
-        screenrecord_stable_bytes="${recorded_bytes}"
-        return 0
-      fi
-    else
-      previous_bytes=""
-      stable_observations=0
-    fi
-    sleep "${screenrecord_stable_size_poll_seconds}"
-  done
-  sed 's/^/screenrecord: /' "${recorder_log}" >&2
-  echo "Timed out waiting for the screenrecord size stability barrier" >&2
-  return 1
+    echo "screenrecord disappeared after the ${baseline_label} baseline" >&2
+    return 1
+  fi
+  if [[ "${confirmed_remote_pid}" != "${expected_remote_pid}" ]]; then
+    echo \
+      "screenrecord PID changed at the ${baseline_label} baseline: ${expected_remote_pid} -> ${confirmed_remote_pid}" \
+      >&2
+    return 1
+  fi
+  if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+    reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+    echo "screenrecord exited after the ${baseline_label} baseline" >&2
+    return 1
+  fi
+  screenrecord_baseline_bytes="${recorded_bytes}"
 }
 
 require_screenrecord_budget() {
@@ -3231,7 +3271,7 @@ for profile in "${density_profiles[@]}"; do
   screenrecord_resume_baseline_bytes=""
   screenrecord_resume_phase_started_at=""
   screenrecord_resume_transition_bytes=""
-  screenrecord_stable_bytes=""
+  screenrecord_baseline_bytes=""
   screencap_pid=""
 
   mkdir -p "${capture_directory}"
@@ -3248,7 +3288,7 @@ for profile in "${density_profiles[@]}"; do
   apply_display_profile "${display_size}" "${density_value}"
   assert_display_profile "${display_size}" "${density_value}"
   timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
-  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+  request_home_surface launch-critical
   sleep 1
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_video}"
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_window}"
@@ -3339,7 +3379,7 @@ for profile in "${density_profiles[@]}"; do
   # continuity recorder on HOME without competing for the system splash
   # frames, then cause a cold launch, HOME, and resume while it is armed.
   timeout "${adb_general_timeout_seconds}" adb shell am force-stop "${package_name}"
-  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+  request_home_surface screenrecord-cold
   sleep 1
   assert_home_surface \
     "${capture_directory}/screenrecord-prelaunch-home-activity.txt"
@@ -3364,20 +3404,16 @@ for profile in "${density_profiles[@]}"; do
     "${remote_video}"
   remote_recorder_pid="${active_remote_recorder_pid}"
   recording_ready_at="${SECONDS}"
-  wait_for_screenrecord_size_stable \
+  assert_home_surface \
+    "${capture_directory}/screenrecord-cold-baseline-home-activity.txt"
+  capture_screenrecord_size_baseline \
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
     "${remote_recorder_pid}" \
-    "${screenrecord_initial_stable_size_timeout_seconds}"
-  screenrecord_cold_baseline_bytes="${screenrecord_stable_bytes}"
-  if [[ ! "${screenrecord_cold_baseline_bytes}" =~ ^[0-9]+$ ]] ||
-    ((screenrecord_cold_baseline_bytes < screenrecord_ready_bytes)); then
-    echo "Invalid screenrecord baseline before the cold transition" >&2
-    exit 1
-  fi
-  assert_home_surface \
-    "${capture_directory}/screenrecord-cold-baseline-home-activity.txt"
+    "${screenrecord_ready_bytes}" \
+    cold
+  screenrecord_cold_baseline_bytes="${screenrecord_baseline_bytes}"
   require_screenrecord_budget \
     "the cold transition" \
     "$((
@@ -3438,13 +3474,6 @@ for profile in "${density_profiles[@]}"; do
     fi
     sleep "${cold_transition_hold_seconds}"
   fi
-  require_screenrecord_budget \
-    "the HOME transition" \
-    "$((
-      screenrecord_home_transition_budget_seconds +
-        screenrecord_phase_deadline_seconds +
-        post_launch_hold_seconds
-    ))"
   screenrecord_resume_expected_process_id="$(
     timeout "${adb_probe_timeout_seconds}" \
       adb shell pidof "${package_name}" |
@@ -3454,19 +3483,22 @@ for profile in "${density_profiles[@]}"; do
     echo "Invalid app process before the HOME transition" >&2
     exit 1
   fi
-  wait_for_screenrecord_size_stable \
+  capture_screenrecord_size_baseline \
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
     "${remote_recorder_pid}" \
-    "${screenrecord_transition_stable_size_timeout_seconds}"
-  screenrecord_home_baseline_bytes="${screenrecord_stable_bytes}"
-  if [[ ! "${screenrecord_home_baseline_bytes}" =~ ^[0-9]+$ ]] ||
-    ((screenrecord_home_baseline_bytes < screenrecord_initial_transition_bytes)); then
-    echo "Invalid screenrecord baseline before the HOME transition" >&2
-    exit 1
-  fi
-  timeout "${adb_probe_timeout_seconds}" adb shell input keyevent KEYCODE_HOME
+    "${screenrecord_initial_transition_bytes}" \
+    home
+  screenrecord_home_baseline_bytes="${screenrecord_baseline_bytes}"
+  require_screenrecord_budget \
+    "the HOME transition" \
+    "$((
+      screenrecord_home_transition_budget_seconds +
+        screenrecord_phase_deadline_seconds +
+        post_launch_hold_seconds
+    ))"
+  request_home_surface screenrecord-home
   sleep 1
   assert_home_surface \
     "${capture_directory}/screenrecord-resume-home-activity.txt"
@@ -3478,18 +3510,14 @@ for profile in "${density_profiles[@]}"; do
     "${screenrecord_home_baseline_bytes}" \
     "$((SECONDS + screenrecord_post_launch_sample_timeout_seconds + 1))"
   screenrecord_home_transition_bytes="${screenrecord_post_launch_bytes}"
-  wait_for_screenrecord_size_stable \
+  capture_screenrecord_size_baseline \
     "${recorder_pid}" \
     "${recorder_log}" \
     "${remote_video}" \
     "${remote_recorder_pid}" \
-    "${screenrecord_transition_stable_size_timeout_seconds}"
-  screenrecord_resume_baseline_bytes="${screenrecord_stable_bytes}"
-  if [[ ! "${screenrecord_resume_baseline_bytes}" =~ ^[0-9]+$ ]] ||
-    ((screenrecord_resume_baseline_bytes < screenrecord_home_transition_bytes)); then
-    echo "Invalid screenrecord baseline before the resume transition" >&2
-    exit 1
-  fi
+    "${screenrecord_home_transition_bytes}" \
+    resume
+  screenrecord_resume_baseline_bytes="${screenrecord_baseline_bytes}"
   require_screenrecord_budget \
     "the resume transition" \
     "$((screenrecord_phase_deadline_seconds + post_launch_hold_seconds))"

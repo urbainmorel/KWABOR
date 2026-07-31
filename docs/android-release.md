@@ -85,11 +85,14 @@ Le `screenrecord` long démarre seulement après la validation et la compression
 critique afin de ne pas lui disputer SurfaceFlinger. Cette preuve de continuité, distincte de la
 preuve launch native, est encodée en 360×780 pour rester sous les capacités AVC logicielles des
 images AOSP. Recorder armé sur une surface HOME attestée pour chaque API, la CI fige une baseline
-MP4 stable, provoque un second cold start puis, au moins quinze secondes plus tard, une transition
-vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester actif et le MP4 doit
-croître séparément après le cold start, après HOME et après la reprise. Une nouvelle baseline stable
-avant chaque transition empêche d'attribuer à celle-ci des octets encore produits par la phase
-précédente ; le processus applicatif doit aussi rester identique entre HOME et la reprise. Les phases
+MP4 monotone juste avant l'action, provoque un second cold start puis, au moins quinze secondes plus
+tard, une transition vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester
+actif et le MP4 doit croître séparément après le cold start, après HOME et après la reprise. Chaque
+baseline est un snapshot de taille validé au plus près de l'action, supérieur ou égal au dernier
+octet déjà prouvé, et encadré par deux contrôles du même PID distant et du processus hôte. La
+croissance strictement supérieure qui suit, les assertions d'activité/UI et la validation finale du
+MP4 prouvent ensemble que le flux traverse chaque transition ; le processus applicatif doit aussi
+rester identique entre HOME et la reprise. Les phases
 partagent un deadline global borné sous la limite AOSP de 180 secondes et conservent dix secondes
 pour finaliser le conteneur. La preuve exige enfin un H.264 décodable d'au moins quatre frames VFR,
 au moins quinze secondes PTS, vingt-quatre secondes murales et une assertion UI distincte après le

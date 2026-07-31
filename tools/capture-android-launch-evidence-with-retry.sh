@@ -8,18 +8,26 @@ if (($# != 1)); then
 fi
 
 capture_status=0
-for capture_attempt in 1 2; do
+maximum_capture_attempts=2
+retry_reason=""
+for ((capture_attempt = 1; capture_attempt <= maximum_capture_attempts; capture_attempt++)); do
   if bash tools/capture-android-launch-evidence.sh "$1"; then
     exit 0
   else
     capture_status=$?
   fi
 
-  if ((capture_status != 75 || capture_attempt == 2)); then
+  case "${capture_status}" in
+    75) retry_reason="transient screencap idle gap" ;;
+    124) retry_reason="bounded command timeout" ;;
+    *) exit "${capture_status}" ;;
+  esac
+  if ((capture_attempt == maximum_capture_attempts)); then
     exit "${capture_status}"
   fi
 
-  echo "::warning::Retrying the complete launch evidence after a transient screencap idle gap"
+  echo \
+    "::warning::Retrying complete launch evidence after ${retry_reason} (${capture_attempt}/${maximum_capture_attempts})"
 done
 
 exit "${capture_status}"
