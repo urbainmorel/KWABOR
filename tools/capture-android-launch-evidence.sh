@@ -36,7 +36,7 @@ post_launch_hold_seconds=2
 onboarding_deadline_seconds=40
 remote_header_probe_bytes=16384
 screenrecord_startup_timeout_seconds=20
-screenrecord_graceful_stop_seconds=15
+screenrecord_graceful_stop_seconds=60
 screenrecord_forced_stop_seconds=5
 screenrecord_host_reap_seconds=10
 adb_probe_timeout_seconds=3
@@ -160,27 +160,51 @@ remote_recorder_is_running() {
   [[ " ${remote_processes} " == *" ${remote_recorder_pid} "* ]]
 }
 
-cleanup() {
-  local remote_state=1
-  if [[ -n "${active_remote_recorder_pid}" ]]; then
-    if remote_recorder_is_running "${active_remote_recorder_pid}"; then
-      remote_state=0
-    else
-      remote_state=$?
-    fi
-    if ((remote_state != 1)); then
-      timeout "${adb_probe_timeout_seconds}" \
-        adb shell kill -2 "${active_remote_recorder_pid}" >/dev/null 2>&1 ||
-        true
-      timeout "${adb_probe_timeout_seconds}" \
-        adb shell kill -2 "${active_remote_recorder_pid}" >/dev/null 2>&1 ||
-        true
-      timeout "${adb_probe_timeout_seconds}" \
-        adb shell kill -9 "${active_remote_recorder_pid}" >/dev/null 2>&1 ||
-        true
-    fi
+signal_remote_recorder() {
+  local remote_recorder_pid="$1"
+  local signal_number="$2"
+  local signal_result=""
+
+  if [[ ! "${remote_recorder_pid}" =~ ^[0-9]+$ ]] ||
+    [[ "${signal_number}" != "2" && "${signal_number}" != "9" ]]; then
+    echo "Refusing an invalid remote screenrecord signal request" >&2
+    return 2
   fi
-  if [[ -n "${active_recorder_pid}" ]]; then
+  if ! signal_result="$(
+    timeout "${adb_probe_timeout_seconds}" adb shell \
+      "process_name=\"\$(cat /proc/${remote_recorder_pid}/comm 2>/dev/null)\"; if [ \"\${process_name}\" != screenrecord ]; then printf ABSENT; elif kill -${signal_number} ${remote_recorder_pid} 2>/dev/null; then printf DELIVERED; elif [ ! -r /proc/${remote_recorder_pid}/comm ]; then printf ABSENT; else printf ERROR; fi" |
+      tr -d '\r\n'
+  )"; then
+    echo "Unable to signal the remote screenrecord process" >&2
+    return 2
+  fi
+  case "${signal_result}" in
+    DELIVERED) return 0 ;;
+    ABSENT) return 1 ;;
+    *)
+      echo "Remote screenrecord signal failed: ${signal_result}" >&2
+      return 2
+      ;;
+  esac
+}
+
+cleanup() {
+  if [[ -n "${active_remote_recorder_pid}" ]]; then
+    signal_remote_recorder \
+      "${active_remote_recorder_pid}" \
+      2 >/dev/null 2>&1 ||
+      true
+    signal_remote_recorder \
+      "${active_remote_recorder_pid}" \
+      2 >/dev/null 2>&1 ||
+      true
+    signal_remote_recorder \
+      "${active_remote_recorder_pid}" \
+      9 >/dev/null 2>&1 ||
+      true
+  fi
+  if [[ -n "${active_recorder_pid}" ]] &&
+    jobs -pr | grep -Fxq "${active_recorder_pid}"; then
     kill -9 "${active_recorder_pid}" >/dev/null 2>&1 || true
   fi
   reset_display
@@ -392,7 +416,9 @@ wait_for_configured_onboarding() {
 wait_for_remote_recorder_exit() {
   local remote_recorder_pid="$1"
   local timeout_seconds="$2"
-  local deadline=$((SECONDS + timeout_seconds))
+  # SECONDS has integer granularity. The extra second guarantees that callers
+  # receive at least the requested observation window.
+  local deadline=$((SECONDS + timeout_seconds + 1))
   local remote_state=0
   local remaining_seconds=0
   local command_timeout_seconds=0
@@ -443,14 +469,31 @@ reap_local_recorder() {
   return "${recorder_status}"
 }
 
+screenrecord_output_is_finalized() {
+  local recorder_log="$1"
+  local remote_video="$2"
+  local media_scanner_command="Executing: /system/bin/am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${remote_video}"
+
+  ! grep -Fq "Encoder failed" "${recorder_log}" &&
+    grep -Eq 'Encoder stopping; recorded [0-9]+ frames in [0-9]+ seconds' \
+      "${recorder_log}" &&
+    grep -Fq "Stopping encoder and muxer" "${recorder_log}" &&
+    grep -Fq "${media_scanner_command}" "${recorder_log}" &&
+    grep -Fq \
+      "Broadcasting: Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE" \
+      "${recorder_log}"
+}
+
 finish_screenrecord() {
   local recorder_pid="$1"
   local remote_recorder_pid="$2"
   local recorder_log="$3"
+  local remote_video="$4"
   local recorder_status=0
   local forced_stop=0
   local remote_state=0
   local remote_stopped=0
+  local signal_status=0
 
   if remote_recorder_is_running "${remote_recorder_pid}"; then
     remote_state=0
@@ -460,26 +503,47 @@ finish_screenrecord() {
   if ((remote_state == 1)); then
     remote_stopped=1
   else
-    timeout "${adb_probe_timeout_seconds}" \
-      adb shell kill -2 "${remote_recorder_pid}" >/dev/null 2>&1 ||
-      true
-    if wait_for_remote_recorder_exit \
-      "${remote_recorder_pid}" \
-      "${screenrecord_graceful_stop_seconds}"; then
-      remote_stopped=1
+    if signal_remote_recorder "${remote_recorder_pid}" 2; then
+      signal_status=0
     else
-      forced_stop=1
-      timeout "${adb_probe_timeout_seconds}" \
-        adb shell kill -2 "${remote_recorder_pid}" >/dev/null 2>&1 ||
-        true
+      signal_status=$?
+      if ((signal_status == 1)); then
+        remote_stopped=1
+      fi
+    fi
+    if ((remote_stopped == 0)); then
+      if wait_for_remote_recorder_exit \
+        "${remote_recorder_pid}" \
+        "${screenrecord_graceful_stop_seconds}"; then
+        remote_stopped=1
+      else
+        if signal_remote_recorder "${remote_recorder_pid}" 2; then
+          forced_stop=1
+        else
+          signal_status=$?
+          if ((signal_status == 1)); then
+            remote_stopped=1
+          fi
+        fi
+      fi
+    fi
+    if ((remote_stopped == 0)); then
       if wait_for_remote_recorder_exit \
         "${remote_recorder_pid}" \
         "${screenrecord_forced_stop_seconds}"; then
         remote_stopped=1
+      fi
+    fi
+    if ((remote_stopped == 0)); then
+      if signal_remote_recorder "${remote_recorder_pid}" 9; then
+        forced_stop=1
       else
-        timeout "${adb_probe_timeout_seconds}" \
-          adb shell kill -9 "${remote_recorder_pid}" >/dev/null 2>&1 ||
-          true
+        signal_status=$?
+        if ((signal_status == 1)); then
+          remote_stopped=1
+        fi
+      fi
+      if ((remote_stopped == 0)); then
         if wait_for_remote_recorder_exit \
           "${remote_recorder_pid}" \
           "${screenrecord_forced_stop_seconds}"; then
@@ -512,10 +576,9 @@ finish_screenrecord() {
     echo "screenrecord did not stop cleanly" >&2
     return 1
   fi
-  if ! grep -Eq 'Encoder stopping; recorded [0-9]+ frames in [0-9]+ seconds' \
-    "${recorder_log}"; then
+  if ! screenrecord_output_is_finalized "${recorder_log}" "${remote_video}"; then
     sed 's/^/screenrecord: /' "${recorder_log}" >&2
-    echo "screenrecord did not report a complete encoder shutdown" >&2
+    echo "screenrecord did not report a finalized MP4 before shutdown" >&2
     return 1
   fi
 }
@@ -604,7 +667,11 @@ for profile in "${density_profiles[@]}"; do
     recording_hold_seconds=$((minimum_evidence_seconds - recording_elapsed_seconds))
   fi
   sleep "${recording_hold_seconds}"
-  finish_screenrecord "${recorder_pid}" "${remote_recorder_pid}" "${recorder_log}"
+  finish_screenrecord \
+    "${recorder_pid}" \
+    "${remote_recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}"
   recording_wall_seconds=$((SECONDS - recording_ready_at))
   if ((recording_wall_seconds < minimum_recording_wall_seconds)); then
     echo "Cold-start recorder stopped too early: ${recording_wall_seconds}s wall time" >&2
