@@ -23,7 +23,7 @@ evidence_root="build/brand-evidence/api-${api_level}"
 # Android screenrecord follows the emulator presentation clock and emits variable-rate
 # frames. Use a generous watchdog, stop after the configured UI is proven, retain the
 # untouched stream, and normalize a separate review copy to at least 15 seconds.
-screenrecord_time_limit_seconds=70
+screenrecord_time_limit_seconds=120
 minimum_evidence_seconds=15
 normalized_frame_rate=30
 contact_sheet_samples=150
@@ -35,7 +35,8 @@ minimum_raw_decoded_frames=30
 post_launch_hold_seconds=2
 onboarding_deadline_seconds=40
 remote_header_probe_bytes=16384
-screenrecord_startup_timeout_seconds=20
+screenrecord_startup_timeout_seconds=30
+screenrecord_post_launch_sample_timeout_seconds=15
 screenrecord_graceful_stop_seconds=60
 screenrecord_forced_stop_seconds=5
 screenrecord_host_reap_seconds=10
@@ -104,6 +105,8 @@ active_recorder_pid=""
 active_remote_recorder_pid=""
 screenrecord_ready_bytes=""
 screenrecord_mdat_payload_offset=""
+screenrecord_frame_bootstrap=""
+screenrecord_post_launch_bytes=""
 
 probe_screenrecord_processes() {
   local probe_timeout_seconds="$1"
@@ -265,10 +268,12 @@ wait_for_screenrecord() {
   local recorder_log="$2"
   local remote_video="$3"
   local remote_pid=""
+  local confirmed_remote_pid=""
   local probe_status=0
   local recorded_bytes=""
+  local refreshed_recorded_bytes=""
   local mdat_payload_offset=""
-  local deadline=$((SECONDS + screenrecord_startup_timeout_seconds))
+  local deadline=$((SECONDS + screenrecord_startup_timeout_seconds + 1))
   local remaining_seconds=0
   local command_timeout_seconds=0
   while ((SECONDS < deadline)); do
@@ -315,16 +320,70 @@ wait_for_screenrecord() {
             "${remote_video}" \
             "${command_timeout_seconds}"
         )"; then
-          if [[ "${mdat_payload_offset}" =~ ^[0-9]+$ ]] &&
-            ((recorded_bytes > mdat_payload_offset)); then
-            if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
-              reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
-              echo "screenrecord exited after writing its first sample" >&2
+          if [[ "${mdat_payload_offset}" =~ ^[0-9]+$ ]]; then
+            remaining_seconds=$((deadline - SECONDS))
+            command_timeout_seconds="${adb_probe_timeout_seconds}"
+            if ((remaining_seconds < command_timeout_seconds)); then
+              command_timeout_seconds="${remaining_seconds}"
+            fi
+            if ((command_timeout_seconds <= 0)); then
+              continue
+            fi
+            refreshed_recorded_bytes="$(
+              timeout "${command_timeout_seconds}" \
+                adb shell stat -c %s "${remote_video}" 2>/dev/null |
+                tr -d '\r' ||
+                true
+            )"
+            if [[ "${refreshed_recorded_bytes}" =~ ^[0-9]+$ ]] &&
+              ((refreshed_recorded_bytes < recorded_bytes)); then
+              echo "screenrecord size regressed while its muxer became ready" >&2
               return 1
             fi
-            screenrecord_ready_bytes="${recorded_bytes}"
-            screenrecord_mdat_payload_offset="${mdat_payload_offset}"
-            return 0
+            if [[ "${refreshed_recorded_bytes}" =~ ^[0-9]+$ ]] &&
+              ((refreshed_recorded_bytes >= mdat_payload_offset)); then
+              remaining_seconds=$((deadline - SECONDS))
+              command_timeout_seconds="${adb_probe_timeout_seconds}"
+              if ((remaining_seconds < command_timeout_seconds)); then
+                command_timeout_seconds="${remaining_seconds}"
+              fi
+              if ((command_timeout_seconds <= 0)); then
+                continue
+              fi
+              if confirmed_remote_pid="$(
+                probe_screenrecord_processes "${command_timeout_seconds}"
+              )"; then
+                :
+              else
+                probe_status=$?
+                if ((probe_status == 2)); then
+                  return 1
+                fi
+                echo "screenrecord disappeared while its muxer became ready" >&2
+                return 1
+              fi
+              if [[ "${confirmed_remote_pid}" != "${remote_pid}" ]]; then
+                echo "screenrecord PID changed while its muxer became ready: ${remote_pid} -> ${confirmed_remote_pid}" >&2
+                return 1
+              fi
+              if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+                reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+                echo "screenrecord exited while its muxer became ready" >&2
+                return 1
+              fi
+              if ((SECONDS >= deadline)); then
+                echo "screenrecord muxer became ready after its startup deadline" >&2
+                return 1
+              fi
+              screenrecord_ready_bytes="${refreshed_recorded_bytes}"
+              screenrecord_mdat_payload_offset="${mdat_payload_offset}"
+              if ((refreshed_recorded_bytes > mdat_payload_offset)); then
+                screenrecord_frame_bootstrap="natural-sample"
+              else
+                screenrecord_frame_bootstrap="muxer-header"
+              fi
+              return 0
+            fi
           fi
         fi
       fi
@@ -340,7 +399,120 @@ wait_for_screenrecord() {
     sleep 0.25
   done
   sed 's/^/screenrecord: /' "${recorder_log}" >&2
-  echo "Timed out waiting for the first encoded screenrecord frame" >&2
+  echo "Timed out waiting for the screenrecord muxer header" >&2
+  return 1
+}
+
+wait_for_screenrecord_growth_after_launch() {
+  local recorder_pid="$1"
+  local recorder_log="$2"
+  local remote_video="$3"
+  local expected_remote_pid="$4"
+  local baseline_bytes="$5"
+  local overall_deadline="$6"
+  local remote_pid=""
+  local confirmed_remote_pid=""
+  local probe_status=0
+  local recorded_bytes=""
+  local deadline=$((SECONDS + screenrecord_post_launch_sample_timeout_seconds + 1))
+  local remaining_seconds=0
+  local command_timeout_seconds=0
+
+  if [[ ! "${expected_remote_pid}" =~ ^[0-9]+$ ]] ||
+    [[ ! "${baseline_bytes}" =~ ^[0-9]+$ ]] ||
+    [[ ! "${overall_deadline}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid screenrecord post-launch growth baseline" >&2
+    return 1
+  fi
+  if ((overall_deadline < deadline)); then
+    deadline="${overall_deadline}"
+  fi
+  while ((SECONDS < deadline)); do
+    remaining_seconds=$((deadline - SECONDS))
+    command_timeout_seconds="${adb_probe_timeout_seconds}"
+    if ((remaining_seconds < command_timeout_seconds)); then
+      command_timeout_seconds="${remaining_seconds}"
+    fi
+    if remote_pid="$(
+      probe_screenrecord_processes "${command_timeout_seconds}"
+    )"; then
+      :
+    else
+      probe_status=$?
+      if ((probe_status == 2)); then
+        return 1
+      fi
+      echo "screenrecord disappeared after the cold launch" >&2
+      return 1
+    fi
+    if [[ "${remote_pid}" != "${expected_remote_pid}" ]]; then
+      echo "Unexpected screenrecord PID after the cold launch: ${remote_pid}" >&2
+      return 1
+    fi
+    if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+      reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+      echo "screenrecord exited after the cold launch" >&2
+      return 1
+    fi
+    remaining_seconds=$((deadline - SECONDS))
+    command_timeout_seconds="${adb_probe_timeout_seconds}"
+    if ((remaining_seconds < command_timeout_seconds)); then
+      command_timeout_seconds="${remaining_seconds}"
+    fi
+    if ((command_timeout_seconds > 0)); then
+      recorded_bytes="$(
+        timeout "${command_timeout_seconds}" \
+          adb shell stat -c %s "${remote_video}" 2>/dev/null |
+          tr -d '\r' ||
+          true
+      )"
+    fi
+    if [[ "${recorded_bytes}" =~ ^[0-9]+$ ]]; then
+      if ((recorded_bytes < baseline_bytes)); then
+        echo "screenrecord size regressed after the cold launch" >&2
+        return 1
+      fi
+      if ((recorded_bytes > baseline_bytes)); then
+        remaining_seconds=$((deadline - SECONDS))
+        command_timeout_seconds="${adb_probe_timeout_seconds}"
+        if ((remaining_seconds < command_timeout_seconds)); then
+          command_timeout_seconds="${remaining_seconds}"
+        fi
+        if ((command_timeout_seconds <= 0)); then
+          break
+        fi
+        if confirmed_remote_pid="$(
+          probe_screenrecord_processes "${command_timeout_seconds}"
+        )"; then
+          :
+        else
+          probe_status=$?
+          if ((probe_status == 2)); then
+            return 1
+          fi
+          echo "screenrecord disappeared after encoding its launch sample" >&2
+          return 1
+        fi
+        if [[ "${confirmed_remote_pid}" != "${expected_remote_pid}" ]]; then
+          echo "screenrecord PID changed after encoding its launch sample: ${confirmed_remote_pid}" >&2
+          return 1
+        fi
+        if ! kill -0 "${recorder_pid}" >/dev/null 2>&1; then
+          reap_finished_recorder "${recorder_pid}" "${recorder_log}" || true
+          echo "screenrecord exited after encoding its launch sample" >&2
+          return 1
+        fi
+        if ((SECONDS >= deadline)); then
+          break
+        fi
+        screenrecord_post_launch_bytes="${recorded_bytes}"
+        return 0
+      fi
+    fi
+    sleep 0.25
+  done
+  sed 's/^/screenrecord: /' "${recorder_log}" >&2
+  echo "Timed out waiting for an encoded sample after the cold launch" >&2
   return 1
 }
 
@@ -352,7 +524,7 @@ wait_for_configured_onboarding() {
   local recorder_log="$5"
   local uiautomator_log="${capture_directory}/uiautomator.txt"
   local window_file="${capture_directory}/window.xml"
-  local deadline=$((recording_ready_at + onboarding_deadline_seconds))
+  local deadline=$((recording_ready_at + onboarding_deadline_seconds + 1))
   local attempt=0
   local remaining_seconds=0
   local command_timeout_seconds=0
@@ -612,6 +784,8 @@ for profile in "${density_profiles[@]}"; do
   recorder_log="${capture_directory}/screenrecord.txt"
   screenrecord_ready_bytes=""
   screenrecord_mdat_payload_offset=""
+  screenrecord_frame_bootstrap=""
+  screenrecord_post_launch_bytes=""
 
   mkdir -p "${capture_directory}"
   adb uninstall "${package_name}" >/dev/null 2>&1 || true
@@ -646,7 +820,10 @@ for profile in "${density_profiles[@]}"; do
   recorder_pid=$!
   active_recorder_pid="${recorder_pid}"
 
-  wait_for_screenrecord "${recorder_pid}" "${recorder_log}" "${remote_video}"
+  wait_for_screenrecord \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}"
   remote_recorder_pid="${active_remote_recorder_pid}"
   recording_ready_at="${SECONDS}"
   adb shell am start -S -W -n "${activity_name}" |
@@ -655,6 +832,13 @@ for profile in "${density_profiles[@]}"; do
     echo "MainActivity did not report a successful cold start" >&2
     exit 1
   fi
+  wait_for_screenrecord_growth_after_launch \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}" \
+    "${remote_recorder_pid}" \
+    "${screenrecord_ready_bytes}" \
+    "$((recording_ready_at + onboarding_deadline_seconds + 1))"
   wait_for_configured_onboarding \
     "${capture_directory}" \
     "${remote_window}" \
@@ -750,9 +934,15 @@ for profile in "${density_profiles[@]}"; do
     echo "Raw cold-start recording has an invalid duration: ${raw_video_duration}" >&2
     exit 1
   fi
+  if ! awk -v duration="${raw_video_duration}" \
+    'BEGIN { exit !(duration > 0) }'; then
+    echo "Raw cold-start recording has a non-positive duration: ${raw_video_duration}" >&2
+    exit 1
+  fi
   # ActivityManager WaitTime and screenrecord PTS use different clocks under an
-  # accelerated emulator. Preserve both metrics; the first-frame barrier and
-  # in-recording UI assertion prove sequence coverage without comparing them.
+  # accelerated emulator. Preserve both metrics; the armed-muxer barrier,
+  # post-launch sample growth, and in-recording UI assertion prove sequencing
+  # without comparing those clocks.
   launch_wait_ms="$(
     awk -F': ' '$1 == "WaitTime" { print $2 }' \
       "${capture_directory}/activity-start.txt" |
@@ -860,6 +1050,8 @@ for profile in "${density_profiles[@]}"; do
     echo "screenrecord_time_limit_seconds=${screenrecord_time_limit_seconds}"
     echo "screenrecord_ready_bytes=${screenrecord_ready_bytes}"
     echo "screenrecord_mdat_payload_offset=${screenrecord_mdat_payload_offset}"
+    echo "screenrecord_frame_bootstrap=${screenrecord_frame_bootstrap}"
+    echo "screenrecord_post_launch_bytes=${screenrecord_post_launch_bytes}"
     echo "recording_wall_seconds=${recording_wall_seconds}"
     echo "launch_wait_ms=${launch_wait_ms}"
     echo "raw_duration_seconds=${raw_video_duration}"
