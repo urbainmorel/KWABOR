@@ -3,6 +3,12 @@ import CoreMedia
 import CryptoKit
 import Foundation
 
+enum CachedIntroVideoResolution {
+    case available(URL)
+    case missingOrInvalid
+    case transientFailure
+}
+
 actor IntroVideoCache {
     private let fileManager: FileManager
     private let session: URLSession
@@ -33,29 +39,38 @@ actor IntroVideoCache {
         }
     }
 
-    func resolveCached(revision: Int64, sha256: String) async -> URL? {
+    func resolveCached(revision: Int64, sha256: String) async -> CachedIntroVideoResolution {
         guard revision > 0, sha256.range(of: sha256Pattern, options: .regularExpression) != nil else {
-            return nil
+            return .missingOrInvalid
         }
         let destination = cachedURL(revision: revision, sha256: sha256)
+        guard fileManager.fileExists(atPath: destination.path) else {
+            return .missingOrInvalid
+        }
         do {
-            guard fileManager.fileExists(atPath: destination.path),
-                  try hasSupportedSize(fileURL: destination),
-                  try hasExpectedHash(fileURL: destination, expectedHash: sha256),
-                  try await isSupportedIntroVideo(fileURL: destination) else {
-                try? fileManager.removeItem(at: destination)
-                return nil
+            let hasValidSize = try hasSupportedSize(fileURL: destination)
+            let hasValidHash = try hasExpectedHash(fileURL: destination, expectedHash: sha256)
+            let hasSupportedFormat = try await isSupportedIntroVideo(fileURL: destination)
+            let isValid = hasValidSize && hasValidHash && hasSupportedFormat
+            guard isValid else {
+                return removeCachedFile(destination) ? .missingOrInvalid : .transientFailure
             }
-            return destination
+            removeOldVersions(except: destination)
+            return .available(destination)
         } catch {
-            try? fileManager.removeItem(at: destination)
-            return nil
+            return .transientFailure
         }
     }
 
-    func clear() {
-        guard !Task.isCancelled else { return }
-        try? fileManager.removeItem(at: directory)
+    func clear() -> Bool {
+        guard !Task.isCancelled else { return false }
+        guard fileManager.fileExists(atPath: directory.path) else { return true }
+        do {
+            try fileManager.removeItem(at: directory)
+            return !fileManager.fileExists(atPath: directory.path)
+        } catch {
+            return false
+        }
     }
 
     private func downloadAndValidate(
@@ -91,7 +106,6 @@ actor IntroVideoCache {
         } else {
             try fileManager.moveItem(at: stagingURL, to: destination)
         }
-        removeOldVersions(except: destination)
         return destination
     }
 
@@ -129,6 +143,16 @@ actor IntroVideoCache {
     private func cachedURL(revision: Int64, sha256: String) -> URL {
         let hashPrefix = String(sha256.prefix(hashFilePrefixLength))
         return directory.appending(path: "intro-\(revision)-\(hashPrefix).mp4")
+    }
+
+    private func removeCachedFile(_ fileURL: URL) -> Bool {
+        guard fileManager.fileExists(atPath: fileURL.path) else { return true }
+        do {
+            try fileManager.removeItem(at: fileURL)
+            return !fileManager.fileExists(atPath: fileURL.path)
+        } catch {
+            return false
+        }
     }
 
     private func hasExpectedHash(fileURL: URL, expectedHash: String) throws -> Bool {

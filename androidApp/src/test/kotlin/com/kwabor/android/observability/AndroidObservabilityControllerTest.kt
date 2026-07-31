@@ -122,6 +122,51 @@ class AndroidObservabilityControllerTest {
     }
 
     @Test
+    fun staleRealtimeCallbackCannotRepublishConfigurationAfterConsentRevocation() {
+        val backend = FakeObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+        )
+        controller.start()
+
+        controller.updateConsent(ObservabilityConsent())
+        backend.emitStaleRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
+
+        assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
+        controller.close()
+    }
+
+    @Test
+    fun remoteMediaSubscriptionsReceiveIndependentSnapshotsAndUpdates() {
+        val backend = FakeObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+        )
+        controller.start()
+        val first = controller.openRemoteMediaSubscription()
+        val second = controller.openRemoteMediaSubscription()
+
+        assertTrue(first.events.tryReceive().getOrNull() is AndroidRemoteMediaEvent.Snapshot)
+        assertTrue(second.events.tryReceive().getOrNull() is AndroidRemoteMediaEvent.Snapshot)
+
+        backend.emitRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
+
+        assertEquals(
+            NEWER_REMOTE_CONFIGURATION,
+            (first.events.tryReceive().getOrNull() as AndroidRemoteMediaEvent.ConfigurationChanged).configuration,
+        )
+        assertEquals(
+            NEWER_REMOTE_CONFIGURATION,
+            (second.events.tryReceive().getOrNull() as AndroidRemoteMediaEvent.ConfigurationChanged).configuration,
+        )
+        first.close()
+        second.close()
+        controller.close()
+    }
+
+    @Test
     fun closeRemovesRealtimeRemoteConfigListener() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(
@@ -140,11 +185,25 @@ private class InMemoryConsentStore(
     var consent: ObservabilityConsent = ObservabilityConsent(),
     private val writesSucceed: Boolean = true,
 ) : ObservabilityConsentStore {
+    private var purgeState = RemoteMediaPurgeState()
+
     override fun read(): ObservabilityConsent = consent
 
     override fun write(consent: ObservabilityConsent): Boolean {
         if (writesSucceed) this.consent = consent
         return writesSucceed
+    }
+
+    override fun readRemoteMediaPurgeState(): RemoteMediaPurgeState = purgeState
+
+    override fun writeRequiredRemoteMediaPurgeEpoch(epoch: RemoteMediaPurgeEpoch): Boolean {
+        purgeState = purgeState.copy(required = epoch)
+        return true
+    }
+
+    override fun writeAcknowledgedRemoteMediaPurgeEpoch(epoch: RemoteMediaPurgeEpoch): Boolean {
+        purgeState = purgeState.copy(acknowledged = epoch)
+        return true
     }
 }
 
@@ -158,6 +217,7 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
     var remoteUpdateStartCount = 0
     var remoteUpdateStopCount = 0
     var remoteUpdateCallback: ((RemoteFeatureConfiguration?) -> Unit)? = null
+    var staleRemoteUpdateCallback: ((RemoteFeatureConfiguration?) -> Unit)? = null
     val remoteUpdatesStarted: Boolean get() = remoteUpdateCallback != null
 
     override fun applyConsent(consent: ObservabilityConsent) {
@@ -194,6 +254,7 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
     override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
         remoteUpdateStartCount += 1
         remoteUpdateCallback = onResult
+        staleRemoteUpdateCallback = onResult
     }
 
     override fun stopRemoteConfigurationUpdates() {
@@ -203,6 +264,10 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
 
     fun emitRemoteUpdate(configuration: RemoteFeatureConfiguration?) {
         remoteUpdateCallback?.invoke(configuration)
+    }
+
+    fun emitStaleRemoteUpdate(configuration: RemoteFeatureConfiguration?) {
+        staleRemoteUpdateCallback?.invoke(configuration)
     }
 }
 

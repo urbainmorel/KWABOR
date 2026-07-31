@@ -2,6 +2,7 @@ package com.kwabor.android
 
 import android.app.Application
 import com.kwabor.android.observability.AndroidObservabilityController
+import com.kwabor.android.observability.createAndroidObservabilityController
 import com.kwabor.android.onboarding.AndroidIntroMediaManager
 import com.kwabor.android.onboarding.AndroidIntroVideoCache
 import com.kwabor.android.onboarding.FirstLaunchStore
@@ -21,7 +22,7 @@ class KwaborApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        observability = AndroidObservabilityController.create(applicationContext)
+        observability = createAndroidObservabilityController(applicationContext)
         observability.start()
         val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
         firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)

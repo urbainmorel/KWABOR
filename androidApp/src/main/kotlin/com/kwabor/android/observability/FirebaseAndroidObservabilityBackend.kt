@@ -137,12 +137,16 @@ private fun AnalyticsEvent.toBundle(): Bundle = Bundle().apply {
     socialPostType?.let { postType -> putString("post_type", postType.wireName) }
 }
 
-private fun FirebaseRemoteConfig.toDomainConfiguration(): RemoteFeatureConfiguration = createRemoteFeatureConfiguration(
-    introVideoEnabled = getBoolean(INTRO_VIDEO_ENABLED_KEY),
-    introVideoUrl = getString(INTRO_VIDEO_URL_KEY),
-    introVideoSha256 = getString(INTRO_VIDEO_SHA256_KEY),
-    introVideoRevision = getLong(INTRO_VIDEO_REVISION_KEY),
-)
+private fun FirebaseRemoteConfig.toDomainConfiguration(): RemoteFeatureConfiguration {
+    val enabledValue = getValue(INTRO_VIDEO_ENABLED_KEY)
+    return createRemoteFeatureConfiguration(
+        introVideoAvailable = enabledValue.source == FirebaseRemoteConfig.VALUE_SOURCE_REMOTE,
+        introVideoEnabled = getBoolean(INTRO_VIDEO_ENABLED_KEY),
+        introVideoUrl = getString(INTRO_VIDEO_URL_KEY),
+        introVideoSha256 = getString(INTRO_VIDEO_SHA256_KEY),
+        introVideoRevision = getLong(INTRO_VIDEO_REVISION_KEY),
+    )
+}
 
 private const val REMOTE_CONFIG_FETCH_INTERVAL_SECONDS = 43_200L
 private const val INTRO_VIDEO_ENABLED_KEY = "intro_video_enabled"

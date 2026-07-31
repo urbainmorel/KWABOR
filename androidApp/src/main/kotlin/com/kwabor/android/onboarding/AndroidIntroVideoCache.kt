@@ -10,9 +10,11 @@ import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.domain.observability.RemoteIntroVideo
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -22,11 +24,11 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 internal interface IntroVideoCache {
-    suspend fun resolve(source: RemoteIntroVideo, protectedFile: File?): File?
+    suspend fun resolve(source: RemoteIntroVideo): File?
 
     suspend fun findCached(pending: PendingRemoteIntro): File?
 
-    suspend fun clear(protectedFile: File? = null)
+    suspend fun clear(protectedFiles: Set<File> = emptySet()): Boolean
 }
 
 internal class AndroidIntroVideoCache(
@@ -35,49 +37,51 @@ internal class AndroidIntroVideoCache(
 ) : IntroVideoCache {
     private val directory = File(context.filesDir, DIRECTORY_NAME)
 
-    override suspend fun resolve(source: RemoteIntroVideo, protectedFile: File?): File? =
-        withContext(dispatcherProvider.io) {
-            directory.mkdirs()
-            val target = cachedFile(source)
-            if (target.isFile && target.hasSha256(source.sha256) && target.isSupportedIntroVideo()) {
-                return@withContext target
-            }
-            target.delete()
-            downloadAndValidate(source = source, target = target, protectedFile = protectedFile)
+    override suspend fun resolve(source: RemoteIntroVideo): File? = withContext(dispatcherProvider.io) {
+        directory.mkdirs()
+        val target = cachedFile(source)
+        if (target.isFile && target.hasSha256(source.sha256) && target.isSupportedIntroVideo()) {
+            return@withContext target
         }
+        target.delete()
+        downloadAndValidate(source = source, target = target)
+    }
 
     override suspend fun findCached(pending: PendingRemoteIntro): File? = withContext(dispatcherProvider.io) {
         val candidate = File(directory, pending.fileName)
-        candidate.takeIf {
-            it.isFile &&
-                it.parentFile == directory &&
-                it.name == pending.fileName &&
-                it.extension.equals(MP4_EXTENSION, ignoreCase = true) &&
-                it.hasSha256(pending.sha256) &&
-                it.isSupportedIntroVideo()
+        val validatedCandidate = candidate.takeIf {
+            it.isValidatedCachedIntro(pending = pending, directory = directory)
         }
+        if (validatedCandidate != null) {
+            directory.reconcileIntroCacheKeeping(validatedCandidate)
+        }
+        validatedCandidate
     }
 
-    override suspend fun clear(protectedFile: File?) = withContext(dispatcherProvider.io) {
-        directory.listFiles().orEmpty().forEach { file ->
-            if (file.isFile && file.parentFile == directory && file != protectedFile) {
-                file.delete()
+    override suspend fun clear(protectedFiles: Set<File>): Boolean = withContext(dispatcherProvider.io) {
+        if (!directory.exists()) return@withContext true
+        val cachedFiles = directory.listFiles() ?: return@withContext false
+        var allFilesDeleted = true
+        cachedFiles.forEach { file ->
+            if (file.isFile && file.parentFile == directory && file !in protectedFiles) {
+                val wasDeleted = file.delete() || !file.exists()
+                allFilesDeleted = allFilesDeleted && wasDeleted
             }
         }
+        allFilesDeleted
     }
 
-    private suspend fun downloadAndValidate(source: RemoteIntroVideo, target: File, protectedFile: File?): File? {
+    private suspend fun downloadAndValidate(source: RemoteIntroVideo, target: File): File? {
         val temporary = File(directory, "${target.name}.part")
         temporary.delete()
         val connection = openConnection(source.url) ?: return null
         return try {
-            connection.connect()
+            connection.runCancellableBlocking { connect() }
             downloadValidatedResponse(
                 connection = connection,
                 source = source,
                 temporary = temporary,
                 target = target,
-                protectedFile = protectedFile,
             )
         } finally {
             connection.disconnect()
@@ -90,36 +94,42 @@ internal class AndroidIntroVideoCache(
         source: RemoteIntroVideo,
         temporary: File,
         target: File,
-        protectedFile: File?,
     ): File? {
-        if (!connection.isSuccessfulMp4Response()) return null
+        if (!connection.runCancellableBlocking { isSuccessfulMp4Response() }) return null
         val actualSha256 = connection.copyBodyTo(temporary) ?: return null
         currentCoroutineContext().ensureActive()
         val isValid = actualSha256 == source.sha256 && temporary.isSupportedIntroVideo()
         if (!isValid) return null
         publishAtomically(temporary = temporary, target = target)
-        removeOldVersions(except = setOfNotNull(target, protectedFile))
         return target
     }
 
     private suspend fun HttpURLConnection.copyBodyTo(target: File): String? {
         val digest = MessageDigest.getInstance(SHA256_ALGORITHM)
-        var totalBytes = 0L
-        var withinLimit = true
-        inputStream.use { input ->
+        runCancellableBlocking { inputStream }.use { input ->
             FileOutputStream(target).use { output ->
-                val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                var count = input.read(buffer)
-                while (count >= 0 && withinLimit) {
-                    currentCoroutineContext().ensureActive()
-                    totalBytes += count
-                    withinLimit = writeChunk(output, digest, buffer, count, totalBytes)
-                    count = nextCount(input = input, buffer = buffer, shouldContinue = withinLimit)
-                }
-                output.fd.sync()
+                if (!copyWithinLimit(input = input, output = output, digest = digest)) return null
             }
         }
-        return digest.digest().toHexString().takeIf { withinLimit }
+        return digest.digest().toHexString()
+    }
+
+    private suspend fun HttpURLConnection.copyWithinLimit(
+        input: InputStream,
+        output: FileOutputStream,
+        digest: MessageDigest,
+    ): Boolean {
+        val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+        var totalBytes = 0L
+        var count = runCancellableBlocking { input.read(buffer) }
+        while (count >= 0) {
+            currentCoroutineContext().ensureActive()
+            totalBytes += count
+            if (!writeChunk(output, digest, buffer, count, totalBytes)) return false
+            count = runCancellableBlocking { input.read(buffer) }
+        }
+        output.fd.sync()
+        return true
     }
 
     private fun writeChunk(
@@ -136,9 +146,6 @@ internal class AndroidIntroVideoCache(
         }
         return withinLimit
     }
-
-    private fun nextCount(input: InputStream, buffer: ByteArray, shouldContinue: Boolean): Int =
-        if (shouldContinue) input.read(buffer) else END_OF_STREAM
 
     private fun openConnection(url: String): HttpURLConnection? = runCatching {
         val uri = URI(url)
@@ -183,11 +190,28 @@ internal class AndroidIntroVideoCache(
         }
     }
 
-    private fun removeOldVersions(except: Set<File>) {
-        directory.listFiles().orEmpty().forEach { file ->
-            if (file.isFile && file !in except && file.extension == MP4_EXTENSION) {
-                file.delete()
+    private suspend fun <T> HttpURLConnection.runCancellableBlocking(block: HttpURLConnection.() -> T): T =
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { disconnect() }
+            if (continuation.isActive) {
+                continuation.resumeWith(runCatching { block() })
             }
+        }
+}
+
+private fun File.isValidatedCachedIntro(pending: PendingRemoteIntro, directory: File): Boolean = isFile &&
+    parentFile == directory &&
+    name == pending.fileName &&
+    extension.equals(MP4_EXTENSION, ignoreCase = true) &&
+    hasSha256(pending.sha256) &&
+    isSupportedIntroVideo()
+
+private fun File.reconcileIntroCacheKeeping(validatedCandidate: File) {
+    val cachedFiles = listFiles() ?: throw IOException("Unable to enumerate the intro media cache.")
+    cachedFiles.forEach { file ->
+        if (file.isFile && file.parentFile == this && file != validatedCandidate) {
+            val wasDeleted = file.delete() || !file.exists()
+            if (!wasDeleted) throw IOException("Unable to reconcile the intro media cache.")
         }
     }
 }
@@ -268,7 +292,6 @@ private const val CONNECT_TIMEOUT_MILLIS = 10_000
 private const val READ_TIMEOUT_MILLIS = 20_000
 private const val HTTP_SUCCESS_MIN = 200
 private const val HTTP_SUCCESS_MAX = 299
-private const val END_OF_STREAM = -1
 private const val AUDIO_MIME_PREFIX = "audio/"
 private const val VIDEO_MIME_PREFIX = "video/"
 private val SUPPORTED_AVC_PROFILES = setOf(AVCProfileBaseline, AVCProfileMain)

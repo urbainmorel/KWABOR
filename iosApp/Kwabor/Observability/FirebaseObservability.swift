@@ -241,25 +241,63 @@ final class FirebasePerformanceTrace {
 }
 
 struct FirebaseRemoteFeatureConfiguration: Equatable {
-    let introVideo: FirebaseRemoteIntroVideo?
+    let introVideoStatus: FirebaseRemoteIntroVideoStatus
 
-    static let safeDefaults = FirebaseRemoteFeatureConfiguration(introVideo: nil)
+    var introVideo: FirebaseRemoteIntroVideo? {
+        switch introVideoStatus {
+        case let .candidate(video):
+            return video
+        case .unavailable, .disabled, .invalid:
+            return nil
+        }
+    }
+
+    static let safeDefaults = FirebaseRemoteFeatureConfiguration(introVideoStatus: .unavailable)
 
     fileprivate init(remoteConfig: RemoteConfig) {
-        let enabled = remoteConfig[introVideoEnabledKey].boolValue
+        let enabledValue = remoteConfig[introVideoEnabledKey]
+        guard enabledValue.source == .remote else {
+            introVideoStatus = .unavailable
+            return
+        }
+        let enabled = enabledValue.boolValue
         let urlValue = remoteConfig[introVideoURLKey].stringValue
         let hashValue = remoteConfig[introVideoSHA256Key].stringValue.lowercased()
         let revision = remoteConfig[introVideoRevisionKey].numberValue.int64Value
-        introVideo = FirebaseRemoteIntroVideo.create(
+        guard enabled else {
+            introVideoStatus = .disabled
+            return
+        }
+        if let video = FirebaseRemoteIntroVideo.create(
             enabled: enabled,
             urlValue: urlValue,
             sha256: hashValue,
             revision: revision
-        )
+        ) {
+            introVideoStatus = .candidate(video)
+        } else {
+            introVideoStatus = .invalid
+        }
     }
 
-    private init(introVideo: FirebaseRemoteIntroVideo?) {
-        self.introVideo = introVideo
+    private init(introVideoStatus: FirebaseRemoteIntroVideoStatus) {
+        self.introVideoStatus = introVideoStatus
+    }
+}
+
+enum FirebaseRemoteIntroVideoStatus: Equatable {
+    case unavailable
+    case disabled
+    case invalid
+    case candidate(FirebaseRemoteIntroVideo)
+
+    var preservesValidatedPendingVideo: Bool {
+        switch self {
+        case .disabled:
+            return false
+        case .unavailable, .invalid, .candidate:
+            return true
+        }
     }
 }
 
@@ -279,6 +317,7 @@ struct FirebaseRemoteIntroVideo: Equatable {
             !urlValue.isEmpty,
             urlValue.count <= maximumRemoteURLLength,
             urlValue.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+            urlValue.rangeOfCharacter(from: unsafeRemoteURLCharacters) == nil,
             let components = URLComponents(string: urlValue),
             components.scheme?.lowercased() == "https",
             components.host?.isEmpty == false,
@@ -326,6 +365,7 @@ private let introRemoteConfigKeys: Set<String> = [
     introVideoRevisionKey,
 ]
 private let sha256Pattern = "^[a-f0-9]{64}$"
+private let unsafeRemoteURLCharacters = CharacterSet(charactersIn: "\\\"<>^`{|}")
 private let notApplicable = "not_applicable"
 private let diagnosticDomain = "com.kwabor.observability"
 private let diagnosticErrorCode = 1

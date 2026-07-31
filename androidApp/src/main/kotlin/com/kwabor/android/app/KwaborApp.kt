@@ -315,6 +315,7 @@ private fun KwaborEntryContent(
         OnboardingEntry.Intro -> KwaborIntroRoute(
             strings = strings,
             mediaSource = state.onboarding.introMediaSource,
+            staticFallbackRequired = state.onboarding.isStaticIntroFallbackRequired,
             viewModel = dependencies.onboardingViewModel,
             launchSplashExited = state.launchSplashExited,
         )

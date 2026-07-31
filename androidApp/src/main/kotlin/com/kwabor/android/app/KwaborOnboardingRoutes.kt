@@ -8,6 +8,7 @@ import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.screens.onboarding.IntroScreen
 import com.kwabor.android.ui.screens.onboarding.IntroScreenActions
+import com.kwabor.android.ui.screens.onboarding.IntroScreenState
 import com.kwabor.android.ui.screens.onboarding.OnboardingLandingActions
 import com.kwabor.android.ui.screens.onboarding.OnboardingLandingScreen
 import com.kwabor.shared.i18n.KwaborStrings
@@ -16,18 +17,23 @@ import com.kwabor.shared.i18n.KwaborStrings
 internal fun KwaborIntroRoute(
     strings: KwaborStrings,
     mediaSource: IntroMediaSource,
+    staticFallbackRequired: Boolean,
     viewModel: OnboardingViewModel,
     launchSplashExited: Boolean,
 ) {
     IntroScreen(
         strings = strings,
-        mediaSource = mediaSource,
-        reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
-        launchSplashExited = launchSplashExited,
+        state = IntroScreenState(
+            mediaSource = mediaSource,
+            reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
+            staticFallbackRequired = staticFallbackRequired,
+            launchSplashExited = launchSplashExited,
+        ),
         actions = IntroScreenActions(
             onDisplayed = { viewModel.onIntent(OnboardingIntent.IntroDisplayed) },
             onCompleted = { viewModel.onIntent(OnboardingIntent.IntroCompleted) },
             onSkipped = { viewModel.onIntent(OnboardingIntent.IntroSkipped) },
+            onPlaybackFailed = { viewModel.onIntent(OnboardingIntent.IntroPlaybackFailed) },
         ),
     )
 }

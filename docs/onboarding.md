@@ -123,6 +123,9 @@ Les actifs de repli sont versionnés avec chaque client :
 - Android : `res/raw/kwabor_intro.mp4` et `res/drawable-nodpi/kwabor_intro_fallback.png` ;
 - iOS : `KwaborIntro.mp4` et l'image set `IntroFallback`.
 
+`tools/verify-onboarding-media.py` impose en CI des MP4 byte-identical sur les deux plateformes et
+verrouille aussi la présence, les octets et les dimensions de l'image statique commune.
+
 Le raccord de lancement utilise séparément le master `kwabor_2.png`, copié bit pour bit dans les ressources Android et iOS. Le format officiel 2172 × 724, son ratio 3:1, son mode RGBA opaque et son SHA-256 sont contrôlés en CI par `tools/verify-brand-assets.py`. Android conserve le symbole carré pendant le splash système masqué, puis affiche immédiatement le wordmark en `Fit`. iOS l'affiche dès `LaunchScreen.storyboard` en `scaleAspectFit`. Sur les deux plateformes, il reste au-dessus du lecteur jusqu'au signal natif de première frame ; le démarrage hors ligne ne dépend donc jamais du réseau ni d'un décodage déjà prêt.
 
 Le remplacement distant dépend du consentement Remote Config et des clés documentées dans [Observabilité](observability.md). La configuration n'est acceptée que si l'URL est HTTPS, le SHA-256 comporte 64 caractères hexadécimaux et la révision est positive. Après consentement, un listener temps réel permet de précharger une publication du super-admin sans attendre le prochain fetch périodique.
@@ -134,15 +137,15 @@ Après téléchargement, chaque client exige :
 - SHA-256 identique à la configuration ;
 - vidéo portrait H.264 de 15 à 25 secondes, sans piste audio.
 
-Le fichier n'est rendu actif qu'après validation et remplacement atomique. La source est figée pendant toute lecture : une publication reçue en cours de session ne redémarre jamais la vidéo et ne surgit pas au-dessus d'un autre écran. La révision est proposée une seule fois au lancement suivant. En cas d'échec de lecture distante, le client revient à l'actif embarqué. Révoquer le consentement ferme le listener temps réel, annule le téléchargement, supprime le cache et la révision en attente, puis restaure les valeurs sûres.
+Le fichier n'est rendu actif qu'après validation et remplacement atomique. La source est figée pendant toute lecture : une publication reçue en cours de session ne redémarre jamais la vidéo et ne surgit pas au-dessus d'un autre écran. Les candidats sont qualifiés dans l'ordre et la révision valide la plus élevée est proposée une seule fois au lancement suivant. Une configuration indisponible ou un média plus récent mais invalide ne remplace ni n'efface cette dernière révision validée ; seule une désactivation explicite reçue du service le fait. Une erreur de lecture locale transitoire utilise le fallback pour ce lancement et conserve la révision pour une tentative ultérieure. Après le premier lancement, l'absence de révision distante prête ne rejoue pas la vidéo locale : l'application continue vers l'authentification ou l'accueil. Si le décodage d'une révision déjà ouverte échoue, le client affiche l'image statique, met cette révision en quarantaine et permet de continuer sans message technique. Révoquer le consentement ferme le listener temps réel, annule le téléchargement et persiste d'abord une intention de purge. Métadonnée et cache doivent être supprimés puis cette intention acquittée avant toute nouvelle qualification ; une purge interrompue ou en échec est reprise au redémarrage. L'historique anti-rejeu reste conservé.
 
 ## Publication par le super-admin
 
-La console Firebase est l'interface opérationnelle V1 ; aucun nouveau client web n'est introduit. Pour publier une intro :
+La console Firebase est l'interface opérationnelle V1 ; aucun nouveau client web n'est introduit. Le pas-à-pas, la frontière Store/distant et le registre des révisions sont définis dans le [runbook de publication vidéo](runbooks/onboarding-video-publication.md). Pour publier une intro :
 
 > **Dépendance avant activation réelle** : le consentement client est raccordé par AUTH-003. La mécanique ne devient néanmoins opérable qu'après provisionnement Firebase staging/production dans ENV-001B/OBS-001B et vérification sur appareils. Elle ne doit pas être annoncée comme active en bêta avant ces preuves.
 
-1. encoder et contrôler le MP4 avec les mêmes invariants que l'actif embarqué ;
+1. encoder et contrôler le MP4 candidat avec `tools/verify-onboarding-media.py --input` ;
 2. déposer le fichier sur le CDN HTTPS approuvé, sans redirection ;
 3. calculer son SHA-256 ;
 4. publier ensemble `intro_video_enabled=true`, l'URL, le SHA-256 et une révision strictement supérieure à toutes les révisions précédentes ;
@@ -158,8 +161,8 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 4. Nouveau lancement sans session et sans nouvelle révision : landing affichée sans rejouer l'intro.
 5. Remote Config refusé ou absent : aucun téléchargement média.
 6. Remote Config consenti et média valide : variante préchargée puis utilisée une seule fois au lancement suivant.
-7. Hash, MIME, codec, durée ou taille invalides : fallback local et aucun message technique à l'écran.
-8. Révocation : cache distant supprimé et fallback local restauré.
+7. Hash, MIME, codec, durée ou taille invalides avant ouverture : aucun écran intro ajouté et aucun message technique à l'écran ; échec de décodage après ouverture : image statique puis révision mise en quarantaine.
+8. Révocation : cache et attente distants supprimés, dernière révision présentée conservée, puis route normale sans rejeu local.
 9. Publication d'une révision supérieure pendant une session : aucun écran interrompu ; la variante apparaît une fois au prochain lancement.
 10. Relance suivante sans nouvelle révision : la variante ne rejoue pas.
 11. OTP vérifié puis application arrêtée : reprise au mot de passe, jamais à l'accueil.

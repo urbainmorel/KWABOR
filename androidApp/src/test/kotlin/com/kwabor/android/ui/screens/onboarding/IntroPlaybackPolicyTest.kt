@@ -11,10 +11,10 @@ import kotlin.test.assertTrue
 
 class IntroPlaybackPolicyTest {
     @Test
-    fun remotePlayerFailureFallsBackToBundledMedia() {
+    fun remotePlayerFailureUsesStaticFallbackWithoutReplayingBundledVideo() {
         val source = IntroMediaSource.Remote(file = File("remote-intro.mp4"), revision = 2)
 
-        assertEquals(IntroPlaybackFailureAction.UseBundled, source.failureAction())
+        assertEquals(IntroPlaybackFailureAction.ShowStaticFallback, source.failureAction())
     }
 
     @Test
@@ -89,8 +89,18 @@ class IntroPlaybackPolicyTest {
 
     @Test
     fun reducedMotionUsesStaticFallbackWhileDefaultModeUsesVideoContinuity() {
-        assertEquals(IntroPrimaryMode.StaticFallback, introPrimaryMode(reducedMotion = true))
-        assertEquals(IntroPrimaryMode.VideoWithContinuity, introPrimaryMode(reducedMotion = false))
+        assertEquals(
+            IntroPrimaryMode.StaticFallback,
+            introPrimaryMode(reducedMotion = true, staticFallbackRequired = false),
+        )
+        assertEquals(
+            IntroPrimaryMode.StaticFallback,
+            introPrimaryMode(reducedMotion = false, staticFallbackRequired = true),
+        )
+        assertEquals(
+            IntroPrimaryMode.VideoWithContinuity,
+            introPrimaryMode(reducedMotion = false, staticFallbackRequired = false),
+        )
     }
 
     @Test

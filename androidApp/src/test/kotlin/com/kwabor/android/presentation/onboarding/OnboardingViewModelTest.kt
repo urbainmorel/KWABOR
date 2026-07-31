@@ -39,11 +39,13 @@ class OnboardingViewModelTest {
     fun remoteIntroIsMarkedPresentedOnlyAfterCompletionAndNeverMarksBundledIntro() = runTest {
         val store = FakeFirstLaunchStore(bundledIntroSeen = true)
         val events = mutableListOf<AnalyticsEventName>()
+        val consumedSources = mutableListOf<IntroMediaSource>()
         val viewModel = createViewModel(
             store = store,
             events = events,
             scope = this,
             launchDecision = completedDecision(remoteLaunchRequest()),
+            onIntroConsumed = { source -> consumedSources += source },
         )
 
         viewModel.onIntent(OnboardingIntent.IntroDisplayed)
@@ -57,6 +59,7 @@ class OnboardingViewModelTest {
         assertTrue(store.bundledIntroSeen)
         assertFalse(viewModel.state.value.isIntroRequired)
         assertEquals(listOf(AnalyticsEventName.IntroVideoShown), events)
+        assertEquals(listOf(remoteLaunchRequest().mediaSource), consumedSources)
     }
 
     @Test
@@ -75,6 +78,24 @@ class OnboardingViewModelTest {
         assertEquals(REMOTE_REVISION, store.lastPresentedRevision)
         assertFalse(viewModel.state.value.isIntroRequired)
         assertEquals(listOf(AnalyticsEventName.IntroVideoSkipped), events)
+    }
+
+    @Test
+    fun failedRemotePlaybackIsQuarantinedBeforeTheStaticFallbackCanBeAbandoned() = runTest {
+        val store = FakeFirstLaunchStore(bundledIntroSeen = true)
+        val viewModel = createViewModel(
+            store = store,
+            events = mutableListOf(),
+            scope = this,
+            launchDecision = completedDecision(remoteLaunchRequest()),
+        )
+
+        viewModel.onIntent(OnboardingIntent.IntroPlaybackFailed)
+
+        assertEquals(REMOTE_REVISION, store.lastPresentedRevision)
+        assertTrue(viewModel.state.value.isIntroRequired)
+        assertTrue(viewModel.state.value.isStaticIntroFallbackRequired)
+        assertTrue(store.bundledIntroSeen)
     }
 
     @Test
@@ -116,6 +137,23 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun staleCompletedRemoteDecisionIsReconciledWithTheDurablePresentedRevision() = runTest {
+        val store = FakeFirstLaunchStore(bundledIntroSeen = true)
+        store.markRemoteIntroPresented(REMOTE_REVISION)
+
+        val viewModel = createViewModel(
+            store = store,
+            events = mutableListOf(),
+            scope = this,
+            launchDecision = completedDecision(remoteLaunchRequest()),
+        )
+
+        assertTrue(viewModel.state.value.isLaunchDecisionComplete)
+        assertFalse(viewModel.state.value.isIntroRequired)
+        assertEquals(IntroMediaSource.Bundled, viewModel.state.value.introMediaSource)
+    }
+
+    @Test
     fun signupAndSigninEmitDistinctEffects() = runTest {
         val signUpViewModel = createViewModel(
             store = FakeFirstLaunchStore(),
@@ -146,11 +184,13 @@ class OnboardingViewModelTest {
                 mediaSource = IntroMediaSource.Bundled,
             ),
         ),
+        onIntroConsumed: (IntroMediaSource) -> Unit = {},
     ): OnboardingViewModel = OnboardingViewModel(
         firstLaunchStore = store,
         launchDecision = launchDecision,
         track = { event -> events += event.name },
         coroutineScope = TestScope(StandardTestDispatcher(scope.testScheduler)),
+        onIntroConsumed = onIntroConsumed,
     )
 
     private fun remoteLaunchRequest(): IntroLaunchRequest = IntroLaunchRequest(
@@ -181,17 +221,20 @@ private class FakeFirstLaunchStore(
 
     override fun lastPresentedRemoteRevision(): Long = lastPresentedRevision
 
-    override fun markRemoteIntroPending(intro: PendingRemoteIntro) {
+    override fun markRemoteIntroPending(intro: PendingRemoteIntro): Boolean {
         pending = intro
+        return true
     }
 
-    override fun markRemoteIntroPresented(revision: Long) {
+    override fun markRemoteIntroPresented(revision: Long): Boolean {
         lastPresentedRevision = maxOf(lastPresentedRevision, revision)
         pending = pending?.takeIf { it.revision > revision }
+        return true
     }
 
-    override fun clearPendingRemoteIntro() {
+    override fun clearPendingRemoteIntro(): Boolean {
         pending = null
+        return true
     }
 }
 

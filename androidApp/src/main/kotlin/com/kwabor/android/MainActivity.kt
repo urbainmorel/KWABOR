@@ -179,6 +179,7 @@ class MainActivity : ComponentActivity() {
                     launchDecision = applicationState.introMediaManager.launchDecision,
                     track = applicationState.observability::track,
                     coroutineScope = newViewModelScope(dispatcherProvider),
+                    onIntroConsumed = applicationState.introMediaManager::onIntroConsumed,
                 )
             }
         },

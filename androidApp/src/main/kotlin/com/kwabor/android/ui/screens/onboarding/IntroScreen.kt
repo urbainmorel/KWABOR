@@ -46,13 +46,7 @@ import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
-internal fun IntroScreen(
-    strings: KwaborStrings,
-    mediaSource: IntroMediaSource,
-    reducedMotion: Boolean,
-    launchSplashExited: Boolean,
-    actions: IntroScreenActions,
-) {
+internal fun IntroScreen(strings: KwaborStrings, state: IntroScreenState, actions: IntroScreenActions) {
     DisposableEffect(Unit) {
         actions.onDisplayed()
         onDispose {}
@@ -65,10 +59,8 @@ internal fun IntroScreen(
     ) {
         IntroPrimaryContent(
             strings = strings,
-            mediaSource = mediaSource,
-            reducedMotion = reducedMotion,
-            launchSplashExited = launchSplashExited,
-            onCompleted = actions.onCompleted,
+            state = state,
+            actions = actions,
         )
         IntroSkipButton(label = strings.introSkip, onSkipped = actions.onSkipped)
     }
@@ -77,37 +69,40 @@ internal fun IntroScreen(
 @Composable
 private fun BoxScope.IntroPrimaryContent(
     strings: KwaborStrings,
-    mediaSource: IntroMediaSource,
-    reducedMotion: Boolean,
-    launchSplashExited: Boolean,
-    onCompleted: () -> Unit,
+    state: IntroScreenState,
+    actions: IntroScreenActions,
 ) {
-    when (introPrimaryMode(reducedMotion)) {
-        IntroPrimaryMode.StaticFallback -> {
-            Image(
-                painter = painterResource(R.drawable.kwabor_intro_fallback),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Button(
-                onClick = onCompleted,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(KwaborSpacing.Xxl),
-            ) {
-                Text(strings.introContinue)
-            }
-        }
+    when (introPrimaryMode(state.reducedMotion, state.staticFallbackRequired)) {
+        IntroPrimaryMode.StaticFallback -> IntroStaticFallback(
+            continueLabel = strings.introContinue,
+            onCompleted = actions.onCompleted,
+        )
         IntroPrimaryMode.VideoWithContinuity -> {
             IntroVideo(
-                mediaSource = mediaSource,
-                bundledVideoResource = R.raw.kwabor_intro,
-                launchSplashExited = launchSplashExited,
-                onCompleted = onCompleted,
+                mediaSource = state.mediaSource,
+                launchSplashExited = state.launchSplashExited,
+                actions = actions,
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+@Composable
+private fun BoxScope.IntroStaticFallback(continueLabel: String, onCompleted: () -> Unit) {
+    Image(
+        painter = painterResource(R.drawable.kwabor_intro_fallback),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+    )
+    Button(
+        onClick = onCompleted,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(KwaborSpacing.Xxl),
+    ) {
+        Text(continueLabel)
     }
 }
 
@@ -116,11 +111,12 @@ internal enum class IntroPrimaryMode {
     VideoWithContinuity,
 }
 
-internal fun introPrimaryMode(reducedMotion: Boolean): IntroPrimaryMode = if (reducedMotion) {
-    IntroPrimaryMode.StaticFallback
-} else {
-    IntroPrimaryMode.VideoWithContinuity
-}
+internal fun introPrimaryMode(reducedMotion: Boolean, staticFallbackRequired: Boolean): IntroPrimaryMode =
+    if (reducedMotion || staticFallbackRequired) {
+        IntroPrimaryMode.StaticFallback
+    } else {
+        IntroPrimaryMode.VideoWithContinuity
+    }
 
 @Composable
 private fun BoxScope.IntroSkipButton(label: String, onSkipped: () -> Unit) {
@@ -141,22 +137,51 @@ internal data class IntroScreenActions(
     val onDisplayed: () -> Unit,
     val onCompleted: () -> Unit,
     val onSkipped: () -> Unit,
+    val onPlaybackFailed: () -> Unit,
+)
+
+internal data class IntroScreenState(
+    val mediaSource: IntroMediaSource,
+    val reducedMotion: Boolean,
+    val staticFallbackRequired: Boolean,
+    val launchSplashExited: Boolean,
 )
 
 @Composable
 private fun IntroVideo(
     mediaSource: IntroMediaSource,
-    @RawRes bundledVideoResource: Int,
     launchSplashExited: Boolean,
-    onCompleted: () -> Unit,
+    actions: IntroScreenActions,
     modifier: Modifier = Modifier,
 ) {
-    val bundledMediaUri = rememberBundledMediaUri(bundledVideoResource)
-    var playbackSource by remember(mediaSource) { mutableStateOf(mediaSource) }
-    val sourceForPlayer = playbackSource
-    val mediaUri = when (sourceForPlayer) {
+    IntroVideoPlayback(
+        mediaSource = mediaSource,
+        launchSplashExited = launchSplashExited,
+        onCompleted = actions.onCompleted,
+        onFailure = {
+            when (mediaSource.failureAction()) {
+                IntroPlaybackFailureAction.ShowStaticFallback -> {
+                    actions.onPlaybackFailed()
+                }
+                IntroPlaybackFailureAction.CompleteIntro -> actions.onCompleted()
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun IntroVideoPlayback(
+    mediaSource: IntroMediaSource,
+    launchSplashExited: Boolean,
+    onCompleted: () -> Unit,
+    onFailure: () -> Unit,
+    modifier: Modifier,
+) {
+    val bundledMediaUri = rememberBundledMediaUri(R.raw.kwabor_intro)
+    val mediaUri = when (mediaSource) {
         IntroMediaSource.Bundled -> bundledMediaUri
-        is IntroMediaSource.Remote -> Uri.fromFile(sourceForPlayer.file)
+        is IntroMediaSource.Remote -> Uri.fromFile(mediaSource.file)
     }
     var continuityVisibility by remember(mediaUri) {
         mutableStateOf(IntroContinuityVisibility.Visible)
@@ -169,12 +194,7 @@ private fun IntroVideo(
         onFirstFrameRendered = {
             continuityVisibility = continuityVisibility.afterFirstFrameRendered()
         },
-        onFailure = {
-            when (sourceForPlayer.failureAction()) {
-                IntroPlaybackFailureAction.UseBundled -> playbackSource = IntroMediaSource.Bundled
-                IntroPlaybackFailureAction.CompleteIntro -> onCompleted()
-            }
-        },
+        onFailure = onFailure,
     )
     IntroPlayerSurface(
         player = player,
@@ -313,13 +333,13 @@ internal class IntroContinuityBarrier(
 }
 
 internal enum class IntroPlaybackFailureAction {
-    UseBundled,
+    ShowStaticFallback,
     CompleteIntro,
 }
 
 internal fun IntroMediaSource.failureAction(): IntroPlaybackFailureAction = when (this) {
     IntroMediaSource.Bundled -> IntroPlaybackFailureAction.CompleteIntro
-    is IntroMediaSource.Remote -> IntroPlaybackFailureAction.UseBundled
+    is IntroMediaSource.Remote -> IntroPlaybackFailureAction.ShowStaticFallback
 }
 
 @Composable

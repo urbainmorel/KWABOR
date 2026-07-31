@@ -124,10 +124,28 @@ data class AnalyticsEvent(
 
 data class RemoteFeatureConfiguration(
     val introVideo: RemoteIntroVideo? = null,
+    val introVideoStatus: RemoteIntroVideoStatus = if (introVideo == null) {
+        RemoteIntroVideoStatus.Unavailable
+    } else {
+        RemoteIntroVideoStatus.Candidate
+    },
 ) {
+    init {
+        require((introVideoStatus == RemoteIntroVideoStatus.Candidate) == (introVideo != null)) {
+            "Only a candidate remote intro status may carry a video."
+        }
+    }
+
     companion object {
         val SafeDefaults = RemoteFeatureConfiguration()
     }
+}
+
+enum class RemoteIntroVideoStatus {
+    Unavailable,
+    Disabled,
+    Invalid,
+    Candidate,
 }
 
 data class RemoteIntroVideo(
@@ -137,18 +155,22 @@ data class RemoteIntroVideo(
 )
 
 fun createRemoteFeatureConfiguration(
+    introVideoAvailable: Boolean = true,
     introVideoEnabled: Boolean,
     introVideoUrl: String?,
     introVideoSha256: String?,
     introVideoRevision: Long,
 ): RemoteFeatureConfiguration {
-    if (!introVideoEnabled) {
+    if (!introVideoAvailable) {
         return RemoteFeatureConfiguration.SafeDefaults
+    }
+    if (!introVideoEnabled) {
+        return RemoteFeatureConfiguration(introVideoStatus = RemoteIntroVideoStatus.Disabled)
     }
     val url = introVideoUrl?.trim().orEmpty()
     val sha256 = introVideoSha256?.trim()?.lowercase().orEmpty()
     if (!url.isSafeHttpsUrl() || !SHA256_PATTERN.matches(sha256) || introVideoRevision <= 0) {
-        return RemoteFeatureConfiguration.SafeDefaults
+        return RemoteFeatureConfiguration(introVideoStatus = RemoteIntroVideoStatus.Invalid)
     }
     return RemoteFeatureConfiguration(
         introVideo = RemoteIntroVideo(
@@ -162,7 +184,11 @@ fun createRemoteFeatureConfiguration(
 private fun String?.isSafeIdentifierOrNull(): Boolean = this == null || SAFE_IDENTIFIER_PATTERN.matches(this)
 
 private fun String.isSafeHttpsUrl(): Boolean {
-    if (length !in MIN_REMOTE_URL_LENGTH..MAX_REMOTE_URL_LENGTH || any(Char::isWhitespace)) {
+    if (
+        length !in MIN_REMOTE_URL_LENGTH..MAX_REMOTE_URL_LENGTH ||
+        any(Char::isWhitespace) ||
+        any(UNSAFE_REMOTE_URL_CHARACTERS::contains)
+    ) {
         return false
     }
     if (!startsWith(prefix = "https://", ignoreCase = true)) {
@@ -174,5 +200,6 @@ private fun String.isSafeHttpsUrl(): Boolean {
 
 private const val MIN_REMOTE_URL_LENGTH = 9
 private const val MAX_REMOTE_URL_LENGTH = 2_048
+private const val UNSAFE_REMOTE_URL_CHARACTERS = "\\\"<>^`{|}"
 private val SAFE_IDENTIFIER_PATTERN = Regex(pattern = "^[A-Za-z0-9_-]{1,64}$")
 private val SHA256_PATTERN = Regex(pattern = "^[a-f0-9]{64}$")

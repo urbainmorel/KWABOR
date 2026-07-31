@@ -80,10 +80,14 @@ final class OnboardingCoordinator: ObservableObject {
     private var launchIntroDecisionCompleted: Bool
     private var launchIntroCompleted = false
     private var launchIntroRevision: Int64?
-    private var bundledFallbackAttempted = false
-    private var deferredRemoteMedia: DeferredRemoteMedia?
     private var remoteMediaTask: Task<Void, Never>?
+    private var remoteMediaPurgeTask: Task<Void, Never>?
     private var remoteMediaRevisionInFlight: Int64?
+    private var queuedRemoteMedia: [FirebaseRemoteIntroVideo] = []
+    private var remoteMediaPurgeRequired = false
+    private var remoteMediaPurgeGeneration: Int64?
+    private var remoteMediaDisablePending = false
+    private var launchPendingRemoteMediaInvalidated = false
     private var completedRegistrationSession: AuthSession?
     private var shouldPresentRegistrationAfterAuthenticationDismissal = false
     private var isRevokingInterruptedRegistrationSession = false
@@ -157,19 +161,31 @@ final class OnboardingCoordinator: ObservableObject {
 
         let hadPendingVideo = introStore.hasPendingVideo
         let storedPendingVideo = introStore.pendingVideoNewerThanLastPresented()
-        let activeRemoteVideo = observability.remoteConfiguration.introVideo
+        let remotePolicyRequiresPurge = !observability.consent.remoteConfigurationAllowed ||
+            observability.remoteConfiguration.introVideoStatus == .disabled
+        var pendingPurgeGeneration = introStore.pendingRemoteMediaPurgeGeneration
+        var purgeRequiredAtLaunch = pendingPurgeGeneration != nil
+        if remotePolicyRequiresPurge {
+            purgeRequiredAtLaunch = true
+            pendingPurgeGeneration = introStore.requireRemoteMediaPurge() ?? pendingPurgeGeneration
+        }
         let pendingAtLaunch: PendingIntroVideo?
         if observability.consent.remoteConfigurationAllowed,
            storedFirstLaunchCompleted,
            let storedPendingVideo,
-           let activeRemoteVideo,
-           storedPendingVideo.matches(activeRemoteVideo) {
+           !purgeRequiredAtLaunch,
+           observability.remoteConfiguration.introVideoStatus.preservesValidatedPendingVideo {
             pendingAtLaunch = storedPendingVideo
         } else {
             pendingAtLaunch = nil
-            introStore.clearPendingVideo()
         }
         let purgeRejectedPendingBeforeObservation = hadPendingVideo && pendingAtLaunch == nil
+        if purgeRejectedPendingBeforeObservation {
+            purgeRequiredAtLaunch = true
+            pendingPurgeGeneration = introStore.requireRemoteMediaPurge() ?? pendingPurgeGeneration
+        }
+        remoteMediaPurgeRequired = purgeRequiredAtLaunch
+        remoteMediaPurgeGeneration = pendingPurgeGeneration
 
         if temporaryPromoterActivationSessionCleanupRequired {
             route = .restoringSession
@@ -198,22 +214,18 @@ final class OnboardingCoordinator: ObservableObject {
 
         if let pendingAtLaunch {
             Task { [weak self, cache] in
-                let resolvedURL = await cache.resolveCached(
+                let resolution = await cache.resolveCached(
                     revision: pendingAtLaunch.revision,
                     sha256: pendingAtLaunch.sha256
                 )
                 guard let self else { return }
-                finishLaunchIntroDecision(pending: pendingAtLaunch, resolvedURL: resolvedURL)
+                finishLaunchIntroDecision(pending: pendingAtLaunch, resolution: resolution)
             }
         }
 
-        if purgeRejectedPendingBeforeObservation {
-            Task { [weak self, cache] in
-                await cache.clear()
-                self?.startObservingRemoteConfiguration()
-            }
-        } else {
-            startObservingRemoteConfiguration()
+        startObservingRemoteConfiguration()
+        if remoteMediaPurgeRequired {
+            scheduleRemoteMediaPurgeIfNeeded()
         }
     }
 
@@ -242,14 +254,10 @@ final class OnboardingCoordinator: ObservableObject {
 
     func introPlaybackFailed() {
         guard !launchIntroCompleted else { return }
-        if launchIntroRevision != nil,
-           !bundledFallbackAttempted,
-           let bundledIntroVideoURL {
-            bundledFallbackAttempted = true
-            introVideoURL = bundledIntroVideoURL
-        } else {
-            introVideoURL = nil
+        if let launchIntroRevision {
+            introStore.markRemoteVideoPresented(revision: launchIntroRevision)
         }
+        introVideoURL = nil
     }
 
     func presentAuthentication() {
@@ -797,17 +805,30 @@ final class OnboardingCoordinator: ObservableObject {
 
     private func finishLaunchIntroDecision(
         pending: PendingIntroVideo,
-        resolvedURL: URL?
+        resolution: CachedIntroVideoResolution
     ) {
         guard !launchIntroDecisionCompleted else { return }
-        if observability.consent.remoteConfigurationAllowed,
-           let activeRemoteVideo = observability.remoteConfiguration.introVideo,
-           pending.matches(activeRemoteVideo),
-           let resolvedURL {
+        let remoteMediaIsAllowed = observability.consent.remoteConfigurationAllowed &&
+            !launchPendingRemoteMediaInvalidated &&
+            !remoteMediaDisablePending &&
+            !remoteMediaPurgeRequired &&
+            observability.remoteConfiguration.introVideoStatus.preservesValidatedPendingVideo
+        switch (remoteMediaIsAllowed, resolution) {
+        case let (true, .available(resolvedURL)):
             introVideoURL = resolvedURL
             launchIntroRevision = pending.revision
-        } else {
-            introStore.clearPendingVideo(ifRevision: pending.revision)
+        case (true, .transientFailure):
+            observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
+        case (true, .missingOrInvalid):
+            let pendingWasCleared = introStore.clearPendingVideo(ifRevision: pending.revision)
+            if pendingWasCleared,
+               let source = observability.remoteConfiguration.introVideo,
+               source.revision == pending.revision,
+               source.sha256 == pending.sha256 {
+                enqueueRemoteMediaIfNewer(source)
+            }
+        case (false, _):
+            break
         }
         launchIntroDecisionCompleted = true
         resolveRoute()
@@ -822,12 +843,25 @@ final class OnboardingCoordinator: ObservableObject {
         consent: ObservabilityConsent
     ) {
         guard consent.remoteConfigurationAllowed else {
-            deferredRemoteMedia = nil
+            launchPendingRemoteMediaInvalidated = true
+            remoteMediaDisablePending = false
             purgePendingRemoteMedia()
             return
         }
-        deferredRemoteMedia = DeferredRemoteMedia(configuration: configuration, consent: consent)
-        processDeferredRemoteMediaIfPossible()
+        switch configuration.introVideoStatus {
+        case .unavailable:
+            return
+        case .disabled:
+            requireRemoteMediaPurge()
+            queuedRemoteMedia.removeAll()
+            launchPendingRemoteMediaInvalidated = true
+            remoteMediaDisablePending = true
+            processDeferredRemoteMediaIfPossible()
+        case .invalid:
+            observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
+        case let .candidate(source):
+            enqueueRemoteMediaIfNewer(source)
+        }
     }
 
     private func startObservingRemoteConfiguration() {
@@ -837,38 +871,54 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func processDeferredRemoteMediaIfPossible() {
-        guard launchIntroDecisionCompleted, !shouldPresentLaunchIntro,
-              let deferredRemoteMedia else {
+        guard launchIntroDecisionCompleted, !shouldPresentLaunchIntro else { return }
+        if remoteMediaDisablePending {
+            remoteMediaDisablePending = false
+            purgePendingRemoteMedia(preservingQueuedMedia: true)
+            startNextRemoteMediaResolutionIfNeeded()
             return
         }
-        self.deferredRemoteMedia = nil
+        startNextRemoteMediaResolutionIfNeeded()
+    }
 
-        guard deferredRemoteMedia.consent.remoteConfigurationAllowed else {
-            purgePendingRemoteMedia()
-            return
-        }
-        guard let source = deferredRemoteMedia.configuration.introVideo else {
-            purgePendingRemoteMedia()
-            return
-        }
-
-        let latestKnownRevision = max(
-            introStore.latestKnownRemoteRevision,
-            remoteMediaRevisionInFlight ?? noRemoteRevision
+    private func enqueueRemoteMediaIfNewer(_ source: FirebaseRemoteIntroVideo) {
+        let latestScheduledRevision = max(
+            remoteMediaRevisionInFlight ?? noRemoteRevision,
+            queuedRemoteMedia.last?.revision ?? noRemoteRevision
         )
+        let latestKnownRevision = max(introStore.latestKnownRemoteRevision, latestScheduledRevision)
         guard source.revision > latestKnownRevision else { return }
 
-        remoteMediaTask?.cancel()
+        queuedRemoteMedia.append(source)
+        processDeferredRemoteMediaIfPossible()
+    }
+
+    private func startNextRemoteMediaResolutionIfNeeded() {
+        if remoteMediaPurgeRequired {
+            scheduleRemoteMediaPurgeIfNeeded()
+            return
+        }
+        guard launchIntroDecisionCompleted,
+              !shouldPresentLaunchIntro,
+              !remoteMediaDisablePending,
+              observability.consent.remoteConfigurationAllowed,
+              remoteMediaTask == nil,
+              !queuedRemoteMedia.isEmpty else {
+            return
+        }
+        let source = queuedRemoteMedia.removeFirst()
         remoteMediaRevisionInFlight = source.revision
-        introStore.clearPendingVideo()
         let telemetry = self.telemetry
         remoteMediaTask = Task { [weak self, cache, observability] in
+            guard !Task.isCancelled else { return }
             let resolvedURL = await cache.resolve(source: source)
             guard let self, !Task.isCancelled,
                   remoteMediaRevisionInFlight == source.revision else {
                 return
             }
+            remoteMediaTask = nil
             remoteMediaRevisionInFlight = nil
+            defer { startNextRemoteMediaResolutionIfNeeded() }
             guard observability.consent.remoteConfigurationAllowed,
                   source.revision > introStore.latestKnownRemoteRevision else {
                 return
@@ -877,16 +927,59 @@ final class OnboardingCoordinator: ObservableObject {
                 observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
                 return
             }
-            introStore.savePendingVideoIfNewer(source)
+            guard introStore.savePendingVideoIfNewer(source) else {
+                observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
+                return
+            }
         }
     }
 
-    private func purgePendingRemoteMedia() {
+    private func purgePendingRemoteMedia(preservingQueuedMedia: Bool = false) {
+        requireRemoteMediaPurge()
         remoteMediaTask?.cancel()
+        remoteMediaTask = nil
         remoteMediaRevisionInFlight = nil
-        introStore.clearPendingVideo()
-        remoteMediaTask = Task { [cache] in
-            await cache.clear()
+        if !preservingQueuedMedia {
+            queuedRemoteMedia.removeAll()
+        }
+        scheduleRemoteMediaPurgeIfNeeded(restart: true)
+    }
+
+    private func requireRemoteMediaPurge() {
+        remoteMediaPurgeRequired = true
+        remoteMediaPurgeGeneration = introStore.requireRemoteMediaPurge() ?? remoteMediaPurgeGeneration
+    }
+
+    private func scheduleRemoteMediaPurgeIfNeeded(restart: Bool = false) {
+        guard remoteMediaPurgeRequired else { return }
+        if restart {
+            remoteMediaPurgeTask?.cancel()
+            remoteMediaPurgeTask = nil
+        } else if remoteMediaPurgeTask != nil {
+            return
+        }
+        if remoteMediaPurgeGeneration == nil {
+            remoteMediaPurgeGeneration = introStore.requireRemoteMediaPurge()
+        }
+        guard let purgeGeneration = remoteMediaPurgeGeneration else {
+            observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
+            return
+        }
+        remoteMediaPurgeTask = Task { [weak self, cache] in
+            guard let self else { return }
+            let pendingMetadataWasCleared = introStore.clearPendingVideo()
+            let cacheWasCleared = await clearIntroVideoCacheWithRetry(cache)
+            guard !Task.isCancelled else { return }
+            remoteMediaPurgeTask = nil
+            guard pendingMetadataWasCleared,
+                  cacheWasCleared,
+                  introStore.acknowledgeRemoteMediaPurge(generation: purgeGeneration) else {
+                observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
+                return
+            }
+            remoteMediaPurgeRequired = false
+            remoteMediaPurgeGeneration = nil
+            startNextRemoteMediaResolutionIfNeeded()
         }
     }
 
@@ -1359,18 +1452,17 @@ final class OnboardingCoordinator: ObservableObject {
     }
 }
 
-private struct DeferredRemoteMedia {
-    let configuration: FirebaseRemoteFeatureConfiguration
-    let consent: ObservabilityConsent
-}
-
-struct PendingIntroVideo {
+struct PendingIntroVideo: Codable {
     let revision: Int64
     let sha256: String
+}
 
-    func matches(_ source: FirebaseRemoteIntroVideo) -> Bool {
-        revision == source.revision && sha256 == source.sha256
-    }
+private struct RemoteMediaPurgeState: Codable, Equatable {
+    let requiredGeneration: Int64
+    let acknowledgedGeneration: Int64
+
+    static let empty = RemoteMediaPurgeState(requiredGeneration: 0, acknowledgedGeneration: 0)
+    static let failClosed = RemoteMediaPurgeState(requiredGeneration: 1, acknowledgedGeneration: 0)
 }
 
 struct IntroVideoPresentationStore {
@@ -1393,51 +1485,147 @@ struct IntroVideoPresentationStore {
         max(lastPresentedRemoteRevision, validPendingRemoteRevision ?? noRemoteRevision)
     }
 
+    var pendingRemoteMediaPurgeGeneration: Int64? {
+        let state = readRemoteMediaPurgeState()
+        return state.requiredGeneration > state.acknowledgedGeneration ? state.requiredGeneration : nil
+    }
+
     var hasPendingVideo: Bool {
-        userDefaults.object(forKey: pendingRemoteRevisionKey) != nil ||
+        userDefaults.object(forKey: pendingRemoteVideoKey) != nil ||
+            userDefaults.object(forKey: pendingRemoteRevisionKey) != nil ||
             userDefaults.object(forKey: pendingRemoteSHA256Key) != nil
     }
 
     func pendingVideoNewerThanLastPresented() -> PendingIntroVideo? {
-        let revision = Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey))
-        guard revision > lastPresentedRemoteRevision,
-              let sha256 = userDefaults.string(forKey: pendingRemoteSHA256Key),
-              sha256.range(of: sha256Pattern, options: .regularExpression) != nil else {
-            clearPendingVideo()
+        guard let pending = readPendingVideo(),
+              pending.revision > lastPresentedRemoteRevision,
+              pending.sha256.range(of: sha256Pattern, options: .regularExpression) != nil else {
             return nil
         }
-        return PendingIntroVideo(revision: revision, sha256: sha256)
+        guard persistPendingVideo(pending) else {
+            return nil
+        }
+        return pending
     }
 
-    func savePendingVideoIfNewer(_ source: FirebaseRemoteIntroVideo) {
-        guard source.revision > latestKnownRemoteRevision else { return }
-        userDefaults.set(source.revision, forKey: pendingRemoteRevisionKey)
-        userDefaults.set(source.sha256, forKey: pendingRemoteSHA256Key)
+    func savePendingVideoIfNewer(_ source: FirebaseRemoteIntroVideo) -> Bool {
+        guard source.revision > latestKnownRemoteRevision else { return false }
+        return persistPendingVideo(
+            PendingIntroVideo(revision: source.revision, sha256: source.sha256)
+        )
     }
 
     func markRemoteVideoPresented(revision: Int64) {
         let presentedRevision = max(lastPresentedRemoteRevision, revision)
         userDefaults.set(presentedRevision, forKey: lastPresentedRemoteRevisionKey)
-        if Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey)) <= presentedRevision {
+        if let pendingRevision = readPendingVideo()?.revision,
+           pendingRevision <= presentedRevision {
             clearPendingVideo()
         }
     }
 
-    func clearPendingVideo(ifRevision revision: Int64? = nil) {
+    @discardableResult
+    func clearPendingVideo(ifRevision revision: Int64? = nil) -> Bool {
         if let revision,
-           Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey)) != revision {
-            return
+           readPendingVideo()?.revision != revision {
+            return true
         }
+        userDefaults.removeObject(forKey: pendingRemoteVideoKey)
         userDefaults.removeObject(forKey: pendingRemoteRevisionKey)
         userDefaults.removeObject(forKey: pendingRemoteSHA256Key)
+        return !hasPendingVideo
     }
+
+    func requireRemoteMediaPurge() -> Int64? {
+        if let pendingRemoteMediaPurgeGeneration {
+            return pendingRemoteMediaPurgeGeneration
+        }
+        let state = readRemoteMediaPurgeState()
+        let currentGeneration = max(state.requiredGeneration, state.acknowledgedGeneration)
+        guard currentGeneration < Int64.max else { return nil }
+        let updatedState = RemoteMediaPurgeState(
+            requiredGeneration: currentGeneration + 1,
+            acknowledgedGeneration: state.acknowledgedGeneration
+        )
+        return persistRemoteMediaPurgeState(updatedState) ? updatedState.requiredGeneration : nil
+    }
+
+    func acknowledgeRemoteMediaPurge(generation: Int64) -> Bool {
+        let state = readRemoteMediaPurgeState()
+        guard generation > 0, generation <= state.requiredGeneration else { return false }
+        return persistRemoteMediaPurgeState(
+            RemoteMediaPurgeState(
+                requiredGeneration: state.requiredGeneration,
+                acknowledgedGeneration: max(state.acknowledgedGeneration, generation)
+            )
+        )
+    }
+
+    private func readPendingVideo() -> PendingIntroVideo? {
+        if let payload = userDefaults.data(forKey: pendingRemoteVideoKey) {
+            return try? JSONDecoder().decode(PendingIntroVideo.self, from: payload)
+        }
+        guard userDefaults.object(forKey: pendingRemoteRevisionKey) != nil,
+              let sha256 = userDefaults.string(forKey: pendingRemoteSHA256Key) else {
+            return nil
+        }
+        return PendingIntroVideo(
+            revision: Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey)),
+            sha256: sha256
+        )
+    }
+
+    private func persistPendingVideo(_ pending: PendingIntroVideo) -> Bool {
+        guard let payload = try? JSONEncoder().encode(pending) else { return false }
+        userDefaults.set(payload, forKey: pendingRemoteVideoKey)
+        return userDefaults.data(forKey: pendingRemoteVideoKey) == payload
+    }
+
+    private func readRemoteMediaPurgeState() -> RemoteMediaPurgeState {
+        guard let payload = userDefaults.data(forKey: remoteMediaPurgeStateKey) else {
+            return .empty
+        }
+        guard let state = try? JSONDecoder().decode(RemoteMediaPurgeState.self, from: payload),
+              state.requiredGeneration >= 0,
+              state.acknowledgedGeneration >= 0,
+              state.acknowledgedGeneration <= state.requiredGeneration else {
+            return .failClosed
+        }
+        return state
+    }
+
+    private func persistRemoteMediaPurgeState(_ state: RemoteMediaPurgeState) -> Bool {
+        guard let payload = try? JSONEncoder().encode(state) else { return false }
+        userDefaults.set(payload, forKey: remoteMediaPurgeStateKey)
+        return userDefaults.data(forKey: remoteMediaPurgeStateKey) == payload
+    }
+}
+
+private func clearIntroVideoCacheWithRetry(_ cache: IntroVideoCache) async -> Bool {
+    for delay in remoteMediaPurgeRetryDelaysNanoseconds {
+        if delay > 0 {
+            do {
+                try await Task.sleep(nanoseconds: delay)
+            } catch {
+                return false
+            }
+        }
+        guard !Task.isCancelled else { return false }
+        if await cache.clear() {
+            return true
+        }
+    }
+    return false
 }
 
 private let bundledIntroName = "KwaborIntro"
 private let mp4Extension = "mp4"
 private let introSeenKey = "kwabor.first_launch.intro_seen_v1"
+private let pendingRemoteVideoKey = "kwabor.intro.pending_remote_video_v2"
 private let pendingRemoteRevisionKey = "kwabor.intro.pending_remote_revision"
 private let pendingRemoteSHA256Key = "kwabor.intro.pending_remote_sha256"
 private let lastPresentedRemoteRevisionKey = "kwabor.intro.last_presented_remote_revision"
+private let remoteMediaPurgeStateKey = "kwabor.intro.remote_media_purge_state_v1"
 private let noRemoteRevision: Int64 = 0
 private let sha256Pattern = "^[a-f0-9]{64}$"
+private let remoteMediaPurgeRetryDelaysNanoseconds: [UInt64] = [0, 200_000_000, 800_000_000]

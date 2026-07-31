@@ -41,13 +41,13 @@ Les seules clés autorisées par cette fondation concernent le remplacement de l
 | `intro_video_enabled` | `false` | doit être explicitement vrai |
 | `intro_video_url` | vide | HTTPS, hôte présent, aucun userinfo, 2048 caractères maximum |
 | `intro_video_sha256` | vide | exactement 64 caractères hexadécimaux |
-| `intro_video_revision` | `0` | entier strictement positif |
+| `intro_video_revision` | `0` | entier signé 64 bits strictement positif |
 
-Une seule valeur absente ou invalide rejette l'ensemble distant et conserve l'asset embarqué. Après consentement, un listener Remote Config temps réel détecte les nouvelles publications et active seulement les changements qui touchent ces quatre clés. Le fetch production de douze heures reste le mécanisme de rattrapage ; aucun polling agressif n'est ajouté. Le listener est retiré à la révocation du consentement. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
+Une valeur encore absente des données actives du service ou invalide rejette l'ensemble distant sans effacer la dernière révision déjà validée ; à défaut, l'asset embarqué reste la valeur sûre. Seul `intro_video_enabled=false` dont la source Firebase est distante désactive explicitement la campagne et purge l'attente : la valeur par défaut locale `false` signifie « configuration indisponible », pas « ordre de suppression ». La désactivation et la révocation utilisent une intention de purge locale persistée et acquittée uniquement après suppression vérifiée de la métadonnée et du cache ; toute intention non acquittée bloque les candidats et est reprise au lancement suivant. Après consentement, un listener Remote Config temps réel détecte les nouvelles publications et active seulement les changements qui touchent ces quatre clés. Le fetch production de douze heures reste le mécanisme de rattrapage ; aucun polling agressif n'est ajouté. Le listener est retiré à la révocation du consentement. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
 
 Le projet Firebase doit avoir l'API **Firebase Remote Config Realtime** activée. Le super-admin publie une révision strictement croissante depuis la console Firebase avec l'URL CDN et le SHA-256 du média. Les clients préchargent la révision validée puis la présentent une seule fois au lancement suivant ; une publication ne peut jamais interrompre une session en cours.
 
-Le téléchargement, la validation codec/durée/taille et la révocation du média sont détaillés dans le [runbook onboarding](onboarding.md) et l'[ADR-0016](adr/0016-consent-gated-onboarding-media.md).
+Le téléchargement, la validation codec/durée/taille et la révocation du média sont détaillés dans le [runbook onboarding](onboarding.md), le [runbook opérateur de publication](runbooks/onboarding-video-publication.md) et l'[ADR-0016](adr/0016-consent-gated-onboarding-media.md).
 
 ## Configuration des builds
 
