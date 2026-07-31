@@ -47,6 +47,7 @@ jobs:
               gradle/libs.versions.toml | \
               kwabor_icone_app.png | \
               kwabor_2.png | \
+              tools/android-screencap-raw.py | \
               tools/capture-android-launch-evidence.sh | \
               tools/generate-brand-assets.ps1 | \
               tools/verify-onboarding-media.py | \

@@ -21,10 +21,11 @@ package_name="com.kwabor.android"
 activity_name="${package_name}/.MainActivity"
 evidence_root="build/brand-evidence/api-${api_level}"
 # Android screenrecord follows the emulator presentation clock and emits variable-rate
-# frames. Retain that untouched stream and also sample the composited display with
-# screencap so short-lived system layers remain reviewable on every supported API.
-# The PNG loop runs inside one bounded device-side shell: repeated adb exec-out
-# transfers can stall for seconds under KVM and erase the splash interval being proved.
+# frames. Capture the launch-critical composited display first as AOSP's dense raw
+# RGBA format, then start the longer screenrecord stream. Running those two SurfaceFlinger
+# consumers sequentially avoids starving the short-lived system splash on KVM runners.
+# Raw frames remain quota-bounded on the device and are pulled, validated, and
+# compressed before the post-launch recorder starts.
 screenrecord_time_limit_seconds=120
 minimum_evidence_seconds=15
 normalized_frame_rate=30
@@ -44,23 +45,28 @@ screenrecord_forced_stop_seconds=5
 screenrecord_host_reap_seconds=10
 adb_probe_timeout_seconds=3
 adb_general_timeout_seconds=60
+cold_start_timeout_seconds=20
+screencap_stop_publish_timeout_seconds=3
 command_kill_grace_seconds=2
 uiautomator_command_timeout_seconds=12
-screencap_hard_timeout_seconds=75
+screencap_hard_timeout_seconds=40
 screencap_arm_timeout_seconds=10
-screencap_frame_timeout_seconds=2
-screencap_sample_interval_microseconds=50000
-screencap_maximum_gap_seconds=0.75
-screencap_maximum_frames=1600
+screencap_frame_timeout_seconds=1
+screencap_sample_period_microseconds=450000
+screencap_maximum_gap_seconds=0.49
+screencap_float_comparison_epsilon_seconds=0.000000001
+screencap_maximum_frames=128
 screencap_maximum_frame_bytes=33554432
-screencap_remote_maximum_bytes=536870912
+screencap_remote_maximum_bytes=1073741824
 screencap_remote_reserve_bytes=268435456
-screencap_pull_timeout_seconds=180
-screencap_validation_timeout_seconds=120
-minimum_screencap_frames=32
-minimum_screencap_duration_seconds=24
-screencap_maximum_frame_duration_seconds=$((screencap_frame_timeout_seconds +
-  command_kill_grace_seconds))
+screencap_pull_timeout_seconds=300
+screencap_validation_timeout_seconds=300
+minimum_screencap_frames=8
+minimum_screencap_duration_seconds=4
+screencap_conversion_maximum_frame_duration_seconds=$((
+  screencap_frame_timeout_seconds + command_kill_grace_seconds
+))
+screencap_maximum_frame_duration_seconds="${screencap_maximum_gap_seconds}"
 ffmpeg_command_timeout_seconds=120
 ffprobe_command_timeout_seconds=30
 intro_accessibility_label="Découvrir le Bénin avec Kwabor"
@@ -73,6 +79,34 @@ declare -a density_profiles=(
   "xhdpi:320:720x1560:720x1560"
   "xxxhdpi:640:1440x3120:720x1560"
 )
+
+largest_expected_raw_frame_bytes=$((16 + 1440 * 3120 * 4))
+screencap_budget_launch_seconds=$((
+  (cold_start_timeout_seconds > minimum_screencap_duration_seconds) ?
+    cold_start_timeout_seconds :
+    minimum_screencap_duration_seconds
+))
+screencap_budget_window_microseconds=$((
+  (screencap_budget_launch_seconds + screencap_stop_publish_timeout_seconds) *
+    1000000
+))
+screencap_budget_capture_frames=$((
+  (screencap_budget_window_microseconds +
+    screencap_sample_period_microseconds - 1) /
+    screencap_sample_period_microseconds +
+    1
+))
+screencap_budget_stored_frames=$((screencap_budget_capture_frames + 1))
+screencap_budget_required_bytes=$((
+  screencap_budget_stored_frames * largest_expected_raw_frame_bytes +
+    screencap_maximum_frame_bytes
+))
+if ((screencap_budget_required_bytes > screencap_remote_maximum_bytes)); then
+  echo \
+    "Raw screencap quota cannot cover the configured cold-start budget: ${screencap_budget_required_bytes}/${screencap_remote_maximum_bytes} bytes" \
+    >&2
+  exit 1
+fi
 
 if [[ -z "${EPOCHREALTIME:-}" ]]; then
   echo "Bash 5+ with EPOCHREALTIME support is required" >&2
@@ -102,6 +136,7 @@ if [[ -z "${python_command}" ]]; then
   echo "Missing a working Python 3.8+ interpreter (python3 or python)" >&2
   exit 1
 fi
+"${python_command}" -B tools/android-screencap-raw.py self-test
 ffmpeg_major_version="$(
   timeout 15 ffmpeg -version |
     sed -n '1s/^ffmpeg version \([0-9][0-9]*\).*/\1/p'
@@ -410,6 +445,67 @@ request_remote_screencap_control() {
   return 1
 }
 
+publish_remote_screencap_stop() {
+  local remote_root="$1"
+  local nonce="$2"
+
+  if ! validate_remote_screencap_root "${remote_root}" ||
+    ! validate_screencap_nonce "${nonce}"; then
+    echo "Refusing invalid remote screencap stop parameters" >&2
+    return 1
+  fi
+  timeout "${screencap_stop_publish_timeout_seconds}" \
+    adb shell -T /system/bin/sh -s -- \
+    "${remote_root}" \
+    "${nonce}" <<'ANDROID_SCREENCAP_STOP'
+set -eu
+umask 077
+
+remote_root="$1"
+nonce="$2"
+pending_file="${remote_root}/screencap-stop.pending"
+stop_file="${remote_root}/screencap-stop"
+
+case "${nonce}" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  *)
+    echo "Invalid remote stop nonce" >&2
+    exit 1
+    ;;
+esac
+case "${remote_root}" in
+  /data/local/tmp/kwabor-brand-002-api-*-"${nonce}") ;;
+  *)
+    echo "Invalid remote stop root" >&2
+    exit 1
+    ;;
+esac
+if [ -f "${stop_file}" ]; then
+  IFS= read -r marker_nonce <"${stop_file}"
+  if [ "${marker_nonce}" != "${nonce}" ]; then
+    echo "Published remote stop marker has the wrong nonce" >&2
+    exit 1
+  fi
+  exit 0
+fi
+if [ ! -f "${pending_file}" ]; then
+  echo "Missing pending remote stop marker" >&2
+  exit 1
+fi
+IFS= read -r marker_nonce <"${pending_file}"
+if [ "${marker_nonce}" != "${nonce}" ]; then
+  echo "Pending remote stop marker has the wrong nonce" >&2
+  exit 1
+fi
+mv "${pending_file}" "${stop_file}"
+IFS= read -r marker_nonce <"${stop_file}"
+if [ "${marker_nonce}" != "${nonce}" ]; then
+  echo "Unable to verify the published remote stop marker" >&2
+  exit 1
+fi
+ANDROID_SCREENCAP_STOP
+}
+
 wait_for_remote_screencap_done() {
   local remote_root="$1"
   local expected_nonce="$2"
@@ -557,10 +653,8 @@ cleanup() {
       true
   fi
   for cleanup_density in mdpi xhdpi xxxhdpi; do
-    cleanup_frames="${evidence_root}/${cleanup_density}/screencap-frames"
-    if [[ -d "${cleanup_frames}" ]]; then
-      rm -rf -- "${cleanup_frames}"
-    fi
+    # Published PNGs are bounded, fully validated diagnostics. Keep them when a
+    # later cadence or perceptual gate fails; raw staging is always discarded.
     for cleanup_staging in \
       "${evidence_root}/${cleanup_density}"/.screencap-staging-*; do
       if [[ -d "${cleanup_staging}" ]]; then
@@ -602,7 +696,7 @@ capture_screencap_frames() {
     "${nonce}" \
     "${screencap_hard_timeout_seconds}" \
     "${screencap_frame_timeout_seconds}" \
-    "${screencap_sample_interval_microseconds}" \
+    "${screencap_sample_period_microseconds}" \
     "${screencap_maximum_frames}" \
     "${minimum_screencap_frames}" \
     "${minimum_screencap_duration_seconds}" \
@@ -614,7 +708,7 @@ remote_root="$1"
 nonce="$2"
 hard_timeout_seconds="$3"
 frame_timeout_seconds="$4"
-sample_interval_microseconds="$5"
+sample_period_microseconds="$5"
 maximum_frames="$6"
 minimum_frames="$7"
 minimum_duration_seconds="$8"
@@ -624,8 +718,14 @@ maximum_total_bytes="$1"
 umask 077
 frames_directory="${remote_root}/screencap-frames"
 timestamps_file="${remote_root}/screencap-timestamps.tsv"
+timeline_file="${remote_root}/screencap-timeline.tsv"
+timeline_pending_file="${timeline_file}.pending"
+home_file="${remote_root}/prelaunch-home.raw"
 armed_file="${remote_root}/screencap-armed"
 armed_pending_file="${armed_file}.pending"
+launch_file="${remote_root}/screencap-launch"
+launch_pending_file="${launch_file}.pending"
+launch_time_file="${remote_root}/screencap-launch-time.tsv"
 stop_file="${remote_root}/screencap-stop"
 stop_pending_file="${stop_file}.pending"
 abort_file="${remote_root}/screencap-abort"
@@ -638,9 +738,15 @@ pid_file="${remote_root}/screencap.pid"
 frame_index=0
 captured_frames=0
 total_bytes=0
+stored_bytes=0
 first_captured_at=""
 last_captured_at=""
 current_partial_path=""
+home_attempted_at=""
+home_completed_at=""
+home_bytes=0
+launch_requested_at=""
+stop_observed_at=""
 
 marker_matches() {
   marker_path="$1"
@@ -661,7 +767,11 @@ finish_capture() {
   fi
   if [ "${capture_status}" -ne 0 ]; then
     rm -rf "${frames_directory}"
-    rm -f "${timestamps_file}"
+    rm -f \
+      "${timestamps_file}" \
+      "${timeline_file}" \
+      "${timeline_pending_file}" \
+      "${home_file}"
   fi
   if printf '%s\t%s\t%s\t%s\n' \
     "${nonce}" \
@@ -674,7 +784,12 @@ finish_capture() {
   else
     echo "Unable to commit remote screencap status" >&2
     rm -rf "${frames_directory}"
-    rm -f "${timestamps_file}" "${status_pending_file}"
+    rm -f \
+      "${timestamps_file}" \
+      "${timeline_file}" \
+      "${timeline_pending_file}" \
+      "${home_file}" \
+      "${status_pending_file}"
     capture_status=125
     captured_frames=0
     total_bytes=0
@@ -700,6 +815,7 @@ trap 'exit 130' HUP INT TERM
 
 if [ ! -d "${frames_directory}" ] ||
   ! marker_matches "${armed_pending_file}" ||
+  ! marker_matches "${launch_pending_file}" ||
   ! marker_matches "${stop_pending_file}" ||
   ! marker_matches "${abort_pending_file}" ||
   ! marker_matches "${done_pending_file}"; then
@@ -709,6 +825,76 @@ fi
 printf '%s\t%s\n' "${nonce}" "$$" >"${pid_file}"
 : >"${timestamps_file}"
 IFS=' ' read -r started_at ignored </proc/uptime
+
+# Prove that the collector can read the exact configured HOME surface before
+# the parent publishes the launch marker. This frame is not part of the
+# post-marker cadence contract, so host-side setup cannot create a false gap.
+home_partial_file="${home_file}.partial"
+current_partial_path="${home_partial_file}"
+IFS=' ' read -r home_attempted_at ignored </proc/uptime
+if ! /system/bin/toybox timeout -s 9 "${frame_timeout_seconds}" \
+  /system/bin/screencap >"${home_partial_file}" ||
+  [ ! -s "${home_partial_file}" ]; then
+  echo "Unable to capture the prelaunch HOME frame" >&2
+  exit 1
+fi
+IFS=' ' read -r home_completed_at ignored </proc/uptime
+home_bytes="$(/system/bin/toybox stat -c %s "${home_partial_file}")"
+case "${home_bytes}" in
+  '' | *[!0-9]*)
+    echo "Invalid prelaunch HOME frame size" >&2
+    exit 1
+    ;;
+esac
+if [ "${home_bytes}" -le 16 ] ||
+  [ "${home_bytes}" -gt "${maximum_frame_bytes}" ] ||
+  [ "${home_bytes}" -gt "${maximum_total_bytes}" ]; then
+  echo "Prelaunch HOME frame violates the raw capture quota: ${home_bytes}" >&2
+  exit 1
+fi
+if ! mv "${home_partial_file}" "${home_file}"; then
+  echo "Unable to publish the prelaunch HOME frame" >&2
+  exit 1
+fi
+current_partial_path=""
+stored_bytes="${home_bytes}"
+if ! mv "${armed_pending_file}" "${armed_file}"; then
+  echo "Unable to publish the remote screencap arm marker" >&2
+  exit 1
+fi
+
+# Wait without accumulating frames until the same device shell that executes
+# `am start` publishes a nonce-bound timestamp and launch marker.
+while ! marker_matches "${launch_file}"; do
+  IFS=' ' read -r current_at ignored </proc/uptime
+  if marker_matches "${abort_file}"; then
+    echo "Screencap sequence aborted before the cold launch" >&2
+    exit 130
+  fi
+  if awk \
+    -v started="${started_at}" \
+    -v current="${current_at}" \
+    -v maximum="${hard_timeout_seconds}" \
+    'BEGIN { exit !(current - started >= maximum) }'; then
+    echo "Screencap sequence did not receive its launch marker" >&2
+    exit 1
+  fi
+  /system/bin/toybox usleep 20000
+done
+if [ ! -f "${launch_time_file}" ]; then
+  echo "Missing nonce-bound screencap launch timestamp" >&2
+  exit 1
+fi
+IFS='	' read -r launch_nonce launch_requested_at <"${launch_time_file}" || {
+  echo "Unable to read the screencap launch timestamp" >&2
+  exit 1
+}
+if [ "${launch_nonce}" != "${nonce}" ] ||
+  ! awk -v timestamp="${launch_requested_at}" \
+    'BEGIN { exit !(timestamp ~ /^[0-9]+([.][0-9]+)?$/) }'; then
+  echo "Invalid screencap launch timestamp" >&2
+  exit 1
+fi
 
 while :; do
   IFS=' ' read -r current_at ignored </proc/uptime
@@ -731,56 +917,44 @@ while :; do
       -v last="${last_captured_at}" \
       -v minimum="${minimum_duration_seconds}" \
       'BEGIN { exit !(last - first >= minimum) }'; then
+    stop_observed_at="${current_at}"
     break
   fi
   if [ "${frame_index}" -ge "${maximum_frames}" ]; then
     echo "Screencap sequence exceeded ${maximum_frames} frame attempts" >&2
     exit 1
   fi
-  if [ "${total_bytes}" -gt "$((maximum_total_bytes - maximum_frame_bytes))" ]; then
+  if [ "${stored_bytes}" -gt "$((maximum_total_bytes - maximum_frame_bytes))" ]; then
     echo \
       "Screencap sequence cannot reserve another ${maximum_frame_bytes}-byte frame" \
       >&2
     exit 1
   fi
 
-  frame_name="$(printf 'frame-%05d.png' "${frame_index}")"
+  frame_name="$(printf 'frame-%05d.raw' "${frame_index}")"
   frame_path="${frames_directory}/${frame_name}"
   partial_path="${frame_path}.partial"
   current_partial_path="${partial_path}"
   IFS=' ' read -r attempted_at ignored </proc/uptime
   if /system/bin/toybox timeout -s 9 "${frame_timeout_seconds}" \
-    /system/bin/screencap -p >"${partial_path}" &&
+    /system/bin/screencap >"${partial_path}" &&
     [ -s "${partial_path}" ]; then
     IFS=' ' read -r completed_at ignored </proc/uptime
     frame_bytes="$(/system/bin/toybox stat -c %s "${partial_path}")"
-    png_header="$(
-      /system/bin/toybox xxd -p -l 8 "${partial_path}" |
-        /system/bin/toybox tr -d '\n'
-    )"
-    png_trailer="$(
-      /system/bin/toybox tail -c 12 "${partial_path}" |
-        /system/bin/toybox xxd -p |
-        /system/bin/toybox tr -d '\n'
-    )"
     case "${frame_bytes}" in
       '' | *[!0-9]*)
         echo "Invalid screencap frame size: ${frame_name}" >&2
         exit 1
         ;;
     esac
-    if [ "${png_header}" != "89504e470d0a1a0a" ] ||
-      [ "${png_trailer}" != "0000000049454e44ae426082" ]; then
-      echo "Incomplete screencap PNG: ${frame_name}" >&2
-      exit 1
-    fi
-    if [ "${frame_bytes}" -gt "${maximum_frame_bytes}" ]; then
+    if [ "${frame_bytes}" -le 16 ] ||
+      [ "${frame_bytes}" -gt "${maximum_frame_bytes}" ]; then
       echo \
         "Screencap frame exceeds ${maximum_frame_bytes} bytes: ${frame_name} (${frame_bytes})" \
         >&2
       exit 1
     fi
-    if [ "$((total_bytes + frame_bytes))" -gt "${maximum_total_bytes}" ]; then
+    if [ "$((stored_bytes + frame_bytes))" -gt "${maximum_total_bytes}" ]; then
       echo \
         "Screencap sequence exceeds ${maximum_total_bytes} bytes at ${frame_name}" \
         >&2
@@ -803,24 +977,43 @@ while :; do
     fi
     captured_frames=$((captured_frames + 1))
     total_bytes=$((total_bytes + frame_bytes))
+    stored_bytes=$((stored_bytes + frame_bytes))
     last_captured_at="${attempted_at}"
     if [ "${captured_frames}" -eq 1 ]; then
       first_captured_at="${attempted_at}"
-      if ! mv "${armed_pending_file}" "${armed_file}"; then
-        echo "Unable to publish the remote screencap arm marker" >&2
-        exit 1
-      fi
     fi
   else
     rm -f "${partial_path}"
     current_partial_path=""
   fi
   frame_index=$((frame_index + 1))
-  /system/bin/toybox usleep "${sample_interval_microseconds}"
+  IFS=' ' read -r scheduling_at ignored </proc/uptime
+  remaining_microseconds="$(
+    awk \
+      -v attempted="${attempted_at}" \
+      -v current="${scheduling_at}" \
+      -v period="${sample_period_microseconds}" '
+      BEGIN {
+        remaining = period - ((current - attempted) * 1000000)
+        if (remaining < 0) remaining = 0
+        printf "%.0f", remaining
+      }
+    '
+  )"
+  case "${remaining_microseconds}" in
+    '' | *[!0-9]*)
+      echo "Unable to schedule the next screencap frame" >&2
+      exit 1
+      ;;
+  esac
+  if [ "${remaining_microseconds}" -gt 0 ]; then
+    /system/bin/toybox usleep "${remaining_microseconds}"
+  fi
 done
 
 echo "captured_frames=${captured_frames}"
 echo "captured_bytes=${total_bytes}"
+echo "stored_bytes=${stored_bytes}"
 if [ "${captured_frames}" -lt "${minimum_frames}" ]; then
   echo \
     "Screencap sequence has too few frames: ${captured_frames}, expected at least ${minimum_frames}" \
@@ -835,6 +1028,18 @@ if ! awk \
   echo \
     "Screencap sequence did not span ${minimum_duration_seconds}s of successful captures" \
     >&2
+  exit 1
+fi
+if ! printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "${nonce}" \
+  "${launch_requested_at}" \
+  "${stop_observed_at}" \
+  "${home_attempted_at}" \
+  "${home_completed_at}" \
+  "${home_bytes}" \
+  >"${timeline_pending_file}" ||
+  ! mv "${timeline_pending_file}" "${timeline_file}"; then
+  echo "Unable to publish the screencap monotonic timeline" >&2
   exit 1
 fi
 ANDROID_SCREENCAP
@@ -860,6 +1065,78 @@ wait_for_screencap_arm() {
   done
   echo "Timed out waiting for the first screencap HOME frame" >&2
   return 1
+}
+
+start_cold_activity_with_screencap_marker() {
+  local remote_root="$1"
+  local nonce="$2"
+  local output_file="$3"
+
+  if ! validate_remote_screencap_root "${remote_root}" ||
+    ! validate_screencap_nonce "${nonce}"; then
+    echo "Refusing invalid cold-start marker parameters" >&2
+    return 1
+  fi
+  timeout "${cold_start_timeout_seconds}" \
+    adb shell -T /system/bin/sh -s -- \
+    "${remote_root}" \
+    "${nonce}" \
+    "${activity_name}" <<'ANDROID_COLD_START' | tee "${output_file}"
+set -eu
+
+remote_root="$1"
+nonce="$2"
+activity_name="$3"
+launch_pending_file="${remote_root}/screencap-launch.pending"
+launch_file="${remote_root}/screencap-launch"
+launch_time_pending_file="${remote_root}/screencap-launch-time.tsv.pending"
+launch_time_file="${remote_root}/screencap-launch-time.tsv"
+
+case "${remote_root}" in
+  /data/local/tmp/kwabor-brand-002-api-30-mdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-30-xhdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-30-xxxhdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-31-mdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-31-xhdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-31-xxxhdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-36-mdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-36-xhdpi-[0-9a-f]* | \
+    /data/local/tmp/kwabor-brand-002-api-36-xxxhdpi-[0-9a-f]*) ;;
+  *)
+    echo "Invalid remote cold-start root" >&2
+    exit 1
+    ;;
+esac
+case "${nonce}" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  *)
+    echo "Invalid cold-start nonce" >&2
+    exit 1
+    ;;
+esac
+if [ "${remote_root##*-}" != "${nonce}" ]; then
+  echo "Cold-start root and nonce disagree" >&2
+  exit 1
+fi
+if [ "${activity_name}" != "com.kwabor.android/.MainActivity" ]; then
+  echo "Invalid cold-start activity" >&2
+  exit 1
+fi
+IFS= read -r marker_nonce <"${launch_pending_file}"
+if [ "${marker_nonce}" != "${nonce}" ] ||
+  [ -e "${launch_file}" ] ||
+  [ -e "${launch_time_file}" ] ||
+  [ -e "${launch_time_pending_file}" ]; then
+  echo "Invalid or previously consumed cold-start marker" >&2
+  exit 1
+fi
+IFS=' ' read -r launch_requested_at ignored </proc/uptime
+printf '%s\t%s\n' "${nonce}" "${launch_requested_at}" \
+  >"${launch_time_pending_file}"
+mv "${launch_time_pending_file}" "${launch_time_file}"
+mv "${launch_pending_file}" "${launch_file}"
+exec /system/bin/am start -S -W -n "${activity_name}"
+ANDROID_COLD_START
 }
 
 prepare_remote_screencap() {
@@ -904,8 +1181,6 @@ test -r /proc/uptime
 test -x /system/bin/screencap
 /system/bin/toybox timeout -s 9 1 /system/bin/toybox true
 /system/bin/toybox usleep 1
-/system/bin/toybox xxd -p -l 8 /dev/null >/dev/null
-/system/bin/toybox tail -c 1 /dev/null >/dev/null
 /system/bin/toybox stat -c %s /dev/null >/dev/null
 awk 1 /dev/null
 available_kilobytes="$(
@@ -932,7 +1207,7 @@ if ! mkdir "${remote_root}"; then
 fi
 remote_root_created=1
 mkdir "${remote_root}/screencap-frames"
-for marker_name in armed stop abort done; do
+for marker_name in armed launch stop abort done; do
   printf '%s\n' "${nonce}" \
     >"${remote_root}/screencap-${marker_name}.pending"
 done
@@ -946,11 +1221,16 @@ pull_remote_screencap() {
   local capture_directory="$3"
   local expected_width="$4"
   local expected_height="$5"
-  local frames_directory="${capture_directory}/screencap-frames"
-  local timestamps_file="${capture_directory}/screencap-timestamps.tsv"
+  local published_directory="${capture_directory}/screencap-evidence"
   local staging_directory="${capture_directory}/.screencap-staging-${nonce}"
-  local staging_frames="${staging_directory}/screencap-frames"
-  local staging_timestamps="${staging_directory}/screencap-timestamps.tsv"
+  local staging_raw_frames="${staging_directory}/raw-frames"
+  local staging_png_frames="${staging_directory}/screencap-frames"
+  local staging_raw_timestamps="${staging_directory}/screencap-raw-timestamps.tsv"
+  local staging_png_timestamps="${staging_directory}/screencap-timestamps.tsv"
+  local staging_timeline="${staging_directory}/screencap-timeline.tsv"
+  local staging_home_raw="${staging_directory}/prelaunch-home.raw"
+  local staging_home_png="${staging_directory}/prelaunch-home.png"
+  local staging_raw_metadata="${staging_directory}/screencap-raw-metadata.tsv"
   local remote_status=""
   local status_nonce=""
   local status_code=""
@@ -958,10 +1238,15 @@ pull_remote_screencap() {
   local status_bytes=""
   local staged_frames=""
   local staged_bytes=""
+  local staged_timeline_nonce=""
 
   if ! validate_remote_screencap_root "${remote_root}" ||
     ! validate_screencap_nonce "${nonce}"; then
     echo "Refusing invalid remote screencap pull parameters" >&2
+    return 1
+  fi
+  if [[ -e "${published_directory}" || -L "${published_directory}" ]]; then
+    echo "Refusing to overwrite published screencap evidence" >&2
     return 1
   fi
   if ! remote_screencap_marker_matches \
@@ -988,26 +1273,55 @@ pull_remote_screencap() {
     return 1
   fi
   rm -rf -- "${staging_directory}"
-  mkdir -p "${staging_frames}"
+  mkdir -p "${staging_raw_frames}" "${staging_png_frames}"
   timeout "${screencap_pull_timeout_seconds}" \
     adb pull \
     "${remote_root}/screencap-frames/." \
-    "${staging_frames}/"
+    "${staging_raw_frames}/"
   timeout "${screencap_pull_timeout_seconds}" \
     adb pull \
     "${remote_root}/screencap-timestamps.tsv" \
-    "${staging_timestamps}"
+    "${staging_raw_timestamps}"
+  timeout "${screencap_pull_timeout_seconds}" \
+    adb pull \
+    "${remote_root}/screencap-timeline.tsv" \
+    "${staging_timeline}"
+  timeout "${screencap_pull_timeout_seconds}" \
+    adb pull \
+    "${remote_root}/prelaunch-home.raw" \
+    "${staging_home_raw}"
+  staged_timeline_nonce="$(
+    awk -F '\t' 'NR == 1 { print $1 }' "${staging_timeline}"
+  )"
+  if [[ "$(awk 'END { print NR }' "${staging_timeline}")" != "1" ||
+    "${staged_timeline_nonce}" != "${nonce}" ]]; then
+    echo "Pulled screencap timeline has an invalid nonce or cardinality" >&2
+    return 1
+  fi
+  timeout "${screencap_validation_timeout_seconds}" \
+    "${python_command}" -B tools/android-screencap-raw.py convert \
+    --manifest "${staging_raw_timestamps}" \
+    --raw-directory "${staging_raw_frames}" \
+    --png-directory "${staging_png_frames}" \
+    --home-raw "${staging_home_raw}" \
+    --home-png "${staging_home_png}" \
+    --metadata "${staging_raw_metadata}" \
+    --png-manifest "${staging_png_timestamps}" \
+    --expected-width "${expected_width}" \
+    --expected-height "${expected_height}" \
+    --maximum-frame-duration "${screencap_conversion_maximum_frame_duration_seconds}" \
+    --maximum-frame-bytes "${screencap_maximum_frame_bytes}"
   validate_screencap_pngs \
-    "${staging_timestamps}" \
-    "${staging_frames}" \
+    "${staging_png_timestamps}" \
+    "${staging_png_frames}" \
     "${expected_width}" \
     "${expected_height}" \
-    "${screencap_maximum_frame_duration_seconds}" \
+    "${screencap_conversion_maximum_frame_duration_seconds}" \
     "${screencap_maximum_frame_bytes}"
-  staged_frames="$(awk 'END { print NR }' "${staging_timestamps}")"
+  staged_frames="$(awk 'END { print NR }' "${staging_raw_timestamps}")"
   staged_bytes="$(
     awk -F '\t' '{ total += $4 } END { printf "%.0f", total }' \
-      "${staging_timestamps}"
+      "${staging_raw_timestamps}"
   )"
   if [[ "${staged_frames}" != "${status_frames}" ||
     "${staged_bytes}" != "${status_bytes}" ]]; then
@@ -1016,11 +1330,12 @@ pull_remote_screencap() {
       >&2
     return 1
   fi
-  rm -rf -- "${frames_directory}"
-  rm -f -- "${timestamps_file}"
-  mv -- "${staging_frames}" "${frames_directory}"
-  mv -- "${staging_timestamps}" "${timestamps_file}"
-  rmdir -- "${staging_directory}"
+  rm -rf -- "${staging_raw_frames}"
+  rm -f -- "${staging_home_raw}"
+  # Every durable component is now inside one hidden directory. Publishing the
+  # directory with a single same-filesystem rename prevents partial artifact
+  # sets if the host process is interrupted.
+  mv -T -- "${staging_directory}" "${published_directory}"
 }
 
 validate_screencap_pngs() {
@@ -1105,6 +1420,7 @@ def validate_png(path: Path, expected_size: int) -> None:
 records = []
 previous_name = ""
 previous_timestamp = None
+previous_completed_at = None
 for line_number, raw_line in enumerate(
     timestamps_path.read_text(encoding="utf-8").splitlines(),
     start=1,
@@ -1140,6 +1456,8 @@ for line_number, raw_line in enumerate(
         fail(f"Non-monotonic screencap filename at line {line_number}")
     if previous_timestamp is not None and started_at <= previous_timestamp:
         fail(f"Non-monotonic screencap timestamp at line {line_number}")
+    if previous_completed_at is not None and started_at < previous_completed_at:
+        fail(f"Overlapping screencap interval at line {line_number}")
     frame_path = frames_directory / frame_name
     if not frame_path.is_file():
         fail(f"Missing screencap frame: {frame_name}")
@@ -1149,6 +1467,7 @@ for line_number, raw_line in enumerate(
     records.append(frame_name)
     previous_name = frame_name
     previous_timestamp = started_at
+    previous_completed_at = completed_at
 
 actual_frames = sorted(path.name for path in frames_directory.glob("frame-*.png"))
 if actual_frames != records:
@@ -1163,8 +1482,13 @@ finalize_screencap_evidence() {
   local capture_directory="$1"
   local display_size="$2"
   local record_size="$3"
-  local frames_directory="${capture_directory}/screencap-frames"
-  local timestamps_file="${capture_directory}/screencap-timestamps.tsv"
+  local published_directory="${capture_directory}/screencap-evidence"
+  local frames_directory="${published_directory}/screencap-frames"
+  local timestamps_file="${published_directory}/screencap-timestamps.tsv"
+  local raw_timestamps_file="${published_directory}/screencap-raw-timestamps.tsv"
+  local timeline_file="${published_directory}/screencap-timeline.tsv"
+  local raw_metadata="${published_directory}/screencap-raw-metadata.tsv"
+  local home_png="${published_directory}/prelaunch-home.png"
   local concat_file="${capture_directory}/screencap-concat.txt"
   local source_video="${capture_directory}/cold-start-screencap-source.mp4"
   local review_video="${capture_directory}/cold-start-screencap.mp4"
@@ -1191,7 +1515,20 @@ finalize_screencap_evidence() {
   local contact_sheet_dimensions=""
   local source_capture_span=""
   local source_maximum_gap=""
-  local source_total_bytes=""
+  local source_png_total_bytes=""
+  local source_raw_total_bytes=""
+  local source_first_started_at=""
+  local source_last_started_at=""
+  local timeline_nonce=""
+  local launch_requested_at=""
+  local stop_observed_at=""
+  local home_attempted_at=""
+  local home_completed_at=""
+  local home_raw_bytes=""
+  local metadata_home_raw_bytes=""
+  local launch_to_first_frame=""
+  local last_frame_to_stop=""
+  local home_dimensions=""
 
   source_frame_count="$(awk 'END { print NR }' "${timestamps_file}")"
   if [[ ! "${source_frame_count}" =~ ^[0-9]+$ ]] ||
@@ -1206,6 +1543,115 @@ finalize_screencap_evidence() {
     "${expected_display_height}" \
     "${screencap_maximum_frame_duration_seconds}" \
     "${screencap_maximum_frame_bytes}"
+  home_dimensions="$(
+    ffprobe -v error -select_streams v:0 \
+      -show_entries stream=width,height -of csv=s=x:p=0 \
+      "${home_png}"
+  )"
+  if [[ "${home_dimensions}" != "${expected_display_width}x${expected_display_height}" ]]; then
+    echo "Unexpected prelaunch HOME dimensions: ${home_dimensions}" >&2
+    return 1
+  fi
+  if [[ "$(awk 'END { print NR }' "${raw_timestamps_file}")" != "${source_frame_count}" ]]; then
+    echo "Raw and PNG screencap manifests disagree on frame count" >&2
+    return 1
+  fi
+  if ! paste "${raw_timestamps_file}" "${timestamps_file}" |
+    awk -F '\t' '
+      NF != 8 { exit 1 }
+      {
+        expected_png = $1
+        sub(/[.]raw$/, ".png", expected_png)
+        if (expected_png != $5 || $2 != $6 || $3 != $7) exit 1
+      }
+    '; then
+    echo "Raw and PNG screencap manifests disagree on identity or timing" >&2
+    return 1
+  fi
+  if [[ "$(awk 'END { print NR }' "${timeline_file}")" != "1" ||
+    "$(awk 'END { print NR - 1 }' "${raw_metadata}")" != "$((source_frame_count + 1))" ]]; then
+    echo "Invalid screencap timeline or raw metadata cardinality" >&2
+    return 1
+  fi
+  IFS=$'\t' read -r \
+    timeline_nonce \
+    launch_requested_at \
+    stop_observed_at \
+    home_attempted_at \
+    home_completed_at \
+    home_raw_bytes <"${timeline_file}" || {
+    echo "Unable to read the screencap monotonic timeline" >&2
+    return 1
+  }
+  metadata_home_raw_bytes="$(
+    awk -F '\t' \
+      '$1 == "prelaunch-home.raw" { print $6 }' \
+      "${raw_metadata}"
+  )"
+  if [[ ! "${timeline_nonce}" =~ ^[0-9a-f]{16}$ ||
+    ! "${launch_requested_at}" =~ ^[0-9]+([.][0-9]+)?$ ||
+    ! "${stop_observed_at}" =~ ^[0-9]+([.][0-9]+)?$ ||
+    ! "${home_attempted_at}" =~ ^[0-9]+([.][0-9]+)?$ ||
+    ! "${home_completed_at}" =~ ^[0-9]+([.][0-9]+)?$ ||
+    ! "${home_raw_bytes}" =~ ^[0-9]+$ ||
+    "${metadata_home_raw_bytes}" != "${home_raw_bytes}" ]]; then
+    echo "Invalid screencap monotonic timeline" >&2
+    return 1
+  fi
+  source_first_started_at="$(
+    awk -F '\t' 'NR == 1 { print $2 }' "${timestamps_file}"
+  )"
+  source_last_started_at="$(
+    awk -F '\t' 'END { print $2 }' "${timestamps_file}"
+  )"
+  if ! awk \
+    -v home_start="${home_attempted_at}" \
+    -v home_end="${home_completed_at}" \
+    -v launch="${launch_requested_at}" \
+    -v first="${source_first_started_at}" \
+    -v last="${source_last_started_at}" \
+    -v stop="${stop_observed_at}" '
+      BEGIN {
+        valid = home_start <= home_end &&
+          home_end <= launch &&
+          launch <= first &&
+          first <= last &&
+          last <= stop
+        exit !valid
+      }
+    '; then
+    echo "Non-monotonic HOME, launch, capture, or stop timeline" >&2
+    return 1
+  fi
+  launch_to_first_frame="$(
+    awk \
+      -v launch="${launch_requested_at}" \
+      -v first="${source_first_started_at}" \
+      'BEGIN { printf "%.6f", first - launch }'
+  )"
+  last_frame_to_stop="$(
+    awk \
+      -v last="${source_last_started_at}" \
+      -v stop="${stop_observed_at}" \
+      'BEGIN { printf "%.6f", stop - last }'
+  )"
+  if ! awk \
+    -v leading="${launch_to_first_frame}" \
+    -v trailing="${last_frame_to_stop}" \
+    -v maximum="${screencap_maximum_gap_seconds}" \
+    -v epsilon="${screencap_float_comparison_epsilon_seconds}" \
+    'BEGIN {
+      valid = leading >= 0 &&
+        trailing >= 0 &&
+        leading - maximum <= epsilon &&
+        trailing - maximum <= epsilon
+      exit !valid
+    }'; then
+    echo \
+      "Screencap boundary gap exceeds ${screencap_maximum_gap_seconds}s: launch=${launch_to_first_frame}s stop=${last_frame_to_stop}s" \
+      >&2
+    return 1
+  fi
 
   source_capture_span="$(
     awk -F '\t' '
@@ -1223,8 +1669,9 @@ finalize_screencap_evidence() {
   fi
 
   if ! awk -F '\t' \
-    -v prefix='screencap-frames/' \
-    -v maximum_gap="${screencap_maximum_gap_seconds}" '
+    -v prefix='screencap-evidence/screencap-frames/' \
+    -v maximum_gap="${screencap_maximum_gap_seconds}" \
+    -v epsilon="${screencap_float_comparison_epsilon_seconds}" '
     NR == 1 {
       previous_file = $1
       previous_time = $2 + 0
@@ -1246,7 +1693,7 @@ finalize_screencap_evidence() {
         invalid = 1
         exit
       }
-      if (duration > maximum_gap) {
+      if (duration - maximum_gap > epsilon) {
         printf "Screencap gap %.9fs exceeds %.9fs before %s\n",
           duration, maximum_gap, $1 > "/dev/stderr"
         invalid = 1
@@ -1286,9 +1733,13 @@ finalize_screencap_evidence() {
       END { printf "%.6f", maximum }
     ' "${timestamps_file}"
   )"
-  source_total_bytes="$(
+  source_png_total_bytes="$(
     awk -F '\t' '{ total += $4 } END { printf "%.0f", total }' \
       "${timestamps_file}"
+  )"
+  source_raw_total_bytes="$(
+    awk -F '\t' '{ total += $4 } END { printf "%.0f", total }' \
+      "${raw_timestamps_file}"
   )"
 
   ffmpeg \
@@ -1352,7 +1803,9 @@ finalize_screencap_evidence() {
   fi
 
   review_duration_seconds="$(
-    awk -v duration="${source_duration}" -v minimum="${minimum_evidence_seconds}" \
+    awk \
+      -v duration="${source_duration}" \
+      -v minimum="${minimum_screencap_duration_seconds}" \
       'BEGIN {
         target = int(duration)
         if (duration > target) target++
@@ -1458,13 +1911,29 @@ finalize_screencap_evidence() {
   {
     echo "capture_hard_timeout_seconds=${screencap_hard_timeout_seconds}"
     echo "maximum_source_gap_seconds=${screencap_maximum_gap_seconds}"
+    echo "float_comparison_epsilon_seconds=${screencap_float_comparison_epsilon_seconds}"
     echo "maximum_frame_duration_seconds=${screencap_maximum_frame_duration_seconds}"
+    echo "conversion_maximum_frame_duration_seconds=${screencap_conversion_maximum_frame_duration_seconds}"
     echo "maximum_frame_bytes=${screencap_maximum_frame_bytes}"
     echo "maximum_sequence_bytes=${screencap_remote_maximum_bytes}"
+    echo "target_sample_period_microseconds=${screencap_sample_period_microseconds}"
+    echo "static_quota_window_microseconds=${screencap_budget_window_microseconds}"
+    echo "static_quota_capture_frames=${screencap_budget_capture_frames}"
+    echo "static_quota_required_bytes=${screencap_budget_required_bytes}"
     echo "source_timestamp_clock=android_proc_uptime_seconds"
-    echo "source_timestamp_semantics=screencap_command_started_and_completed_at"
+    echo "source_timestamp_semantics=launch_marker_and_screencap_command_started_and_completed_at"
+    echo "launch_requested_at=${launch_requested_at}"
+    echo "launch_to_first_frame_seconds=${launch_to_first_frame}"
+    echo "last_frame_to_stop_seconds=${last_frame_to_stop}"
+    echo "stop_observed_at=${stop_observed_at}"
+    echo "prelaunch_home_started_at=${home_attempted_at}"
+    echo "prelaunch_home_completed_at=${home_completed_at}"
+    echo "prelaunch_home_raw_bytes=${home_raw_bytes}"
+    echo "prelaunch_home_png_sha256=$(sha256sum "${home_png}" | awk '{print $1}')"
     echo "source_frames=${source_frame_count}"
-    echo "source_total_bytes=${source_total_bytes}"
+    echo "source_raw_total_bytes=${source_raw_total_bytes}"
+    echo "source_png_total_bytes=${source_png_total_bytes}"
+    echo "source_raw_metadata_sha256=$(sha256sum "${raw_metadata}" | awk '{print $1}')"
     echo "source_capture_span_seconds=${source_capture_span}"
     echo "source_observed_maximum_gap_seconds=${source_maximum_gap}"
     echo "source_video_duration_seconds=${source_duration}"
@@ -2058,8 +2527,8 @@ for profile in "${density_profiles[@]}"; do
     exit 1
   fi
   remote_screencap_root="/data/local/tmp/kwabor-brand-002-api-${api_level}-${density_name}-${screencap_nonce}"
-  raw_video="${capture_directory}/cold-start-raw.mp4"
-  local_video="${capture_directory}/cold-start.mp4"
+  raw_video="${capture_directory}/post-launch-raw.mp4"
+  local_video="${capture_directory}/post-launch.mp4"
   recorder_log="${capture_directory}/screenrecord.txt"
   screencap_log="${capture_directory}/screencap-capture.log"
   screenrecord_ready_bytes=""
@@ -2094,22 +2563,6 @@ for profile in "${density_profiles[@]}"; do
       exit 1
     fi
   fi
-  adb shell screenrecord \
-    --verbose \
-    --size "${record_size}" \
-    --bit-rate 4000000 \
-    --time-limit "${screenrecord_time_limit_seconds}" \
-    "${remote_video}" \
-    >"${recorder_log}" 2>&1 &
-  recorder_pid=$!
-  active_recorder_pid="${recorder_pid}"
-
-  wait_for_screenrecord \
-    "${recorder_pid}" \
-    "${recorder_log}" \
-    "${remote_video}"
-  remote_recorder_pid="${active_remote_recorder_pid}"
-  recording_ready_at="${SECONDS}"
   active_screencap_remote_root="${remote_screencap_root}"
   active_screencap_nonce="${screencap_nonce}"
   active_screencap_started=0
@@ -2131,13 +2584,62 @@ for profile in "${density_profiles[@]}"; do
     exit 1
   fi
   assert_display_profile "${display_size}" "${density_value}"
-  timeout "${onboarding_deadline_seconds}" \
-    adb shell am start -S -W -n "${activity_name}" |
-    tee "${capture_directory}/activity-start.txt"
+  start_cold_activity_with_screencap_marker \
+    "${remote_screencap_root}" \
+    "${screencap_nonce}" \
+    "${capture_directory}/activity-start.txt"
   if ! grep -Fq "Status: ok" "${capture_directory}/activity-start.txt"; then
     echo "MainActivity did not report a successful cold start" >&2
     exit 1
   fi
+  # `am start -W` may return before the four-second evidence floor. Publish
+  # stop immediately; the worker honors it only after the minimum span.
+  publish_remote_screencap_stop \
+    "${remote_screencap_root}" \
+    "${screencap_nonce}"
+  if wait "${screencap_pid}"; then
+    active_screencap_pid=""
+    if ! remote_screencap_marker_matches \
+      "${remote_screencap_root}/screencap-done" \
+      "${screencap_nonce}"; then
+      echo "Remote screencap sequence exited without its done marker" >&2
+      exit 1
+    fi
+  else
+    active_screencap_pid=""
+    sed 's/^/screencap: /' "${screencap_log}" >&2
+    echo "Unable to capture the bounded composited-display sequence" >&2
+    exit 1
+  fi
+  assert_display_profile "${display_size}" "${density_value}"
+  pull_remote_screencap \
+    "${remote_screencap_root}" \
+    "${screencap_nonce}" \
+    "${capture_directory}" \
+    "${display_size%x*}" \
+    "${display_size#*x}"
+  remove_remote_screencap_root "${remote_screencap_root}"
+  active_screencap_remote_root=""
+  active_screencap_nonce=""
+  active_screencap_started=0
+
+  # The launch-critical raw collector is now quiescent. Start the longer
+  # post-launch recorder without competing for the system splash frames.
+  adb shell screenrecord \
+    --verbose \
+    --size "${record_size}" \
+    --bit-rate 4000000 \
+    --time-limit "${screenrecord_time_limit_seconds}" \
+    "${remote_video}" \
+    >"${recorder_log}" 2>&1 &
+  recorder_pid=$!
+  active_recorder_pid="${recorder_pid}"
+  wait_for_screenrecord \
+    "${recorder_pid}" \
+    "${recorder_log}" \
+    "${remote_video}"
+  remote_recorder_pid="${active_remote_recorder_pid}"
+  recording_ready_at="${SECONDS}"
   wait_for_screenrecord_growth_after_launch \
     "${recorder_pid}" \
     "${recorder_log}" \
@@ -2154,28 +2656,10 @@ for profile in "${density_profiles[@]}"; do
     "${recorder_log}"
   recording_elapsed_seconds=$((SECONDS - recording_ready_at))
   recording_hold_seconds="${post_launch_hold_seconds}"
-  if ((recording_elapsed_seconds + recording_hold_seconds < minimum_evidence_seconds)); then
-    recording_hold_seconds=$((minimum_evidence_seconds - recording_elapsed_seconds))
+  if ((recording_elapsed_seconds + recording_hold_seconds < minimum_recording_wall_seconds)); then
+    recording_hold_seconds=$((minimum_recording_wall_seconds - recording_elapsed_seconds))
   fi
   sleep "${recording_hold_seconds}"
-  request_remote_screencap_control \
-    "${remote_screencap_root}/screencap-stop.pending" \
-    "${remote_screencap_root}/screencap-stop" \
-    "${screencap_nonce}"
-  if wait "${screencap_pid}"; then
-    active_screencap_pid=""
-    if ! remote_screencap_marker_matches \
-      "${remote_screencap_root}/screencap-done" \
-      "${screencap_nonce}"; then
-      echo "Remote screencap sequence exited without its done marker" >&2
-      exit 1
-    fi
-  else
-    active_screencap_pid=""
-    sed 's/^/screencap: /' "${screencap_log}" >&2
-    echo "Unable to capture the bounded composited-display sequence" >&2
-    exit 1
-  fi
   finish_screenrecord \
     "${recorder_pid}" \
     "${remote_recorder_pid}" \
@@ -2183,19 +2667,9 @@ for profile in "${density_profiles[@]}"; do
     "${remote_video}"
   recording_wall_seconds=$((SECONDS - recording_ready_at))
   if ((recording_wall_seconds < minimum_recording_wall_seconds)); then
-    echo "Cold-start recorder stopped too early: ${recording_wall_seconds}s wall time" >&2
+    echo "Post-launch recorder stopped too early: ${recording_wall_seconds}s wall time" >&2
     exit 1
   fi
-  pull_remote_screencap \
-    "${remote_screencap_root}" \
-    "${screencap_nonce}" \
-    "${capture_directory}" \
-    "${display_size%x*}" \
-    "${display_size#*x}"
-  remove_remote_screencap_root "${remote_screencap_root}"
-  active_screencap_remote_root=""
-  active_screencap_nonce=""
-  active_screencap_started=0
   timeout "${adb_general_timeout_seconds}" adb pull "${remote_video}" "${raw_video}"
   timeout "${adb_general_timeout_seconds}" adb shell rm -f "${remote_video}"
   assert_display_profile "${display_size}" "${density_value}"
@@ -2269,26 +2743,26 @@ for profile in "${density_profiles[@]}"; do
   fi
   if [[ ! "${raw_video_frames}" =~ ^[0-9]+$ ]] ||
     ((raw_video_frames < minimum_raw_decoded_frames)); then
-    echo "Raw cold-start recording has too few decoded frames: ${raw_video_frames}" >&2
+    echo "Raw post-launch recording has too few decoded frames: ${raw_video_frames}" >&2
     exit 1
   fi
   if [[ ! "${raw_video_size}" =~ ^[0-9]+$ ]] || ((raw_video_size == 0)); then
-    echo "Raw cold-start recording is empty" >&2
+    echo "Raw post-launch recording is empty" >&2
     exit 1
   fi
   if [[ ! "${raw_video_duration}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-    echo "Raw cold-start recording has an invalid duration: ${raw_video_duration}" >&2
+    echo "Raw post-launch recording has an invalid duration: ${raw_video_duration}" >&2
     exit 1
   fi
   if ! awk -v duration="${raw_video_duration}" \
     'BEGIN { exit !(duration > 0) }'; then
-    echo "Raw cold-start recording has a non-positive duration: ${raw_video_duration}" >&2
+    echo "Raw post-launch recording has a non-positive duration: ${raw_video_duration}" >&2
     exit 1
   fi
-  # ActivityManager WaitTime and screenrecord PTS use different clocks under an
-  # accelerated emulator. Preserve both metrics; the armed-muxer barrier,
-  # post-launch sample growth, and in-recording UI assertion prove sequencing
-  # without comparing those clocks.
+  # ActivityManager WaitTime and post-launch screenrecord PTS use different
+  # clocks under an accelerated emulator. Preserve both metrics without
+  # comparing them; the launch-critical sequence has its own device-monotonic
+  # marker, while the recorder has an armed-muxer barrier and UI assertion.
   launch_wait_ms="$(
     awk -F': ' '$1 == "WaitTime" { print $2 }' \
       "${capture_directory}/activity-start.txt" |
@@ -2393,6 +2867,7 @@ for profile in "${density_profiles[@]}"; do
   fi
 
   {
+    echo "phase=post-launch"
     echo "screenrecord_time_limit_seconds=${screenrecord_time_limit_seconds}"
     echo "screenrecord_ready_bytes=${screenrecord_ready_bytes}"
     echo "screenrecord_mdat_payload_offset=${screenrecord_mdat_payload_offset}"
@@ -2417,11 +2892,11 @@ for profile in "${density_profiles[@]}"; do
     -i "${local_video}" \
     -vf "fps=${contact_sheet_samples}/${normalized_evidence_seconds},scale=${contact_sheet_frame_width}:-2,tile=${contact_sheet_columns}x${contact_sheet_rows}" \
     -frames:v 1 \
-    "${capture_directory}/contact-sheet.png"
+    "${capture_directory}/post-launch-contact-sheet.png"
   contact_sheet_dimensions="$(
     ffprobe -v error -select_streams v:0 \
       -show_entries stream=width,height -of csv=s=x:p=0 \
-      "${capture_directory}/contact-sheet.png"
+      "${capture_directory}/post-launch-contact-sheet.png"
   )"
   if [[ "${contact_sheet_dimensions}" != "2700x3900" ]]; then
     echo "Unexpected contact sheet size: ${contact_sheet_dimensions}" >&2

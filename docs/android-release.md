@@ -55,16 +55,26 @@ python -B tools/verify-brand-assets.py
 
 Quand un asset de lancement ou son pipeline change, la CI appelle aussi
 `.github/workflows/android-launch-evidence.yml`. Elle enregistre un cold start après installation
-fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`. Chaque profil conserve le
-flux `screenrecord` brut. En parallèle, la capture de l'écran composé est armée sur HOME avant le
-cold start, couvre au moins 24 secondes jusqu'à la surface onboarding, refuse tout intervalle
-source supérieur à 750 ms et contrôle les dimensions de chaque PNG avant encodage. La CI publie
-les deux vidéos de revue, leurs planches-contact et les métadonnées pendant 7 jours. Les vidéos
-normalisées facilitent la lecture mais ne remplacent jamais l'examen des flux bruts. L'APK de
-preuve utilise une URL réservée `.invalid` et une clé factice non secrète ; la capture échoue si
-l'activité n'est pas reprise ou si aucune surface onboarding configurée (intro ou landing) n'est
-exposée après le splash. Ces preuves automatisées ne remplacent pas la revue perceptuelle finale
-sur appareils Pixel/Samsung et iOS.
+fraîche sur les API 30, 31 et 36, chacune en `mdpi`, `xhdpi` et `xxxhdpi`. La capture brute AOSP de
+l'écran composé est d'abord armée par une frame HOME. Le même shell appareil horodate ensuite
+`/proc/uptime`, publie le marqueur et exécute le cold start. La séquence RGBA couvre le lancement
+pendant au moins quatre secondes à compter de cette requête, refuse tout intervalle — bornes
+incluses — supérieur à 490 ms et vérifie l'en-tête, le format, les dimensions et la taille exacte
+de chaque frame avant conversion PNG côté hôte. Un stop reçu plus tôt reste en attente jusqu'à
+cette durée minimale. Les données brutes sont supprimées après production d'un manifeste SHA-256,
+puis l'ensemble validé est publié par un unique renommage atomique de répertoire.
+
+Le `screenrecord` long démarre seulement après cette séquence critique afin de ne pas lui disputer
+SurfaceFlinger. Il conserve au moins 24 secondes de continuité post-lancement et une assertion UI
+confirme l'intro ou le landing configuré. La CI publie les vidéos source et de revue, les
+planches-contact, la frame HOME et les métadonnées pendant 7 jours ; en cas d'échec de cadence,
+les PNG déjà validés restent disponibles pour le diagnostic. Les vidéos normalisées facilitent
+la lecture mais ne remplacent ni les sources horodatées ni les tests déterministes qui imposent
+1 000 ms de splash et 500 ms de wordmark. L'APK de preuve utilise une URL réservée `.invalid` et
+une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou si aucune
+surface onboarding configurée n'est exposée. Ces preuves automatisées ne remplacent pas la revue
+perceptuelle finale sur appareils Pixel/Samsung et iOS. Une matrice sans frame wordmark clairement
+identifiable est donc rejetée lors de cette revue, même si ses garde-fous temporels sont verts.
 
 ## Clé d'upload production
 
