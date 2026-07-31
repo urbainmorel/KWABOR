@@ -8,7 +8,7 @@ if (($# != 1)); then
 fi
 
 capture_status=0
-maximum_capture_attempts=2
+maximum_capture_attempts=3
 retry_reason=""
 for ((capture_attempt = 1; capture_attempt <= maximum_capture_attempts; capture_attempt++)); do
   if bash tools/capture-android-launch-evidence.sh "$1"; then

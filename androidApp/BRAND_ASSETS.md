@@ -45,10 +45,10 @@ composited sequence rejects inactive acquisition gaps above 4.5 seconds and vali
 before encoding. The continuous recording spans at least 24 seconds of wall time. The workflow
 publishes normalized review videos and contact sheets from both sources plus device metadata;
 normalization never substitutes for review of the raw streams.
-For the resume transition, API 30/31 must report `HOT` or `WARM`. API 36 may additionally report
-`UNKNOWN (0)` only alongside Android's exact warning that the existing task was brought to the
-front; the unchanged app PID, recorder growth, resumed activity and onboarding UI checks remain
-mandatory and prevent that platform-specific response from weakening the evidence gate.
+For the resume transition, Android must report `HOT` or `WARM`. The AOSP Activity Manager may
+instead report `UNKNOWN (0)` only alongside its exact warning that the existing task was brought
+to the front; the unchanged app PID, recorder growth, resumed activity and onboarding UI checks
+remain mandatory and prevent that paired platform response from weakening the evidence gate.
 The evidence APK uses only a reserved `.invalid` URL and a non-secret placeholder key; the capture
 fails unless `MainActivity` stays resumed and reaches either the bundled intro or the configured
 onboarding landing surface.

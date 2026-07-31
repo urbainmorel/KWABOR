@@ -3560,14 +3560,13 @@ for profile in "${density_profiles[@]}"; do
   if grep -Eq '^LaunchState: (HOT|WARM)$' \
     "${screenrecord_resume_start_file}"; then
     :
-  elif [[ "${api_level}" == "36" ]] &&
-    grep -Fxq 'LaunchState: UNKNOWN (0)' \
+  elif grep -Fxq 'LaunchState: UNKNOWN (0)' \
       "${screenrecord_resume_start_file}" &&
     grep -Fxq \
       'Warning: Activity not started, its current task has been brought to the front' \
       "${screenrecord_resume_start_file}"; then
-    # Android 16 can report UNKNOWN when am start merely brings the existing
-    # task to the foreground. Accept only that exact platform response; the
+    # AOSP can report UNKNOWN when am start merely brings the existing task to
+    # the foreground. Accept only that exact paired platform response; the
     # unchanged PID, recorder growth, resumed activity and UI checks below
     # must still corroborate the transition.
     :

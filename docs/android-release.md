@@ -72,8 +72,9 @@ renommages atomiques, l'horodatage de ce retour, le marqueur `ready` et la deman
 worker n'honore cette dernière qu'après le burst final. Celui-ci doit contenir au moins quatre
 captures postérieures au marqueur et couvrir au moins 2,5 secondes. Chaque commande est bornée à
 trois secondes ; le temps réellement inactif entre la fin d'une capture valide et le début de la
-suivante reste limité à 4,5 secondes. Un dépassement rejette toute la séquence et autorise une seule
-recapture complète ; aucune frame du premier essai n'est réutilisée. L'en-tête, le format, les
+suivante reste limité à 4,5 secondes. Un dépassement ou un timeout de commande rejette toute la
+séquence et autorise jusqu'à deux recaptures complètes ; aucune frame d'un essai rejeté n'est
+réutilisée. L'en-tête, le format, les
 dimensions et la taille exacte de chaque frame sont vérifiés avant conversion PNG côté hôte. Les
 budgets statiques sont de 608 633 344 octets en `xxxhdpi`, 177 324 544 en `xhdpi` et 69 497 344 en
 `mdpi`, chacun contrôlé avec 128 Mio supplémentaires réservés au système et sous le quota de
@@ -96,10 +97,10 @@ baseline est un snapshot de taille validé au plus près de l'action, supérieur
 octet déjà prouvé, et encadré par deux contrôles du même PID distant et du processus hôte. La
 croissance strictement supérieure qui suit, les assertions d'activité/UI et la validation finale du
 MP4 prouvent ensemble que le flux traverse chaque transition ; le processus applicatif doit aussi
-rester identique entre HOME et la reprise. API 30/31 exigent un `LaunchState` `HOT` ou `WARM` pour
-cette reprise. API 36 accepte aussi `UNKNOWN (0)` uniquement si `am start` émet exactement
-l'avertissement indiquant que la tâche courante a été ramenée au premier plan ; cette exception
-Android 16 reste corroborée par le même PID, la croissance du flux, l'activité reprise et l'état UI.
+rester identique entre HOME et la reprise. Le `LaunchState` doit être `HOT` ou `WARM`. Le retour
+`UNKNOWN (0)` n'est admis que si `am start` émet aussi exactement l'avertissement indiquant que la
+tâche courante a été ramenée au premier plan ; cette paire AOSP reste corroborée par le même PID,
+la croissance du flux, l'activité reprise et l'état UI.
 Les phases
 partagent un deadline global borné sous la limite AOSP de 180 secondes et conservent dix secondes
 pour finaliser le conteneur. La preuve exige enfin un H.264 décodable d'au moins quatre frames VFR,
