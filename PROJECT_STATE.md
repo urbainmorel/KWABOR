@@ -194,10 +194,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Le watermark Room couvre murs, référentiels et contenu canonique des fiches : un recul d'horloge après redémarrage ne bloque plus les écritures, les rejets obsolètes sont explicites et une éviction de corruption ne peut pas supprimer un remplacement concurrent sain. Chaque append conserve en plus la fraîcheur propre aux fiches héritées et aux référentiels, sans écraser un contenu canonique plus récent issu d'une autre clé. Les coordonnées `BJ` réseau/Room sont validées par le polygone du Bénin.
 - Les changements de compte ou déconnexions invalident les interactions Explore en vol, purgent les états privés like/favori et rechargent le nouveau viewer. Le premier rendu est synchroniquement en chargement ; les états asynchrones sont annoncés par une région live TalkBack unique et les skeletons restent hors sémantique.
 - Validation locale finale EXPLORE-002A : 288 tests shared et 171 tests Android sans échec. Le gate `check` couvre Spotless, Detekt, lint, pureté du domaine et schéma Room ; les APK debug (41,77 Mo) et staging minifié/R8 (13,74 Mo) sont assemblés, et Kotlin compile pour `iosX64`, `iosArm64` et `iosSimulatorArm64`. Le run complet est vert en 30 min 51 s ; les scénarios couvrent notamment migration Room 1→2, recul d'horloge, fraîcheur multi-clé, récupération atomique, single-flight annulé, sessions viewer et accessibilité.
+- La PR brouillon EXPLORE-002A `#41` est publiée au-dessus d'OFFLINE-001 `#40`. Le run GitHub Actions `30723036248` est entièrement vert : `quality` en 6 min 39 s, build simulateur iOS en 20 min 25 s, preuves de lancement Android API 30/31/36 et gate agrégé validés.
 
 ## Tâche en cours
 
-Publier la PR brouillon EXPLORE-002A empilée sur OFFLINE-001 `#40`, puis attendre ses gates GitHub Actions. Conserver les gates propriétaire/appareils de BRAND-002 et la séquence de revue/fusion de la pile existante.
+Faire relire EXPLORE-002A `#41`, puis la fusionner seulement après OFFLINE-001 `#40` en conservant la séquence de la pile. Préparer ensuite le contrat serveur versionné d'EXPLORE-002B sans introduire de classement client divergent. Les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -232,7 +233,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier et faire relire EXPLORE-002A au-dessus de `#40`, puis faire approuver et fusionner la pile
+Faire relire EXPLORE-002A `#41` au-dessus de `#40`, puis faire approuver et fusionner la pile
 `#35` → `#36` → `#37` → `#38` → `#39` → `#40` → EXPLORE-002A. Le prochain sous-lot Explore doit
 versionner ses tris/filtres/sponsors côté serveur avant de modifier le classement client. La revue
 appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.

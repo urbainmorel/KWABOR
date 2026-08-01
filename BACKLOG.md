@@ -116,7 +116,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     la ville persistée/GPS, les référentiels Room v2 et les catégories serveur réelles.
   - [ ] EXPLORE-002B — Versionner les tris/filtres prix-date-événement et le plafond sponsorisé côté serveur,
     puis les brancher sans classement client divergent.
-  - [ ] PR-EXPLORE-002A — Publier la PR brouillon empilée sur `#40` et obtenir les gates GitHub Actions vertes.
+  - [x] PR-EXPLORE-002A — PR brouillon `#41` publiée sur `#40` ; le run `30723036248` a passé
+    `quality`, le build simulateur iOS et les preuves de lancement Android API 30/31/36.
 - [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
