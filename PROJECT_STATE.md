@@ -181,11 +181,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Le RPC reste publié uniquement même pour un propriétaire authentifié, borne ses grants à `anon`/`authenticated` et expose l'état sponsorisé calculé avec le même snapshot serveur que le classement. Le badge jaune ne dépend donc plus de l'horloge appareil pour ce parcours.
 - ADR-0018 trace le choix RPC/keyset et la conservation de la pagination offset générique hors catalogue. CATALOG-002 n'ajoute volontairement aucun chargement suivant visible : la consommation du curseur, le refresh et les tris métier appartiennent à EXPLORE-002.
 - Validation locale CATALOG-002 : migration appliquée, 371 assertions pgTAP sur huit fichiers, lint Supabase sans erreur, tests shared/Android, Spotless, Detekt, lint Android, `check`, APK debug et compilation Kotlin iOS Simulator verts. Le plan interne anon mesuré sur le seed exécute la requête en 2,688 ms/27 buffers ; aucun réglage JIT ni index de ranking non prouvé n'a été ajouté.
-- La PR brouillon CATALOG-002 `#39` est publiée au-dessus de `#38` ; sa CI est en attente au moment de cette mise à jour.
+- La PR brouillon CATALOG-002 `#39` est publiée au-dessus de `#38`. Le run `30692610347` a passé `quality` en 5 min 45 s puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release en 16 min 30 s.
 
 ## Tâche en cours
 
-Obtenir la CI et la revue humaine de la PR empilée CATALOG-002 `#39`, puis conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour
+Obtenir la revue humaine de la PR empilée CATALOG-002 `#39`, puis conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour
 fusionner `#35`, retargeter si nécessaire puis
 fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
@@ -221,7 +221,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Obtenir la CI et la revue de CATALOG-002 `#39`, publiée au-dessus de `#38`, puis faire approuver et fusionner la
+Obtenir la revue de CATALOG-002 `#39`, publiée au-dessus de `#38` avec CI verte, puis faire approuver et fusionner la
 pile `#35` → `#36` → `#37` → `#38` → `#39`. EXPLORE-002 pourra ensuite consommer le curseur,
 mais ses tris métier et la navigation V1 restent soumis aux décisions produit ouvertes. La revue
 appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.
