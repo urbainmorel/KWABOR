@@ -112,6 +112,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] CATALOG-002 — Ajouter un RPC de résumé catalogue paginé par curseur et supprimer le N+1 média.
 - [ ] PR-CATALOG-002 — PR brouillon empilée `#39` publiée avec CI verte ; obtenir la revue humaine avant fusion.
 - [ ] EXPLORE-002 — Finaliser Explore Android : pagination, refresh, filtres, ville/GPS, sponsors et cache.
+  - [x] EXPLORE-002A — Livrer le mur offline-first, la pagination/déduplication, le refresh non destructif,
+    la ville persistée/GPS, les référentiels Room v2 et les catégories serveur réelles.
+  - [ ] EXPLORE-002B — Versionner les tris/filtres prix-date-événement et le plafond sponsorisé côté serveur,
+    puis les brancher sans classement client divergent.
+  - [ ] PR-EXPLORE-002A — Publier la PR brouillon empilée sur `#40` et obtenir les gates GitHub Actions vertes.
 - [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.

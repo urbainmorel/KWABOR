@@ -2,6 +2,7 @@ package com.kwabor.shared.presentation.explore
 
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
@@ -20,9 +21,15 @@ data class ExploreChip(
     val label: String,
 )
 
+data class ExploreCityOption(
+    val id: String,
+    val label: String,
+)
+
 data class ExploreLoadRequest(
     val selectedTab: ExploreTab = ExploreTab.Places,
     val selectedChipId: String? = null,
+    val selectedCityId: String? = null,
 )
 
 data class ExploreListingItem(
@@ -57,14 +64,26 @@ data class PendingExploreAuthInteraction(
 
 data class ExploreUiState(
     val cityLabel: String,
+    val selectedCityId: String? = null,
+    val availableCities: List<ExploreCityOption> = emptyList(),
     val selectedTab: ExploreTab,
     val selectedChipId: String?,
     val chips: List<ExploreChip>,
     val listings: List<ExploreListingItem>,
     val currency: KwaborCurrency = KwaborCurrency.Xof,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val isAppending: Boolean = false,
     val isOffline: Boolean = false,
+    val isLocalCacheUnavailable: Boolean = false,
+    val nextCursor: String? = null,
+    val feedSnapshot: ExploreFeedSnapshot? = null,
     val errorMessage: String? = null,
+    val refreshMessage: String? = null,
+    val appendErrorMessage: String? = null,
+    val isCitySelectorOpen: Boolean = false,
+    val isLocating: Boolean = false,
+    val locationMessage: String? = null,
     val interactionMessage: String? = null,
     val pendingAuthInteraction: PendingExploreAuthInteraction? = null,
     val queuedInteractions: List<QueuedExploreInteraction> = emptyList(),
@@ -73,10 +92,13 @@ data class ExploreUiState(
         get() = errorMessage != null
 
     val isEmpty: Boolean
-        get() = !isLoading && !hasError && listings.isEmpty()
+        get() = !isLoading && !isRefreshing && !hasError && listings.isEmpty()
 
     val hasQueuedInteractions: Boolean
         get() = queuedInteractions.isNotEmpty()
+
+    val canLoadMore: Boolean
+        get() = nextCursor != null && !isLoading && !isRefreshing && !isAppending && !isOffline
 }
 
 fun ExploreTab.label(strings: KwaborStrings): String = when (this) {
@@ -93,32 +115,27 @@ fun ExploreTab.toListingType(): ListingType = when (this) {
 
 fun ExploreTab.defaultChips(strings: KwaborStrings): List<ExploreChip> = when (this) {
     ExploreTab.Places -> listOf(
-        ExploreChip(id = "beaches", label = strings.beaches),
-        ExploreChip(id = "history", label = strings.history),
-        ExploreChip(id = "markets", label = strings.markets),
-        ExploreChip(id = "nature", label = strings.nature),
+        ExploreChip(id = "heritage-historique", label = strings.history),
+        ExploreChip(id = "heritage-nature", label = strings.nature),
+        ExploreChip(id = "commercial-marche", label = strings.markets),
     )
     ExploreTab.Events -> listOf(
-        ExploreChip(id = "concerts", label = strings.concerts),
-        ExploreChip(id = "festivals", label = strings.festivals),
-        ExploreChip(id = "conferences", label = strings.conferences),
-        ExploreChip(id = "hikes", label = strings.hikes),
+        ExploreChip(id = "event-culture", label = strings.culture),
     )
     ExploreTab.HotelsRestaurants -> listOf(
-        ExploreChip(id = "hotels", label = strings.hotels),
-        ExploreChip(id = "restaurants", label = strings.restaurants),
-        ExploreChip(id = "maquis", label = strings.maquis),
-        ExploreChip(id = "bars", label = strings.bars),
-        ExploreChip(id = "cafes", label = strings.cafes),
+        ExploreChip(id = "commercial-restaurant", label = strings.restaurants),
+        ExploreChip(id = "commercial-hotel", label = strings.hotels),
+        ExploreChip(id = "guide-touristique", label = strings.touristGuides),
     )
 }
 
 fun initialExploreUiState(strings: KwaborStrings, request: ExploreLoadRequest = ExploreLoadRequest()): ExploreUiState =
     ExploreUiState(
         cityLabel = strings.currentCity,
+        selectedCityId = request.selectedCityId,
         selectedTab = request.selectedTab,
         selectedChipId = request.selectedChipId,
-        chips = request.selectedTab.defaultChips(strings),
+        chips = emptyList(),
         listings = emptyList(),
     )
 
@@ -128,7 +145,7 @@ fun loadingExploreUiState(strings: KwaborStrings, request: ExploreLoadRequest): 
 fun sampleExploreUiState(strings: KwaborStrings): ExploreUiState = ExploreUiState(
     cityLabel = strings.currentCity,
     selectedTab = ExploreTab.Places,
-    selectedChipId = "history",
+    selectedChipId = "heritage-historique",
     chips = ExploreTab.Places.defaultChips(strings),
     listings = sampleExploreListings(),
 )

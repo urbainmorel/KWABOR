@@ -1,5 +1,7 @@
 package com.kwabor.android.presentation.auth
 
+import com.kwabor.android.auth.ApproximateLocationResult
+import com.kwabor.android.auth.ApproximateLocationService
 import com.kwabor.android.auth.AuthJourneyStore
 import com.kwabor.android.auth.GoogleIdentityProvider
 import com.kwabor.android.auth.GoogleIdentityResult
@@ -8,8 +10,6 @@ import com.kwabor.android.auth.InterruptedAuthJourney
 import com.kwabor.android.auth.NotificationPermissionPolicy
 import com.kwabor.android.auth.NotificationPrimingStore
 import com.kwabor.android.auth.PromoterActivationSessionStore
-import com.kwabor.android.auth.RegistrationLocationResult
-import com.kwabor.android.auth.RegistrationLocationService
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -115,9 +115,9 @@ class AuthViewModelOnboardingTest {
             repository = RegistrationAuthRepository(),
             scope = this,
             overrides = AuthTestOverrides(
-                locationService = RegistrationLocationService {
+                locationService = ApproximateLocationService {
                     locationReads += 1
-                    RegistrationLocationResult.Available(latitude = 6.37, longitude = 2.39)
+                    ApproximateLocationResult.Available(latitude = 6.37, longitude = 2.39)
                 },
             ),
         )
@@ -1895,8 +1895,8 @@ private suspend fun TestScope.completeRegistrationUntilObservability(viewModel: 
 }
 
 private data class AuthTestOverrides(
-    val locationService: RegistrationLocationService = RegistrationLocationService {
-        RegistrationLocationResult.Unavailable
+    val locationService: ApproximateLocationService = ApproximateLocationService {
+        ApproximateLocationResult.Unavailable
     },
     val notificationPermissionPolicy: NotificationPermissionPolicy = NotificationPermissionPolicy { false },
     val notificationPrimingStore: NotificationPrimingStore = FakeNotificationPrimingStore(resolved = false),

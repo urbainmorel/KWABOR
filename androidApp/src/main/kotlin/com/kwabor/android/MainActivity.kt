@@ -13,12 +13,12 @@ import com.kwabor.android.app.KwaborApp
 import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
 import com.kwabor.android.app.KwaborUnavailableApp
+import com.kwabor.android.auth.AndroidApproximateLocationService
 import com.kwabor.android.auth.AndroidDeepLinkClassifier
 import com.kwabor.android.auth.AndroidDeepLinkDestination
 import com.kwabor.android.auth.AndroidGoogleIdentityProvider
 import com.kwabor.android.auth.AndroidLegalDocumentLauncher
 import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
-import com.kwabor.android.auth.AndroidRegistrationLocationService
 import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
 import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
 import com.kwabor.android.auth.SharedPreferencesPromoterActivationSessionStore
@@ -125,6 +125,7 @@ class MainActivity : ComponentActivity() {
             initializer {
                 ExploreViewModel(
                     presenter = compositionRoot.explorePresenter,
+                    locationService = AndroidApproximateLocationService(applicationContext),
                     strings = strings,
                     coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
                 )
@@ -145,7 +146,7 @@ class MainActivity : ComponentActivity() {
                         authPresenter = configuredApp.authPresenters.auth,
                         passwordRecoveryPresenter = configuredApp.authPresenters.passwordRecovery,
                         registrationPresenter = configuredApp.authPresenters.registration,
-                        locationService = AndroidRegistrationLocationService(applicationContext),
+                        locationService = AndroidApproximateLocationService(applicationContext),
                         notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
                         notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
                         authJourneyStore = SharedPreferencesAuthJourneyStore(applicationContext),

@@ -13,15 +13,15 @@ class ExploreModelsTest {
     @Test
     fun defaultChips_returnsDistinctOptionsForEachTab() {
         assertEquals(
-            listOf(strings.beaches, strings.history, strings.markets, strings.nature),
+            listOf(strings.history, strings.nature, strings.markets),
             ExploreTab.Places.defaultChips(strings).map { chip -> chip.label },
         )
         assertEquals(
-            listOf(strings.concerts, strings.festivals, strings.conferences, strings.hikes),
+            listOf(strings.culture),
             ExploreTab.Events.defaultChips(strings).map { chip -> chip.label },
         )
         assertEquals(
-            listOf(strings.hotels, strings.restaurants, strings.maquis, strings.bars, strings.cafes),
+            listOf(strings.restaurants, strings.hotels, strings.touristGuides),
             ExploreTab.HotelsRestaurants.defaultChips(strings).map { chip -> chip.label },
         )
     }
@@ -38,6 +38,7 @@ class ExploreModelsTest {
 
         assertTrue(state.isEmpty)
         assertFalse(state.hasError)
+        assertFalse(state.copy(isRefreshing = true).isEmpty)
     }
 
     @Test
@@ -61,7 +62,7 @@ class ExploreModelsTest {
 
         assertEquals(strings.currentCity, state.cityLabel)
         assertEquals(ExploreTab.Places, state.selectedTab)
-        assertEquals("history", state.selectedChipId)
+        assertEquals("heritage-historique", state.selectedChipId)
         assertTrue(state.listings.isNotEmpty())
     }
 
@@ -71,13 +72,13 @@ class ExploreModelsTest {
             strings = strings,
             request = ExploreLoadRequest(
                 selectedTab = ExploreTab.HotelsRestaurants,
-                selectedChipId = "hotels",
+                selectedChipId = "commercial-hotel",
             ),
         )
 
         assertEquals(ExploreTab.HotelsRestaurants, state.selectedTab)
-        assertEquals("hotels", state.selectedChipId)
-        assertEquals(strings.hotels, state.chips.first().label)
+        assertEquals("commercial-hotel", state.selectedChipId)
+        assertTrue(state.chips.isEmpty())
         assertTrue(state.listings.isEmpty())
     }
 }

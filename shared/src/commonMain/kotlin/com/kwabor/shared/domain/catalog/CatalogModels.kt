@@ -64,7 +64,12 @@ fun nearestCity(cities: List<City>, location: GeoPoint): City? {
     }
     return cities
         .asSequence()
-        .filter { city -> city.countryCode == "BJ" && city.latitude != null && city.longitude != null }
+        .filter { city ->
+            city.countryCode == "BJ" &&
+                city.latitude != null &&
+                city.longitude != null &&
+                GeoPoint(latitude = city.latitude, longitude = city.longitude).isWithinBeninBounds
+        }
         .minByOrNull { city ->
             val latitudeDelta = requireNotNull(city.latitude) - location.latitude
             val longitudeDelta = requireNotNull(city.longitude) - location.longitude

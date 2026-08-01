@@ -1,69 +1,124 @@
 package com.kwabor.shared.presentation.explore
 
-import com.kwabor.shared.domain.catalog.CatalogRepository
+import com.kwabor.shared.domain.catalog.CatalogInteractionRepository
 import com.kwabor.shared.domain.catalog.Category
-import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
-import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreFeedQuery
+import com.kwabor.shared.domain.explore.ExploreFeedRepository
+import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
+import com.kwabor.shared.domain.explore.ExploreFeedSource
+import com.kwabor.shared.domain.explore.ExploreFeedWarning
+import com.kwabor.shared.domain.preferences.AppPreferences
+import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.KwaborStrings
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 private const val EXPLORE_PAGE_SIZE = 20
+private const val DEFAULT_EXPLORE_CITY_ID = "cotonou"
 private const val RATING_DECIMAL_SCALE = 10
 private const val RATING_DECIMAL_DIVISOR = 10.0
-
-private val CATEGORY_IDS_BY_CHIP = mapOf(
-    "history" to listOf("heritage-historique"),
-    "nature" to listOf("heritage-nature"),
-    "markets" to listOf("commercial-marche"),
-    "hotels" to listOf("commercial-hotel"),
-    "restaurants" to listOf("commercial-restaurant"),
-)
+private const val CITY_UNAVAILABLE_ERROR_KEY = "error.explore.city_unavailable"
+private const val CATEGORY_UNAVAILABLE_ERROR_KEY = "error.explore.category_unavailable"
+private const val APPEND_REVALIDATION_REQUIRED_ERROR_KEY = "error.explore.revalidation_required"
 
 class ExplorePresenter(
-    private val catalogRepository: CatalogRepository,
+    private val exploreFeedRepository: ExploreFeedRepository,
+    private val catalogInteractionRepository: CatalogInteractionRepository,
+    private val appPreferencesRepository: AppPreferencesRepository?,
     private val clockProvider: ClockProvider,
 ) {
     suspend fun load(request: ExploreLoadRequest, strings: KwaborStrings): ExploreUiState {
-        val cities = when (val result = catalogRepository.listCities()) {
-            is DomainResult.Success -> result.value
-            is DomainResult.Failure -> return request.errorState(strings, result.error)
+        val preparedState = prepareInitialState(request, strings)
+        val cachedState = loadCached(preparedState, strings)
+        return refresh(cachedState, strings)
+    }
+
+    suspend fun prepareInitialState(request: ExploreLoadRequest, strings: KwaborStrings): ExploreUiState {
+        val preferencesResult = appPreferencesRepository?.get()
+        val preferences = when (preferencesResult) {
+            is DomainResult.Success -> preferencesResult.value
+            is DomainResult.Failure,
+            null,
+            -> AppPreferences.Default
         }
-        val categories = when (val result = catalogRepository.listCategories()) {
-            is DomainResult.Success -> result.value
-            is DomainResult.Failure -> return request.errorState(strings, result.error)
+        return initialExploreUiState(strings = strings, request = request).copy(
+            selectedCityId = request.selectedCityId ?: preferences.exploreCityId ?: DEFAULT_EXPLORE_CITY_ID,
+            currency = preferences.displayCurrency,
+            isLocalCacheUnavailable = preferencesResult is DomainResult.Failure || preferencesResult == null,
+        )
+    }
+
+    suspend fun loadCached(state: ExploreUiState, strings: KwaborStrings): ExploreUiState =
+        when (val result = exploreFeedRepository.readCached(state.toFeedQuery())) {
+            is DomainResult.Success -> result.value?.let { snapshot ->
+                state.applySnapshot(
+                    snapshot = snapshot,
+                    strings = strings,
+                    interactionsByListingId = state.viewerInteractionsByListingId(),
+                )
+            } ?: state
+            is DomainResult.Failure -> state.copy(isLocalCacheUnavailable = true)
         }
-        val listings = when (
-            val result = catalogRepository.listListings(
-                filters = request.toFilters(categories),
-                page = ListingPageRequest(limit = EXPLORE_PAGE_SIZE),
+
+    suspend fun refresh(state: ExploreUiState, strings: KwaborStrings): ExploreUiState {
+        val result = exploreFeedRepository.refresh(state.toFeedQuery())
+        return when (result) {
+            is DomainResult.Success -> applyNetworkSnapshot(
+                state = state,
+                snapshot = result.value,
+                strings = strings,
+                interactionListingIds = result.value.items.map(ListingSummary::id),
+            )
+            is DomainResult.Failure -> refreshAfterFilterValidationOrFail(state, strings, result.error)
+        }
+    }
+
+    suspend fun append(state: ExploreUiState, strings: KwaborStrings): ExploreUiState {
+        val currentSnapshot = state.feedSnapshot
+            ?: return state.appendFailure(strings, DomainError.Unexpected())
+        if (currentSnapshot.source != ExploreFeedSource.Network) {
+            return state.appendFailure(
+                strings = strings,
+                error = DomainError.Validation(APPEND_REVALIDATION_REQUIRED_ERROR_KEY),
+            )
+        }
+        val currentListingIds = currentSnapshot.items.mapTo(mutableSetOf(), ListingSummary::id)
+        return when (
+            val result = exploreFeedRepository.append(
+                query = state.toFeedQuery(),
+                currentSnapshot = currentSnapshot,
             )
         ) {
-            is DomainResult.Success -> result.value
-            is DomainResult.Failure -> return request.errorState(strings, result.error)
+            is DomainResult.Success -> applyNetworkSnapshot(
+                state = state,
+                snapshot = result.value,
+                strings = strings,
+                interactionListingIds = result.value.items
+                    .map(ListingSummary::id)
+                    .filterNot(currentListingIds::contains),
+            )
+            is DomainResult.Failure -> state.appendFailure(strings, result.error)
         }
+    }
 
-        val nowEpochMilliseconds = clockProvider.nowEpochMilliseconds()
-        val cityNamesById = cities.associate { city -> city.id to city.name }
-        val viewerInteractions = loadViewerInteractions(listings.items.map { listing -> listing.id })
-
-        return initialExploreUiState(strings = strings, request = request).copy(
-            cityLabel = cities.homeCityLabel(strings),
-            isOffline = viewerInteractions.isOffline,
-            interactionMessage = viewerInteractions.message,
-            listings = listings.items.map { listing ->
-                listing.toExploreListingItem(
-                    cityNamesById = cityNamesById,
-                    nowEpochMilliseconds = nowEpochMilliseconds,
-                    interaction = viewerInteractions.byListingId[listing.id],
-                )
-            },
+    suspend fun selectCity(state: ExploreUiState, cityId: String, strings: KwaborStrings): ExploreUiState {
+        val city = state.availableCities.firstOrNull { option -> option.id == cityId } ?: return state
+        val persistenceFailed = when (val repository = appPreferencesRepository) {
+            null -> true
+            else -> repository.setExploreCity(city.id) is DomainResult.Failure
+        }
+        return state.copy(
+            cityLabel = city.label,
+            selectedCityId = city.id,
+            isCitySelectorOpen = false,
+            locationMessage = if (persistenceFailed) strings.exploreCityPersistenceError else null,
+            isLocalCacheUnavailable = state.isLocalCacheUnavailable || persistenceFailed,
         )
     }
 
@@ -83,6 +138,64 @@ class ExplorePresenter(
             kind = ExploreInteractionKind.Favorite,
         )
 
+    private suspend fun refreshAfterFilterValidationOrFail(
+        state: ExploreUiState,
+        strings: KwaborStrings,
+        error: DomainError,
+    ): ExploreUiState {
+        val fallbackState = when {
+            error.messageKey == CITY_UNAVAILABLE_ERROR_KEY -> state.copy(
+                selectedCityId = state.fallbackCityId(),
+            )
+            error.messageKey == CATEGORY_UNAVAILABLE_ERROR_KEY -> state.copy(selectedChipId = null)
+            else -> return state.refreshFailure(strings, error)
+        }
+        if (fallbackState.toFeedQuery() == state.toFeedQuery()) {
+            return state.refreshFailure(strings, error)
+        }
+        return when (val retry = exploreFeedRepository.refresh(fallbackState.toFeedQuery())) {
+            is DomainResult.Success -> {
+                val persistenceFailed = fallbackState.selectedCityId != state.selectedCityId &&
+                    persistExploreCity(fallbackState.selectedCityId)
+                applyNetworkSnapshot(
+                    state = fallbackState,
+                    snapshot = retry.value,
+                    strings = strings,
+                    interactionListingIds = retry.value.items.map(ListingSummary::id),
+                ).copy(
+                    isLocalCacheUnavailable = fallbackState.isLocalCacheUnavailable || persistenceFailed,
+                )
+            }
+            is DomainResult.Failure -> state.refreshFailure(strings, retry.error)
+        }
+    }
+
+    private suspend fun applyNetworkSnapshot(
+        state: ExploreUiState,
+        snapshot: ExploreFeedSnapshot,
+        strings: KwaborStrings,
+        interactionListingIds: List<String>,
+    ): ExploreUiState {
+        val knownInteractions = state.viewerInteractionsByListingId()
+        val interactions = loadViewerInteractions(
+            listingIds = interactionListingIds,
+        )
+        return state.applySnapshot(
+            snapshot = snapshot,
+            strings = strings,
+            interactionsByListingId = knownInteractions + interactions.byListingId,
+        ).copy(
+            isLoading = false,
+            isRefreshing = false,
+            isAppending = false,
+            isOffline = interactions.isOffline,
+            errorMessage = null,
+            refreshMessage = null,
+            appendErrorMessage = null,
+            interactionMessage = interactions.message ?: state.interactionMessage,
+        )
+    }
+
     private suspend fun toggleInteraction(
         state: ExploreUiState,
         listingId: String,
@@ -94,8 +207,7 @@ class ExplorePresenter(
             ExploreInteractionKind.Like -> !listing.liked
             ExploreInteractionKind.Favorite -> !listing.favorited
         }
-
-        return when (val result = runInteraction(kind = kind, listingId = listingId, selected = selected)) {
+        return when (val result = runInteraction(kind, listingId, selected)) {
             is DomainResult.Success -> state.applyInteraction(kind = kind, interaction = result.value)
             is DomainResult.Failure -> state.handleInteractionFailure(
                 strings = strings,
@@ -116,14 +228,14 @@ class ExplorePresenter(
         selected: Boolean,
     ): DomainResult<ListingViewerInteraction> = when (kind) {
         ExploreInteractionKind.Like -> if (selected) {
-            catalogRepository.likeListing(listingId)
+            catalogInteractionRepository.likeListing(listingId)
         } else {
-            catalogRepository.unlikeListing(listingId)
+            catalogInteractionRepository.unlikeListing(listingId)
         }
         ExploreInteractionKind.Favorite -> if (selected) {
-            catalogRepository.favoriteListing(listingId)
+            catalogInteractionRepository.favoriteListing(listingId)
         } else {
-            catalogRepository.unfavoriteListing(listingId)
+            catalogInteractionRepository.unfavoriteListing(listingId)
         }
     }
 
@@ -131,10 +243,9 @@ class ExplorePresenter(
         if (listingIds.isEmpty()) {
             return ViewerInteractionsState()
         }
-
-        return when (val result = catalogRepository.listListingViewerInteractions(listingIds)) {
+        return when (val result = catalogInteractionRepository.listListingViewerInteractions(listingIds)) {
             is DomainResult.Success -> ViewerInteractionsState(
-                byListingId = result.value.associateBy { interaction -> interaction.listingId },
+                byListingId = result.value.associateBy(ListingViewerInteraction::listingId),
             )
             is DomainResult.Failure -> when (result.error) {
                 is DomainError.AuthenticationRequired,
@@ -149,7 +260,126 @@ class ExplorePresenter(
             }
         }
     }
+
+    private suspend fun persistExploreCity(cityId: String?): Boolean {
+        val repository = appPreferencesRepository ?: return true
+        return repository.setExploreCity(cityId) is DomainResult.Failure
+    }
 }
+
+private fun ExploreUiState.applySnapshot(
+    snapshot: ExploreFeedSnapshot,
+    strings: KwaborStrings,
+    interactionsByListingId: Map<String, ListingViewerInteraction>,
+): ExploreUiState {
+    val cityNamesById = snapshot.cities.associate { city -> city.id to city.name }
+    val availableChips = snapshot.categories.toExploreChips(selectedTab, strings)
+    val selectedCategory = selectedChipId?.takeIf { chipId -> availableChips.any { chip -> chip.id == chipId } }
+    val items = snapshot.items.map { listing ->
+        listing.toExploreListingItem(
+            cityNamesById = cityNamesById,
+            interaction = interactionsByListingId[listing.id],
+        )
+    }.applyQueuedInteractions(queuedInteractions)
+    return copy(
+        cityLabel = cityNamesById[selectedCityId] ?: cityLabel,
+        availableCities = snapshot.cities.map { city -> ExploreCityOption(city.id, city.name) },
+        selectedChipId = selectedCategory,
+        chips = availableChips,
+        listings = items,
+        nextCursor = snapshot.nextCursor,
+        feedSnapshot = snapshot,
+        isLocalCacheUnavailable = isLocalCacheUnavailable ||
+            snapshot.warning is ExploreFeedWarning.LocalPersistenceUnavailable,
+    )
+}
+
+private fun ExploreUiState.refreshFailure(strings: KwaborStrings, error: DomainError): ExploreUiState =
+    if (listings.isEmpty()) {
+        copy(
+            isLoading = false,
+            isRefreshing = false,
+            isAppending = false,
+            isOffline = error is DomainError.NetworkUnavailable,
+            errorMessage = error.toExploreMessage(strings),
+            refreshMessage = null,
+        )
+    } else {
+        copy(
+            isLoading = false,
+            isRefreshing = false,
+            isAppending = false,
+            isOffline = error is DomainError.NetworkUnavailable,
+            errorMessage = null,
+            refreshMessage = strings.exploreRefreshError,
+        )
+    }
+
+private fun ExploreUiState.appendFailure(strings: KwaborStrings, error: DomainError): ExploreUiState = copy(
+    isAppending = false,
+    isOffline = error is DomainError.NetworkUnavailable,
+    appendErrorMessage = strings.exploreLoadMoreError,
+)
+
+private fun ExploreUiState.toFeedQuery(): ExploreFeedQuery = ExploreFeedQuery(
+    filters = ListingFilters(
+        cityId = selectedCityId,
+        categoryId = selectedChipId,
+        listingType = selectedTab.toListingType(),
+        onlyPublished = true,
+    ),
+    pageSize = EXPLORE_PAGE_SIZE,
+)
+
+private fun ExploreUiState.viewerInteractionsByListingId(): Map<String, ListingViewerInteraction> =
+    listings.associate { listing ->
+        listing.id to ListingViewerInteraction(
+            listingId = listing.id,
+            likedByViewer = listing.liked,
+            favoritedByViewer = listing.favorited,
+            likesCount = listing.likesCount,
+        )
+    }
+
+private fun ExploreUiState.fallbackCityId(): String =
+    availableCities.firstOrNull { city -> city.id == DEFAULT_EXPLORE_CITY_ID }?.id
+        ?: availableCities.firstOrNull()?.id
+        ?: DEFAULT_EXPLORE_CITY_ID
+
+private fun List<Category>.toExploreChips(tab: ExploreTab, strings: KwaborStrings): List<ExploreChip> = asSequence()
+    .filter { category -> category.listingType == tab.toListingType() }
+    .mapNotNull { category -> category.toExploreChip(strings) }
+    .toList()
+
+private fun Category.toExploreChip(strings: KwaborStrings): ExploreChip? {
+    val label = when (nameKey) {
+        "category.heritage.historique" -> strings.history
+        "category.heritage.nature" -> strings.nature
+        "category.commercial.marche" -> strings.markets
+        "category.commercial.restaurant" -> strings.restaurants
+        "category.commercial.hotel" -> strings.hotels
+        "category.commercial.guide" -> strings.touristGuides
+        "category.event.culture" -> strings.culture
+        else -> return null
+    }
+    return ExploreChip(id = id, label = label)
+}
+
+private fun ListingSummary.toExploreListingItem(
+    cityNamesById: Map<String, String>,
+    interaction: ListingViewerInteraction?,
+): ExploreListingItem = ExploreListingItem(
+    id = id,
+    title = name,
+    cityLabel = cityNamesById[cityId] ?: cityId,
+    coverImageUrl = coverImageUrl,
+    price = priceFromXof,
+    ratingLabel = ratingAverage?.toRatingLabel(),
+    likesCount = interaction?.likesCount ?: likesCount,
+    sponsored = isSponsoredPlacement == true,
+    liked = interaction?.likedByViewer ?: false,
+    favorited = interaction?.favoritedByViewer ?: false,
+)
 
 private fun ExploreUiState.applyInteraction(
     kind: ExploreInteractionKind,
@@ -219,14 +449,30 @@ private fun ExploreUiState.queueOfflineInteraction(
     ),
 )
 
+private fun List<ExploreListingItem>.applyQueuedInteractions(
+    interactions: List<QueuedExploreInteraction>,
+): List<ExploreListingItem> = interactions.fold(this) { items, interaction ->
+    items.map { listing ->
+        if (listing.id == interaction.listingId) {
+            listing.applyOptimisticInteraction(interaction.kind, interaction.selected)
+        } else {
+            listing
+        }
+    }
+}
+
 private fun ExploreListingItem.applyOptimisticInteraction(
     kind: ExploreInteractionKind,
     selected: Boolean,
 ): ExploreListingItem = when (kind) {
-    ExploreInteractionKind.Like -> copy(
-        liked = selected,
-        likesCount = if (selected) likesCount + 1 else max(likesCount - 1, 0),
-    )
+    ExploreInteractionKind.Like -> if (liked == selected) {
+        this
+    } else {
+        copy(
+            liked = selected,
+            likesCount = if (selected) likesCount + 1 else max(likesCount - 1, 0),
+        )
+    }
     ExploreInteractionKind.Favorite -> copy(favorited = selected)
 }
 
@@ -235,47 +481,6 @@ private fun List<QueuedExploreInteraction>.upsert(
 ): List<QueuedExploreInteraction> = filterNot { queued ->
     queued.listingId == interaction.listingId && queued.kind == interaction.kind
 } + interaction
-
-private fun ExploreLoadRequest.toFilters(categories: List<Category>): ListingFilters = ListingFilters(
-    categoryId = selectedChipId?.let { chipId -> chipId.toKnownCategoryId(categories) },
-    listingType = selectedTab.toListingType(),
-    onlyPublished = true,
-)
-
-private fun ListingSummary.toExploreListingItem(
-    cityNamesById: Map<String, String>,
-    nowEpochMilliseconds: Long,
-    interaction: ListingViewerInteraction?,
-): ExploreListingItem = ExploreListingItem(
-    id = id,
-    title = name,
-    cityLabel = cityNamesById[cityId] ?: cityId,
-    coverImageUrl = coverImageUrl,
-    price = priceFromXof,
-    ratingLabel = ratingAverage?.toRatingLabel(),
-    likesCount = interaction?.likesCount ?: likesCount,
-    sponsored = isSponsoredPlacement
-        ?: sponsoredUntilEpochMilliseconds?.let { it > nowEpochMilliseconds }
-        ?: false,
-    liked = interaction?.likedByViewer ?: false,
-    favorited = interaction?.favoritedByViewer ?: false,
-)
-
-private fun ExploreLoadRequest.errorState(strings: KwaborStrings, error: DomainError): ExploreUiState =
-    initialExploreUiState(strings = strings, request = this).copy(
-        isOffline = error is DomainError.NetworkUnavailable,
-        errorMessage = error.toExploreMessage(strings),
-    )
-
-private fun List<City>.homeCityLabel(strings: KwaborStrings): String =
-    firstOrNull { city -> city.name.equals(strings.currentCity, ignoreCase = true) }?.name
-        ?: firstOrNull()?.name
-        ?: strings.currentCity
-
-private fun String.toKnownCategoryId(categories: List<Category>): String? {
-    val knownCategoryIds = categories.mapTo(mutableSetOf()) { category -> category.id }
-    return CATEGORY_IDS_BY_CHIP[this]?.firstOrNull { categoryId -> categoryId in knownCategoryIds }
-}
 
 private fun DomainError.toExploreMessage(strings: KwaborStrings): String = when (this) {
     is DomainError.NetworkUnavailable -> strings.offlineBanner

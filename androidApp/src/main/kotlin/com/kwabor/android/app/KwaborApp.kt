@@ -1,5 +1,8 @@
 package com.kwabor.android.app
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -209,24 +212,23 @@ private object AuthEffectDispatcher {
         { effect, pendingDestinationKey, dependencies, actions ->
             when (effect) {
                 AuthEffect.AuthenticationCompleted -> {
+                    dependencies.syncExploreViewerContext()
                     val destination = pendingDestinationKey?.let(RootNavigationDestination::fromRouteKey)
-                    if (destination == null) {
-                        dependencies.exploreViewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
-                    } else {
+                    if (destination != null) {
                         actions.onAuthenticatedDestinationRequested(destination)
                     }
                     actions.onDestinationResolved()
                 }
                 AuthEffect.GuestContinuationSelected -> {
                     actions.onDestinationResolved()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
+                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                 }
                 AuthEffect.SignedOut -> {
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
                     actions.onDeepLinkConsumed()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
+                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.SignOutNavigationHandled)
                 }
                 AuthEffect.AccountDeleted -> {
@@ -234,10 +236,11 @@ private object AuthEffectDispatcher {
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
                     actions.onDeepLinkConsumed()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ContinueAsGuest)
+                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.AccountDeletionNavigationHandled)
                 }
                 is AuthEffect.PromoterActivationCompleted -> {
+                    dependencies.syncExploreViewerContext()
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
                     actions.onDeepLinkConsumed()
@@ -374,6 +377,10 @@ private fun KwaborAppContent(
         onDeepLinkConsumed = onDeepLinkConsumed,
     )
     DeepLinkEffectHandler(deepLink = state.deepLink, actions = effectActions)
+    ExploreViewerContextHandler(
+        viewerId = state.auth.exploreViewerId,
+        exploreViewModel = dependencies.exploreViewModel,
+    )
     ExploreEffectHandler(dependencies = dependencies)
     AuthEffectHandler(
         pendingDestinationKey = pendingDestinationKey,
@@ -387,20 +394,6 @@ private fun KwaborAppContent(
         state = state,
         onDestinationSelected = requestDestination,
     )
-}
-
-@Composable
-internal fun KwaborUnavailableApp() {
-    val strings = stringsFor(AppLocale.French)
-    KwaborTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            KwaborStateMessage(
-                title = strings.errorStateTitle,
-                supportingText = strings.configurationUnavailable,
-                modifier = Modifier.padding(24.dp),
-            )
-        }
-    }
 }
 
 @Composable
@@ -504,11 +497,19 @@ private fun DeepLinkEffectHandler(deepLink: String?, actions: RootEffectActions)
 
 @Composable
 private fun ExploreEffectHandler(dependencies: HomeShellDependencies) {
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        dependencies.exploreViewModel.onIntent(ExploreIntent.LocationPermissionResult(granted))
+    }
     LaunchedEffect(dependencies.exploreViewModel, dependencies.authViewModel) {
         dependencies.exploreViewModel.effects.collect { effect ->
             when (effect) {
                 ExploreEffect.AuthenticationRequired -> {
                     dependencies.authViewModel.onIntent(AuthIntent.OpenSoftWall)
+                }
+                ExploreEffect.RequestLocationPermission -> {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
                 }
             }
         }
@@ -536,6 +537,13 @@ private data class RootEffectActions(
     val onDestinationResolved: () -> Unit,
     val onDeepLinkConsumed: () -> Unit,
 )
+
+private val AuthUiState.exploreViewerId: String?
+    get() = currentSession?.userId?.takeIf { isAuthenticated }
+
+private fun HomeShellDependencies.syncExploreViewerContext() {
+    exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(authViewModel.state.value.exploreViewerId))
+}
 
 private val rootDestinationRequester =
     {
@@ -595,6 +603,12 @@ private val ExploreViewModel.screenActions: ExploreScreenActions
         onTabSelected = { tab -> onIntent(ExploreIntent.SelectTab(tab)) },
         onChipSelected = { chip -> onIntent(ExploreIntent.SelectChip(chip)) },
         onRetry = { onIntent(ExploreIntent.Retry) },
+        onRefresh = { onIntent(ExploreIntent.Refresh) },
+        onLoadNext = { onIntent(ExploreIntent.LoadNext) },
+        onCityClick = { onIntent(ExploreIntent.OpenCitySelector) },
+        onCityDismiss = { onIntent(ExploreIntent.CloseCitySelector) },
+        onCitySelected = { cityId -> onIntent(ExploreIntent.SelectCity(cityId)) },
+        onUseLocation = { onIntent(ExploreIntent.RequestLocation) },
         onLikeClick = { listingId -> onIntent(ExploreIntent.ToggleLike(listingId)) },
         onFavoriteClick = { listingId -> onIntent(ExploreIntent.ToggleFavorite(listingId)) },
     )

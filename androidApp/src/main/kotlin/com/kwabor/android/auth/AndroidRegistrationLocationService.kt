@@ -14,44 +14,44 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 
-internal sealed interface RegistrationLocationResult {
-    data class Available(val latitude: Double, val longitude: Double) : RegistrationLocationResult
+internal sealed interface ApproximateLocationResult {
+    data class Available(val latitude: Double, val longitude: Double) : ApproximateLocationResult
 
-    data object PermissionDenied : RegistrationLocationResult
+    data object PermissionDenied : ApproximateLocationResult
 
-    data class PermissionFailure(val cause: SecurityException) : RegistrationLocationResult
+    data class PermissionFailure(val cause: SecurityException) : ApproximateLocationResult
 
-    data object LocationDisabled : RegistrationLocationResult
+    data object LocationDisabled : ApproximateLocationResult
 
-    data object Unavailable : RegistrationLocationResult
+    data object Unavailable : ApproximateLocationResult
 
-    data class UnavailableFailure(val cause: IllegalArgumentException) : RegistrationLocationResult
+    data class UnavailableFailure(val cause: IllegalArgumentException) : ApproximateLocationResult
 }
 
-internal fun interface RegistrationLocationService {
-    suspend fun currentApproximateLocation(): RegistrationLocationResult
+internal fun interface ApproximateLocationService {
+    suspend fun currentApproximateLocation(): ApproximateLocationResult
 }
 
-internal class AndroidRegistrationLocationService(
+internal class AndroidApproximateLocationService(
     private val context: Context,
-) : RegistrationLocationService {
-    override suspend fun currentApproximateLocation(): RegistrationLocationResult {
+) : ApproximateLocationService {
+    override suspend fun currentApproximateLocation(): ApproximateLocationResult {
         if (!hasCoarseLocationPermission()) {
-            return RegistrationLocationResult.PermissionDenied
+            return ApproximateLocationResult.PermissionDenied
         }
         val locationManager = ContextCompat.getSystemService(context, LocationManager::class.java)
-            ?: return RegistrationLocationResult.Unavailable
-        val provider = locationManager.availableProvider() ?: return RegistrationLocationResult.LocationDisabled
+            ?: return ApproximateLocationResult.Unavailable
+        val provider = locationManager.availableProvider() ?: return ApproximateLocationResult.LocationDisabled
         val location = try {
             withTimeoutOrNull(LOCATION_TIMEOUT_MILLISECONDS) {
                 requestCurrentLocation(locationManager = locationManager, provider = provider)
             }
         } catch (exception: SecurityException) {
-            return RegistrationLocationResult.PermissionFailure(exception)
+            return ApproximateLocationResult.PermissionFailure(exception)
         } catch (exception: IllegalArgumentException) {
-            return RegistrationLocationResult.UnavailableFailure(exception)
-        } ?: return RegistrationLocationResult.Unavailable
-        return RegistrationLocationResult.Available(
+            return ApproximateLocationResult.UnavailableFailure(exception)
+        } ?: return ApproximateLocationResult.Unavailable
+        return ApproximateLocationResult.Available(
             latitude = location.latitude,
             longitude = location.longitude,
         )

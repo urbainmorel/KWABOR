@@ -90,3 +90,84 @@ internal data class ExploreCacheSnapshotItemEntity(
     @ColumnInfo(name = "is_sponsored_placement")
     val isSponsoredPlacement: Boolean?,
 )
+
+@Entity(tableName = "explore_reference_snapshots")
+internal data class ExploreReferenceSnapshotEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "snapshot_key")
+    val snapshotKey: String,
+    @ColumnInfo(name = "cached_at_epoch_milliseconds")
+    val cachedAtEpochMilliseconds: Long,
+    @ColumnInfo(name = "city_count")
+    val cityCount: Int,
+    @ColumnInfo(name = "category_count")
+    val categoryCount: Int,
+)
+
+@Entity(
+    tableName = "explore_reference_cities",
+    primaryKeys = ["snapshot_key", "city_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ExploreReferenceSnapshotEntity::class,
+            parentColumns = ["snapshot_key"],
+            childColumns = ["snapshot_key"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(
+            value = ["snapshot_key", "position"],
+            unique = true,
+        ),
+    ],
+)
+internal data class ExploreReferenceCityEntity(
+    @ColumnInfo(name = "snapshot_key")
+    val snapshotKey: String,
+    @ColumnInfo(name = "city_id")
+    val cityId: String,
+    @ColumnInfo(name = "position")
+    val position: Int,
+    @ColumnInfo(name = "name")
+    val name: String,
+    @ColumnInfo(name = "country_code")
+    val countryCode: String,
+    @ColumnInfo(name = "latitude")
+    val latitude: Double?,
+    @ColumnInfo(name = "longitude")
+    val longitude: Double?,
+)
+
+@Entity(
+    tableName = "explore_reference_categories",
+    primaryKeys = ["snapshot_key", "category_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ExploreReferenceSnapshotEntity::class,
+            parentColumns = ["snapshot_key"],
+            childColumns = ["snapshot_key"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(
+            value = ["snapshot_key", "position"],
+            unique = true,
+        ),
+    ],
+)
+internal data class ExploreReferenceCategoryEntity(
+    @ColumnInfo(name = "snapshot_key")
+    val snapshotKey: String,
+    @ColumnInfo(name = "category_id")
+    val categoryId: String,
+    @ColumnInfo(name = "position")
+    val position: Int,
+    @ColumnInfo(name = "name_key")
+    val nameKey: String,
+    @ColumnInfo(name = "listing_type")
+    val listingType: String,
+    @ColumnInfo(name = "default_listing_class")
+    val defaultListingClass: String,
+)

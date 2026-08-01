@@ -14,6 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborRadius
@@ -111,6 +114,7 @@ fun OfflineBanner(strings: KwaborStrings, modifier: Modifier = Modifier) {
         text = strings.offlineBanner,
         modifier = modifier
             .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .background(color = KwaborColors.Ink900)
             .padding(horizontal = KwaborSpacing.Lg, vertical = KwaborSpacing.Md),
         color = KwaborColors.Surface0,
@@ -124,6 +128,7 @@ fun KwaborInlineBanner(text: String, modifier: Modifier = Modifier) {
         text = text,
         modifier = modifier
             .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .background(color = MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = KwaborSpacing.Lg, vertical = KwaborSpacing.Md),
         color = MaterialTheme.colorScheme.onSurfaceVariant,

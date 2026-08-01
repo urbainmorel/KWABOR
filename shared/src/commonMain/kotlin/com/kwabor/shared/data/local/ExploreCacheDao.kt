@@ -72,8 +72,14 @@ internal interface ExploreCacheStatements {
     @Query("DELETE FROM explore_cache_snapshot_items WHERE snapshot_key = :snapshotKey")
     suspend fun deleteSnapshotItems(snapshotKey: String)
 
-    @Query("DELETE FROM explore_cache_snapshots WHERE snapshot_key = :snapshotKey")
-    suspend fun deleteSnapshot(snapshotKey: String)
+    @Query(
+        """
+        DELETE FROM explore_cache_snapshots
+        WHERE snapshot_key = :snapshotKey
+            AND cached_at_epoch_milliseconds = :expectedCachedAtEpochMilliseconds
+        """,
+    )
+    suspend fun deleteSnapshotIfTimestampMatches(snapshotKey: String, expectedCachedAtEpochMilliseconds: Long): Int
 
     @Query(
         """
@@ -117,34 +123,206 @@ internal interface ExploreCacheDao : ExploreCacheStatements {
         listings: List<ExploreCachedListingEntity>,
         items: List<ExploreCacheSnapshotItemEntity>,
         maxSnapshotCount: Int,
-    ) {
-        require(maxSnapshotCount > 0) { "Explore cache snapshot limit must be positive." }
-        val timestampsByListingId = if (listings.isEmpty()) {
-            emptyMap()
-        } else {
-            findListingTimestamps(listings.map { listing -> listing.listingId })
-                .associate { cached -> cached.listingId to cached.contentCachedAtEpochMilliseconds }
-        }
-        val listingsToUpdate = listings.filter { listing ->
-            val currentTimestamp = timestampsByListingId[listing.listingId]
-            currentTimestamp == null || listing.contentCachedAtEpochMilliseconds > currentTimestamp
-        }
-
-        deleteSnapshotItems(snapshot.snapshotKey)
-        upsertSnapshot(snapshot)
-        if (listingsToUpdate.isNotEmpty()) {
-            upsertListings(listingsToUpdate)
-        }
-        if (items.isNotEmpty()) {
-            insertSnapshotItems(items)
-        }
-        deleteSnapshotsBeyondLimit(maxSnapshotCount)
-        deleteOrphanListings()
-    }
+    ): ExplorePersistenceWriteResult = replaceSnapshotIfNewer(snapshot, listings, items, maxSnapshotCount)
 
     @Transaction
     suspend fun clearSnapshot(snapshotKey: String) {
-        deleteSnapshot(snapshotKey)
+        val expectedCachedAtEpochMilliseconds = findSnapshot(snapshotKey)?.cachedAtEpochMilliseconds ?: return
+        clearSnapshotRowsIfTimestampMatches(snapshotKey, expectedCachedAtEpochMilliseconds)
+    }
+
+    @Transaction
+    suspend fun clearSnapshotIfTimestampMatches(
+        snapshotKey: String,
+        expectedCachedAtEpochMilliseconds: Long,
+    ): Boolean = clearSnapshotRowsIfTimestampMatches(snapshotKey, expectedCachedAtEpochMilliseconds)
+}
+
+private suspend fun ExploreCacheStatements.clearSnapshotRowsIfTimestampMatches(
+    snapshotKey: String,
+    expectedCachedAtEpochMilliseconds: Long,
+): Boolean {
+    val wasDeleted = deleteSnapshotIfTimestampMatches(
+        snapshotKey = snapshotKey,
+        expectedCachedAtEpochMilliseconds = expectedCachedAtEpochMilliseconds,
+    ) > 0
+    if (wasDeleted) {
         deleteOrphanListings()
     }
+    return wasDeleted
+}
+
+internal data class ExploreReferenceRecord(
+    val snapshot: ExploreReferenceSnapshotEntity,
+    val cities: List<ExploreReferenceCityEntity>,
+    val categories: List<ExploreReferenceCategoryEntity>,
+)
+
+internal interface ExploreReferenceStatements {
+    @Query(
+        """
+        SELECT *
+        FROM explore_reference_snapshots
+        WHERE snapshot_key = :snapshotKey
+        """,
+    )
+    suspend fun findReferenceSnapshot(snapshotKey: String): ExploreReferenceSnapshotEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM explore_reference_cities
+        WHERE snapshot_key = :snapshotKey
+        ORDER BY position ASC
+        """,
+    )
+    suspend fun findReferenceCities(snapshotKey: String): List<ExploreReferenceCityEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM explore_reference_categories
+        WHERE snapshot_key = :snapshotKey
+        ORDER BY position ASC
+        """,
+    )
+    suspend fun findReferenceCategories(snapshotKey: String): List<ExploreReferenceCategoryEntity>
+
+    @Insert
+    suspend fun insertReferenceSnapshot(snapshot: ExploreReferenceSnapshotEntity)
+
+    @Insert
+    suspend fun insertReferenceCities(cities: List<ExploreReferenceCityEntity>)
+
+    @Insert
+    suspend fun insertReferenceCategories(categories: List<ExploreReferenceCategoryEntity>)
+
+    @Query("DELETE FROM explore_reference_snapshots WHERE snapshot_key = :snapshotKey")
+    suspend fun deleteReferenceSnapshot(snapshotKey: String)
+
+    @Query(
+        """
+        DELETE FROM explore_reference_snapshots
+        WHERE snapshot_key = :snapshotKey
+            AND cached_at_epoch_milliseconds = :expectedCachedAtEpochMilliseconds
+        """,
+    )
+    suspend fun deleteReferenceSnapshotIfTimestampMatches(
+        snapshotKey: String,
+        expectedCachedAtEpochMilliseconds: Long,
+    ): Int
+}
+
+@Dao
+internal interface ExploreReferenceDao : ExploreReferenceStatements {
+    @Transaction
+    suspend fun readReference(snapshotKey: String): ExploreReferenceRecord? {
+        val snapshot = findReferenceSnapshot(snapshotKey) ?: return null
+        return ExploreReferenceRecord(
+            snapshot = snapshot,
+            cities = findReferenceCities(snapshotKey),
+            categories = findReferenceCategories(snapshotKey),
+        )
+    }
+
+    @Transaction
+    suspend fun replaceReference(
+        snapshot: ExploreReferenceSnapshotEntity,
+        cities: List<ExploreReferenceCityEntity>,
+        categories: List<ExploreReferenceCategoryEntity>,
+    ) = replaceReferenceIfNewer(snapshot, cities, categories)
+
+    @Transaction
+    suspend fun clearReference(snapshotKey: String) {
+        deleteReferenceSnapshot(snapshotKey)
+    }
+
+    @Transaction
+    suspend fun clearReferenceIfTimestampMatches(
+        snapshotKey: String,
+        expectedCachedAtEpochMilliseconds: Long,
+    ): Boolean = deleteReferenceSnapshotIfTimestampMatches(
+        snapshotKey = snapshotKey,
+        expectedCachedAtEpochMilliseconds = expectedCachedAtEpochMilliseconds,
+    ) > 0
+}
+
+@Dao
+internal interface ExploreFeedPersistenceDao : ExploreCacheStatements, ExploreReferenceStatements {
+    @Transaction
+    suspend fun replaceFeed(
+        wall: ExploreCacheWrite,
+        references: ExploreReferenceWrite,
+        maxSnapshotCount: Int,
+    ): ExplorePersistenceWriteResult {
+        val wallResult = replaceSnapshotIfNewer(wall.snapshot, wall.listings, wall.items, maxSnapshotCount)
+        val referenceResult = replaceReferenceIfNewer(
+            references.snapshot,
+            references.cities,
+            references.categories,
+        )
+        return if (
+            wallResult == ExplorePersistenceWriteResult.Applied ||
+            referenceResult == ExplorePersistenceWriteResult.Applied
+        ) {
+            ExplorePersistenceWriteResult.Applied
+        } else {
+            ExplorePersistenceWriteResult.Rejected
+        }
+    }
+}
+
+private suspend fun ExploreCacheStatements.replaceSnapshotIfNewer(
+    snapshot: ExploreCacheSnapshotEntity,
+    listings: List<ExploreCachedListingEntity>,
+    items: List<ExploreCacheSnapshotItemEntity>,
+    maxSnapshotCount: Int,
+): ExplorePersistenceWriteResult {
+    require(maxSnapshotCount > 0) { "Explore cache snapshot limit must be positive." }
+    val currentSnapshot = findSnapshot(snapshot.snapshotKey)
+    if (currentSnapshot != null && snapshot.cachedAtEpochMilliseconds <= currentSnapshot.cachedAtEpochMilliseconds) {
+        return ExplorePersistenceWriteResult.Rejected
+    }
+    val timestampsByListingId = if (listings.isEmpty()) {
+        emptyMap()
+    } else {
+        findListingTimestamps(listings.map { listing -> listing.listingId })
+            .associate { cached -> cached.listingId to cached.contentCachedAtEpochMilliseconds }
+    }
+    val listingsToUpdate = listings.filter { listing ->
+        val currentTimestamp = timestampsByListingId[listing.listingId]
+        currentTimestamp == null || listing.contentCachedAtEpochMilliseconds > currentTimestamp
+    }
+
+    deleteSnapshotItems(snapshot.snapshotKey)
+    upsertSnapshot(snapshot)
+    if (listingsToUpdate.isNotEmpty()) {
+        upsertListings(listingsToUpdate)
+    }
+    if (items.isNotEmpty()) {
+        insertSnapshotItems(items)
+    }
+    deleteSnapshotsBeyondLimit(maxSnapshotCount)
+    deleteOrphanListings()
+    return ExplorePersistenceWriteResult.Applied
+}
+
+private suspend fun ExploreReferenceStatements.replaceReferenceIfNewer(
+    snapshot: ExploreReferenceSnapshotEntity,
+    cities: List<ExploreReferenceCityEntity>,
+    categories: List<ExploreReferenceCategoryEntity>,
+): ExplorePersistenceWriteResult {
+    val currentSnapshot = findReferenceSnapshot(snapshot.snapshotKey)
+    if (currentSnapshot != null && snapshot.cachedAtEpochMilliseconds <= currentSnapshot.cachedAtEpochMilliseconds) {
+        return ExplorePersistenceWriteResult.Rejected
+    }
+    deleteReferenceSnapshot(snapshot.snapshotKey)
+    insertReferenceSnapshot(snapshot)
+    if (cities.isNotEmpty()) {
+        insertReferenceCities(cities)
+    }
+    if (categories.isNotEmpty()) {
+        insertReferenceCategories(categories)
+    }
+    return ExplorePersistenceWriteResult.Applied
 }

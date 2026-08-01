@@ -23,6 +23,10 @@ object KwaborSizing {
     val Hairline = 1.dp
     val TouchTarget = 44.dp
     val MinimumAccessibleTouchTarget = 48.dp
+    val ExploreTabletBreakpoint = 600.dp
+    const val EXPLORE_MOBILE_GRID_COLUMNS = 2
+    const val EXPLORE_TABLET_GRID_COLUMNS = 3
+    const val EXPLORE_LOAD_MORE_THRESHOLD = 4
     val GoogleLogo = 20.dp
     val BottomNavigationHeight = 76.dp
     val FloatingActionButton = 56.dp

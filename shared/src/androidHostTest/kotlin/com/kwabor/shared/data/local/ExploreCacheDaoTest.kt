@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -148,6 +150,77 @@ class ExploreCacheDaoTest {
     }
 
     @Test
+    fun appendAcrossCacheKeysDoesNotOutrankContentFetchedByAnEarlierRequest() = runTest {
+        withDatabase(coroutineContext) { database ->
+            val dao = database.exploreCacheDao()
+            val store = ExploreCacheStore(dao)
+            val sharedListingId = "listing-shared"
+            val staleListing = listingSummary(id = sharedListingId, name = "Nom initial")
+            val initialWall = ExploreCacheSnapshot(
+                snapshotKey = "explore:places",
+                items = listOf(staleListing),
+                nextCursor = "cursor-initial",
+                cachedAtEpochMilliseconds = 1_000,
+            )
+            store.replace(initialWall)
+
+            store.replace(
+                initialWall.copy(
+                    items = listOf(staleListing, listingSummary(id = "listing-appended")),
+                    nextCursor = "cursor-appended",
+                    cachedAtEpochMilliseconds = 3_000,
+                    itemCachedAtEpochMilliseconds = mapOf(
+                        sharedListingId to initialWall.cachedAtEpochMilliseconds,
+                    ),
+                ),
+            )
+            val fresherWall = ExploreCacheSnapshot(
+                snapshotKey = "explore:heritage",
+                items = listOf(listingSummary(id = sharedListingId, name = "Nom réellement plus frais")),
+                nextCursor = null,
+                cachedAtEpochMilliseconds = 2_000,
+            )
+            store.replace(fresherWall)
+
+            val places = assertNotNull(store.read(initialWall.snapshotKey))
+            assertEquals("Nom réellement plus frais", places.items.first().name)
+            assertEquals(
+                fresherWall.cachedAtEpochMilliseconds,
+                dao.findListingTimestamps(listOf(sharedListingId)).single().contentCachedAtEpochMilliseconds,
+            )
+        }
+    }
+
+    @Test
+    fun watermarkIncludesCanonicalListingContentRetainedByAnOlderSnapshot() = runTest {
+        withDatabase(coroutineContext) { database ->
+            val store = ExploreCacheStore(database.exploreCacheDao())
+            val older = ExploreCacheSnapshot(
+                snapshotKey = "explore:watermark-older",
+                items = listOf(listingSummary(name = "Ancien")),
+                nextCursor = null,
+                cachedAtEpochMilliseconds = OLDER_WATERMARK_TIMESTAMP,
+            )
+            val newer = older.copy(
+                snapshotKey = "explore:watermark-newer",
+                items = listOf(listingSummary(name = "Récent")),
+                cachedAtEpochMilliseconds = CANONICAL_LISTING_WATERMARK,
+            )
+            store.replace(older)
+            store.replace(newer)
+            store.clear(newer.snapshotKey)
+
+            val watermark = ExplorePersistenceWatermarkStore(database.explorePersistenceWatermarkDao()).read()
+
+            assertEquals(CANONICAL_LISTING_WATERMARK, watermark)
+            assertEquals(
+                OLDER_WATERMARK_TIMESTAMP,
+                assertNotNull(store.read(older.snapshotKey)).cachedAtEpochMilliseconds,
+            )
+        }
+    }
+
+    @Test
     fun clearPrunesCanonicalContentOnlyAfterItsLastSnapshotIsRemoved() = runTest {
         withDatabase(coroutineContext) { database ->
             val dao = database.exploreCacheDao()
@@ -171,6 +244,47 @@ class ExploreCacheDaoTest {
             store.clear(second.snapshotKey)
 
             assertTrue(dao.findListingTimestamps(listOf("listing-1")).isEmpty())
+        }
+    }
+
+    @Test
+    fun corruptSnapshotEvictionCannotDeleteANewerReplacementAfterAStaleRead() = runTest {
+        withDatabase(coroutineContext) { database ->
+            val dao = database.exploreCacheDao()
+            val snapshotKey = "explore:conditional-clear"
+            val corruptListing = listingSummary(id = "listing-corrupt")
+            dao.replaceSnapshot(
+                snapshot = ExploreCacheSnapshotEntity(
+                    snapshotKey = snapshotKey,
+                    nextCursor = "cursor-old",
+                    cachedAtEpochMilliseconds = 1_000,
+                    itemCount = 1,
+                ),
+                listings = listOf(
+                    corruptListing.toExploreCachedListingEntity(cachedAtEpochMilliseconds = 1_000)
+                        .copy(likesCount = -1),
+                ),
+                items = listOf(corruptListing.toExploreCacheSnapshotItemEntity(snapshotKey, position = 0)),
+                maxSnapshotCount = DEFAULT_MAX_EXPLORE_CACHE_SNAPSHOTS,
+            )
+            val readStarted = CompletableDeferred<Unit>()
+            val continueRead = CompletableDeferred<Unit>()
+            val staleStore = ExploreCacheStore(BarrierExploreCacheDao(dao, readStarted, continueRead))
+            val staleRead = async { staleStore.read(snapshotKey) }
+            readStarted.await()
+            val fresh = ExploreCacheSnapshot(
+                snapshotKey = snapshotKey,
+                items = listOf(listingSummary(id = "listing-fresh", name = "Nouveau")),
+                nextCursor = "cursor-new",
+                cachedAtEpochMilliseconds = 2_000,
+            )
+            val currentStore = ExploreCacheStore(dao)
+            currentStore.replace(fresh)
+
+            continueRead.complete(Unit)
+
+            assertNull(staleRead.await())
+            assertEquals(fresh, currentStore.read(snapshotKey))
         }
     }
 
@@ -207,6 +321,38 @@ class ExploreCacheDaoTest {
             assertNull(store.read("explore:corrupt"))
             assertEquals(healthy, store.read(healthy.snapshotKey))
             assertTrue(dao.findListingTimestamps(listOf("listing-corrupt")).isEmpty())
+        }
+    }
+
+    @Test
+    fun olderOrEqualSnapshotCannotReplaceNewerCanonicalContent() = runTest {
+        withDatabase(coroutineContext) { database ->
+            val store = ExploreCacheStore(database.exploreCacheDao())
+            val newer = ExploreCacheSnapshot(
+                snapshotKey = "explore:ordered",
+                items = listOf(listingSummary(id = "listing-ordered", name = "Nouveau")),
+                nextCursor = "cursor-new",
+                cachedAtEpochMilliseconds = 2_000,
+            )
+            store.replace(newer)
+
+            val equalResult = store.replace(
+                newer.copy(
+                    items = listOf(listingSummary(id = "listing-ordered", name = "Egal")),
+                    nextCursor = "cursor-equal",
+                ),
+            )
+            val olderResult = store.replace(
+                newer.copy(
+                    items = listOf(listingSummary(id = "listing-ordered", name = "Ancien")),
+                    nextCursor = "cursor-old",
+                    cachedAtEpochMilliseconds = 1_000,
+                ),
+            )
+
+            assertEquals(ExplorePersistenceWriteResult.Rejected, equalResult)
+            assertEquals(ExplorePersistenceWriteResult.Rejected, olderResult)
+            assertEquals(newer, store.read(newer.snapshotKey))
         }
     }
 
@@ -251,6 +397,21 @@ class ExploreCacheDaoTest {
 }
 
 private const val THIRD_SNAPSHOT_SEQUENCE = 3L
+private const val OLDER_WATERMARK_TIMESTAMP = 1_000L
+private const val CANONICAL_LISTING_WATERMARK = 9_000L
+
+private class BarrierExploreCacheDao(
+    private val delegate: ExploreCacheDao,
+    private val readStarted: CompletableDeferred<Unit>,
+    private val continueRead: CompletableDeferred<Unit>,
+) : ExploreCacheDao by delegate {
+    override suspend fun readSnapshot(snapshotKey: String): ExploreCacheRecord? {
+        val record = delegate.readSnapshot(snapshotKey)
+        readStarted.complete(Unit)
+        continueRead.await()
+        return record
+    }
+}
 
 private suspend fun withDatabase(queryCoroutineContext: CoroutineContext, block: suspend (KwaborDatabase) -> Unit) {
     val database = buildKwaborDatabase(

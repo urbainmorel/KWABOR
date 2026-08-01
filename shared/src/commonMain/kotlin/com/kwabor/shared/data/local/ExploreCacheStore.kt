@@ -7,6 +7,13 @@ internal data class ExploreCacheSnapshot(
     val items: List<ListingSummary>,
     val nextCursor: String?,
     val cachedAtEpochMilliseconds: Long,
+    val itemCachedAtEpochMilliseconds: Map<String, Long> = emptyMap(),
+)
+
+internal data class ExploreCacheWrite(
+    val snapshot: ExploreCacheSnapshotEntity,
+    val listings: List<ExploreCachedListingEntity>,
+    val items: List<ExploreCacheSnapshotItemEntity>,
 )
 
 internal class ExploreCacheStore(
@@ -27,35 +34,30 @@ internal class ExploreCacheStore(
                 items = record.listings.map(ExploreCachedListingRecord::toDomain),
                 nextCursor = record.snapshot.nextCursor,
                 cachedAtEpochMilliseconds = record.snapshot.cachedAtEpochMilliseconds,
+                itemCachedAtEpochMilliseconds = record.listings
+                    .filter { listing ->
+                        listing.listing.contentCachedAtEpochMilliseconds !=
+                            record.snapshot.cachedAtEpochMilliseconds
+                    }
+                    .associate { listing ->
+                        listing.listing.listingId to listing.listing.contentCachedAtEpochMilliseconds
+                    },
             )
         } catch (_: CorruptExploreCacheException) {
-            dao.clearSnapshot(snapshotKey)
+            dao.clearSnapshotIfTimestampMatches(
+                snapshotKey = snapshotKey,
+                expectedCachedAtEpochMilliseconds = record.snapshot.cachedAtEpochMilliseconds,
+            )
             null
         }
     }
 
-    suspend fun replace(snapshot: ExploreCacheSnapshot) {
-        snapshot.requireValid()
-        val listings = snapshot.items.map { listing ->
-            listing.toExploreCachedListingEntity(
-                cachedAtEpochMilliseconds = snapshot.cachedAtEpochMilliseconds,
-            )
-        }
-        val items = snapshot.items.mapIndexed { position, listing ->
-            listing.toExploreCacheSnapshotItemEntity(
-                snapshotKey = snapshot.snapshotKey,
-                position = position,
-            )
-        }
-        dao.replaceSnapshot(
-            snapshot = ExploreCacheSnapshotEntity(
-                snapshotKey = snapshot.snapshotKey,
-                nextCursor = snapshot.nextCursor,
-                cachedAtEpochMilliseconds = snapshot.cachedAtEpochMilliseconds,
-                itemCount = listings.size,
-            ),
-            listings = listings,
-            items = items,
+    suspend fun replace(snapshot: ExploreCacheSnapshot): ExplorePersistenceWriteResult {
+        val write = snapshot.toCacheWrite()
+        return dao.replaceSnapshot(
+            snapshot = write.snapshot,
+            listings = write.listings,
+            items = write.items,
             maxSnapshotCount = maxSnapshotCount,
         )
     }
@@ -64,6 +66,39 @@ internal class ExploreCacheStore(
         snapshotKey.requireValidSnapshotKey()
         dao.clearSnapshot(snapshotKey)
     }
+
+    suspend fun clear(snapshotKey: String, expectedCachedAtEpochMilliseconds: Long): Boolean {
+        snapshotKey.requireValidSnapshotKey()
+        return dao.clearSnapshotIfTimestampMatches(
+            snapshotKey = snapshotKey,
+            expectedCachedAtEpochMilliseconds = expectedCachedAtEpochMilliseconds,
+        )
+    }
+}
+
+internal fun ExploreCacheSnapshot.toCacheWrite(): ExploreCacheWrite {
+    requireValid()
+    val listings = items.map { listing ->
+        listing.toExploreCachedListingEntity(
+            cachedAtEpochMilliseconds = itemCachedAtEpochMilliseconds[listing.id]
+                ?: cachedAtEpochMilliseconds,
+        )
+    }
+    return ExploreCacheWrite(
+        snapshot = ExploreCacheSnapshotEntity(
+            snapshotKey = snapshotKey,
+            nextCursor = nextCursor,
+            cachedAtEpochMilliseconds = cachedAtEpochMilliseconds,
+            itemCount = listings.size,
+        ),
+        listings = listings,
+        items = items.mapIndexed { position, listing ->
+            listing.toExploreCacheSnapshotItemEntity(
+                snapshotKey = snapshotKey,
+                position = position,
+            )
+        },
+    )
 }
 
 private fun ExploreCacheSnapshot.requireValid() {
@@ -73,6 +108,13 @@ private fun ExploreCacheSnapshot.requireValid() {
         "Explore cache cursor is too long."
     }
     require(cachedAtEpochMilliseconds >= 0) { "Explore cache timestamp must not be negative." }
+    val itemIds = items.mapTo(mutableSetOf(), ListingSummary::id)
+    require(itemCachedAtEpochMilliseconds.keys.all(itemIds::contains)) {
+        "Explore cache item timestamps must reference snapshot listing ids."
+    }
+    require(itemCachedAtEpochMilliseconds.values.all { timestamp -> timestamp >= 0 }) {
+        "Explore cache item timestamps must not be negative."
+    }
     require(items.size <= MAX_EXPLORE_CACHE_ITEMS) {
         "Explore cache snapshots must contain at most $MAX_EXPLORE_CACHE_ITEMS items."
     }

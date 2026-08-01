@@ -4,6 +4,7 @@ import com.kwabor.shared.data.auth.authDataModule
 import com.kwabor.shared.data.catalog.catalogDataModule
 import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
+import com.kwabor.shared.data.explore.exploreDataModule
 import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -31,7 +32,7 @@ class KwaborCompositionRoot internal constructor(
     val clockProvider: ClockProvider = application.koin.get()
     val dispatcherProvider: DispatcherProvider = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
-    val explorePresenter: ExplorePresenter = application.koin.get()
+    val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
@@ -67,8 +68,9 @@ internal fun createKwaborCompositionRootOrNull(
                 environment = environment,
                 authSessionManager = authSessionManager,
             ),
-            catalogDataModule,
-            explorePresentationModule,
+            catalogDataModule(hasAuthentication = authSessionManager != null),
+            exploreDataModule(hasPersistence = persistenceConfiguration != null),
+            explorePresentationModule(hasPersistence = persistenceConfiguration != null),
             organizationDataModule,
         )
         if (authSessionManager != null) {

@@ -61,7 +61,7 @@ internal data class AuthViewModelDependencies(
     val authPresenter: com.kwabor.shared.presentation.auth.AuthPresenter,
     val registrationPresenter: RegistrationPresenter,
     val passwordRecoveryPresenter: PasswordRecoveryPresenter,
-    val locationService: com.kwabor.android.auth.RegistrationLocationService,
+    val locationService: com.kwabor.android.auth.ApproximateLocationService,
     val notificationPermissionPolicy: com.kwabor.android.auth.NotificationPermissionPolicy,
     val notificationPrimingStore: com.kwabor.android.auth.NotificationPrimingStore,
     val authJourneyStore: com.kwabor.android.auth.AuthJourneyStore,

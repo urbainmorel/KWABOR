@@ -18,6 +18,10 @@ import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreFeedQuery
+import com.kwabor.shared.domain.explore.ExploreFeedRepository
+import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
+import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.stringsFor
@@ -50,10 +54,13 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(
-            request = ExploreLoadRequest(selectedTab = ExploreTab.Places, selectedChipId = "history"),
+            request = ExploreLoadRequest(
+                selectedTab = ExploreTab.Places,
+                selectedChipId = "heritage-historique",
+            ),
             strings = strings,
         )
 
@@ -61,7 +68,7 @@ class ExplorePresenterTest {
         assertFalse(state.hasError)
         assertEquals(strings.currentCity, state.cityLabel)
         assertEquals(ExploreTab.Places, state.selectedTab)
-        assertEquals("history", state.selectedChipId)
+        assertEquals("heritage-historique", state.selectedChipId)
         assertEquals(ListingType.Place, repository.lastFilters?.listingType)
         assertEquals("heritage-historique", repository.lastFilters?.categoryId)
 
@@ -77,7 +84,7 @@ class ExplorePresenterTest {
     @Test
     fun load_keepsUnknownChipAsTabFilterOnly() = runSuspendTest {
         val repository = FakeCatalogRepository()
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         presenter.load(
             request = ExploreLoadRequest(selectedTab = ExploreTab.Events, selectedChipId = "concerts"),
@@ -93,7 +100,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(listingsError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -117,7 +124,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, FixedClockProvider(nowEpochMilliseconds = 0L))
+        val presenter = testPresenter(repository, FixedClockProvider(nowEpochMilliseconds = 0L))
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -139,7 +146,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -155,7 +162,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -177,7 +184,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -209,7 +216,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -236,7 +243,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -267,7 +274,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -301,7 +308,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -325,7 +332,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -466,6 +473,86 @@ private class FakeCatalogRepository(
         return getListingViewerInteraction(listingId)
     }
 }
+
+private fun testPresenter(repository: CatalogRepository, clockProvider: ClockProvider): ExplorePresenter =
+    ExplorePresenter(
+        exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
+        catalogInteractionRepository = repository,
+        appPreferencesRepository = null,
+        clockProvider = clockProvider,
+    )
+
+private class TestExploreFeedRepository(
+    private val catalogRepository: CatalogRepository,
+    private val clockProvider: ClockProvider,
+) : ExploreFeedRepository {
+    override suspend fun readCached(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot?> =
+        DomainResult.Success(null)
+
+    override suspend fun refresh(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot> =
+        when (val result = catalogRepository.listCities()) {
+            is DomainResult.Success -> loadCategories(query, result.value)
+            is DomainResult.Failure -> result
+        }
+
+    private suspend fun loadCategories(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+    ): DomainResult<ExploreFeedSnapshot> = when (val result = catalogRepository.listCategories()) {
+        is DomainResult.Success -> loadPage(query, cities, result.value)
+        is DomainResult.Failure -> result
+    }
+
+    private suspend fun loadPage(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+        categories: List<Category>,
+    ): DomainResult<ExploreFeedSnapshot> {
+        val validationError = query.invalidReferenceError(cities, categories)
+        return if (validationError != null) {
+            DomainResult.Failure(validationError)
+        } else {
+            loadValidPage(query, cities, categories)
+        }
+    }
+
+    private suspend fun loadValidPage(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+        categories: List<Category>,
+    ): DomainResult<ExploreFeedSnapshot> = when (
+        val result = catalogRepository.listListings(
+            filters = query.filters,
+            page = ListingPageRequest(limit = query.pageSize),
+        )
+    ) {
+        is DomainResult.Success -> DomainResult.Success(
+            ExploreFeedSnapshot(
+                cities = cities,
+                categories = categories,
+                items = result.value.items,
+                nextCursor = result.value.nextCursor,
+                cachedAtEpochMilliseconds = clockProvider.nowEpochMilliseconds(),
+                source = ExploreFeedSource.Network,
+            ),
+        )
+        is DomainResult.Failure -> result
+    }
+
+    override suspend fun append(
+        query: ExploreFeedQuery,
+        currentSnapshot: ExploreFeedSnapshot,
+    ): DomainResult<ExploreFeedSnapshot> = DomainResult.Failure(DomainError.Unexpected())
+}
+
+private fun ExploreFeedQuery.invalidReferenceError(cities: List<City>, categories: List<Category>): DomainError? =
+    when {
+        filters.cityId != null && cities.none { city -> city.id == filters.cityId } ->
+            DomainError.Validation("error.explore.city_unavailable")
+        filters.categoryId != null && categories.none { category -> category.id == filters.categoryId } ->
+            DomainError.Validation("error.explore.category_unavailable")
+        else -> null
+    }
 
 private class FixedClockProvider(private val nowEpochMilliseconds: Long) : ClockProvider {
     override fun nowEpochMilliseconds(): Long = nowEpochMilliseconds

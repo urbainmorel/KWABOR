@@ -211,15 +211,39 @@ class DataCatalogRepositoryTest {
     }
 
     @Test
+    fun listListingViewerInteractions_withoutSessionSkipsDataSourceCall() = runTest {
+        val dataSource = FakeCatalogDataSource()
+        val repository = DataCatalogRepository(
+            SessionAwareCatalogDataSource(
+                delegate = dataSource,
+                sessionState = CatalogSessionState { false },
+            ),
+        )
+
+        val result = repository.listListingViewerInteractions(listOf("listing-1", "listing-2"))
+
+        val success = assertIs<DomainResult.Success<List<ListingViewerInteraction>>>(result)
+        assertEquals(emptyList(), success.value)
+        assertEquals(0, dataSource.interactionCallCount)
+        assertEquals(null, dataSource.lastInteractionBatchIds)
+    }
+
+    @Test
     fun listListingViewerInteractions_trimsAndDeduplicatesIds() = runTest {
         val dataSource = FakeCatalogDataSource()
-        val repository = DataCatalogRepository(dataSource)
+        val repository = DataCatalogRepository(
+            SessionAwareCatalogDataSource(
+                delegate = dataSource,
+                sessionState = CatalogSessionState { true },
+            ),
+        )
 
         val result = repository.listListingViewerInteractions(listOf(" listing-1 ", "listing-1", "listing-2"))
 
         val success = assertIs<DomainResult.Success<List<ListingViewerInteraction>>>(result)
         assertEquals(listOf("listing-1", "listing-2"), dataSource.lastInteractionBatchIds)
         assertEquals(listOf("listing-1", "listing-2"), success.value.map { item -> item.listingId })
+        assertEquals(1, dataSource.interactionCallCount)
     }
 
     @Test

@@ -17,7 +17,9 @@ kotlin {
         namespace = "com.kwabor.shared"
         compileSdk = 36
         minSdk = 26
-        withHostTest {}
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -69,7 +71,16 @@ kotlin {
     }
 }
 
+androidComponents {
+    onVariants { variant ->
+        variant.hostTests.values.forEach { hostTest ->
+            hostTest.sources.assets?.addStaticSourceDirectory("schemas")
+        }
+    }
+}
+
 dependencies {
+    add("androidHostTestImplementation", "androidx.room:room-testing:2.8.4")
     add("androidHostTestImplementation", "androidx.test:core:1.7.0")
     add("androidHostTestImplementation", "org.robolectric:robolectric:4.16")
     add("kspAndroid", "androidx.room:room-compiler:2.8.4")
@@ -83,6 +94,7 @@ room {
 }
 
 val roomSchemaDirectory = layout.projectDirectory.dir("schemas")
+
 val verifyRoomSchemas by tasks.registering {
     group = "verification"
     description = "Validates Room schema history and rejects schema drift in CI."

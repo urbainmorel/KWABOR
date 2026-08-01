@@ -1,6 +1,6 @@
 package com.kwabor.android.presentation.auth
 
-import com.kwabor.android.auth.RegistrationLocationResult
+import com.kwabor.android.auth.ApproximateLocationResult
 import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.GeoPoint
 import com.kwabor.shared.domain.catalog.nearestCity
@@ -56,15 +56,15 @@ internal class AuthPlatformCoordinator(
         runtime.operationJob?.cancel()
         runtime.operationJob = runtime.coroutineScope.launch {
             when (val result = dependencies.locationService.currentApproximateLocation()) {
-                is RegistrationLocationResult.Available -> selectNearestCity(result.latitude, result.longitude)
-                RegistrationLocationResult.PermissionDenied,
-                is RegistrationLocationResult.PermissionFailure,
+                is ApproximateLocationResult.Available -> selectNearestCity(result.latitude, result.longitude)
+                ApproximateLocationResult.PermissionDenied,
+                is ApproximateLocationResult.PermissionFailure,
                 -> updateLocationStatus(RegistrationLocationStatus.PermissionDenied)
-                RegistrationLocationResult.LocationDisabled -> updateLocationStatus(
+                ApproximateLocationResult.LocationDisabled -> updateLocationStatus(
                     RegistrationLocationStatus.LocationDisabled,
                 )
-                RegistrationLocationResult.Unavailable,
-                is RegistrationLocationResult.UnavailableFailure,
+                ApproximateLocationResult.Unavailable,
+                is ApproximateLocationResult.UnavailableFailure,
                 -> updateLocationStatus(RegistrationLocationStatus.Unavailable)
             }
         }
