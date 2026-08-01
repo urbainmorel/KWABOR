@@ -117,11 +117,6 @@ internal data class ListingMediaDto(
     val isCover: Boolean,
 )
 
-internal data class ListingSummaryDto(
-    val listing: ListingDto,
-    val coverImageUrl: String?,
-)
-
 internal data class ListingDetailDto(
     val listing: ListingDto,
     val media: List<ListingMediaDto>,
@@ -164,10 +159,6 @@ internal fun CategoryDto.toDomain(): Category = Category(
     nameKey = nameKey,
     listingType = listingType.toListingType(),
     defaultListingClass = defaultListingClass.toListingClass(),
-)
-
-internal fun ListingSummaryDto.toDomain(): ListingSummary = listing.toSummaryDomain(
-    coverImageUrl = coverImageUrl,
 )
 
 internal fun ListingDetailDto.toDomain(): ListingDetail {
@@ -247,21 +238,21 @@ private fun ListingMediaDto.toDomain(): ListingMedia = ListingMedia(
     isCover = isCover,
 )
 
-private fun String.toListingType(): ListingType = when (this) {
+internal fun String.toListingType(): ListingType = when (this) {
     "lieu" -> ListingType.Place
     "etablissement" -> ListingType.Establishment
     "evenement" -> ListingType.Event
     else -> invalidDatabaseValue("listings.type", this)
 }
 
-private fun String.toListingClass(): ListingClass = when (this) {
+internal fun String.toListingClass(): ListingClass = when (this) {
     "patrimonial" -> ListingClass.Heritage
     "commercial" -> ListingClass.Commercial
     "evenementiel" -> ListingClass.Event
     else -> invalidDatabaseValue("listings.listing_class", this)
 }
 
-private fun String.toListingStatus(): ListingStatus = when (this) {
+internal fun String.toListingStatus(): ListingStatus = when (this) {
     "brouillon" -> ListingStatus.Draft
     "en_attente" -> ListingStatus.PendingReview
     "publie" -> ListingStatus.Published
@@ -282,18 +273,18 @@ private fun String.toPriceUnit(): PriceUnit = when (this) {
 private fun String.toAppLocale(): AppLocale = AppLocale.entries.firstOrNull { locale -> locale.tag == this }
     ?: invalidDatabaseValue("listings.content_lang", this)
 
-private fun String.toEpochMilliseconds(): Long = try {
+internal fun String.toEpochMilliseconds(): Long = try {
     Instant.parse(this).toEpochMilliseconds()
 } catch (exception: IllegalArgumentException) {
     throw CatalogDataException.Unexpected(exception)
 }
 
-private fun Long.toNonNegativeMoney(fieldName: String): MoneyXof = when (val result = MoneyXof.fromAmount(this)) {
+internal fun Long.toNonNegativeMoney(fieldName: String): MoneyXof = when (val result = MoneyXof.fromAmount(this)) {
     is DomainResult.Success -> result.value
     is DomainResult.Failure -> invalidDatabaseValue(fieldName, toString())
 }
 
-private fun Int.toNonNegativeCount(fieldName: String): Int {
+internal fun Int.toNonNegativeCount(fieldName: String): Int {
     if (this >= 0) {
         return this
     }

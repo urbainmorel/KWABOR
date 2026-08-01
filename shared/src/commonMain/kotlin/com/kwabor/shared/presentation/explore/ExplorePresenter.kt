@@ -4,12 +4,12 @@ import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
 import com.kwabor.shared.i18n.KwaborStrings
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -42,7 +42,7 @@ class ExplorePresenter(
         val listings = when (
             val result = catalogRepository.listListings(
                 filters = request.toFilters(categories),
-                page = PageRequest(limit = EXPLORE_PAGE_SIZE),
+                page = ListingPageRequest(limit = EXPLORE_PAGE_SIZE),
             )
         ) {
             is DomainResult.Success -> result.value
@@ -252,7 +252,9 @@ private fun ListingSummary.toExploreListingItem(
     price = priceFromXof,
     ratingLabel = ratingAverage?.toRatingLabel(),
     likesCount = interaction?.likesCount ?: likesCount,
-    sponsored = sponsoredUntilEpochMilliseconds?.let { it > nowEpochMilliseconds } ?: false,
+    sponsored = isSponsoredPlacement
+        ?: sponsoredUntilEpochMilliseconds?.let { it > nowEpochMilliseconds }
+        ?: false,
     liked = interaction?.likedByViewer ?: false,
     favorited = interaction?.favoritedByViewer ?: false,
 )

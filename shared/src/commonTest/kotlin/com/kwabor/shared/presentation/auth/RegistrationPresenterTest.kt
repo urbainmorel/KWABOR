@@ -18,14 +18,13 @@ import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
-import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.observability.ObservabilityConsent
@@ -285,13 +284,13 @@ private class FakeRegistrationCatalogRepository : CatalogRepository {
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = unused()
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = unused()
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = unused()
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = unused()
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = unused()
 

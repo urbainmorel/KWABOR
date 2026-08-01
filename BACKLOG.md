@@ -104,7 +104,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ### Explore, recherche, détail et devises
 
-- [ ] CATALOG-002 — Ajouter une vue/RPC de résumé catalogue paginé et supprimer le N+1 média.
+- [x] CATALOG-002 — Ajouter un RPC de résumé catalogue paginé par curseur et supprimer le N+1 média.
+- [ ] PR-CATALOG-002 — Publier la PR empilée, obtenir une CI verte puis la revue humaine avant fusion.
 - [ ] EXPLORE-002 — Finaliser Explore Android : pagination, refresh, filtres, ville/GPS, sponsors et cache.
 - [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.

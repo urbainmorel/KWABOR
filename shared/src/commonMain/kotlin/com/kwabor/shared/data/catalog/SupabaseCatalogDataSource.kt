@@ -1,8 +1,8 @@
 package com.kwabor.shared.data.catalog
 
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
-import com.kwabor.shared.domain.core.PageRequest
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.Postgrest
@@ -10,6 +10,7 @@ import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.serialization.SerializationException
 
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401
@@ -38,48 +39,19 @@ internal class SupabaseCatalogDataSource(
             .decodeList()
     }
 
-    override suspend fun listListings(filters: ListingFilters, page: PageRequest): List<ListingSummaryDto> =
-        runPostgrest {
-            val listings = postgrest.from(LISTINGS)
-                .select {
-                    applyListingFilters(filters)
-                    order("sponsored_until", Order.DESCENDING)
-                    order("rating_avg", Order.DESCENDING)
-                    order("likes_count", Order.DESCENDING)
-                    applyPage(page)
-                }
-                .decodeList<ListingDto>()
+    override suspend fun listListings(filters: ListingFilters, page: ListingPageRequest): ListingSummaryPageDto =
+        loadListingSummaryPage(
+            filters = filters,
+            searchQuery = null,
+            page = page,
+        )
 
-            listings.map { listing ->
-                ListingSummaryDto(
-                    listing = listing,
-                    coverImageUrl = findCoverImageUrl(listing.id),
-                )
-            }
-        }
-
-    override suspend fun searchListings(query: ListingSearchQuery, page: PageRequest): List<ListingSummaryDto> =
-        runPostgrest {
-            val listings = postgrest.from(LISTINGS)
-                .select {
-                    applyListingFilters(query.filters)
-                    filter {
-                        ilike("name", query.text.toIlikePattern())
-                    }
-                    order("sponsored_until", Order.DESCENDING)
-                    order("rating_avg", Order.DESCENDING)
-                    order("likes_count", Order.DESCENDING)
-                    applyPage(page)
-                }
-                .decodeList<ListingDto>()
-
-            listings.map { listing ->
-                ListingSummaryDto(
-                    listing = listing,
-                    coverImageUrl = findCoverImageUrl(listing.id),
-                )
-            }
-        }
+    override suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto =
+        loadListingSummaryPage(
+            filters = query.filters,
+            searchQuery = query.text,
+            page = page,
+        )
 
     override suspend fun getListingDetail(listingId: String): ListingDetailDto = runPostgrest {
         val listing = postgrest.from(LISTINGS)
@@ -140,19 +112,16 @@ internal class SupabaseCatalogDataSource(
         ).decodeSingle()
     }
 
-    private suspend fun findCoverImageUrl(listingId: String): String? {
-        val media = postgrest.from(LISTING_MEDIA)
-            .select {
-                filter {
-                    eq("listing_id", listingId)
-                }
-                order("is_cover", Order.DESCENDING)
-                order("display_order", Order.ASCENDING)
-                limit(1)
-            }
-            .decodeList<ListingMediaDto>()
-
-        return media.firstOrNull()?.url
+    private suspend fun loadListingSummaryPage(
+        filters: ListingFilters,
+        searchQuery: String?,
+        page: ListingPageRequest,
+    ): ListingSummaryPageDto = runPostgrest {
+        postgrest.rpc(
+            function = LIST_CATALOG_SUMMARIES,
+            parameters = filters.toSummaryPageRpcDto(searchQuery = searchQuery, page = page),
+        ).decodeList<ListingSummaryDto>()
+            .toSummaryPage(page.limit)
     }
 
     private suspend fun listMedia(listingId: String): List<ListingMediaDto> = postgrest.from(LISTING_MEDIA)
@@ -169,26 +138,35 @@ private const val CITIES = "cities"
 private const val CATEGORIES = "categories"
 private const val LISTINGS = "listings"
 private const val LISTING_MEDIA = "listing_media"
+private const val LIST_CATALOG_SUMMARIES = "list_catalog_summaries"
 
-private fun io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder.applyPage(page: PageRequest) {
-    range(
-        from = page.offset.toLong(),
-        to = (page.offset + page.limit - 1).toLong(),
-    )
-}
+private fun ListingFilters.toSummaryPageRpcDto(
+    searchQuery: String?,
+    page: ListingPageRequest,
+): ListingSummaryPageRpcDto = ListingSummaryPageRpcDto(
+    cityId = cityId,
+    categoryId = categoryId,
+    listingType = listingType?.toDatabaseValue(),
+    listingClass = listingClass?.toDatabaseValue(),
+    searchQuery = searchQuery,
+    cursor = page.cursor,
+    limit = page.limit,
+)
 
-private fun io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder.applyListingFilters(
-    filters: ListingFilters,
-) {
-    filter {
-        if (filters.onlyPublished) {
-            eq("status", "publie")
-        }
-        filters.cityId?.let { cityId -> eq("city_id", cityId) }
-        filters.categoryId?.let { categoryId -> eq("category_id", categoryId) }
-        filters.listingType?.let { listingType -> eq("type", listingType.toDatabaseValue()) }
-        filters.listingClass?.let { listingClass -> eq("listing_class", listingClass.toDatabaseValue()) }
+internal fun List<ListingSummaryDto>.toSummaryPage(limit: Int): ListingSummaryPageDto {
+    val items = take(limit)
+    val nextCursor = if (size > limit) {
+        items.lastOrNull()
+            ?.rowCursor
+            ?.takeIf { cursor -> cursor.isNotBlank() }
+            ?: throw CatalogDataException.Unexpected(
+                IllegalStateException("Catalog summary RPC returned an invalid page cursor."),
+            )
+    } else {
+        null
     }
+
+    return ListingSummaryPageDto(items = items, nextCursor = nextCursor)
 }
 
 private suspend fun <T> runPostgrest(block: suspend () -> T): T = try {
@@ -201,6 +179,8 @@ private suspend fun <T> runPostgrest(block: suspend () -> T): T = try {
     throw CatalogDataException.NetworkUnavailable(exception)
 } catch (exception: HttpRequestException) {
     throw CatalogDataException.NetworkUnavailable(exception)
+} catch (exception: SerializationException) {
+    throw CatalogDataException.Unexpected(exception)
 }
 
 private fun RestException.toCatalogDataException(): CatalogDataException {
@@ -223,5 +203,3 @@ private fun RestException.toCatalogDataException(): CatalogDataException {
         else -> CatalogDataException.Unexpected(this)
     }
 }
-
-private fun String.toIlikePattern(): String = "%${trim().replace("%", "").replace("_", "")}%"

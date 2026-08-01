@@ -4,6 +4,9 @@ import com.kwabor.shared.domain.catalog.ListingClass
 import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.i18n.AppLocale
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,21 +35,52 @@ class CatalogDtoMappingTest {
 
     @Test
     fun listingSummaryDto_mapsMoneyStatusAndSponsorDate() {
-        val summary = ListingSummaryDto(
-            listing = listingDto(
-                ListingDtoFixture(
-                    status = "publie",
-                    priceFromXof = 15_000,
-                    sponsoredUntil = "2026-07-03T10:15:30Z",
-                ),
-            ),
+        val summary = catalogSummaryDto(
+            priceFromXof = 15_000,
+            sponsoredUntil = "2026-07-03T10:15:30Z",
             coverImageUrl = "https://cdn.kwabor.test/cover.jpg",
         ).toDomain()
 
         assertEquals(ListingStatus.Published, summary.status)
-        assertEquals(15_000, summary.priceFromXof?.amount)
-        assertEquals(1_783_073_730_000, summary.sponsoredUntilEpochMilliseconds)
+        assertEquals(15_000L, summary.priceFromXof?.amount)
+        assertEquals(1_783_073_730_000L, summary.sponsoredUntilEpochMilliseconds)
+        assertEquals(true, summary.isSponsoredPlacement)
         assertEquals("https://cdn.kwabor.test/cover.jpg", summary.coverImageUrl)
+    }
+
+    @Test
+    fun catalogSummaryRpc_decodesRowsAndEncodesStableParameterNames() {
+        val row = Json.decodeFromString<List<ListingSummaryDto>>(CATALOG_SUMMARY_RPC_RESPONSE).single()
+        val parameters = ListingSummaryPageRpcDto(
+            cityId = "cotonou",
+            categoryId = null,
+            listingType = "etablissement",
+            listingClass = "commercial",
+            searchQuery = null,
+            cursor = "cursor-current",
+            limit = 20,
+        )
+        val encodedParameters = Json.encodeToJsonElement(ListingSummaryPageRpcDto.serializer(), parameters).jsonObject
+
+        assertEquals("listing-1", row.id)
+        assertEquals(5_000L, row.priceFromXof)
+        assertEquals(4.5, row.ratingAverage)
+        assertEquals(true, row.isSponsoredPlacement)
+        assertEquals("cursor-next", row.rowCursor)
+        assertEquals(
+            setOf(
+                "p_city_id",
+                "p_category_id",
+                "p_listing_type",
+                "p_listing_class",
+                "p_search_query",
+                "p_cursor",
+                "p_limit",
+            ),
+            encodedParameters.keys,
+        )
+        assertEquals(JsonNull, encodedParameters.getValue("p_category_id"))
+        assertEquals(JsonNull, encodedParameters.getValue("p_search_query"))
     }
 
     @Test
@@ -86,10 +120,7 @@ class CatalogDtoMappingTest {
 
     @Test
     fun listingDto_rejectsInvalidDatabaseEnum() {
-        val dto = ListingSummaryDto(
-            listing = listingDto(ListingDtoFixture(type = "invalid")),
-            coverImageUrl = null,
-        )
+        val dto = catalogSummaryDto(type = "invalid")
 
         assertFailsWith<CatalogDataException.Unexpected> {
             dto.toDomain()
@@ -174,6 +205,30 @@ internal fun listingDto(fixture: ListingDtoFixture = ListingDtoFixture()): Listi
     publishedAt = fixture.publishedAt,
 )
 
+private fun catalogSummaryDto(
+    type: String = "etablissement",
+    priceFromXof: Long? = null,
+    sponsoredUntil: String? = null,
+    coverImageUrl: String? = null,
+    isSponsoredPlacement: Boolean = true,
+): ListingSummaryDto = ListingSummaryDto(
+    id = "listing-1",
+    type = type,
+    listingClass = "commercial",
+    status = "publie",
+    name = "Restaurant Kwabor",
+    cityId = "cotonou",
+    categoryId = "restaurants",
+    coverImageUrl = coverImageUrl,
+    priceFromXof = priceFromXof,
+    ratingAverage = 4.5,
+    likesCount = 12,
+    verified = true,
+    sponsoredUntil = sponsoredUntil,
+    isSponsoredPlacement = isSponsoredPlacement,
+    rowCursor = "cursor-listing-1",
+)
+
 internal fun listingViewerInteractionDto(
     listingId: String = "listing-1",
     likedByCurrentUser: Boolean = false,
@@ -185,3 +240,25 @@ internal fun listingViewerInteractionDto(
     favoritedByCurrentUser = favoritedByCurrentUser,
     likesCount = likesCount,
 )
+
+private const val CATALOG_SUMMARY_RPC_RESPONSE = """
+[
+  {
+    "id": "listing-1",
+    "type": "etablissement",
+    "listing_class": "commercial",
+    "status": "publie",
+    "name": "Restaurant Kwabor",
+    "city_id": "cotonou",
+    "category_id": "restaurants",
+    "cover_image_url": "https://cdn.kwabor.test/cover.jpg",
+    "price_from_xof": 5000,
+    "rating_avg": 4.50,
+    "likes_count": 12,
+    "verified": true,
+    "sponsored_until": "2026-08-03T10:15:30+00:00",
+    "is_sponsored_placement": true,
+    "row_cursor": "cursor-next"
+  }
+]
+"""

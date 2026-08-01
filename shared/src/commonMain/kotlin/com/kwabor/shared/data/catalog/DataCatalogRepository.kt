@@ -5,12 +5,11 @@ import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
-import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 
 class DataCatalogRepository internal constructor(
     private val dataSource: CatalogDataSource,
@@ -25,20 +24,20 @@ class DataCatalogRepository internal constructor(
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = runDataCall {
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = runDataCall {
+        filters.requirePublishedOnly()
         dataSource.listListings(filters = filters, page = page)
-            .map { item -> item.toDomain() }
-            .toPageResult(page)
+            .toDomain()
     }
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = runDataCall {
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = runDataCall {
+        query.filters.requirePublishedOnly()
         dataSource.searchListings(query = query, page = page)
-            .map { item -> item.toDomain() }
-            .toPageResult(page)
+            .toDomain()
     }
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = runDataCall {
@@ -84,11 +83,6 @@ private inline fun <T> runDataCall(block: () -> T): DomainResult<T> = try {
     DomainResult.Failure(exception.domainError)
 }
 
-private fun <T> List<T>.toPageResult(page: PageRequest): PageResult<T> = PageResult(
-    items = this,
-    nextOffset = if (size >= page.limit) page.offset + page.limit else null,
-)
-
 private fun String.toRequiredListingId(): String {
     val value = trim()
     if (value.isBlank()) {
@@ -100,3 +94,9 @@ private fun String.toRequiredListingId(): String {
 
 private fun List<String>.toRequiredListingIds(): List<String> = map { listingId -> listingId.toRequiredListingId() }
     .distinct()
+
+private fun ListingFilters.requirePublishedOnly() {
+    if (!onlyPublished) {
+        throw CatalogDataException.Validation()
+    }
+}

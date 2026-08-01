@@ -8,16 +8,16 @@ import com.kwabor.shared.domain.catalog.ListingContact
 import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingMedia
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.stringsFor
@@ -44,6 +44,7 @@ class ExplorePresenterTest {
                             coverImageUrl = "https://example.invalid/cover.jpg",
                             ratingAverage = 4.74,
                             sponsoredUntilEpochMilliseconds = 2_000L,
+                            isSponsoredPlacement = true,
                         ),
                     ),
                 ),
@@ -103,15 +104,20 @@ class ExplorePresenterTest {
     }
 
     @Test
-    fun load_marksExpiredCampaignAsNotSponsored() = runSuspendTest {
+    fun load_usesServerSponsorSnapshotDespiteDeviceClockSkew() = runSuspendTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(
                 listings = listOf(
-                    listingSummary(ListingSummaryFixture(sponsoredUntilEpochMilliseconds = 500L)),
+                    listingSummary(
+                        ListingSummaryFixture(
+                            sponsoredUntilEpochMilliseconds = 500L,
+                            isSponsoredPlacement = false,
+                        ),
+                    ),
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = ExplorePresenter(repository, FixedClockProvider(nowEpochMilliseconds = 0L))
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -394,18 +400,18 @@ private class FakeCatalogRepository(
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> {
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> {
         lastFilters = filters
         return scenario.listingsError?.let { error -> DomainResult.Failure(error) }
-            ?: DomainResult.Success(PageResult(items = scenario.listings, nextOffset = null))
+            ?: DomainResult.Success(ListingSummaryPage(items = scenario.listings, nextCursor = null))
     }
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = DomainResult.Success(
-        PageResult(items = emptyList(), nextOffset = null),
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = DomainResult.Success(
+        ListingSummaryPage(items = emptyList(), nextCursor = null),
     )
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = DomainResult.Success(
@@ -473,6 +479,7 @@ private data class ListingSummaryFixture(
     val ratingAverage: Double? = null,
     val likesCount: Int = 12,
     val sponsoredUntilEpochMilliseconds: Long? = null,
+    val isSponsoredPlacement: Boolean? = null,
 )
 
 private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixture()): ListingSummary {
@@ -491,6 +498,7 @@ private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixtur
         likesCount = fixture.likesCount,
         verified = true,
         sponsoredUntilEpochMilliseconds = fixture.sponsoredUntilEpochMilliseconds,
+        isSponsoredPlacement = fixture.isSponsoredPlacement,
     )
 }
 

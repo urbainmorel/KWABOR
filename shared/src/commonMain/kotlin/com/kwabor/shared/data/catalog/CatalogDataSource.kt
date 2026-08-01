@@ -1,9 +1,9 @@
 package com.kwabor.shared.data.catalog
 
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.core.DomainError
-import com.kwabor.shared.domain.core.PageRequest
 
 internal interface CatalogDataSource : CatalogQueryDataSource, CatalogInteractionDataSource
 
@@ -12,9 +12,9 @@ internal interface CatalogQueryDataSource {
 
     suspend fun listCategories(): List<CategoryDto>
 
-    suspend fun listListings(filters: ListingFilters, page: PageRequest): List<ListingSummaryDto>
+    suspend fun listListings(filters: ListingFilters, page: ListingPageRequest): ListingSummaryPageDto
 
-    suspend fun searchListings(query: ListingSearchQuery, page: PageRequest): List<ListingSummaryDto>
+    suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto
 
     suspend fun getListingDetail(listingId: String): ListingDetailDto
 }

@@ -177,10 +177,14 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - La PR brouillon empilée `#38` contient aussi REMOTE-INTRO-001 : première installation embarquée/offline, média distant compatible précaché après consentement, présenté une fois au lancement suivant, puis mis en quarantaine ou purgé de façon durable. Les octets éditoriaux compatibles changent sans release Store ; une évolution du lecteur, du contrat, du fallback, du consentement ou du comportement exige une release.
 - Le run final `30654047648` du commit `4606309` a passé les sept checks, dont les trois jobs API 30/31/36 et les configurations iOS simulateur. Ses neuf cellules sont techniquement intègres, mais la revue perceptuelle rejette la matrice : wordmark absent de la preuve API30/xhdpi et API31/xxxhdpi, monogramme absent de la preuve API30/mdpi et API30/xxxhdpi. Il s'agit de trous de preuve, pas d'une preuve que l'app saute ces surfaces.
 - Le run de clôture `30661731938` du commit `94a31d5` passe les sept checks, dont `quality`, API 30/31/36 et les configurations iOS simulateur. Les neuf cellules sont techniquement intègres ; leur preuve continue de premier lancement montre perceptuellement HOME → monogramme → wordmark complet → intro. Le harnais conserve sa tolérance de cadence à 4,5 secondes, borne à trois essais les seuls transitoires `75/124` et n'accepte `UNKNOWN (0)` qu'avec le statut réussi, l'avertissement AOSP exact et les contrôles PID/activité/UI/flux aval.
+- CATALOG-002 est implémentée sur `codex/catalog-002-paginated-summary` : liste et recherche utilisent un unique RPC `security invoker`, un DTO carte plat et un curseur opaque lié aux filtres. La couverture est sélectionnée par jointure latérale déterministe ; les appels média par fiche et le faux `nextOffset` terminal sont supprimés.
+- Le RPC reste publié uniquement même pour un propriétaire authentifié, borne ses grants à `anon`/`authenticated` et expose l'état sponsorisé calculé avec le même snapshot serveur que le classement. Le badge jaune ne dépend donc plus de l'horloge appareil pour ce parcours.
+- ADR-0018 trace le choix RPC/keyset et la conservation de la pagination offset générique hors catalogue. CATALOG-002 n'ajoute volontairement aucun chargement suivant visible : la consommation du curseur, le refresh et les tris métier appartiennent à EXPLORE-002.
+- Validation locale CATALOG-002 : migration appliquée, 371 assertions pgTAP sur huit fichiers, lint Supabase sans erreur, tests shared/Android, Spotless, Detekt, lint Android, `check`, APK debug et compilation Kotlin iOS Simulator verts. Le plan interne anon mesuré sur le seed exécute la requête en 2,688 ms/27 buffers ; aucun réglage JIT ni index de ranking non prouvé n'a été ajouté.
 
 ## Tâche en cours
 
-Conserver les gates propriétaire/appareils de BRAND-002, puis obtenir la revue humaine et
+Finaliser et publier la PR empilée CATALOG-002, puis conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour
 fusionner `#35`, retargeter si nécessaire puis
 fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
@@ -197,7 +201,8 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
-- Les couvertures de fiches catalogue sont récupérées par requête média dédiée par fiche ; une vue/RPC de listing summary sera à envisager avant optimisation forte du mur.
+- Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
+- Explore consomme encore seulement la première page de vingt fiches ; load-more, refresh, tris par onglet et cache restent dans EXPLORE-002.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
@@ -215,7 +220,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Faire approuver et fusionner la pile `#35` → `#36` → `#37` → `#38`. Après fusion, faire valider le
-périmètre/navigation V1 avant de supprimer
-les parcours factices et de commencer le résumé catalogue paginé. La revue appareils BRAND-002 et
-ENV-001B/OBS-001B restent des gates propriétaire.
+Publier CATALOG-002 au-dessus de `#38`, obtenir sa CI et sa revue, puis faire approuver et fusionner la
+pile `#35` → `#36` → `#37` → `#38` → CATALOG-002. EXPLORE-002 pourra ensuite consommer le curseur,
+mais ses tris métier et la navigation V1 restent soumis aux décisions produit ouvertes. La revue
+appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.

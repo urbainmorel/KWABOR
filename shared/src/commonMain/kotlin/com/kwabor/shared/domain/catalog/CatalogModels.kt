@@ -191,6 +191,7 @@ data class ListingSummary(
     val likesCount: Int,
     val verified: Boolean,
     val sponsoredUntilEpochMilliseconds: Long?,
+    val isSponsoredPlacement: Boolean? = null,
 )
 
 data class ListingDetail(

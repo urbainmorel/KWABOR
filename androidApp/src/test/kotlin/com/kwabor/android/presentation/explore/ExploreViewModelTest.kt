@@ -6,16 +6,16 @@ import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingClass
 import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExplorePresenter
@@ -107,16 +107,16 @@ private class ViewModelCatalogRepository(
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> {
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> {
         lastFilters = filters
-        return DomainResult.Success(PageResult(items = listOf(testListing()), nextOffset = null))
+        return DomainResult.Success(ListingSummaryPage(items = listOf(testListing()), nextCursor = null))
     }
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = DomainResult.Success(PageResult(emptyList(), null))
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = DomainResult.Success(ListingSummaryPage(emptyList(), null))
 
     override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> =
         DomainResult.Failure(DomainError.NotFound("error.catalog.not_found"))
