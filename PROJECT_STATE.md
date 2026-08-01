@@ -186,11 +186,12 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - DataStore KMP conserve uniquement la ville Explore, la locale et la devise d'affichage. Les erreurs I/O deviennent `LocalStorageUnavailable`, les valeurs inconnues retombent sur des défauts sûrs et aucune session, consentement, outbox ni donnée synchronisable n'y est placée.
 - Room, DataStore, leurs builders et le scope DataStore sont injectés par Koin et créés seulement au premier accès. La base est fermée et le scope annulé avec l'unique composition root du processus ; les factories de builder/storage ne sont pas des ressources fermables. Le schéma exporté v1 est versionné ; `check` valide son historique et refuse en CI toute dérive ou tout JSON non suivi.
 - La compatibilité est figée à Room `2.8.4`, SQLite bundled `2.6.2`, DataStore `1.2.1` et KSP `2.3.10` tant que `iosX64` reste active. Room 3/SQLite 2.7 ne sont pas adoptés car ils ne publient plus cette variante.
-- Validation locale finale OFFLINE-001 : 218 tests shared et 160 tests Android verts, dont huit scénarios DAO Room réels sous Robolectric, réouverture/corruption DataStore et paresse Koin. `check` couvre Spotless, Detekt, lint, pureté du domaine et schéma Room ; les APK debug et staging minifié/R8 sont assemblés, et KSP/Kotlin compile pour `iosX64`, `iosArm64` et `iosSimulatorArm64`. La CI reste à obtenir avant clôture.
+- Validation locale finale OFFLINE-001 : 218 tests shared et 160 tests Android verts, dont huit scénarios DAO Room réels sous Robolectric, réouverture/corruption DataStore et paresse Koin. `check` couvre Spotless, Detekt, lint, pureté du domaine et schéma Room ; les APK debug et staging minifié/R8 sont assemblés, et KSP/Kotlin compile pour `iosX64`, `iosArm64` et `iosSimulatorArm64`.
+- La PR brouillon OFFLINE-001 `#40` est publiée au-dessus de CATALOG-002 `#39`. Le run `30705934250` a passé `quality` en 5 min 18 s et `iOS simulator build` en 20 min 35 s ; `launch_evidence` est correctement ignoré puisque cette tranche ne modifie ni vidéo ni surface de lancement.
 
 ## Tâche en cours
 
-Terminer les gates globales et publier la PR empilée OFFLINE-001 au-dessus de CATALOG-002 `#39`, puis obtenir les revues humaines de la pile. Conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour fusionner `#35`, retargeter si nécessaire puis fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
+Obtenir la revue humaine de la PR empilée OFFLINE-001 `#40`, puis des autres PR de la pile. Conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour fusionner `#35`, retargeter si nécessaire puis fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -225,7 +226,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier et faire valider OFFLINE-001 au-dessus de CATALOG-002 `#39`, puis faire approuver et fusionner la
-pile `#35` → `#36` → `#37` → `#38` → `#39` → OFFLINE-001. EXPLORE-002 pourra ensuite consommer le curseur et Room,
+Faire relire OFFLINE-001 `#40`, puis faire approuver et fusionner la
+pile `#35` → `#36` → `#37` → `#38` → `#39` → `#40`. EXPLORE-002 pourra ensuite consommer le curseur et Room,
 mais ses tris métier et la navigation V1 restent soumis aux décisions produit ouvertes. La revue
 appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.
