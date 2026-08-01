@@ -98,6 +98,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 ### Offline, préférences et médias
 
 - [ ] OFFLINE-001 — Installer Room KMP, schémas exportés et DataStore KMP pour préférences légères.
+  - [x] Implémenter le schéma Room v1 Explore, la rétention bornée, l'auto-réparation et les builders Android/iOS.
+  - [x] Implémenter DataStore pour ville Explore, locale et devise, avec erreurs de stockage typées et cycle de vie Koin paresseux.
+  - [x] Valider 218 tests shared, 160 tests Android, les gates globales, les APK debug/staging minifié et KSP sur les trois cibles iOS.
+  - [ ] Publier la PR empilée et obtenir les gates GitHub Actions `quality`/iOS vertes.
 - [ ] SYNC-001 — Persister l'outbox, coalescer Like/Favori, appliquer idempotence, backoff et drain réseau/session.
 - [ ] DRAFT-001 — Synchroniser les brouillons avec version optimiste et conservation des deux versions en conflit.
 - [ ] MEDIA-001 — Créer buckets/RLS, uploads temporaires, validation, downsampling, dérivés et Edge Function `media-finalize`.

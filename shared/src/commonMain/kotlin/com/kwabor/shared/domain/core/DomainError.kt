@@ -13,5 +13,9 @@ sealed interface DomainError {
 
     data class NetworkUnavailable(override val messageKey: String = "error.network.unavailable") : DomainError
 
+    data class LocalStorageUnavailable(
+        override val messageKey: String = "error.storage.unavailable",
+    ) : DomainError
+
     data class Unexpected(override val messageKey: String = "error.unexpected") : DomainError
 }

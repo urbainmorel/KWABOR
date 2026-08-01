@@ -141,6 +141,7 @@ class ExplorePresenter(
                 is DomainError.PermissionDenied,
                 -> ViewerInteractionsState()
                 is DomainError.NetworkUnavailable -> ViewerInteractionsState(isOffline = true)
+                is DomainError.LocalStorageUnavailable,
                 is DomainError.NotFound,
                 is DomainError.Unexpected,
                 is DomainError.Validation,
@@ -193,6 +194,7 @@ private fun ExploreUiState.handleInteractionFailure(
         message = strings.interactionQueuedOffline,
         queuedAtEpochMilliseconds = failure.queuedAtEpochMilliseconds,
     )
+    is DomainError.LocalStorageUnavailable,
     is DomainError.NotFound,
     is DomainError.Unexpected,
     is DomainError.Validation,
@@ -278,6 +280,7 @@ private fun String.toKnownCategoryId(categories: List<Category>): String? {
 private fun DomainError.toExploreMessage(strings: KwaborStrings): String = when (this) {
     is DomainError.NetworkUnavailable -> strings.offlineBanner
     is DomainError.AuthenticationRequired,
+    is DomainError.LocalStorageUnavailable,
     is DomainError.NotFound,
     is DomainError.PermissionDenied,
     is DomainError.Unexpected,

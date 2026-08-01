@@ -182,12 +182,15 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - ADR-0018 trace le choix RPC/keyset et la conservation de la pagination offset générique hors catalogue. CATALOG-002 n'ajoute volontairement aucun chargement suivant visible : la consommation du curseur, le refresh et les tris métier appartiennent à EXPLORE-002.
 - Validation locale CATALOG-002 : migration appliquée, 371 assertions pgTAP sur huit fichiers, lint Supabase sans erreur, tests shared/Android, Spotless, Detekt, lint Android, `check`, APK debug et compilation Kotlin iOS Simulator verts. Le plan interne anon mesuré sur le seed exécute la requête en 2,688 ms/27 buffers ; aucun réglage JIT ni index de ranking non prouvé n'a été ajouté.
 - La PR brouillon CATALOG-002 `#39` est publiée au-dessus de `#38`. Le run `30692610347` a passé `quality` en 5 min 45 s puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release en 16 min 30 s.
+- OFFLINE-001 est implémentée sur `codex/offline-001-room-foundation`, empilée sur CATALOG-002 : Room KMP v1 normalise snapshots Explore, fiches canoniques et positions sponsorisées, avec transactions, clés étrangères, éviction ciblée des corruptions, maximum de 50 fiches par snapshot et rétention bornée aux 64 snapshots les plus récents.
+- DataStore KMP conserve uniquement la ville Explore, la locale et la devise d'affichage. Les erreurs I/O deviennent `LocalStorageUnavailable`, les valeurs inconnues retombent sur des défauts sûrs et aucune session, consentement, outbox ni donnée synchronisable n'y est placée.
+- Room, DataStore, leurs builders et le scope DataStore sont injectés par Koin et créés seulement au premier accès. La base est fermée et le scope annulé avec l'unique composition root du processus ; les factories de builder/storage ne sont pas des ressources fermables. Le schéma exporté v1 est versionné ; `check` valide son historique et refuse en CI toute dérive ou tout JSON non suivi.
+- La compatibilité est figée à Room `2.8.4`, SQLite bundled `2.6.2`, DataStore `1.2.1` et KSP `2.3.10` tant que `iosX64` reste active. Room 3/SQLite 2.7 ne sont pas adoptés car ils ne publient plus cette variante.
+- Validation locale finale OFFLINE-001 : 218 tests shared et 160 tests Android verts, dont huit scénarios DAO Room réels sous Robolectric, réouverture/corruption DataStore et paresse Koin. `check` couvre Spotless, Detekt, lint, pureté du domaine et schéma Room ; les APK debug et staging minifié/R8 sont assemblés, et KSP/Kotlin compile pour `iosX64`, `iosArm64` et `iosSimulatorArm64`. La CI reste à obtenir avant clôture.
 
 ## Tâche en cours
 
-Obtenir la revue humaine de la PR empilée CATALOG-002 `#39`, puis conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour
-fusionner `#35`, retargeter si nécessaire puis
-fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
+Terminer les gates globales et publier la PR empilée OFFLINE-001 au-dessus de CATALOG-002 `#39`, puis obtenir les revues humaines de la pile. Conserver les gates propriétaire/appareils de BRAND-002 et obtenir la revue humaine pour fusionner `#35`, retargeter si nécessaire puis fusionner `#36`, et enfin relire/retargeter puis fusionner la PR STAB-003 `#37`.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -199,11 +202,12 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release cumulées jusqu'à la PR `#38` sont confirmées par le run GitHub Actions macOS `30661731938` sous Xcode 16.4.
+- Room et DataStore compilent pour les trois cibles iOS, mais la CI actuelle n'exécute pas encore de smoke test de persistance sur simulateur ; ce test runtime reste requis avant de brancher le cache sur Explore iOS.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
-- Explore consomme encore seulement la première page de vingt fiches ; load-more, refresh, tris par onglet et cache restent dans EXPLORE-002.
+- Explore consomme encore seulement la première page de vingt fiches ; load-more, refresh, tris par onglet et consommation du cache Room restent dans EXPLORE-002.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif n'est pas encore implémenté ; l'ancien placeholder Compose iOS a été supprimé et la parité devra être livrée directement en SwiftUI.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
@@ -221,7 +225,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Obtenir la revue de CATALOG-002 `#39`, publiée au-dessus de `#38` avec CI verte, puis faire approuver et fusionner la
-pile `#35` → `#36` → `#37` → `#38` → `#39`. EXPLORE-002 pourra ensuite consommer le curseur,
+Publier et faire valider OFFLINE-001 au-dessus de CATALOG-002 `#39`, puis faire approuver et fusionner la
+pile `#35` → `#36` → `#37` → `#38` → `#39` → OFFLINE-001. EXPLORE-002 pourra ensuite consommer le curseur et Room,
 mais ses tris métier et la navigation V1 restent soumis aux décisions produit ouvertes. La revue
 appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.

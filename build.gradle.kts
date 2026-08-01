@@ -4,6 +4,8 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
     id("com.android.application") version "9.2.0" apply false
     id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
+    id("androidx.room") version "2.8.4" apply false
+    id("com.google.devtools.ksp") version "2.3.10" apply false
     id("com.google.firebase.crashlytics") version "3.0.7" apply false
     id("com.google.firebase.firebase-perf") version "2.0.2" apply false
     id("com.google.gms.google-services") version "4.5.0" apply false
@@ -14,6 +16,8 @@ plugins {
 }
 
 fun Project.configureQualityTools() {
+    val generatedKspDirectory = layout.buildDirectory.dir("generated/ksp").get().asFile.toPath()
+
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension> {
         kotlin {
             target("src/**/*.kt")
@@ -38,6 +42,7 @@ fun Project.configureQualityTools() {
 
     tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
         jvmTarget = "17"
+        exclude { source -> source.file.toPath().startsWith(generatedKspDirectory) }
         reports {
             html.required.set(true)
             sarif.required.set(true)

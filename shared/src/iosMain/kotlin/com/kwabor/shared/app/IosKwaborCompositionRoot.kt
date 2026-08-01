@@ -2,6 +2,8 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
+import com.kwabor.shared.data.local.createIosKwaborDatabaseBuilder
+import com.kwabor.shared.data.preferences.createIosAppPreferencesStorage
 
 class IosKwaborCompositionRoot(
     environmentName: String?,
@@ -13,6 +15,12 @@ class IosKwaborCompositionRoot(
         supabasePublishableKey = supabasePublishableKey,
         environmentName = environmentName,
         authSessionManager = createIosSecureAuthSessionManager(),
+        persistenceConfigurationProvider = {
+            KwaborPersistenceConfiguration(
+                databaseBuilderFactory = ::createIosKwaborDatabaseBuilder,
+                preferencesStorageFactory = ::createIosAppPreferencesStorage,
+            )
+        },
     )
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
 

@@ -4,11 +4,13 @@ import com.kwabor.shared.data.auth.authDataModule
 import com.kwabor.shared.data.catalog.catalogDataModule
 import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
+import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.organization.OrganizationRepository
+import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
@@ -23,6 +25,7 @@ import org.koin.dsl.module
 class KwaborCompositionRoot internal constructor(
     private val application: KoinApplication,
     hasAuthentication: Boolean,
+    private val hasPersistence: Boolean,
 ) {
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
@@ -33,6 +36,11 @@ class KwaborCompositionRoot internal constructor(
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
     val registrationPresenter: RegistrationPresenter? = if (hasAuthentication) application.koin.get() else null
+    val appPreferencesRepository: AppPreferencesRepository?
+        get() = if (hasPersistence) application.koin.get() else null
+
+    internal val exploreCacheStore: ExploreCacheStore?
+        get() = if (hasPersistence) application.koin.get() else null
 
     fun close() {
         application.close()
@@ -44,12 +52,14 @@ internal fun createKwaborCompositionRootOrNull(
     supabasePublishableKey: String?,
     environmentName: String? = DEFAULT_ENVIRONMENT_NAME,
     authSessionManager: SessionManager? = null,
+    persistenceConfigurationProvider: (() -> KwaborPersistenceConfiguration)? = null,
 ): KwaborCompositionRoot? {
     val environment = createKwaborEnvironmentOrNull(
         environmentName = environmentName,
         supabaseUrl = supabaseUrl,
         supabasePublishableKey = supabasePublishableKey,
     ) ?: return null
+    val persistenceConfiguration = persistenceConfigurationProvider?.invoke()
     val rootModule = module {
         single<DispatcherProvider> { DefaultDispatcherProvider() }
         includes(
@@ -64,6 +74,9 @@ internal fun createKwaborCompositionRootOrNull(
         if (authSessionManager != null) {
             includes(authDataModule, authPresentationModule)
         }
+        if (persistenceConfiguration != null) {
+            includes(persistenceModule(persistenceConfiguration))
+        }
     }
     val application = koinApplication {
         allowOverride(false)
@@ -73,6 +86,7 @@ internal fun createKwaborCompositionRootOrNull(
     return KwaborCompositionRoot(
         application = application,
         hasAuthentication = authSessionManager != null,
+        hasPersistence = persistenceConfiguration != null,
     )
 }
 

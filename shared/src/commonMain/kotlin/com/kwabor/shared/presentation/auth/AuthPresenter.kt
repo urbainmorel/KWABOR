@@ -118,6 +118,7 @@ private fun <T> DomainResult<T>.toAuthActionResult(strings: KwaborStrings): Auth
 internal fun DomainError.toAuthMessage(strings: KwaborStrings): String = when (this) {
     is DomainError.AuthenticationRequired -> strings.authSessionExpired
     is DomainError.NetworkUnavailable -> strings.offlineBanner
+    is DomainError.LocalStorageUnavailable -> strings.authInvalidInput
     is DomainError.PermissionDenied -> strings.authPermissionDenied
     is DomainError.NotFound -> strings.registrationLegalUnavailable
     is DomainError.Validation -> messageKey.toAuthValidationMessage(strings)
