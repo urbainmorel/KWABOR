@@ -138,8 +138,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
   - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
     contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.
-  - [ ] PR-DETAIL-001A — PR brouillon `#45` publiée sur `#44` depuis `3bb96b3` ; obtenir les gates
-    GitHub exact-head vertes puis la revue humaine.
+  - [ ] PR-DETAIL-001A — PR brouillon `#45` publiée sur `#44` ; le premier run exact-head
+    `30753221174` valide Gradle, Android, iOS et les nouvelles suites détail/curseur. Fermer les
+    régressions d'attentes ACL historiques, obtenir tous les gates verts puis la revue humaine.
   - [ ] DETAIL-001B — Livrer le DetailSheet Android Compose connecté au read model, sans stub ni CTA factice.
   - [ ] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.

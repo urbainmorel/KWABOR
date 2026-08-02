@@ -437,11 +437,13 @@ select is(
 
 select ok(
   (
-    select end_at > start_at and venue_listing_id is null
+    select
+      end_at > start_at
+      and venue_listing_id = '00000000-0000-4000-8000-000000000101'
     from public.event_details
     where listing_id = '00000000-0000-4000-8000-000000000104'
   ),
-  'the seed event keeps a coherent schedule and canonical direct location'
+  'the seed event keeps a coherent schedule and its canonical published venue'
 );
 
 select ok(
@@ -450,9 +452,21 @@ select ok(
 );
 
 select ok(to_regclass('public.event_details_start_listing_idx') is not null, 'event date index exists');
-select ok(has_table_privilege('anon', 'public.event_details', 'select'), 'anon has event detail select');
+select ok(
+  not has_table_privilege('anon', 'public.event_details', 'select')
+  and has_column_privilege('anon', 'public.event_details', 'listing_id', 'select')
+  and not has_column_privilege('anon', 'public.event_details', 'created_at', 'select')
+  and not has_column_privilege('anon', 'public.event_details', 'updated_at', 'select'),
+  'anon receives only column-scoped public event detail select access'
+);
 select ok(not has_table_privilege('anon', 'public.event_details', 'insert'), 'anon cannot insert event details');
-select ok(has_table_privilege('authenticated', 'public.event_details', 'select'), 'authenticated can select details');
+select ok(
+  not has_table_privilege('authenticated', 'public.event_details', 'select')
+  and has_column_privilege('authenticated', 'public.event_details', 'listing_id', 'select')
+  and not has_column_privilege('authenticated', 'public.event_details', 'created_at', 'select')
+  and not has_column_privilege('authenticated', 'public.event_details', 'updated_at', 'select'),
+  'authenticated receives only column-scoped public event detail select access'
+);
 select ok(
   has_column_privilege('authenticated', 'public.event_details', 'listing_id', 'insert'),
   'authenticated can insert the managed event identifier'
@@ -621,15 +635,19 @@ select throws_ok(
   'published event details cannot switch to a private draft venue'
 );
 
+select tests.use_auth_context('service_role', null);
+
 select throws_ok(
   $sql$
     delete from public.event_details
     where listing_id = 'ed100000-0000-4000-8000-000000000010'
   $sql$,
   '23514',
-  'An event under review or published must keep its event details',
+  'An active catalog listing must keep its typed detail',
   'database integrity rejects privileged removal of published event details'
 );
+
+reset role;
 
 select ok(
   tests.statement_fails_as(

@@ -1614,6 +1614,22 @@ alter table public.guide_details enable row level security;
 alter table public.ticket_tiers enable row level security;
 alter table public.listing_amenities enable row level security;
 
+drop policy if exists "listing managers read mutable media" on public.listing_media;
+create policy "listing managers read mutable media"
+on public.listing_media
+for select
+to authenticated
+using (
+  (select app_private.current_user_has_completed_onboarding())
+  and public.current_user_can_manage_listing(listing_id)
+  and exists (
+    select 1
+    from public.listings listing
+    where listing.id = listing_media.listing_id
+      and listing.status in ('brouillon', 'en_attente')
+  )
+);
+
 drop policy "listing managers create media" on public.listing_media;
 create policy "listing managers create media"
 on public.listing_media
@@ -2488,6 +2504,27 @@ grant select (
   published_at,
   is_claimable
 ) on table public.listings to anon, authenticated;
+
+drop policy if exists "verified promoters submit claims" on public.claims;
+create policy "verified promoters submit claims"
+on public.claims
+for insert
+to authenticated
+with check (
+  (select app_private.current_user_has_completed_onboarding())
+  and claimant_id = (select auth.uid())
+  and (
+    public.current_user_has_verified_role('promoteur')
+    or public.current_user_has_verified_role('guide')
+  )
+  and exists (
+    select 1
+    from public.listings listing
+    where listing.id = claims.listing_id
+      and listing.status = 'publie'
+      and listing.is_claimable
+  )
+);
 
 revoke select on table public.event_details from public, anon, authenticated;
 grant select (

@@ -740,7 +740,8 @@ SELECT is(
     $sql$
       UPDATE public.listing_media
       SET alt = 'Mutation media interdite'
-      WHERE id = '43000000-0000-4000-8000-000000000001'
+      WHERE listing_id = '00000000-0000-4000-8000-000000000101'
+        AND display_order = 99
     $sql$
   ),
   0::bigint,
@@ -753,7 +754,8 @@ SELECT is(
     'dddddddd-0000-4000-8000-000000000004',
     $sql$
       DELETE FROM public.listing_media
-      WHERE id = '43000000-0000-4000-8000-000000000001'
+      WHERE listing_id = '00000000-0000-4000-8000-000000000101'
+        AND display_order = 99
     $sql$
   ),
   0::bigint,

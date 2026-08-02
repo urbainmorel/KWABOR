@@ -136,7 +136,7 @@ as $$
   $json$::jsonb;
 $$;
 
-select plan(196);
+select plan(198);
 
 insert into auth.users (
   id,
@@ -460,6 +460,14 @@ values
     'Salle du club',
     0,
     true,
+    'image'
+  ),
+  (
+    'da140000-0000-4000-8000-000000000001',
+    'https://media.example.invalid/restaurant-draft.jpg',
+    'Salle du restaurant en brouillon',
+    0,
+    false,
     'image'
   );
 
@@ -2415,6 +2423,35 @@ select is(
   ),
   0::bigint,
   'a manager cannot bypass re-moderation by editing a published room type'
+);
+
+select is(
+  tests.affected_rows_as(
+    'authenticated',
+    'da000000-0000-4000-8000-000000000001',
+    $$
+      update public.listing_media
+      set alt = 'Salle du restaurant relue'
+      where listing_id = 'da140000-0000-4000-8000-000000000001'
+        and display_order = 0
+    $$
+  ),
+  1::bigint,
+  'a completed manager can update official media on its draft listing'
+);
+
+select is(
+  tests.affected_rows_as(
+    'authenticated',
+    'da000000-0000-4000-8000-000000000001',
+    $$
+      delete from public.listing_media
+      where listing_id = 'da140000-0000-4000-8000-000000000001'
+        and display_order = 0
+    $$
+  ),
+  1::bigint,
+  'a completed manager can delete official media from its draft listing'
 );
 
 select throws_ok(
