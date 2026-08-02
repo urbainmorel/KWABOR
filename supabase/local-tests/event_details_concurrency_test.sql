@@ -23,6 +23,7 @@ begin
   if exists (select 1 from pg_roles where rolname = 'kwabor_event_concurrency_test') then
     execute 'revoke all privileges on table public.categories, public.listings, public.event_details from kwabor_event_concurrency_test';
     execute 'revoke usage on schema public from kwabor_event_concurrency_test';
+    execute 'revoke usage on schema extensions from kwabor_event_concurrency_test';
     execute $revoke_validators$
       revoke execute on function
         app_private.catalog_opening_hours_is_valid(jsonb),
@@ -53,6 +54,10 @@ $role_setup$;
 
 grant usage on schema public to kwabor_event_concurrency_test;
 grant usage on schema app_private to kwabor_event_concurrency_test;
+-- The invoker geography validator resolves its PostGIS dependencies through
+-- the extensions schema. Supabase client roles receive this USAGE grant from
+-- the platform baseline, but this isolated NOINHERIT test role does not.
+grant usage on schema extensions to kwabor_event_concurrency_test;
 grant execute on function
   app_private.catalog_opening_hours_is_valid(jsonb),
   app_private.catalog_https_url_is_valid(text),
@@ -733,6 +738,7 @@ rollback;
 revoke all privileges on table public.categories, public.listings, public.event_details
 from kwabor_event_concurrency_test;
 revoke usage on schema public from kwabor_event_concurrency_test;
+revoke usage on schema extensions from kwabor_event_concurrency_test;
 revoke execute on function
   app_private.catalog_opening_hours_is_valid(jsonb),
   app_private.catalog_https_url_is_valid(text),
