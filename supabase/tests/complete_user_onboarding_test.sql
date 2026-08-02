@@ -621,7 +621,7 @@ SELECT is(
       AND 'authenticated' = ANY (policy.roles)
       AND policy.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
   ),
-  30,
+  54,
   'the audited authenticated mutation policy set excludes RPC-only membership creation'
 );
 
@@ -637,7 +637,7 @@ SELECT is(
         in coalesce(policy.qual, '') || ' ' || coalesce(policy.with_check, '')
       ) > 0
   ),
-  30,
+  54,
   'every authenticated product mutation policy requires completed onboarding'
 );
 

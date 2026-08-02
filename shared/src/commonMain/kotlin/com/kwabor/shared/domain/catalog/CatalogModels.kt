@@ -1,6 +1,5 @@
 package com.kwabor.shared.domain.catalog
 
-import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import kotlin.math.abs
 
@@ -199,22 +198,6 @@ data class ListingSummary(
     val isSponsoredPlacement: Boolean? = null,
 )
 
-data class ListingDetail(
-    val summary: ListingSummary,
-    val slug: String,
-    val description: String,
-    val contentLocale: AppLocale,
-    val district: String?,
-    val address: String?,
-    val geoPoint: GeoPoint?,
-    val contact: ListingContact,
-    val media: List<ListingMedia>,
-    val tags: List<String>,
-    val ownerId: String?,
-    val stewardId: String?,
-    val publishedAtEpochMilliseconds: Long?,
-)
-
 data class ListingViewerInteraction(
     val listingId: String,
     val likedByViewer: Boolean,
@@ -227,13 +210,6 @@ data class ListingContact(
     val whatsapp: String?,
     val externalUrl: String?,
     val email: String?,
-)
-
-data class ListingMedia(
-    val url: String,
-    val alt: String,
-    val order: Int,
-    val isCover: Boolean,
 )
 
 data class ListingFilters(

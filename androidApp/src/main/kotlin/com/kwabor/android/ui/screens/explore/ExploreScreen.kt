@@ -1,6 +1,5 @@
 package com.kwabor.android.ui.screens.explore
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -22,20 +20,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,10 +46,11 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import com.kwabor.android.design.KwaborColors
+import androidx.compose.ui.unit.Dp
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
+import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.android.ui.components.KwaborInlineBanner
 import com.kwabor.android.ui.components.KwaborSkeletonCard
 import com.kwabor.android.ui.components.KwaborStateMessage
@@ -76,37 +69,32 @@ import com.kwabor.shared.presentation.explore.label
 
 @Composable
 fun ExploreScreen(
-    state: ExploreUiState,
+    model: ExploreScreenUiModel,
     strings: KwaborStrings,
-    isGuestSession: Boolean = true,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     modifier: Modifier = Modifier,
-    actions: ExploreScreenActions = ExploreScreenActions(),
+    actions: ExploreScreenActions,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (state.isOffline) {
-                OfflineBanner(strings = strings)
-            }
-            state.interactionMessage?.let { message ->
-                KwaborInlineBanner(text = message)
-            }
-            state.refreshMessage?.let { message ->
-                KwaborInlineBanner(text = message)
-            }
-            state.locationMessage
-                ?.takeUnless { state.isCitySelectorOpen }
-                ?.let { message -> KwaborInlineBanner(text = message) }
-            ExploreContent(
-                state = state,
-                strings = strings,
-                isGuestSession = isGuestSession,
-                actions = actions,
-            )
+    val state = model.state
+    Column(modifier = modifier.fillMaxSize()) {
+        if (state.isOffline) {
+            OfflineBanner(strings = strings)
         }
-        ExploreAssistantButton(
+        state.interactionMessage?.let { message ->
+            KwaborInlineBanner(text = message)
+        }
+        state.refreshMessage?.let { message ->
+            KwaborInlineBanner(text = message)
+        }
+        state.locationMessage
+            ?.takeUnless { state.isCitySelectorOpen }
+            ?.let { message -> KwaborInlineBanner(text = message) }
+        ExploreContent(
+            state = state,
             strings = strings,
-            onClick = actions.onAssistantClick,
-            modifier = Modifier.align(Alignment.BottomEnd),
+            mediaUrlPolicy = mediaUrlPolicy,
+            isGuestSession = model.isGuestSession,
+            actions = actions,
         )
     }
     if (state.isCitySelectorOpen) {
@@ -118,24 +106,16 @@ fun ExploreScreen(
     }
 }
 
-@Composable
-private fun ExploreAssistantButton(strings: KwaborStrings, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    FloatingActionButton(
-        onClick = onClick,
-        modifier = modifier.padding(end = KwaborSpacing.Lg, bottom = KwaborSpacing.Xxl)
-            .size(KwaborSizing.FloatingActionButton),
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        shape = CircleShape,
-    ) {
-        Icon(imageVector = Icons.Filled.AutoAwesome, contentDescription = strings.aiAssistant)
-    }
-}
+data class ExploreScreenUiModel(
+    val state: ExploreUiState,
+    val isGuestSession: Boolean = true,
+)
 
 @Composable
 private fun ExploreContent(
     state: ExploreUiState,
     strings: KwaborStrings,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     isGuestSession: Boolean,
     actions: ExploreScreenActions,
 ) {
@@ -143,6 +123,7 @@ private fun ExploreContent(
     val gridContent = ExploreGridContent(
         state = state,
         strings = strings,
+        mediaUrlPolicy = mediaUrlPolicy,
         isGuestSession = isGuestSession,
     )
     val paginationGuard = remember(state.selectedTab, state.selectedChipId, state.selectedCityId) {
@@ -168,6 +149,7 @@ private fun ExploreContent(
 private data class ExploreGridContent(
     val state: ExploreUiState,
     val strings: KwaborStrings,
+    val mediaUrlPolicy: ListingMediaUrlPolicy,
     val isGuestSession: Boolean,
 )
 
@@ -246,11 +228,7 @@ private fun ExploreListingsGrid(
             .fillMaxSize()
             .exploreLiveRegion(liveRegionStatus),
     ) {
-        val columnCount = if (maxWidth < KwaborSizing.ExploreTabletBreakpoint) {
-            KwaborSizing.EXPLORE_MOBILE_GRID_COLUMNS
-        } else {
-            KwaborSizing.EXPLORE_TABLET_GRID_COLUMNS
-        }
+        val columnCount = exploreColumnCount(maxWidth)
         LazyVerticalGrid(
             columns = GridCells.Fixed(count = columnCount),
             state = gridState,
@@ -267,15 +245,27 @@ private fun ExploreListingsGrid(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 ExploreHeader(state, strings, content.isGuestSession, actions)
             }
-            exploreGridItems(state = state, strings = strings, actions = actions)
+            exploreGridItems(
+                state = state,
+                strings = strings,
+                mediaUrlPolicy = content.mediaUrlPolicy,
+                actions = actions,
+            )
             exploreAppendFooter(state = state, strings = strings, onRetry = onAppendRetry)
         }
     }
 }
 
+private fun exploreColumnCount(maxWidth: Dp): Int = if (maxWidth < KwaborSizing.ExploreTabletBreakpoint) {
+    KwaborSizing.EXPLORE_MOBILE_GRID_COLUMNS
+} else {
+    KwaborSizing.EXPLORE_TABLET_GRID_COLUMNS
+}
+
 private fun LazyGridScope.exploreGridItems(
     state: ExploreUiState,
     strings: KwaborStrings,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     actions: ExploreScreenActions,
 ) {
     when {
@@ -291,11 +281,13 @@ private fun LazyGridScope.exploreGridItems(
         )
         else -> items(items = state.listings, key = { item -> item.id }) { listing ->
             ListingCard(
-                state = listing.toCardState(),
+                state = listing.toCardState(
+                    priceOptions = PriceTagOptions(currency = state.currency, mode = PriceTagMode.Compact),
+                ),
                 strings = strings,
-                priceOptions = PriceTagOptions(currency = state.currency, mode = PriceTagMode.Compact),
+                mediaUrlPolicy = mediaUrlPolicy,
                 actions = ListingCardActions(
-                    onClick = { actions.onListingClick(listing.id) },
+                    onClick = null,
                     onLikeClick = { actions.onLikeClick(listing.id) },
                     onFavoriteClick = { actions.onFavoriteClick(listing.id) },
                 ),
@@ -362,7 +354,6 @@ private fun ExploreHeader(
         )
         Text(text = strings.homeTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         ExploreTabs(state.selectedTab, strings, actions.onTabSelected)
-        ExploreSearchRow(strings, actions.onSearchClick, actions.onFilterClick)
         ExploreChips(state.chips, state.selectedChipId, actions.onChipSelected)
     }
 }
@@ -426,47 +417,6 @@ private fun ExploreTabs(selectedTab: ExploreTab, strings: KwaborStrings, onTabSe
 }
 
 @Composable
-private fun ExploreSearchRow(strings: KwaborStrings, onSearchClick: () -> Unit, onFilterClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ExploreSearchSurface(strings, onSearchClick, Modifier.weight(1f))
-        ExploreFilterButton(strings, onFilterClick)
-    }
-}
-
-@Composable
-private fun ExploreSearchSurface(strings: KwaborStrings, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        color = KwaborColors.Ink100,
-        shape = RoundedCornerShape(KwaborRadius.Control),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = KwaborSpacing.Lg, vertical = KwaborSpacing.Md),
-            horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.Search, contentDescription = null)
-            Text(strings.searchPlaceholder, style = MaterialTheme.typography.bodyMedium, color = KwaborColors.Ink700)
-        }
-    }
-}
-
-@Composable
-private fun ExploreFilterButton(strings: KwaborStrings, onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget)
-            .background(color = KwaborColors.Ink950, shape = RoundedCornerShape(KwaborRadius.Control)),
-    ) {
-        Icon(Icons.Filled.Tune, contentDescription = strings.filter, tint = KwaborColors.Surface0)
-    }
-}
-
-@Composable
 private fun ExploreChips(chips: List<ExploreChip>, selectedChipId: String?, onChipSelected: (ExploreChip) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm)) {
         items(chips, key = { chip -> chip.id }) { chip ->
@@ -479,11 +429,12 @@ private fun ExploreChips(chips: List<ExploreChip>, selectedChipId: String?, onCh
     }
 }
 
-private fun ExploreListingItem.toCardState(): ListingCardState = ListingCardState(
+private fun ExploreListingItem.toCardState(priceOptions: PriceTagOptions): ListingCardState = ListingCardState(
     title = title,
     cityLabel = cityLabel,
     coverImageUrl = coverImageUrl,
     price = price,
+    priceOptions = priceOptions,
     ratingLabel = ratingLabel,
     sponsored = sponsored,
     liked = liked,

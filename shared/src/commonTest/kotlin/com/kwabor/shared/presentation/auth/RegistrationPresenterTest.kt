@@ -13,10 +13,10 @@ import com.kwabor.shared.domain.auth.PromoterActivationContext
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
@@ -292,7 +292,7 @@ private class FakeRegistrationCatalogRepository : CatalogRepository {
         page: ListingPageRequest,
     ): DomainResult<ListingSummaryPage> = unused()
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = unused()
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> = unused()
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         unused()

@@ -1,9 +1,10 @@
 package com.kwabor.shared.data.catalog
 
+import com.kwabor.shared.data.core.isValidUuid
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
@@ -40,7 +41,7 @@ class DataCatalogRepository internal constructor(
             .toDomain()
     }
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = runDataCall {
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> = runDataCall {
         dataSource.getListingDetail(listingId.toRequiredListingId()).toDomain()
     }
 
@@ -85,8 +86,8 @@ private inline fun <T> runDataCall(block: () -> T): DomainResult<T> = try {
 
 private fun String.toRequiredListingId(): String {
     val value = trim()
-    if (value.isBlank()) {
-        throw CatalogDataException.Validation("error.catalog.listing_id_required")
+    if (!value.isValidUuid()) {
+        throw CatalogDataException.Validation("error.catalog.listing_id_invalid")
     }
 
     return value

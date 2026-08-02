@@ -13,6 +13,7 @@ import com.kwabor.android.ui.components.KwaborLoadingState
 import com.kwabor.android.ui.components.KwaborSkeletonCard
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.components.ListingCard
+import com.kwabor.android.ui.components.ListingCardActions
 import com.kwabor.android.ui.components.ListingCardState
 import com.kwabor.android.ui.components.OfflineBanner
 import com.kwabor.android.ui.components.PriceTag
@@ -66,9 +67,11 @@ fun ListingCardPreview() {
         ListingCard(
             state = previewListingState(),
             strings = strings,
+            mediaUrlPolicy = previewListingMediaUrlPolicy,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(KwaborSpacing.Lg),
+            actions = previewListingCardActions,
         )
     }
 }
@@ -124,6 +127,12 @@ private fun previewListingState(): ListingCardState = ListingCardState(
     sponsored = true,
     liked = true,
     favorited = true,
+)
+
+private val previewListingCardActions = ListingCardActions(
+    onClick = null,
+    onLikeClick = {},
+    onFavoriteClick = {},
 )
 
 private fun money(amount: Long): MoneyXof = when (val result = MoneyXof.fromAmount(amount)) {

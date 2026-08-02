@@ -10,13 +10,14 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/explore-ios-001-parity`, empilée sur `codex/intro-store-release-only` (`#43`) |
+| Branche active | `codex/detail-001a-read-model`, empilée sur `codex/explore-ios-001-parity` (`#44`) |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
-| Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run `30740826138` entièrement vert |
+| Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
+| Détail catalogue | DETAIL-001A et porte mobile locale terminés ; PR/CI et validation PostgreSQL finale à publier |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -46,11 +47,28 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - REMOTE-INTRO-001 a été implémenté historiquement dans la PR `#38`, mais ADR-0021 le supersède avant la V1. INTRO-STORE-001 retire URL/téléchargement/cache/purge distants, conserve Remote Config générique et impose une révision embarquée Android/iOS distribuée exclusivement par release Store.
 - INTRO-STORE-001 est validé localement par la porte Gradle complète, les vérificateurs média/marque/dépôt et deux revues indépendantes sans P0/P1/P2. La PR brouillon `#43` est publiée sur `#42` et son run GitHub Actions `30733200076` est entièrement vert.
 - EXPLORE-IOS-001 partage le runtime Explore avec Android et livre une surface SwiftUI native : grille adaptative, états chargement/vide/offline/erreur, refresh, pagination, ville/GPS, Like/Favori avec soft wall d'authentification et images HTTPS bornées. Recherche, filtres, assistant et détail restent absents tant que leurs contrats ne sont pas livrés.
-- La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. La CI a ensuite fait corriger l'isolation Swift 6 des providers et l'import d'enum Kotlin au profit d'intentions iOS sémantiques. Le run final `30740826138` exécute le smoke test Room/DataStore, construit les XCFrameworks et les trois configurations Xcode simulateur, et passe `quality`, Supabase ainsi que les preuves Android API 30/31/36 ; API 30 y exerce avec succès la nouvelle recapture transitoire `75`.
+- La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. Le run exact-head `30741677132` exécute le smoke test Room/DataStore, construit les XCFrameworks et les trois configurations Xcode simulateur, et passe `quality`, Supabase ainsi que les preuves Android API 30/31/36.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
 ## En cours
+
+### DETAIL-001A — Read model atomique du détail
+
+Objectifs :
+
+- projeter une fiche publiée dans un RPC V1 atomique, versionné et `security invoker` ;
+- typer les six variantes sans fuite Supabase/Ktor dans le domaine ;
+- aligner strictement contraintes SQL, sérialisation et validation mobile ;
+- retirer d'Explore Android les contrôles factices jusqu'à livraison des contrats correspondants.
+
+État : implémentation et revues SQL/Android terminées sans P0/P1/P2. La porte locale
+`spotlessCheck detekt check` est verte en 13 min 24 s, avec 311 tests shared et 147 tests Android
+sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows. Les plans
+pgTAP sont exacts à 196 assertions détail et 57 assertions curseur. La migration et le seed ont été
+exercés avant les derniers durcissements, mais Docker local ne répond plus ; la validation
+PostgreSQL finale, le commit, la PR empilée et sa CI restent à terminer. DETAIL-001 demeure ouvert :
+aucun DetailSheet Android ni écran détail SwiftUI n'est livré par ce sous-lot.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
 
@@ -75,7 +93,7 @@ Objectifs :
 - prouver la persistance réelle sur simulateur macOS et les configurations Xcode de la tranche.
 
 État : implémentation, porte locale, trois revues indépendantes, commit, push, publication de la
-PR brouillon `#44`, build Xcode, smoke test simulateur et CI finale `30740826138` terminés. La revue
+PR brouillon `#44`, build Xcode, smoke test simulateur et CI exacte `30741677132` terminés. La revue
 humaine et la preuve VoiceOver/appareil physique restent ouvertes.
 
 ### BRAND-002 — Fidélité du splash système
@@ -129,12 +147,12 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir les revues humaines de la pile jusqu'à EXPLORE-IOS-001 `#44`, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
+3. Publier DETAIL-001A au-dessus de `#44`, obtenir ses gates, puis faire relire toute la pile dans l'ordre.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.
-7. Retirer les CTA/placeholders factices avant d’ajouter de nouveaux écrans.
-8. Commencer le résumé catalogue paginé et supprimer le N+1 média.
+7. Livrer DETAIL-001B Android puis DETAIL-IOS-001 sans réintroduire de CTA factice.
+8. Reprendre EXPLORE-002B2 après validation des règles de classement et de sponsoring.
 
 ## Décisions techniques actées pendant la reprise
 
@@ -149,6 +167,7 @@ Objectifs :
 - Les dispatchers sont une dépendance de couche application ; le domaine reste Kotlin pur et ne dépend d'aucun SDK asynchrone.
 - La gate d'architecture vérifie des règles déterministes d'emplacement et d'import ; une isolation physique de classpath nécessiterait un module et un ADR séparés.
 - Tout changement des octets vidéo exige des actifs Android/iOS byte-identical, l'incrément simultané des deux révisions embarquées et une release Store ; Remote Config reste réservé aux flags UX sûrs et ne transporte aucun média.
+- Le détail catalogue public est lu par un RPC atomique versionné, `security invoker` et publié-only ; le domaine reste fermé sur six variantes et ne dépend ni de Supabase ni de Ktor.
 
 ## Problèmes rencontrés
 

@@ -33,6 +33,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kwabor.android.auth.LegalDocumentLauncher
 import com.kwabor.android.design.KwaborTheme
+import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.android.presentation.auth.AuthAccessUiState
 import com.kwabor.android.presentation.auth.AuthEffect
 import com.kwabor.android.presentation.auth.AuthIntent
@@ -52,6 +53,7 @@ import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
+import com.kwabor.android.ui.screens.explore.ExploreScreenUiModel
 import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
 import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
 import com.kwabor.shared.domain.auth.AuthenticationMethod
@@ -139,6 +141,7 @@ internal data class KwaborAppDependencies(
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
     val legalDocumentLauncher: LegalDocumentLauncher,
+    val listingMediaUrlPolicy: ListingMediaUrlPolicy,
 )
 
 internal data class KwaborAppRuntimeState(
@@ -198,6 +201,7 @@ private data class HomeShellDependencies(
     val exploreViewModel: ExploreViewModel,
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
+    val listingMediaUrlPolicy: ListingMediaUrlPolicy,
 )
 
 private object AuthEffectDispatcher {
@@ -317,6 +321,7 @@ private fun KwaborEntryContent(
                 exploreViewModel = dependencies.exploreViewModel,
                 authViewModel = dependencies.authViewModel,
                 onboardingViewModel = dependencies.onboardingViewModel,
+                listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
             ),
             state = HomeShellState(
                 auth = state.auth,
@@ -424,6 +429,7 @@ private fun KwaborRootNavHost(
             ExploreRoute(
                 exploreViewModel = dependencies.exploreViewModel,
                 strings = strings,
+                mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
                 isGuestSession = !state.auth.isAuthenticated,
                 modifier = Modifier.padding(paddingValues),
             )
@@ -569,15 +575,19 @@ private fun KwaborBottomNavigation(
 private fun ExploreRoute(
     exploreViewModel: ExploreViewModel,
     strings: KwaborStrings,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     isGuestSession: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val exploreState by exploreViewModel.state.collectAsStateWithLifecycle()
 
     ExploreScreen(
-        state = exploreState,
+        model = ExploreScreenUiModel(
+            state = exploreState,
+            isGuestSession = isGuestSession,
+        ),
         strings = strings,
-        isGuestSession = isGuestSession,
+        mediaUrlPolicy = mediaUrlPolicy,
         modifier = modifier,
         actions = remember(exploreViewModel) { exploreViewModel.screenActions },
     )

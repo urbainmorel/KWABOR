@@ -2,11 +2,11 @@ package com.kwabor.android.presentation.explore
 
 import com.kwabor.android.auth.ApproximateLocationResult
 import com.kwabor.android.auth.ApproximateLocationService
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingClass
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
@@ -515,7 +515,7 @@ private class ViewModelCatalogRepository(
         page: ListingPageRequest,
     ): DomainResult<ListingSummaryPage> = DomainResult.Success(ListingSummaryPage(emptyList(), null))
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> =
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> =
         DomainResult.Failure(DomainError.NotFound("error.catalog.not_found"))
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =

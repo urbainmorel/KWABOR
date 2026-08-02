@@ -1,13 +1,11 @@
 package com.kwabor.shared.presentation.explore
 
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingClass
-import com.kwabor.shared.domain.catalog.ListingContact
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
-import com.kwabor.shared.domain.catalog.ListingMedia
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
@@ -421,25 +419,8 @@ private class FakeCatalogRepository(
         ListingSummaryPage(items = emptyList(), nextCursor = null),
     )
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = DomainResult.Success(
-        ListingDetail(
-            summary = listingSummary(ListingSummaryFixture(id = listingId)),
-            slug = listingId,
-            description = "Description",
-            contentLocale = AppLocale.French,
-            district = null,
-            address = null,
-            geoPoint = null,
-            contact = ListingContact(phone = null, whatsapp = null, externalUrl = null, email = null),
-            media = listOf(
-                ListingMedia(url = "https://example.invalid/image.jpg", alt = "Image", order = 0, isCover = true),
-            ),
-            tags = emptyList(),
-            ownerId = null,
-            stewardId = null,
-            publishedAtEpochMilliseconds = null,
-        ),
-    )
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> =
+        DomainResult.Failure(DomainError.NotFound("error.catalog.not_found"))
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         scenario.interactionError?.let { error -> DomainResult.Failure(error) }

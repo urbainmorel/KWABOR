@@ -52,7 +52,7 @@ exception
 end;
 $$;
 
-select plan(55);
+select plan(57);
 
 insert into auth.users (
   id,
@@ -390,17 +390,17 @@ values
   (
     'cb000000-0000-4000-8000-000000000011',
     '00000000-0000-4000-8000-000000000102',
-    'https://media.kwabor.test/fallback-low-id.jpg',
-    'Image secondaire avec identifiant bas',
+    'https://media.kwabor.test/fallback-low-order.jpg',
+    'Image secondaire avec ordre bas',
     5,
     false
   ),
   (
     'cb000000-0000-4000-8000-000000000012',
     '00000000-0000-4000-8000-000000000102',
-    'https://media.kwabor.test/fallback-high-id.jpg',
-    'Image secondaire avec identifiant haut',
-    5,
+    'https://media.kwabor.test/fallback-high-order.jpg',
+    'Image secondaire avec ordre haut',
+    6,
     false
   ),
   (
@@ -620,8 +620,8 @@ select is(
     from public.list_catalog_summaries(p_limit => 50)
     where id = '00000000-0000-4000-8000-000000000102'
   ),
-  'https://media.kwabor.test/fallback-low-id.jpg',
-  'media fallback is deterministic by display order then id'
+  'https://media.kwabor.test/fallback-low-order.jpg',
+  'media fallback is deterministic by unique display order'
 );
 
 select is(
@@ -836,6 +836,89 @@ select throws_ok(
   '22023',
   'p_cursor fields are malformed',
   'cursor missing sort fields is rejected'
+);
+
+with source_cursor as (
+  select row_cursor
+  from public.list_catalog_summaries(p_limit => 1)
+  limit 1
+), decoded_cursor as (
+  select convert_from(decode(row_cursor, 'base64'), 'UTF8')::jsonb as payload
+  from source_cursor
+)
+insert into catalog_bad_cursors (kind, cursor_value)
+select
+  'published-year-after-mobile-range',
+  replace(
+    replace(
+      encode(
+        convert_to(
+          jsonb_set(
+            payload,
+            '{published_at}',
+            '"10000-01-01 00:00:00+00"'::jsonb
+          )::text,
+          'UTF8'
+        ),
+        'base64'
+      ),
+      chr(10),
+      ''
+    ),
+    chr(13),
+    ''
+  )
+from decoded_cursor
+union all
+select
+  'as-of-year-before-mobile-range',
+  replace(
+    replace(
+      encode(
+        convert_to(
+          jsonb_set(
+            payload,
+            '{as_of}',
+            '"0001-01-01 BC"'::jsonb
+          )::text,
+          'UTF8'
+        ),
+        'base64'
+      ),
+      chr(10),
+      ''
+    ),
+    chr(13),
+    ''
+  )
+from decoded_cursor;
+
+select throws_ok(
+  format(
+    'select * from public.list_catalog_summaries(p_cursor => %L)',
+    (
+      select cursor_value
+      from catalog_bad_cursors
+      where kind = 'published-year-after-mobile-range'
+    )
+  ),
+  '22023',
+  'p_cursor fields are invalid',
+  'cursor publication timestamps reject years after the mobile range'
+);
+
+select throws_ok(
+  format(
+    'select * from public.list_catalog_summaries(p_cursor => %L)',
+    (
+      select cursor_value
+      from catalog_bad_cursors
+      where kind = 'as-of-year-before-mobile-range'
+    )
+  ),
+  '22023',
+  'p_cursor fields are invalid',
+  'cursor snapshot timestamps reject years before the mobile range'
 );
 
 create temporary table catalog_city_cursor as

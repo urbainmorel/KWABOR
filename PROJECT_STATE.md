@@ -204,11 +204,15 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - EXPLORE-IOS-001 est implémentée localement sur `codex/explore-ios-001-parity`, empilée sur INTRO-STORE-001 : le runtime Kotlin commun porte désormais les intents, l'état, les effets, la concurrence et le cycle de vie, tandis que les adaptateurs Android et iOS restent minces.
 - L'écran SwiftUI natif expose la grille adaptative, les états chargement/vide/offline/erreur, le refresh, la pagination, la ville persistée/GPS approximatif, les interactions Like/Favori avec soft wall d'authentification et un pipeline image HTTPS borné/dédupliqué/downsamplé. Recherche, filtres, assistant et navigation détail ne sont pas affichés tant que leurs contrats V1 ne sont pas livrés.
 - La validation locale EXPLORE-IOS-001 passe les vérificateurs dépôt/média/marque et la porte `spotlessCheck detekt check` ; les rapports courants comptent 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ont fait corriger les courses de sélection, les limites/annulations du pipeline image, Dynamic Type, les bandeaux, le formatage XOF partagé et le timeout simulateur, puis ne relèvent plus aucun P0/P1/P2. Le contrôleur iOS et ses politiques Swift sont couverts ; le smoke test macOS rouvre réellement Room et DataStore via des chemins temporaires.
-- La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43`. Les premiers runs ont exposé puis fait corriger l'isolation Swift 6 des providers, l'import fragile d'un cas `ExploreTab` et un timeout transitoire de capture HOME Android. Le run final `30740826138` est entièrement vert : `quality`, Supabase, smoke test iOS, XCFrameworks, configurations Xcode simulateur Debug/Staging/Release et preuves Android API 30/31/36. API 30 y a exercé une recapture transitoire `75` avant de réussir, sans relancer les erreurs déterministes.
+- La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43`. Les premiers runs ont exposé puis fait corriger l'isolation Swift 6 des providers, l'import fragile d'un cas `ExploreTab` et un timeout transitoire de capture HOME Android. Le run exact-head `30741677132` est entièrement vert : `quality`, Supabase, smoke test iOS, XCFrameworks, configurations Xcode simulateur Debug/Staging/Release et preuves Android API 30/31/36.
+- DETAIL-001A introduit un read model atomique `get_catalog_detail_v1` en `security invoker`, limité aux fiches publiées et versionné par `schema_version`. Les six variantes fermées, médias officiels, horaires, services, chambres, billetterie, métriques et statut de claim sont projetés vers des DTO séparés puis un domaine Kotlin pur.
+- La migration DETAIL-001A verrouille les invariants parent/enfant, les collections ordonnées, les droits Data API par colonne et le même sous-ensemble URL/temps/Unicode que le mapper mobile. Deux revues SQL indépendantes ne relèvent aucun P0/P1/P2 ; les plans statiques comptent 196 assertions détail et 57 assertions curseur.
+- Android ne montre plus Recherche, filtres, assistant, FAB ou ouverture de fiche factices. Les images Explore passent par une politique HTTPS injectée et fail-closed, sans dépendance Supabase dans l'UI. Le DetailSheet Android et l'écran détail SwiftUI restent explicitement dans DETAIL-001B et DETAIL-IOS-001.
+- La porte locale DETAIL-001A `spotlessCheck detekt check` est verte en 13 min 24 s : 311 tests shared et 147 tests Android sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows inclus. Les vérificateurs dépôt, onboarding Store-only et marque sont également verts.
 
 ## Tâche en cours
 
-Obtenir la revue humaine de la PR brouillon EXPLORE-IOS-001 `#44`. Les revues humaines de `#41`, `#42`, `#43` et `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Finaliser la relecture post-refactor de DETAIL-001A, publier sa PR brouillon au-dessus de `#44`, puis obtenir ses gates GitHub, notamment pgTAP et le build Xcode. Les revues humaines de `#41` à `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -219,13 +223,13 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
-- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release de la pile jusqu'à la PR `#43` sont confirmées par le run GitHub Actions macOS `30733200076` sous Xcode 16.4. La nouvelle surface Explore attend encore son propre run.
-- Room et DataStore compilent pour les trois cibles iOS et le smoke test de persistance simulateur est ajouté à la CI de la tranche Explore ; son exécution macOS reste à confirmer avant de considérer le cache iOS prouvé en runtime.
+- La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release et le smoke test Room/DataStore de la PR `#44` sont confirmés par le run GitHub Actions macOS exact-head `30741677132` sous Xcode 16.4.
+- Le moteur Docker local ne répond plus après l'arrêt code 137 du conteneur Supabase. La migration et le seed DETAIL-001A ont été exécutés avant les derniers durcissements ; la suite PostgreSQL finale doit donc être prouvée par la CI sans redémarrer le moteur global utilisé par d'autres projets.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
-- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes. Le stockage serveur des dates d'événements est posé, mais les tris métier par onglet, filtres prix/date et plafonds sponsorisés restent bloqués par un contrat catalogue versionné et des décisions produit ; recherche, filtre, assistant et navigation fiche restent aussi à brancher.
+- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes. Le read model détail est posé, mais le DetailSheet Android, l'écran SwiftUI correspondant, les tris métier par onglet, les filtres prix/date et les plafonds sponsorisés restent à livrer ; recherche et assistant ne sont pas affichés tant que leurs contrats manquent.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif compile dans les trois configurations simulateur et son smoke test de persistance est vert ; la validation VoiceOver/appareil physique reste à prouver avant fusion.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
@@ -243,8 +247,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Faire approuver puis fusionner la pile `#35` → `#36` →
-`#37` → `#38` → `#39` → `#40` → `#41` → `#42` → `#43` → `#44`. Le sous-lot Explore suivant doit
-faire valider popularité, plafond sponsorisé et
-intervalles de dates avant de versionner le RPC/cursor et les contrats mobile. La revue appareils
-BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire, sans bloquer la vidéo embarquée.
+Publier et valider DETAIL-001A au-dessus de `#44`, puis livrer DETAIL-001B sans marquer DETAIL-001
+terminé avant la parité SwiftUI. La pile `#35` → `#44` doit toujours être approuvée et fusionnée dans
+l'ordre. La revue appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire, sans
+bloquer la vidéo embarquée.

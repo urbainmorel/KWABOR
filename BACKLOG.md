@@ -133,9 +133,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Livrer la grille SwiftUI native, ses états chargement/vide/offline/erreur, l'image pipeline borné et les politiques d'accessibilité/adaptation.
   - [x] Ajouter un smoke test iOS simulateur qui rouvre Room et DataStore sur disque, le brancher à la CI macOS et borner son exécution.
   - [x] Passer la porte locale complète et trois revues indépendantes sans P0/P1/P2 résiduel.
-- [ ] PR-EXPLORE-IOS-001 — PR brouillon `#44` publiée sur `#43` ; le run `30740826138` a passé `quality`, le build Xcode simulateur et les preuves Android API 30/31/36. Obtenir la revue humaine.
+- [ ] PR-EXPLORE-IOS-001 — PR brouillon `#44` publiée sur `#43` ; le run exact-head `30741677132` a passé `quality`, le build Xcode simulateur et les preuves Android API 30/31/36. Obtenir la revue humaine.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
+  - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
+    contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.
+  - [ ] PR-DETAIL-001A — Publier la PR brouillon empilée sur `#44`, puis obtenir les gates GitHub vertes.
+  - [ ] DETAIL-001B — Livrer le DetailSheet Android Compose connecté au read model, sans stub ni CTA factice.
+  - [ ] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
 - [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide, claim et état événement terminé.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.

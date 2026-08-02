@@ -1,8 +1,8 @@
 package com.kwabor.shared.data.catalog
 
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingClass
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
@@ -35,8 +35,8 @@ class DataCatalogRepositoryTest {
         val dataSource = FakeCatalogDataSource(
             listingsPage = ListingSummaryPageDto(
                 items = listOf(
-                    listingSummaryDto(id = "listing-1"),
-                    listingSummaryDto(id = "listing-2"),
+                    listingSummaryDto(id = CATALOG_LISTING_ID_ONE),
+                    listingSummaryDto(id = CATALOG_LISTING_ID_TWO),
                 ),
                 nextCursor = "cursor-next-exact",
             ),
@@ -51,7 +51,7 @@ class DataCatalogRepositoryTest {
         val success = assertIs<DomainResult.Success<ListingSummaryPage>>(result)
         assertEquals(2, success.value.items.size)
         val firstListing = success.value.items.first()
-        assertEquals("listing-1", firstListing.id)
+        assertEquals(CATALOG_LISTING_ID_ONE, firstListing.id)
         assertEquals(ListingType.Establishment, firstListing.type)
         assertEquals(ListingClass.Commercial, firstListing.listingClass)
         assertEquals(ListingStatus.Published, firstListing.status)
@@ -91,7 +91,7 @@ class DataCatalogRepositoryTest {
         )
 
         val success = assertIs<DomainResult.Success<ListingSummaryPage>>(result)
-        assertEquals("listing-1", success.value.items.first().id)
+        assertEquals(CATALOG_LISTING_ID_ONE, success.value.items.first().id)
         assertEquals("search-next-exact", success.value.nextCursor)
         assertEquals(query, dataSource.lastSearchQuery)
         assertEquals(request, dataSource.lastSearchPage)
@@ -139,14 +139,15 @@ class DataCatalogRepositoryTest {
     }
 
     @Test
-    fun getListingDetail_mapsDetailAndMedia() = runTest {
+    fun getListingDetail_mapsTypedAtomicPayload() = runTest {
         val repository = DataCatalogRepository(FakeCatalogDataSource())
 
-        val result = repository.getListingDetail("listing-1")
+        val result = repository.getListingDetail(CATALOG_LISTING_ID_ONE)
 
-        val detail = assertIs<DomainResult.Success<ListingDetail>>(result).value
-        assertEquals("restaurant-kwabor", detail.slug)
-        assertEquals("https://cdn.kwabor.test/cover.jpg", detail.summary.coverImageUrl)
+        val detail = assertIs<DomainResult.Success<CatalogDetail.Establishment.Food>>(result).value
+        assertEquals("restaurant-kwabor", detail.common.slug)
+        assertEquals("https://cdn.kwabor.test/cover.jpg", detail.common.media.single().url)
+        assertEquals(listOf("beninoise"), detail.cuisines)
     }
 
     @Test
@@ -155,10 +156,22 @@ class DataCatalogRepositoryTest {
             FakeCatalogDataSource(throwOnGetDetail = true),
         )
 
-        val result = repository.getListingDetail("missing")
+        val result = repository.getListingDetail(CATALOG_LISTING_ID_ONE)
 
         val failure = assertIs<DomainResult.Failure>(result)
         assertIs<DomainError.NotFound>(failure.error)
+    }
+
+    @Test
+    fun getListingDetail_rejectsMalformedIdWithoutCallingDataSource() = runTest {
+        val dataSource = FakeCatalogDataSource()
+        val repository = DataCatalogRepository(dataSource)
+
+        val result = repository.getListingDetail("not-a-uuid")
+
+        val failure = assertIs<DomainResult.Failure>(result)
+        assertIs<DomainError.Validation>(failure.error)
+        assertEquals(0, dataSource.detailCallCount)
     }
 
     @Test
@@ -190,7 +203,7 @@ class DataCatalogRepositoryTest {
             ),
         )
 
-        val result = repository.getListingViewerInteraction("listing-1")
+        val result = repository.getListingViewerInteraction(CATALOG_LISTING_ID_ONE)
 
         val interaction = assertIs<DomainResult.Success<ListingViewerInteraction>>(result).value
         assertEquals(true, interaction.likedByViewer)
@@ -220,7 +233,9 @@ class DataCatalogRepositoryTest {
             ),
         )
 
-        val result = repository.listListingViewerInteractions(listOf("listing-1", "listing-2"))
+        val result = repository.listListingViewerInteractions(
+            listOf(CATALOG_LISTING_ID_ONE, CATALOG_LISTING_ID_TWO),
+        )
 
         val success = assertIs<DomainResult.Success<List<ListingViewerInteraction>>>(result)
         assertEquals(emptyList(), success.value)
@@ -238,12 +253,31 @@ class DataCatalogRepositoryTest {
             ),
         )
 
-        val result = repository.listListingViewerInteractions(listOf(" listing-1 ", "listing-1", "listing-2"))
+        val result = repository.listListingViewerInteractions(
+            listOf(" $CATALOG_LISTING_ID_ONE ", CATALOG_LISTING_ID_ONE, CATALOG_LISTING_ID_TWO),
+        )
 
         val success = assertIs<DomainResult.Success<List<ListingViewerInteraction>>>(result)
-        assertEquals(listOf("listing-1", "listing-2"), dataSource.lastInteractionBatchIds)
-        assertEquals(listOf("listing-1", "listing-2"), success.value.map { item -> item.listingId })
+        assertEquals(listOf(CATALOG_LISTING_ID_ONE, CATALOG_LISTING_ID_TWO), dataSource.lastInteractionBatchIds)
+        assertEquals(
+            listOf(CATALOG_LISTING_ID_ONE, CATALOG_LISTING_ID_TWO),
+            success.value.map { item -> item.listingId },
+        )
         assertEquals(1, dataSource.interactionCallCount)
+    }
+
+    @Test
+    fun listListingViewerInteractions_rejectsMalformedIdWithoutCallingDataSource() = runTest {
+        val dataSource = FakeCatalogDataSource()
+        val repository = DataCatalogRepository(dataSource)
+
+        val result = repository.listListingViewerInteractions(
+            listOf(CATALOG_LISTING_ID_ONE, "not-a-uuid", CATALOG_LISTING_ID_TWO),
+        )
+
+        val failure = assertIs<DomainResult.Failure>(result)
+        assertIs<DomainError.Validation>(failure.error)
+        assertEquals(0, dataSource.interactionCallCount)
     }
 
     @Test
@@ -253,10 +287,10 @@ class DataCatalogRepositoryTest {
         )
         val repository = DataCatalogRepository(dataSource)
 
-        val result = repository.likeListing("listing-1")
+        val result = repository.likeListing(CATALOG_LISTING_ID_ONE)
 
         val interaction = assertIs<DomainResult.Success<ListingViewerInteraction>>(result).value
-        assertEquals("listing-1", dataSource.lastInteractionListingId)
+        assertEquals(CATALOG_LISTING_ID_ONE, dataSource.lastInteractionListingId)
         assertEquals(true, interaction.likedByViewer)
         assertEquals(13, interaction.likesCount)
     }
@@ -268,10 +302,10 @@ class DataCatalogRepositoryTest {
         )
         val repository = DataCatalogRepository(dataSource)
 
-        val result = repository.favoriteListing("listing-1")
+        val result = repository.favoriteListing(CATALOG_LISTING_ID_ONE)
 
         val interaction = assertIs<DomainResult.Success<ListingViewerInteraction>>(result).value
-        assertEquals("listing-1", dataSource.lastInteractionListingId)
+        assertEquals(CATALOG_LISTING_ID_ONE, dataSource.lastInteractionListingId)
         assertEquals(true, interaction.favoritedByViewer)
     }
 
@@ -291,7 +325,7 @@ class DataCatalogRepositoryTest {
             FakeCatalogDataSource(interactionException = CatalogDataException.AuthenticationRequired()),
         )
 
-        val result = repository.favoriteListing("listing-1")
+        val result = repository.favoriteListing(CATALOG_LISTING_ID_ONE)
 
         val failure = assertIs<DomainResult.Failure>(result)
         assertIs<DomainError.AuthenticationRequired>(failure.error)
@@ -319,6 +353,8 @@ private class FakeCatalogDataSource(
     var listingCallCount: Int = 0
         private set
     var searchCallCount: Int = 0
+        private set
+    var detailCallCount: Int = 0
         private set
     var lastInteractionListingId: String? = null
         private set
@@ -357,22 +393,13 @@ private class FakeCatalogDataSource(
         return listingsPage
     }
 
-    override suspend fun getListingDetail(listingId: String): ListingDetailDto {
+    override suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto {
+        detailCallCount += 1
         if (throwOnGetDetail) {
             throw CatalogDataException.NotFound()
         }
 
-        return ListingDetailDto(
-            listing = listingDto(ListingDtoFixture(id = listingId)),
-            media = listOf(
-                ListingMediaDto(
-                    url = "https://cdn.kwabor.test/cover.jpg",
-                    alt = "Photo principale",
-                    displayOrder = 0,
-                    isCover = true,
-                ),
-            ),
-        )
+        return catalogDetailPayloadDto().copy(id = listingId)
     }
 
     override suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto =
@@ -401,7 +428,7 @@ private class FakeCatalogDataSource(
     }
 }
 
-private fun listingSummaryDto(id: String = "listing-1", type: String = "etablissement"): ListingSummaryDto =
+private fun listingSummaryDto(id: String = CATALOG_LISTING_ID_ONE, type: String = "etablissement"): ListingSummaryDto =
     ListingSummaryDto(
         id = id,
         type = type,

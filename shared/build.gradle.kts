@@ -49,6 +49,7 @@ kotlin {
             implementation("io.github.jan-tennert.supabase:functions-kt:3.6.0")
             implementation("io.github.jan-tennert.supabase:postgrest-kt:3.6.0")
             implementation("io.github.jan-tennert.supabase:supabase-kt:3.6.0")
+            implementation("io.ktor:ktor-http:3.4.3")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -66,6 +67,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation("app.cash.turbine:turbine:1.2.1")
+            implementation("io.ktor:ktor-client-mock:3.4.3")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
     }

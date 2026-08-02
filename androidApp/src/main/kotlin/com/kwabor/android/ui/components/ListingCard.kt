@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +18,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,6 +36,7 @@ import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
+import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
 
@@ -44,28 +44,33 @@ private const val LISTING_CARD_WIDTH_RATIO = 3f
 private const val LISTING_CARD_HEIGHT_RATIO = 4f
 
 data class ListingCardActions(
-    val onClick: () -> Unit = {},
-    val onLikeClick: () -> Unit = {},
-    val onFavoriteClick: () -> Unit = {},
+    val onClick: (() -> Unit)?,
+    val onLikeClick: () -> Unit,
+    val onFavoriteClick: () -> Unit,
 )
 
 @Composable
 fun ListingCard(
     state: ListingCardState,
     strings: KwaborStrings,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     modifier: Modifier = Modifier,
-    priceOptions: PriceTagOptions = PriceTagOptions(mode = PriceTagMode.Compact),
-    actions: ListingCardActions = ListingCardActions(),
+    actions: ListingCardActions,
 ) {
     Surface(
         modifier = modifier
             .aspectRatio(LISTING_CARD_WIDTH_RATIO / LISTING_CARD_HEIGHT_RATIO)
             .clip(RoundedCornerShape(KwaborRadius.Card))
-            .clickable(onClick = actions.onClick),
+            .listingClick(actions.onClick),
         color = KwaborColors.Ink950,
         shape = RoundedCornerShape(KwaborRadius.Card),
     ) {
-        ListingCardContent(state = state, strings = strings, priceOptions = priceOptions, actions = actions)
+        ListingCardContent(
+            state = state,
+            strings = strings,
+            mediaUrlPolicy = mediaUrlPolicy,
+            actions = actions,
+        )
     }
 }
 
@@ -73,11 +78,15 @@ fun ListingCard(
 private fun ListingCardContent(
     state: ListingCardState,
     strings: KwaborStrings,
-    priceOptions: PriceTagOptions,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
     actions: ListingCardActions,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(placeholderGradient(state.placeholderColor))) {
-        ListingCoverImage(imageUrl = state.coverImageUrl, modifier = Modifier.fillMaxSize())
+        ListingCoverImage(
+            imageUrl = state.coverImageUrl,
+            mediaUrlPolicy = mediaUrlPolicy,
+            modifier = Modifier.fillMaxSize(),
+        )
         Box(modifier = Modifier.fillMaxSize().background(listingScrim()))
         ListingCardTopBar(
             state = state,
@@ -88,8 +97,12 @@ private fun ListingCardContent(
         ListingCardBody(
             state = state,
             strings = strings,
-            priceOptions = priceOptions,
-            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(KwaborSpacing.Lg),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(
+                start = KwaborSpacing.Lg,
+                top = KwaborSpacing.Lg,
+                end = KwaborSizing.MinimumAccessibleTouchTarget + KwaborSpacing.Md,
+                bottom = KwaborSpacing.Lg,
+            ),
         )
     }
 }
@@ -107,12 +120,7 @@ private fun listingScrim(): Brush = Brush.verticalGradient(
 )
 
 @Composable
-private fun ListingCardBody(
-    state: ListingCardState,
-    strings: KwaborStrings,
-    priceOptions: PriceTagOptions,
-    modifier: Modifier = Modifier,
-) {
+private fun ListingCardBody(state: ListingCardState, strings: KwaborStrings, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm)) {
         Text(
             text = state.title,
@@ -130,7 +138,7 @@ private fun ListingCardBody(
             overflow = TextOverflow.Ellipsis,
         )
         state.ratingLabel?.let { rating -> ListingRating(label = rating, strings = strings) }
-        PriceTag(price = state.price, strings = strings, options = priceOptions)
+        PriceTag(price = state.price, strings = strings, options = state.priceOptions)
     }
 }
 
@@ -160,6 +168,7 @@ data class ListingCardState(
     val cityLabel: String,
     val coverImageUrl: String? = null,
     val price: MoneyXof?,
+    val priceOptions: PriceTagOptions = PriceTagOptions(mode = PriceTagMode.Compact),
     val ratingLabel: String? = null,
     val sponsored: Boolean = false,
     val liked: Boolean = false,
@@ -174,28 +183,32 @@ private fun ListingCardTopBar(
     actions: ListingCardActions,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
-        verticalAlignment = Alignment.Top,
-    ) {
+    Box(modifier = modifier) {
         if (state.sponsored) {
-            SponsoredBadge(strings = strings)
+            SponsoredBadge(
+                strings = strings,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
         }
-        Spacer(modifier = Modifier.weight(1f))
-        ListingActionButton(
-            label = strings.favorite,
-            selected = state.favorited,
-            imageVector = Icons.Filled.Bookmark,
-            onClick = actions.onFavoriteClick,
-        )
-        ListingActionButton(
-            label = strings.like,
-            selected = state.liked,
-            selectedColor = KwaborColors.Ticket,
-            imageVector = Icons.Filled.Favorite,
-            onClick = actions.onLikeClick,
-        )
+        Column(
+            modifier = Modifier.align(Alignment.TopEnd),
+            verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ListingActionButton(
+                label = strings.favorite,
+                selected = state.favorited,
+                imageVector = Icons.Filled.Bookmark,
+                onClick = actions.onFavoriteClick,
+            )
+            ListingActionButton(
+                label = strings.like,
+                selected = state.liked,
+                selectedColor = KwaborColors.Ticket,
+                imageVector = Icons.Filled.Favorite,
+                onClick = actions.onLikeClick,
+            )
+        }
     }
 }
 
@@ -207,20 +220,29 @@ private fun ListingActionButton(
     imageVector: ImageVector,
     onClick: () -> Unit,
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(KwaborSizing.FloatingPill)
-            .background(
-                color = KwaborColors.Surface0.copy(alpha = KwaborAlpha.FROSTED_SURFACE),
-                shape = CircleShape,
-            ),
+    IconToggleButton(
+        checked = selected,
+        onCheckedChange = { onClick() },
+        modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
     ) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = label,
-            modifier = Modifier.size(KwaborSpacing.Xxl),
-            tint = if (selected) selectedColor else KwaborColors.Surface0,
-        )
+        Box(
+            modifier = Modifier
+                .size(KwaborSizing.FloatingPill)
+                .background(
+                    color = KwaborColors.Surface0.copy(alpha = KwaborAlpha.FROSTED_SURFACE),
+                    shape = CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = label,
+                modifier = Modifier.size(KwaborSpacing.Xxl),
+                tint = if (selected) selectedColor else KwaborColors.Surface0,
+            )
+        }
     }
 }
+
+private fun Modifier.listingClick(onClick: (() -> Unit)?): Modifier =
+    if (onClick == null) this else clickable(onClick = onClick)

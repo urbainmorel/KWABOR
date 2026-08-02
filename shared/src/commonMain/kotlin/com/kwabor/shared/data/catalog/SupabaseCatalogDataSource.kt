@@ -18,6 +18,7 @@ private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_CONFLICT = 409
 private const val HTTP_UNPROCESSABLE_CONTENT = 422
+private const val POSTGREST_SCHEMA_CACHE_ERROR_PREFIX = "PGRST2"
 
 internal class SupabaseCatalogDataSource(
     private val postgrest: Postgrest,
@@ -53,20 +54,12 @@ internal class SupabaseCatalogDataSource(
             page = page,
         )
 
-    override suspend fun getListingDetail(listingId: String): ListingDetailDto = runPostgrest {
-        val listing = postgrest.from(LISTINGS)
-            .select {
-                filter {
-                    eq("id", listingId)
-                }
-                limit(1)
-            }
-            .decodeSingle<ListingDto>()
-
-        ListingDetailDto(
-            listing = listing,
-            media = listMedia(listingId),
-        )
+    override suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto = runPostgrest {
+        postgrest.rpc(
+            function = GET_CATALOG_DETAIL,
+            parameters = CatalogDetailRpcParametersDto(listingId = listingId),
+        ).decodeSingleOrNull<CatalogDetailRpcRowDto>()?.payload?.decodeStrictCatalogDetailPayload()
+            ?: throw CatalogDataException.NotFound()
     }
 
     override suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto = runPostgrest {
@@ -123,22 +116,12 @@ internal class SupabaseCatalogDataSource(
         ).decodeList<ListingSummaryDto>()
             .toSummaryPage(page.limit)
     }
-
-    private suspend fun listMedia(listingId: String): List<ListingMediaDto> = postgrest.from(LISTING_MEDIA)
-        .select {
-            filter {
-                eq("listing_id", listingId)
-            }
-            order("display_order", Order.ASCENDING)
-        }
-        .decodeList()
 }
 
 private const val CITIES = "cities"
 private const val CATEGORIES = "categories"
-private const val LISTINGS = "listings"
-private const val LISTING_MEDIA = "listing_media"
 private const val LIST_CATALOG_SUMMARIES = "list_catalog_summaries"
+private const val GET_CATALOG_DETAIL = "get_catalog_detail_v1"
 
 private fun ListingFilters.toSummaryPageRpcDto(
     searchQuery: String?,
@@ -184,22 +167,27 @@ private suspend fun <T> runPostgrest(block: suspend () -> T): T = try {
 }
 
 private fun RestException.toCatalogDataException(): CatalogDataException {
-    if (this is PostgrestRestException) {
-        when (code) {
-            "P0002", "PGRST116" -> return CatalogDataException.NotFound(cause = this)
-            "42501" -> return CatalogDataException.AuthenticationRequired(this)
-            "22023", "23503", "23505", "23514" -> return CatalogDataException.Validation(cause = this)
-        }
-    }
+    val codeMappedException = (this as? PostgrestRestException)?.toCodeMappedCatalogDataException()
+    return codeMappedException ?: toStatusMappedCatalogDataException()
+}
 
-    return when (statusCode) {
-        HTTP_UNAUTHORIZED -> CatalogDataException.AuthenticationRequired(this)
-        HTTP_FORBIDDEN -> CatalogDataException.PermissionDenied(cause = this)
-        HTTP_NOT_FOUND -> CatalogDataException.NotFound(cause = this)
-        HTTP_BAD_REQUEST,
-        HTTP_CONFLICT,
-        HTTP_UNPROCESSABLE_CONTENT,
-        -> CatalogDataException.Validation(cause = this)
-        else -> CatalogDataException.Unexpected(this)
+private fun PostgrestRestException.toCodeMappedCatalogDataException(): CatalogDataException? = when {
+    code?.startsWith(POSTGREST_SCHEMA_CACHE_ERROR_PREFIX) == true -> CatalogDataException.Unexpected(this)
+    else -> when (code) {
+        "P0002", "PGRST116" -> CatalogDataException.NotFound(cause = this)
+        "42501" -> CatalogDataException.AuthenticationRequired(this)
+        "22023", "23503", "23505", "23514" -> CatalogDataException.Validation(cause = this)
+        else -> null
     }
+}
+
+private fun RestException.toStatusMappedCatalogDataException(): CatalogDataException = when (statusCode) {
+    HTTP_UNAUTHORIZED -> CatalogDataException.AuthenticationRequired(this)
+    HTTP_FORBIDDEN -> CatalogDataException.PermissionDenied(cause = this)
+    HTTP_NOT_FOUND -> CatalogDataException.NotFound(cause = this)
+    HTTP_BAD_REQUEST,
+    HTTP_CONFLICT,
+    HTTP_UNPROCESSABLE_CONTENT,
+    -> CatalogDataException.Validation(cause = this)
+    else -> CatalogDataException.Unexpected(this)
 }

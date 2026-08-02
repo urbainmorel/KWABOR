@@ -19,7 +19,7 @@ interface CatalogQueryRepository {
         page: ListingPageRequest = ListingPageRequest(),
     ): DomainResult<ListingSummaryPage>
 
-    suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail>
+    suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail>
 }
 
 interface CatalogInteractionRepository {

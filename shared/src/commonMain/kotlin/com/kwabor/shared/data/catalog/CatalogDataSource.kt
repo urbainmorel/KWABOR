@@ -16,7 +16,7 @@ internal interface CatalogQueryDataSource {
 
     suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto
 
-    suspend fun getListingDetail(listingId: String): ListingDetailDto
+    suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto
 }
 
 internal interface CatalogInteractionDataSource {
