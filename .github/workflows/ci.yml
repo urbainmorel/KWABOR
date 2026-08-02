@@ -157,6 +157,9 @@ jobs:
           supabase db start
           supabase test db
 
+      - name: Supabase event concurrency tests
+        run: python3 tools/test-event-details-concurrency.py
+
   ios:
     name: iOS simulator build
     runs-on: macos-15

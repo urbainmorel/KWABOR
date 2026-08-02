@@ -116,6 +116,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     la ville persistée/GPS, les référentiels Room v2 et les catégories serveur réelles.
   - [ ] EXPLORE-002B — Versionner les tris/filtres prix-date-événement et le plafond sponsorisé côté serveur,
     puis les brancher sans classement client divergent.
+    - [x] EXPLORE-002B1 — Ajouter `event_details`, ses invariants parent/enfant, ses grants/RLS,
+      un seed canonique et sa couverture pgTAP sans modifier le classement catalogue existant.
+    - [ ] EXPLORE-002B2 — Figer la popularité, les placements sponsorisés et les intervalles de dates,
+      puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
   - [x] PR-EXPLORE-002A — PR brouillon `#41` publiée sur `#40` ; le run `30723036248` a passé
     `quality`, le build simulateur iOS et les preuves de lancement Android API 30/31/36.
 - [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.

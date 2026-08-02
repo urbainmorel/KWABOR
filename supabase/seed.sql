@@ -143,7 +143,7 @@ insert into public.listings (
     'culture',
     'evenementiel',
     'event-culture',
-    'publie',
+    'brouillon',
     'Festival culturel de Ouidah',
     'festival-culturel-ouidah-test',
     'Evenement culturel de test pour valider les fiches evenementielles, la recherche par ville et les campagnes futures.',
@@ -161,7 +161,7 @@ insert into public.listings (
     8,
     75,
     15,
-    now()
+    null
   )
 on conflict (id) do update set
   status = excluded.status,
@@ -182,6 +182,45 @@ on conflict (id) do update set
   views_count = excluded.views_count,
   likes_count = excluded.likes_count,
   published_at = excluded.published_at;
+
+insert into public.event_details (
+  listing_id,
+  category,
+  start_at,
+  end_at,
+  venue_listing_id,
+  organizer_name,
+  organizer_contact,
+  ticket_type,
+  ticket_url,
+  capacity
+) values (
+  '00000000-0000-4000-8000-000000000104',
+  'culture',
+  '2030-01-10 18:00:00+01',
+  '2030-01-10 22:00:00+01',
+  null,
+  'Kwabor Démonstration',
+  'events@kwabor.test',
+  'payant',
+  'https://example.invalid/kwabor/tickets/festival-ouidah',
+  500
+)
+on conflict (listing_id) do update set
+  category = excluded.category,
+  start_at = excluded.start_at,
+  end_at = excluded.end_at,
+  venue_listing_id = excluded.venue_listing_id,
+  organizer_name = excluded.organizer_name,
+  organizer_contact = excluded.organizer_contact,
+  ticket_type = excluded.ticket_type,
+  ticket_url = excluded.ticket_url,
+  capacity = excluded.capacity;
+
+update public.listings
+set status = 'publie',
+    published_at = '2026-07-01 00:00:00+00'
+where id = '00000000-0000-4000-8000-000000000104';
 
 insert into public.listing_media (
   listing_id,
