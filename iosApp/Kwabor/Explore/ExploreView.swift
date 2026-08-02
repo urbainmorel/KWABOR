@@ -138,17 +138,17 @@ private struct ExploreTabs: View {
                 ExploreSelectionPill(
                     label: store.strings.places,
                     selected: store.state.isPlacesTabSelected,
-                    action: { store.selectTab(.places) }
+                    action: store.selectPlacesTab
                 )
                 ExploreSelectionPill(
                     label: store.strings.events,
                     selected: store.state.isEventsTabSelected,
-                    action: { store.selectTab(.events) }
+                    action: store.selectEventsTab
                 )
                 ExploreSelectionPill(
                     label: store.strings.hotelsRestaurants,
                     selected: store.state.isHotelsRestaurantsTabSelected,
-                    action: { store.selectTab(.hotelsRestaurants) }
+                    action: store.selectHotelsRestaurantsTab
                 )
             }
         }

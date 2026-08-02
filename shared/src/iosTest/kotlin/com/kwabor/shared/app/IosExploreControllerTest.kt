@@ -83,7 +83,9 @@ class IosExploreControllerTest {
         val runtime = FakeIosExploreRuntime()
         val controller = configuredController(runtime, testScheduler)
 
-        controller.feedActions.selectTab(ExploreTab.Events)
+        controller.feedActions.selectPlacesTab()
+        controller.feedActions.selectEventsTab()
+        controller.feedActions.selectHotelsRestaurantsTab()
         controller.feedActions.selectChip("event-culture")
         controller.feedActions.retry()
         controller.feedActions.refresh()
@@ -104,7 +106,9 @@ class IosExploreControllerTest {
 
         assertEquals(
             listOf(
+                ExploreIntent.SelectTab(ExploreTab.Places),
                 ExploreIntent.SelectTab(ExploreTab.Events),
+                ExploreIntent.SelectTab(ExploreTab.HotelsRestaurants),
                 ExploreIntent.SelectChip("event-culture"),
                 ExploreIntent.Retry,
                 ExploreIntent.Refresh,

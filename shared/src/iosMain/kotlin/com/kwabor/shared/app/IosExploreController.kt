@@ -32,8 +32,16 @@ enum class IosExploreEffect {
 class IosExploreFeedActions internal constructor(
     private val dispatch: (ExploreIntent) -> Unit,
 ) {
-    fun selectTab(tab: ExploreTab) {
-        dispatch(ExploreIntent.SelectTab(tab))
+    fun selectPlacesTab() {
+        selectTab(ExploreTab.Places)
+    }
+
+    fun selectEventsTab() {
+        selectTab(ExploreTab.Events)
+    }
+
+    fun selectHotelsRestaurantsTab() {
+        selectTab(ExploreTab.HotelsRestaurants)
     }
 
     fun selectChip(chipId: String) {
@@ -50,6 +58,10 @@ class IosExploreFeedActions internal constructor(
 
     fun loadNext() {
         dispatch(ExploreIntent.LoadNext)
+    }
+
+    private fun selectTab(tab: ExploreTab) {
+        dispatch(ExploreIntent.SelectTab(tab))
     }
 }
 

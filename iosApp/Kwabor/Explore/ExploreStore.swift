@@ -46,9 +46,19 @@ final class ExploreStore: ObservableObject {
         controller.interactionActions.updateViewerContext(viewerId: viewerID)
     }
 
-    func selectTab(_ tab: ExploreTab) {
+    func selectPlacesTab() {
         paginationGuard.reset()
-        controller.feedActions.selectTab(tab: tab)
+        controller.feedActions.selectPlacesTab()
+    }
+
+    func selectEventsTab() {
+        paginationGuard.reset()
+        controller.feedActions.selectEventsTab()
+    }
+
+    func selectHotelsRestaurantsTab() {
+        paginationGuard.reset()
+        controller.feedActions.selectHotelsRestaurantsTab()
     }
 
     func selectChip(_ chipID: String) {
