@@ -21,8 +21,8 @@ protocol RegistrationLocationProviding {
 final class CoreLocationRegistrationService: RegistrationLocationProviding {
     private let provider: ApproximateLocationProviding
 
-    init(provider: ApproximateLocationProviding = CoreLocationApproximateLocationProvider()) {
-        self.provider = provider
+    init(provider: ApproximateLocationProviding? = nil) {
+        self.provider = provider ?? CoreLocationApproximateLocationProvider()
     }
 
     func requestCurrentLocation() async -> RegistrationLocationResult {

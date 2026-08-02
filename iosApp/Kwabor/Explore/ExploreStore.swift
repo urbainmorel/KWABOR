@@ -23,10 +23,10 @@ final class ExploreStore: ObservableObject {
 
     init(
         controller: IosExploreController,
-        locationProvider: ApproximateLocationProviding = CoreLocationApproximateLocationProvider()
+        locationProvider: ApproximateLocationProviding? = nil
     ) {
         self.controller = controller
-        self.locationProvider = locationProvider
+        self.locationProvider = locationProvider ?? CoreLocationApproximateLocationProvider()
         state = controller.currentState
         strings = controller.strings
         isConfigured = controller.isConfigured
