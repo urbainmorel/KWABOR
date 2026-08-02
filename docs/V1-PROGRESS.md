@@ -16,7 +16,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
-| Explore iOS | EXPLORE-IOS-001 implémenté localement en SwiftUI natif ; trois revues vertes, publication/CI de tranche à faire |
+| Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes, CI en cours |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -74,9 +74,8 @@ Objectifs :
 - brancher le cache Room, DataStore, refresh, pagination, localisation et interactions ;
 - prouver la persistance réelle sur simulateur macOS et les configurations Xcode de la tranche.
 
-État : implémentation, porte locale et trois revues indépendantes terminées sur
-`codex/explore-ios-001-parity`. La publication de la PR empilée, le build Xcode, le smoke test
-simulateur et la CI restent à faire.
+État : implémentation, porte locale, trois revues indépendantes, commit, push et publication de la
+PR brouillon `#44` terminés. Le build Xcode, le smoke test simulateur et la CI sont en cours.
 
 ### BRAND-002 — Fidélité du splash système
 
@@ -129,7 +128,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Publier EXPLORE-IOS-001 au-dessus de la PR INTRO-STORE-001 `#43`, obtenir sa CI verte puis les revues humaines de la pile, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
+3. Obtenir la CI verte d'EXPLORE-IOS-001 `#44`, puis les revues humaines de la pile, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.

@@ -204,10 +204,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - EXPLORE-IOS-001 est implémentée localement sur `codex/explore-ios-001-parity`, empilée sur INTRO-STORE-001 : le runtime Kotlin commun porte désormais les intents, l'état, les effets, la concurrence et le cycle de vie, tandis que les adaptateurs Android et iOS restent minces.
 - L'écran SwiftUI natif expose la grille adaptative, les états chargement/vide/offline/erreur, le refresh, la pagination, la ville persistée/GPS approximatif, les interactions Like/Favori avec soft wall d'authentification et un pipeline image HTTPS borné/dédupliqué/downsamplé. Recherche, filtres, assistant et navigation détail ne sont pas affichés tant que leurs contrats V1 ne sont pas livrés.
 - La validation locale EXPLORE-IOS-001 passe les vérificateurs dépôt/média/marque et la porte `spotlessCheck detekt check` ; les rapports courants comptent 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ont fait corriger les courses de sélection, les limites/annulations du pipeline image, Dynamic Type, les bandeaux, le formatage XOF partagé et le timeout simulateur, puis ne relèvent plus aucun P0/P1/P2. Le contrôleur iOS et ses politiques Swift sont couverts ; un smoke test simulateur rouvre réellement Room et DataStore via des chemins temporaires, mais son exécution native et le build Xcode de cette tranche restent à confirmer par la CI macOS.
+- La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43` ; sa CI GitHub est en cours.
 
 ## Tâche en cours
 
-Publier la PR brouillon EXPLORE-IOS-001 empilée sur INTRO-STORE-001 `#43`, puis suivre ses gates macOS/Android jusqu'au vert. Les revues humaines de `#41`, `#42`, `#43` et de cette nouvelle tranche restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Suivre les gates macOS/Android de la PR brouillon EXPLORE-IOS-001 `#44` jusqu'au vert. Les revues humaines de `#41`, `#42`, `#43` et `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -242,8 +243,8 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier EXPLORE-IOS-001 au-dessus d'INTRO-STORE-001 `#43`, obtenir sa CI verte puis faire approuver et
-fusionner la pile `#35` → `#36` → `#37` → `#38` → `#39` → `#40` → `#41` → `#42` → `#43` →
-EXPLORE-IOS-001. Le sous-lot Explore suivant doit faire valider popularité, plafond sponsorisé et
+Obtenir la CI verte d'EXPLORE-IOS-001 `#44`, puis faire approuver et fusionner la pile `#35` → `#36` →
+`#37` → `#38` → `#39` → `#40` → `#41` → `#42` → `#43` → `#44`. Le sous-lot Explore suivant doit
+faire valider popularité, plafond sponsorisé et
 intervalles de dates avant de versionner le RPC/cursor et les contrats mobile. La revue appareils
 BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire, sans bloquer la vidéo embarquée.

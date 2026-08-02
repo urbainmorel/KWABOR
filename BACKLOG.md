@@ -133,7 +133,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Livrer la grille SwiftUI native, ses états chargement/vide/offline/erreur, l'image pipeline borné et les politiques d'accessibilité/adaptation.
   - [x] Ajouter un smoke test iOS simulateur qui rouvre Room et DataStore sur disque, le brancher à la CI macOS et borner son exécution.
   - [x] Passer la porte locale complète et trois revues indépendantes sans P0/P1/P2 résiduel.
-- [ ] PR-EXPLORE-IOS-001 — Publier la PR brouillon empilée sur `#43`, obtenir les gates GitHub Actions verts puis la revue humaine.
+- [ ] PR-EXPLORE-IOS-001 — PR brouillon `#44` publiée sur `#43` ; obtenir les gates GitHub Actions verts puis la revue humaine.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
