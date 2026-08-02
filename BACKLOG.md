@@ -78,10 +78,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-AUTH-002 — PR `#29` mergée après vérification média, `quality`, pgTAP et les trois configurations `iOS simulator build` vertes.
 - [x] REMOTE-INTRO-001 — Implémentation historique livrée dans `#38`, désormais remplacée par ADR-0021 et non retenue comme état cible V1.
 - [ ] PR-REMOTE-INTRO-001 — PR brouillon empilée `#38` publiée sur `#37`, run final `30661731938` vert ; ne pas livrer le canal distant sans la tranche de retrait Store-only au-dessus de la pile.
-- [ ] INTRO-STORE-001 — Retirer URL/téléchargement/cache/quarantaine/purge distants, conserver Remote Config pour les flags sûrs, versionner l'intro embarquée sur Android/iOS et imposer une release Store pour tout changement vidéo.
-  - [ ] Verrouiller la révision initiale `1`, l'égalité Android/iOS et le couplage octets/révision contre la base Git.
+- [x] INTRO-STORE-001 — Retirer URL/téléchargement/cache/quarantaine/purge distants, conserver Remote Config pour les flags sûrs, versionner l'intro embarquée sur Android/iOS et imposer une release Store pour tout changement vidéo.
+  - [x] Verrouiller la révision initiale `1`, l'égalité Android/iOS et le couplage octets/révision contre la base Git.
   - [ ] Confirmer provenance, droits de diffusion et approbation éditoriale de chaque média avant build Store.
   - [ ] Prouver première lecture, non-répétition, upgrade vers une révision supérieure, offline et reduced-motion sur les deux plateformes.
+- [ ] PR-INTRO-STORE-001 — PR brouillon empilée `#43` publiée sur `#42` ; validations locales et deux revues indépendantes vertes, CI GitHub en cours.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.

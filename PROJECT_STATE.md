@@ -199,10 +199,12 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - ADR-0020 verrouille les invariants parent/enfant et la borne d'écriture actuelle : onboarding terminé, gestionnaire autorisé et fiche `brouillon`/`en_attente`, sauf Admin vérifié pour l'insertion/mise à jour. Un événement ne peut entrer en revue ou être publié sans détails ni avec un lieu non publié ; ceux d'un parent en attente/publié ne peuvent être supprimés directement, même par Admin, et leur lieu ne peut être dépublié. La migration échoue si des événements actifs historiques sont incomplets et les verrous parent/lieu sérialisent soumission, suppression, localisation et conversion concurrentes. Les gardes trigger privilégiées restent dans `app_private`, avec `search_path` vide, contrôle explicite de l'acteur et exécution publique révoquée.
 - Validation locale EXPLORE-002B1 : reset Supabase complet, 57 assertions événementielles et 428 assertions pgTAP standard vertes sur neuf fichiers. Le harnais multi-connexion, retiré de la suite distante et borné par un runner localhost explicite, ajoute 12 assertions concurrentes vertes. La couverture prouve notamment la transition vers modération, la suppression Admin, les courses parent/enfant/lieu, la confidentialité et la publication obligatoire des lieux actifs, l'intégrité privilégiée, le cascade parent, HTTPS, capacité, normalisation et localisation. Le lint `public`/`app_private`, la requête directe du seed, l'historique local des migrations, l'intégrité du dépôt et la porte Gradle `spotlessCheck detekt check` sont verts. Le seul projet Supabase visible par le compte connecté n'est pas un environnement Kwabor, donc ses advisors ne constituent pas une preuve de ce schéma local.
 - La PR brouillon EXPLORE-002B1 `#42` est publiée au-dessus d'EXPLORE-002A `#41`. Son run `30729830885` est entièrement vert ; sa revue humaine reste requise avant fusion.
+- INTRO-STORE-001 retire le canal média distant Android/iOS/shared, conserve Remote Config générique, migre l'ancien état vers une baseline fixe `1` et verrouille en CI l'égalité des assets ainsi que le couplage octets/révision. La validation locale complète et deux revues indépendantes sont vertes.
+- La PR brouillon INTRO-STORE-001 `#43` est publiée au-dessus d'EXPLORE-002B1 `#42` ; sa CI GitHub est en cours.
 
 ## Tâche en cours
 
-Terminer INTRO-STORE-001 sur `codex/intro-store-release-only` : retirer le canal média distant sans supprimer Remote Config générique, verrouiller la révision embarquée Android/iOS et publier une PR au-dessus de `#42`. Puis faire relire EXPLORE-002A `#41` et EXPLORE-002B1 `#42` dans l'ordre de la pile. Les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Suivre la CI de la PR INTRO-STORE-001 `#43`, puis faire relire EXPLORE-002A `#41`, EXPLORE-002B1 `#42` et INTRO-STORE-001 `#43` dans l'ordre de la pile. Les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -237,8 +239,8 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Terminer, valider et publier INTRO-STORE-001 au-dessus de `#42`, puis faire approuver et fusionner la
-pile `#35` → `#36` → `#37` → `#38` → `#39` → `#40` → `#41` → `#42` → retrait Store-only. Le sous-lot
+Obtenir une CI verte et la revue humaine d'INTRO-STORE-001 `#43`, puis faire approuver et fusionner la
+pile `#35` → `#36` → `#37` → `#38` → `#39` → `#40` → `#41` → `#42` → `#43`. Le sous-lot
 Explore suivant doit faire valider popularité, plafond sponsorisé et intervalles de dates avant de
 versionner le RPC/cursor et les contrats mobile. La revue appareils BRAND-002 et ENV-001B/OBS-001B
 restent des gates propriétaire, sans bloquer la vidéo embarquée.
