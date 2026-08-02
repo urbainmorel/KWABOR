@@ -21,7 +21,7 @@ declare
   test_password text;
 begin
   if exists (select 1 from pg_roles where rolname = 'kwabor_event_concurrency_test') then
-    execute 'revoke all privileges on table public.categories, public.listings, public.event_details from kwabor_event_concurrency_test';
+    execute 'revoke all privileges on table public.categories, public.listings, public.event_details, public.listing_media from kwabor_event_concurrency_test';
     execute 'revoke usage on schema public from kwabor_event_concurrency_test';
     execute 'revoke usage on schema extensions from kwabor_event_concurrency_test';
     execute $revoke_validators$
@@ -72,6 +72,7 @@ grant select on table public.categories to kwabor_event_concurrency_test;
 grant select, insert, update, delete
 on table public.listings, public.event_details
 to kwabor_event_concurrency_test;
+grant insert on table public.listing_media to kwabor_event_concurrency_test;
 
 begin;
 
@@ -128,6 +129,22 @@ begin
         6.3703,
         2.3912,
         'aucune'
+      );
+
+      insert into public.listing_media (
+        listing_id,
+        url,
+        alt,
+        display_order,
+        is_cover,
+        kind
+      ) values (
+        'ec100000-0000-4000-8000-000000000001',
+        'https://media.example.invalid/event-concurrency-cover.jpg',
+        'Couverture événement concurrence',
+        0,
+        true,
+        'image'
       );
 
       insert into public.event_details (
@@ -401,7 +418,7 @@ begin
           'nature',
           'patrimonial',
           'heritage-nature',
-          'publie',
+          'brouillon',
           'Lieu concurrence localisation',
           'event-location-concurrency-venue',
           'Lieu temporaire utilisé pour vérifier la sérialisation de la localisation.',
@@ -579,7 +596,7 @@ begin
           'nature',
           'patrimonial',
           'heritage-nature',
-          'publie',
+          'brouillon',
           'Lieu concurrence typologie',
           'event-venue-type-concurrency',
           'Lieu temporaire utilisé pour vérifier la sérialisation de sa typologie.',
@@ -735,7 +752,7 @@ $$;
 select * from finish();
 rollback;
 
-revoke all privileges on table public.categories, public.listings, public.event_details
+revoke all privileges on table public.categories, public.listings, public.event_details, public.listing_media
 from kwabor_event_concurrency_test;
 revoke usage on schema public from kwabor_event_concurrency_test;
 revoke usage on schema extensions from kwabor_event_concurrency_test;
