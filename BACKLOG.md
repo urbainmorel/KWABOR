@@ -118,6 +118,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     puis les brancher sans classement client divergent.
     - [x] EXPLORE-002B1 — Ajouter `event_details`, ses invariants parent/enfant, ses grants/RLS,
       un seed canonique et sa couverture pgTAP sans modifier le classement catalogue existant.
+    - [ ] PR-EXPLORE-002B1 — PR brouillon empilée `#42` publiée sur `#41` ; obtenir la CI et la revue
+      humaines, puis la fusionner en respectant l'ordre de la pile.
     - [ ] EXPLORE-002B2 — Figer la popularité, les placements sponsorisés et les intervalles de dates,
       puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
   - [x] PR-EXPLORE-002A — PR brouillon `#41` publiée sur `#40` ; le run `30723036248` a passé

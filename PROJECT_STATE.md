@@ -198,10 +198,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - EXPLORE-002B1 ajoute la fondation relationnelle `event_details` sans modifier le RPC catalogue : dates `timestamptz`, lieu rattaché ou adresse/GPS, organisateur, billetterie, capacité, enum fermée, indexes ciblés, grants Data API explicites et RLS par rôle.
 - ADR-0020 verrouille les invariants parent/enfant et la borne d'écriture actuelle : onboarding terminé, gestionnaire autorisé et fiche `brouillon`/`en_attente`, sauf Admin vérifié pour l'insertion/mise à jour. Un événement ne peut entrer en revue ou être publié sans détails ni avec un lieu non publié ; ceux d'un parent en attente/publié ne peuvent être supprimés directement, même par Admin, et leur lieu ne peut être dépublié. La migration échoue si des événements actifs historiques sont incomplets et les verrous parent/lieu sérialisent soumission, suppression, localisation et conversion concurrentes. Les gardes trigger privilégiées restent dans `app_private`, avec `search_path` vide, contrôle explicite de l'acteur et exécution publique révoquée.
 - Validation locale EXPLORE-002B1 : reset Supabase complet, 57 assertions événementielles et 428 assertions pgTAP standard vertes sur neuf fichiers. Le harnais multi-connexion, retiré de la suite distante et borné par un runner localhost explicite, ajoute 12 assertions concurrentes vertes. La couverture prouve notamment la transition vers modération, la suppression Admin, les courses parent/enfant/lieu, la confidentialité et la publication obligatoire des lieux actifs, l'intégrité privilégiée, le cascade parent, HTTPS, capacité, normalisation et localisation. Le lint `public`/`app_private`, la requête directe du seed, l'historique local des migrations, l'intégrité du dépôt et la porte Gradle `spotlessCheck detekt check` sont verts. Le seul projet Supabase visible par le compte connecté n'est pas un environnement Kwabor, donc ses advisors ne constituent pas une preuve de ce schéma local.
+- La PR brouillon EXPLORE-002B1 `#42` est publiée au-dessus d'EXPLORE-002A `#41`. Sa CI et sa revue humaine restent requises avant fusion.
 
 ## Tâche en cours
 
-Faire relire EXPLORE-002A `#41`, puis la fusionner seulement après OFFLINE-001 `#40` en conservant la séquence de la pile. Publier EXPLORE-002B1 au-dessus de `#41`, puis figer les trois décisions produit nécessaires au RPC/cursor v2 sans introduire de classement client divergent. Les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Faire relire EXPLORE-002A `#41`, puis la fusionner seulement après OFFLINE-001 `#40` en conservant la séquence de la pile. Faire valider la CI et la revue humaine d'EXPLORE-002B1 `#42`, puis figer les trois décisions produit nécessaires au RPC/cursor v2 sans introduire de classement client divergent. Les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -236,7 +237,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier EXPLORE-002B1 au-dessus de `#41`, puis faire approuver et fusionner la pile
-`#35` → `#36` → `#37` → `#38` → `#39` → `#40` → `#41` → EXPLORE-002B1. Le sous-lot suivant doit
+Faire approuver et fusionner la pile
+`#35` → `#36` → `#37` → `#38` → `#39` → `#40` → `#41` → `#42`. Le sous-lot suivant doit
 faire valider popularité, plafond sponsorisé et intervalles de dates avant de versionner le RPC/cursor
 et les contrats mobile. La revue appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire.
