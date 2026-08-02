@@ -10,7 +10,7 @@ Toute collecte est désactivée au premier lancement :
 - la personnalisation publicitaire et la collecte de l'identifiant publicitaire Android sont désactivées ;
 - iOS utilise `FirebaseAnalyticsCore`, sans capacité IDFA, et désactive aussi l'IDFV Analytics ;
 - Remote Config n'effectue aucun fetch tant que son consentement explicite n'est pas accordé ;
-- un retrait remet immédiatement la configuration distante aux valeurs sûres, suspend la collecte et supprime les rapports de crash non envoyés ;
+- un retrait arrête immédiatement les nouveaux fetch/listeners Remote Config, invalide leurs callbacks applicatifs, suspend la collecte et supprime les rapports de crash non envoyés ;
 - aucun user ID Firebase, email, nom, téléphone, texte de recherche ou contenu libre n'est accepté par le contrat Analytics.
 
 Les trois consentements persistés sont indépendants : mesure d'usage, diagnostics et configuration distante. L'écran d'inscription les raccorde dans `AUTH-003` au moment où l'utilisateur confirme ses choix, juste avant la finalisation atomique du compte ; le réglage utilisateur reste à livrer dans `PROF-002`. Tant qu'un choix explicite n'a pas été validé, les valeurs restent toutes à `false`.
@@ -34,20 +34,30 @@ Les dimensions émises pour chaque événement sont :
 
 ## Remote Config
 
-Les seules clés autorisées par cette fondation concernent le remplacement de la vidéo d'intro :
+La vidéo d'intro n'utilise plus Remote Config. Les quatre anciennes clés média, tout transport
+d'URL ou d'octets éditoriaux et toute logique de téléchargement/cache sont interdits par
+l'[ADR-0021](adr/0021-store-released-onboarding-media.md). Le média est embarqué, révisionné et
+publié exclusivement avec les versions Store.
 
-| Clé | Défaut embarqué | Validation |
-|---|---:|---|
-| `intro_video_enabled` | `false` | doit être explicitement vrai |
-| `intro_video_url` | vide | HTTPS, hôte présent, aucun userinfo, 2048 caractères maximum |
-| `intro_video_sha256` | vide | exactement 64 caractères hexadécimaux |
-| `intro_video_revision` | `0` | entier signé 64 bits strictement positif |
+Remote Config reste disponible après consentement pour des valeurs UX et feature flags sûrs selon
+l'ADR-0013. Chaque futur paramètre doit être approuvé avec :
 
-Une valeur encore absente des données actives du service ou invalide rejette l'ensemble distant sans effacer la dernière révision déjà validée ; à défaut, l'asset embarqué reste la valeur sûre. Seul `intro_video_enabled=false` dont la source Firebase est distante désactive explicitement la campagne et purge l'attente : la valeur par défaut locale `false` signifie « configuration indisponible », pas « ordre de suppression ». La désactivation et la révocation utilisent une intention de purge locale persistée et acquittée uniquement après suppression vérifiée de la métadonnée et du cache ; toute intention non acquittée bloque les candidats et est reprise au lancement suivant. Après consentement, un listener Remote Config temps réel détecte les nouvelles publications et active seulement les changements qui touchent ces quatre clés. Le fetch production de douze heures reste le mécanisme de rattrapage ; aucun polling agressif n'est ajouté. Le listener est retiré à la révocation du consentement. Remote Config ne porte aucune autorisation, règle RLS, limite serveur, prix ou décision de paiement.
+- une clé explicitement allowlistée et un type fermé ;
+- une valeur sûre embarquée qui reste fonctionnelle sans Firebase ni réseau ;
+- des bornes et une validation fail-closed sur Android et iOS ;
+- des tests de consentement, révocation, valeur absente/invalide et parité plateforme ;
+- une documentation opérateur et un propriétaire nommé.
 
-Le projet Firebase doit avoir l'API **Firebase Remote Config Realtime** activée. Le super-admin publie une révision strictement croissante depuis la console Firebase avec l'URL CDN et le SHA-256 du média. Les clients préchargent la révision validée puis la présentent une seule fois au lancement suivant ; une publication ne peut jamais interrompre une session en cours.
+Remote Config ne transporte aucun média ou URL de contenu et ne porte aucune autorisation, règle
+RLS, limite serveur, prix ou décision de paiement. Aucun dictionnaire arbitraire de flags n'est
+exposé au domaine partagé. Tant qu'aucun flag concret n'est approuvé, les adaptateurs conservent la
+capacité Firebase générique et leurs valeurs sûres sans inventer de contrat produit.
 
-Le téléchargement, la validation codec/durée/taille et la révocation du média sont détaillés dans le [runbook onboarding](onboarding.md), le [runbook opérateur de publication](runbooks/onboarding-video-publication.md) et l'[ADR-0016](adr/0016-consent-gated-onboarding-media.md).
+Firebase peut terminer en interne une opération `fetch`/`activate` déjà remise au SDK juste avant
+une révocation ; cette cache SDK n'est jamais une autorité ni une valeur directement exposée. Tout
+futur lecteur typé doit vérifier le consentement au moment de chaque lecture et retourner sa valeur
+embarquée sûre lorsque le consentement est absent. Les générations de session empêchent en plus
+les callbacks obsolètes de publier un état ou un diagnostic après révocation/réactivation.
 
 ## Configuration des builds
 

@@ -30,9 +30,9 @@ After the platform splash is actually removed, the full wordmark must be drawn i
 window for at least 500 ms across distinct display frames. The intro player is attached behind
 that wordmark, prepared paused at position zero, and may play only when the surface, continuity
 barrier and foreground lifecycle are all ready.
-On returning launches, the same full wordmark also covers any pending local decision about a
-cached remote intro, so a slower cache check cannot expose the generic session-loading surface
-between the system mark and a required intro.
+On returning launches, the same full wordmark also covers the local bundled-revision decision,
+so an app update whose embedded intro must be shown once cannot expose the generic
+session-loading surface between the system mark and that required intro.
 
 .github/workflows/android-launch-evidence.yml automates that matrix on API 30, 31 and 36. For
 each API, `tools/capture-android-launch-evidence.sh` resets application data for every `mdpi`,

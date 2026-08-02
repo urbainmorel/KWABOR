@@ -105,6 +105,8 @@ jobs:
           fi
 
       - uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Verify repository integrity
         run: python3 tools/verify-repository-integrity.py
@@ -118,7 +120,15 @@ jobs:
           fi
 
       - name: Verify embedded onboarding media
-        run: python3 tools/verify-onboarding-media.py
+        shell: bash
+        env:
+          ONBOARDING_MEDIA_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -n "$ONBOARDING_MEDIA_BASE_REF" && ! "$ONBOARDING_MEDIA_BASE_REF" =~ ^0+$ ]]; then
+            python3 tools/verify-onboarding-media.py --base-ref "$ONBOARDING_MEDIA_BASE_REF"
+          else
+            python3 tools/verify-onboarding-media.py
+          fi
 
       - name: Verify brand asset integrity
         run: python3 tools/verify-brand-assets.py
@@ -180,6 +190,8 @@ jobs:
         run: |
           xcrun swiftc \
             iosApp/Kwabor/Onboarding/PromoterActivationSessionMarker.swift \
+            iosApp/Kwabor/Onboarding/IntroVideoPresentationStore.swift \
+            iosApp/Kwabor/Onboarding/LegacyRemoteIntroCleaner.swift \
             iosApp/PolicyTests/main.swift \
             -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
           "$RUNNER_TEMP/kwabor-ios-policy-tests"

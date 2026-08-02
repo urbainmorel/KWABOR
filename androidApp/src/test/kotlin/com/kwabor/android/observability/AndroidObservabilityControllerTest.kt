@@ -5,23 +5,14 @@ import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.domain.observability.PerformanceTraceName
-import com.kwabor.shared.domain.observability.RemoteFeatureConfiguration
-import com.kwabor.shared.domain.observability.RemoteIntroVideo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AndroidObservabilityControllerTest {
     @Test
-    fun realtimeListenerOnlyAcceptsIntroVideoKeys() {
-        assertFalse(setOf("unrelated_feature").containsIntroVideoRemoteKey())
-        assertEquals(true, setOf("intro_video_revision").containsIntroVideoRemoteKey())
-    }
-
-    @Test
-    fun start_keepsAllCollectionDisabledWithoutStoredConsent() {
+    fun startKeepsAllCollectionAndRemoteConfigurationDisabledWithoutStoredConsent() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(backend, InMemoryConsentStore())
 
@@ -37,7 +28,7 @@ class AndroidObservabilityControllerTest {
     }
 
     @Test
-    fun updateConsent_persistsChoiceAndGatesEveryBackendCapability() {
+    fun updateConsentPersistsChoiceAndGatesEveryBackendCapability() {
         val backend = FakeObservabilityBackend()
         val store = InMemoryConsentStore()
         val controller = AndroidObservabilityController(backend, store)
@@ -57,12 +48,12 @@ class AndroidObservabilityControllerTest {
         assertEquals(1, backend.events.size)
         assertEquals(listOf(DiagnosticCode.UnexpectedApplicationState), backend.diagnostics)
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
-        assertEquals(REMOTE_CONFIGURATION, controller.remoteConfiguration.value)
+        assertTrue(backend.remoteConfigurationFetched)
         assertEquals(1, backend.remoteUpdateStartCount)
     }
 
     @Test
-    fun updateConsentDoesNotApplyOrPublishChoiceWhenDurableWriteFails() {
+    fun updateConsentDoesNotApplyChoiceWhenDurableWriteFails() {
         val backend = FakeObservabilityBackend()
         val store = InMemoryConsentStore(writesSucceed = false)
         val controller = AndroidObservabilityController(backend, store)
@@ -77,7 +68,7 @@ class AndroidObservabilityControllerTest {
     }
 
     @Test
-    fun revokingConsent_revertsToSafeConfigAndStopsFurtherCollection() {
+    fun revokingConsentStopsRemoteUpdatesAndFurtherCollection() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
@@ -95,79 +86,70 @@ class AndroidObservabilityControllerTest {
         controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
         controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
 
-        assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
         assertEquals(emptyList(), backend.events)
         assertEquals(emptyList(), backend.diagnostics)
         assertEquals(1, backend.remoteUpdateStopCount)
     }
 
     @Test
-    fun realtimeRemoteConfigUpdateIsPublishedOnlyWhileConsentRemainsGranted() {
-        val backend = FakeObservabilityBackend()
+    fun failedGenericRemoteConfigurationFetchIsReportedOnlyWithDiagnosticsConsent() {
+        val backend = FakeObservabilityBackend(fetchSucceeds = false)
         val controller = AndroidObservabilityController(
             backend,
-            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+            InMemoryConsentStore(
+                ObservabilityConsent(
+                    diagnosticsAllowed = true,
+                    remoteConfigurationAllowed = true,
+                ),
+            ),
         )
+
         controller.start()
 
-        backend.emitRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
-
-        assertEquals(NEWER_REMOTE_CONFIGURATION, controller.remoteConfiguration.value)
-
-        controller.updateConsent(ObservabilityConsent())
-        backend.emitRemoteUpdate(REMOTE_CONFIGURATION)
-
-        assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
-        assertEquals(1, backend.remoteUpdateStopCount)
+        assertEquals(listOf(DiagnosticCode.RemoteConfigurationFetchFailed), backend.diagnostics)
     }
 
     @Test
-    fun staleRealtimeCallbackCannotRepublishConfigurationAfterConsentRevocation() {
+    fun staleRemoteConfigurationCallbackCannotReportAfterConsentRevocation() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
-            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+            InMemoryConsentStore(
+                ObservabilityConsent(
+                    diagnosticsAllowed = true,
+                    remoteConfigurationAllowed = true,
+                ),
+            ),
         )
         controller.start()
 
-        controller.updateConsent(ObservabilityConsent())
-        backend.emitStaleRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
+        controller.updateConsent(ObservabilityConsent(diagnosticsAllowed = true))
+        backend.emitStaleRemoteUpdate(succeeded = false)
 
-        assertSame(RemoteFeatureConfiguration.SafeDefaults, controller.remoteConfiguration.value)
-        controller.close()
+        assertEquals(emptyList(), backend.diagnostics)
     }
 
     @Test
-    fun remoteMediaSubscriptionsReceiveIndependentSnapshotsAndUpdates() {
+    fun genericRealtimeRemoteConfigurationFailureIsReportedWhileConsentRemainsGranted() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
-            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+            InMemoryConsentStore(
+                ObservabilityConsent(
+                    diagnosticsAllowed = true,
+                    remoteConfigurationAllowed = true,
+                ),
+            ),
         )
         controller.start()
-        val first = controller.openRemoteMediaSubscription()
-        val second = controller.openRemoteMediaSubscription()
 
-        assertTrue(first.events.tryReceive().getOrNull() is AndroidRemoteMediaEvent.Snapshot)
-        assertTrue(second.events.tryReceive().getOrNull() is AndroidRemoteMediaEvent.Snapshot)
+        backend.emitRemoteUpdate(succeeded = false)
 
-        backend.emitRemoteUpdate(NEWER_REMOTE_CONFIGURATION)
-
-        assertEquals(
-            NEWER_REMOTE_CONFIGURATION,
-            (first.events.tryReceive().getOrNull() as AndroidRemoteMediaEvent.ConfigurationChanged).configuration,
-        )
-        assertEquals(
-            NEWER_REMOTE_CONFIGURATION,
-            (second.events.tryReceive().getOrNull() as AndroidRemoteMediaEvent.ConfigurationChanged).configuration,
-        )
-        first.close()
-        second.close()
-        controller.close()
+        assertEquals(listOf(DiagnosticCode.RemoteConfigurationFetchFailed), backend.diagnostics)
     }
 
     @Test
-    fun closeRemovesRealtimeRemoteConfigListener() {
+    fun closeRemovesTheGenericRealtimeRemoteConfigurationListener() {
         val backend = FakeObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
@@ -185,29 +167,17 @@ private class InMemoryConsentStore(
     var consent: ObservabilityConsent = ObservabilityConsent(),
     private val writesSucceed: Boolean = true,
 ) : ObservabilityConsentStore {
-    private var purgeState = RemoteMediaPurgeState()
-
     override fun read(): ObservabilityConsent = consent
 
     override fun write(consent: ObservabilityConsent): Boolean {
         if (writesSucceed) this.consent = consent
         return writesSucceed
     }
-
-    override fun readRemoteMediaPurgeState(): RemoteMediaPurgeState = purgeState
-
-    override fun writeRequiredRemoteMediaPurgeEpoch(epoch: RemoteMediaPurgeEpoch): Boolean {
-        purgeState = purgeState.copy(required = epoch)
-        return true
-    }
-
-    override fun writeAcknowledgedRemoteMediaPurgeEpoch(epoch: RemoteMediaPurgeEpoch): Boolean {
-        purgeState = purgeState.copy(acknowledged = epoch)
-        return true
-    }
 }
 
-private class FakeObservabilityBackend : AndroidObservabilityBackend {
+private class FakeObservabilityBackend(
+    private val fetchSucceeds: Boolean = true,
+) : AndroidObservabilityBackend {
     override val isConfigured: Boolean = true
     var appliedConsent = ObservabilityConsent()
     val events = mutableListOf<AnalyticsEvent>()
@@ -216,8 +186,8 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
     var remoteConfigurationFetched = false
     var remoteUpdateStartCount = 0
     var remoteUpdateStopCount = 0
-    var remoteUpdateCallback: ((RemoteFeatureConfiguration?) -> Unit)? = null
-    var staleRemoteUpdateCallback: ((RemoteFeatureConfiguration?) -> Unit)? = null
+    var remoteUpdateCallback: ((Boolean) -> Unit)? = null
+    var staleRemoteUpdateCallback: ((Boolean) -> Unit)? = null
     val remoteUpdatesStarted: Boolean get() = remoteUpdateCallback != null
 
     override fun applyConsent(consent: ObservabilityConsent) {
@@ -244,14 +214,12 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
         return PerformanceTrace.None
     }
 
-    override fun fetchRemoteConfiguration(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
         remoteConfigurationFetched = true
-        onResult(REMOTE_CONFIGURATION)
+        onResult(fetchSucceeds)
     }
 
-    override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = null
-
-    override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun startRemoteConfigurationUpdates(onResult: (Boolean) -> Unit) {
         remoteUpdateStartCount += 1
         remoteUpdateCallback = onResult
         staleRemoteUpdateCallback = onResult
@@ -262,26 +230,11 @@ private class FakeObservabilityBackend : AndroidObservabilityBackend {
         remoteUpdateCallback = null
     }
 
-    fun emitRemoteUpdate(configuration: RemoteFeatureConfiguration?) {
-        remoteUpdateCallback?.invoke(configuration)
+    fun emitRemoteUpdate(succeeded: Boolean) {
+        remoteUpdateCallback?.invoke(succeeded)
     }
 
-    fun emitStaleRemoteUpdate(configuration: RemoteFeatureConfiguration?) {
-        staleRemoteUpdateCallback?.invoke(configuration)
+    fun emitStaleRemoteUpdate(succeeded: Boolean) {
+        staleRemoteUpdateCallback?.invoke(succeeded)
     }
 }
-
-private val REMOTE_CONFIGURATION = RemoteFeatureConfiguration(
-    introVideo = RemoteIntroVideo(
-        url = "https://cdn.kwabor.example/intro.mp4",
-        sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        revision = 1,
-    ),
-)
-private val NEWER_REMOTE_CONFIGURATION = RemoteFeatureConfiguration(
-    introVideo = RemoteIntroVideo(
-        url = "https://cdn.kwabor.example/intro-v2.mp4",
-        sha256 = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
-        revision = 2,
-    ),
-)

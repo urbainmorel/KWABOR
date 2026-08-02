@@ -150,7 +150,7 @@ L'implémentation doit préparer les contrats, contrôles, runbooks et emplaceme
 - [ADR-0013 — Services mobiles Firebase](adr/0013-firebase-mobile-platform-services.md)
 - [ADR-0014 — Paiements FedaPay côté serveur](adr/0014-fedapay-server-side-payments.md)
 - [ADR-0015 — Navigation mobile native](adr/0015-native-mobile-navigation.md)
-- [ADR-0016 — Média d'onboarding conditionné au consentement](adr/0016-consent-gated-onboarding-media.md)
+- [ADR-0021 — Vidéo d'intro distribuée exclusivement avec les versions Store](adr/0021-store-released-onboarding-media.md)
 - [Runbook onboarding mobile](onboarding.md)
 
 Étape suivante : prendre le premier ticket non livré de `BACKLOG.md`, sans sauter ses dépendances.

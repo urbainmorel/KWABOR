@@ -11,6 +11,10 @@ struct KwaborApp: App {
     @MainActor
     init() {
         GoogleSignInBootstrap.configureIfPossible()
+        let legacyRemoteIntroCleaner = LegacyRemoteIntroCleaner()
+        _ = Task.detached(priority: .utility) {
+            await legacyRemoteIntroCleaner.cleanIfNeeded()
+        }
         let observability = FirebaseObservability()
         let compositionRoot = IosKwaborCompositionRoot(
             environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),

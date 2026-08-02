@@ -3,22 +3,25 @@ package com.kwabor.android
 import android.app.Application
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.observability.createAndroidObservabilityController
-import com.kwabor.android.onboarding.AndroidIntroMediaManager
-import com.kwabor.android.onboarding.AndroidIntroVideoCache
 import com.kwabor.android.onboarding.FirstLaunchStore
 import com.kwabor.android.onboarding.SharedPreferencesFirstLaunchStore
+import com.kwabor.android.onboarding.createLegacyRemoteIntroCleanup
 import com.kwabor.shared.app.DefaultDispatcherProvider
 import com.kwabor.shared.app.createAndroidKwaborCompositionRootOrNull
+import com.kwabor.shared.domain.observability.DiagnosticCode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class KwaborApplication : Application() {
     internal val launchProcessState = LaunchProcessState()
 
     lateinit var observability: AndroidObservabilityController
         private set
-    lateinit var introMediaManager: AndroidIntroMediaManager
-        private set
     internal lateinit var firstLaunchStore: FirstLaunchStore
         private set
+    private var legacyCleanupScope: CoroutineScope? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -26,20 +29,21 @@ class KwaborApplication : Application() {
         observability.start()
         val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
         firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)
-        introMediaManager = AndroidIntroMediaManager(
-            observability = observability,
-            cache = AndroidIntroVideoCache(
-                context = applicationContext,
-                dispatcherProvider = dispatcherProvider,
-            ),
-            firstLaunchStore = firstLaunchStore,
-            dispatcherProvider = dispatcherProvider,
-        )
-        introMediaManager.start()
+        legacyCleanupScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io).also { scope ->
+            scope.launch {
+                val cleanupSucceeded = runCatching {
+                    createLegacyRemoteIntroCleanup(applicationContext).run()
+                }.getOrDefault(false)
+                if (!cleanupSucceeded) {
+                    observability.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
+                }
+            }
+        }
     }
 
     override fun onTerminate() {
-        introMediaManager.close()
+        legacyCleanupScope?.cancel()
+        legacyCleanupScope = null
         observability.close()
         compositionRoot?.close()
         super.onTerminate()

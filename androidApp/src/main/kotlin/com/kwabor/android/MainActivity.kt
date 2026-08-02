@@ -177,10 +177,8 @@ class MainActivity : ComponentActivity() {
             initializer {
                 OnboardingViewModel(
                     firstLaunchStore = applicationState.firstLaunchStore,
-                    launchDecision = applicationState.introMediaManager.launchDecision,
                     track = applicationState.observability::track,
                     coroutineScope = newViewModelScope(dispatcherProvider),
-                    onIntroConsumed = applicationState.introMediaManager::onIntroConsumed,
                 )
             }
         },

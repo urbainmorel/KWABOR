@@ -3,8 +3,7 @@ package com.kwabor.shared.domain.observability
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
 
 class ObservabilityModelsTest {
     @Test
@@ -52,70 +51,14 @@ class ObservabilityModelsTest {
     }
 
     @Test
-    fun remoteConfiguration_acceptsOnlyVerifiableHttpsIntroVideo() {
-        val configuration = createRemoteFeatureConfiguration(
-            introVideoEnabled = true,
-            introVideoUrl = "https://cdn.kwabor.example/intro.mp4",
-            introVideoSha256 = VALID_SHA256.uppercase(),
-            introVideoRevision = 2,
-        )
+    fun observabilityConsent_deniesEveryCapabilityByDefault() {
+        val consent = ObservabilityConsent()
 
-        val introVideo = assertNotNull(configuration.introVideo)
-        assertEquals(VALID_SHA256, introVideo.sha256)
-        assertEquals(2, introVideo.revision)
-        assertEquals(RemoteIntroVideoStatus.Candidate, configuration.introVideoStatus)
-    }
-
-    @Test
-    fun remoteConfiguration_fallsBackSafelyWhenAnyRemoteValueIsInvalid() {
-        val invalidScheme = createRemoteFeatureConfiguration(
-            introVideoEnabled = true,
-            introVideoUrl = "http://cdn.kwabor.example/intro.mp4",
-            introVideoSha256 = VALID_SHA256,
-            introVideoRevision = 1,
-        )
-        val invalidValues = createRemoteFeatureConfiguration(
-            introVideoEnabled = true,
-            introVideoUrl = "https://user@cdn.kwabor.example/intro.mp4",
-            introVideoSha256 = "invalid",
-            introVideoRevision = 0,
-        )
-
-        assertNull(invalidScheme.introVideo)
-        assertEquals(RemoteIntroVideoStatus.Invalid, invalidScheme.introVideoStatus)
-        assertNull(invalidValues.introVideo)
-        assertEquals(RemoteIntroVideoStatus.Invalid, invalidValues.introVideoStatus)
-    }
-
-    @Test
-    fun remoteConfiguration_distinguishesExplicitDisableFromInvalidValues() {
-        val unavailable = createRemoteFeatureConfiguration(
-            introVideoAvailable = false,
-            introVideoEnabled = false,
-            introVideoUrl = null,
-            introVideoSha256 = null,
-            introVideoRevision = 0,
-        )
-        val disabled = createRemoteFeatureConfiguration(
-            introVideoEnabled = false,
-            introVideoUrl = "https://cdn.kwabor.example/ignored.mp4",
-            introVideoSha256 = VALID_SHA256,
-            introVideoRevision = 3,
-        )
-        val unsafeUrl = createRemoteFeatureConfiguration(
-            introVideoEnabled = true,
-            introVideoUrl = "https://cdn.kwabor.example/intro\\campaign.mp4",
-            introVideoSha256 = VALID_SHA256,
-            introVideoRevision = 3,
-        )
-
-        assertEquals(RemoteIntroVideoStatus.Unavailable, unavailable.introVideoStatus)
-        assertEquals(RemoteIntroVideoStatus.Disabled, disabled.introVideoStatus)
-        assertEquals(RemoteIntroVideoStatus.Invalid, unsafeUrl.introVideoStatus)
+        assertFalse(consent.analyticsAllowed)
+        assertFalse(consent.diagnosticsAllowed)
+        assertFalse(consent.remoteConfigurationAllowed)
     }
 }
-
-private const val VALID_SHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 private val EXPECTED_EVENT_NAMES = setOf(
     "view_card",

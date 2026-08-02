@@ -42,7 +42,6 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.kwabor.android.R
 import com.kwabor.android.design.KwaborSpacing
-import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.shared.i18n.KwaborStrings
 
 @Composable
@@ -79,7 +78,6 @@ private fun BoxScope.IntroPrimaryContent(
         )
         IntroPrimaryMode.VideoWithContinuity -> {
             IntroVideo(
-                mediaSource = state.mediaSource,
                 launchSplashExited = state.launchSplashExited,
                 actions = actions,
                 modifier = Modifier.fillMaxSize(),
@@ -141,48 +139,29 @@ internal data class IntroScreenActions(
 )
 
 internal data class IntroScreenState(
-    val mediaSource: IntroMediaSource,
     val reducedMotion: Boolean,
     val staticFallbackRequired: Boolean,
     val launchSplashExited: Boolean,
 )
 
 @Composable
-private fun IntroVideo(
-    mediaSource: IntroMediaSource,
-    launchSplashExited: Boolean,
-    actions: IntroScreenActions,
-    modifier: Modifier = Modifier,
-) {
+private fun IntroVideo(launchSplashExited: Boolean, actions: IntroScreenActions, modifier: Modifier = Modifier) {
     IntroVideoPlayback(
-        mediaSource = mediaSource,
         launchSplashExited = launchSplashExited,
         onCompleted = actions.onCompleted,
-        onFailure = {
-            when (mediaSource.failureAction()) {
-                IntroPlaybackFailureAction.ShowStaticFallback -> {
-                    actions.onPlaybackFailed()
-                }
-                IntroPlaybackFailureAction.CompleteIntro -> actions.onCompleted()
-            }
-        },
+        onFailure = actions.onPlaybackFailed,
         modifier = modifier,
     )
 }
 
 @Composable
 private fun IntroVideoPlayback(
-    mediaSource: IntroMediaSource,
     launchSplashExited: Boolean,
     onCompleted: () -> Unit,
     onFailure: () -> Unit,
     modifier: Modifier,
 ) {
-    val bundledMediaUri = rememberBundledMediaUri(R.raw.kwabor_intro)
-    val mediaUri = when (mediaSource) {
-        IntroMediaSource.Bundled -> bundledMediaUri
-        is IntroMediaSource.Remote -> Uri.fromFile(mediaSource.file)
-    }
+    val mediaUri = rememberBundledMediaUri(R.raw.kwabor_intro)
     var continuityVisibility by remember(mediaUri) {
         mutableStateOf(IntroContinuityVisibility.Visible)
     }
@@ -330,16 +309,6 @@ internal class IntroContinuityBarrier(
     private companion object {
         const val MINIMUM_DISTINCT_FRAME_COUNT = 2
     }
-}
-
-internal enum class IntroPlaybackFailureAction {
-    ShowStaticFallback,
-    CompleteIntro,
-}
-
-internal fun IntroMediaSource.failureAction(): IntroPlaybackFailureAction = when (this) {
-    IntroMediaSource.Bundled -> IntroPlaybackFailureAction.CompleteIntro
-    is IntroMediaSource.Remote -> IntroPlaybackFailureAction.ShowStaticFallback
 }
 
 @Composable

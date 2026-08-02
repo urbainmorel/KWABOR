@@ -1,10 +1,11 @@
 # 0016 — Garantir l'intro embarquée et conditionner son remplacement distant au consentement
 
-- **Statut** : accepté
+- **Statut** : remplacé par ADR-0021
 - **Date** : 2026-07-14
 - **Dernière clarification** : 2026-07-31
 - **Décideurs** : Équipe
 - **Remplace** : —
+- **Remplacé par** : [ADR-0021](0021-store-released-onboarding-media.md)
 
 ## Contexte et problème
 

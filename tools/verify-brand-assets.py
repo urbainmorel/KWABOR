@@ -721,20 +721,16 @@ def verify_android_splash_xml() -> None:
         "player.setMediaItem(MediaItem.fromUri(mediaUri), true)",
     )
     require_text(
-        "androidApp/src/main/kotlin/com/kwabor/android/app/KwaborApp.kt",
-        "RestoringLaunchContent.Wordmark -> LaunchDecisionPendingScreen(strings = strings)",
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "setImageResource(R.drawable.kwabor_launch_wordmark)",
     )
     require_text(
-        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
-        "painter = painterResource(R.drawable.kwabor_launch_wordmark)",
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "scaleType = ImageView.ScaleType.FIT_CENTER",
     )
     require_text(
-        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
-        "contentScale = ContentScale.Fit",
-    )
-    require_text(
-        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/LaunchDecisionPendingScreen.kt",
-        ".background(colorResource(R.color.kwabor_wordmark_background))",
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "setBackgroundColor(context.getColor(R.color.kwabor_wordmark_background))",
     )
 
 

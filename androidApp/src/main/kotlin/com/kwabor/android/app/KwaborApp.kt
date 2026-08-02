@@ -52,9 +52,6 @@ import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenActions
-import com.kwabor.android.ui.screens.onboarding.LaunchDecisionPendingScreen
-import com.kwabor.android.ui.screens.onboarding.RestoringLaunchContent
-import com.kwabor.android.ui.screens.onboarding.restoringLaunchContent
 import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
 import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
 import com.kwabor.shared.domain.auth.AuthenticationMethod
@@ -179,16 +176,12 @@ private class KwaborCollectedState(
         )
 
     val onboardingEntry: OnboardingEntry
-        get() = if (onboarding.isLaunchDecisionComplete) {
-            OnboardingEntryResolver.resolve(
-                firstLaunchCompleted = !onboarding.isIntroRequired,
-                sessionRestoreCompleted = isSessionRestoreComplete,
-                isAuthenticated = auth.isAuthenticated,
-                guestAccessGranted = onboarding.isGuestSession,
-            )
-        } else {
-            OnboardingEntry.RestoringSession
-        }
+        get() = OnboardingEntryResolver.resolve(
+            firstLaunchCompleted = !onboarding.isIntroRequired,
+            sessionRestoreCompleted = isSessionRestoreComplete,
+            isAuthenticated = auth.isAuthenticated,
+            guestAccessGranted = onboarding.isGuestSession,
+        )
 }
 
 private data class CollectedAuthenticationState(
@@ -307,17 +300,9 @@ private fun KwaborEntryContent(
     onDeepLinkConsumed: () -> Unit,
 ) {
     when (entry) {
-        OnboardingEntry.RestoringSession -> when (
-            restoringLaunchContent(
-                isLaunchDecisionComplete = state.onboarding.isLaunchDecisionComplete,
-            )
-        ) {
-            RestoringLaunchContent.Wordmark -> LaunchDecisionPendingScreen(strings = strings)
-            RestoringLaunchContent.Progress -> SessionRestoreScreen(strings = strings)
-        }
+        OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
         OnboardingEntry.Intro -> KwaborIntroRoute(
             strings = strings,
-            mediaSource = state.onboarding.introMediaSource,
             staticFallbackRequired = state.onboarding.isStaticIntroFallbackRequired,
             viewModel = dependencies.onboardingViewModel,
             launchSplashExited = state.launchSplashExited,

@@ -31,6 +31,7 @@ Les règles suivantes sont obligatoires :
 - Analytics respecte le consentement et n'enregistre pas de PII ;
 - Crashlytics filtre toute donnée utilisateur sensible ;
 - Remote Config pilote des valeurs UX et feature flags, jamais une autorisation, un prix, un paiement ou une règle RLS ;
+- Remote Config ne transporte aucun média ou URL de contenu ; la vidéo d'intro est distribuée exclusivement avec les versions Store selon l'ADR-0021 ;
 - des valeurs sûres sont embarquées, le dernier Remote Config valide est mis en cache et une configuration invalide est rejetée ;
 - les fichiers de configuration et secrets spécifiques aux environnements sont injectés par CI et ne sont pas versionnés avec des valeurs réelles.
 

@@ -6,15 +6,16 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 
 | Élément | État |
 | --- | --- |
-| Date du snapshot | 31 juillet 2026 |
+| Date du snapshot | 2 août 2026 |
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/brand-002-launch-master`, empilée sur `codex/stab-003-repo-integrity` |
+| Branche active | `codex/intro-store-release-only`, empilée sur `codex/explore-002b-contract` (`#42`) |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
+| Retrait média distant | INTRO-STORE-001 en cours sur `codex/intro-store-release-only`, à publier au-dessus de `#42` |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -41,7 +42,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - BRAND-002 corrige le réagrandissement du splash Android : canevas 288 dp séparés du launcher 108 dp, cinq densités dérivées directement du master 1254 px, hashes/géométrie/câblage XML verrouillés et iOS inchangé.
 - Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte.
 - Le run de clôture `30661731938` du commit `94a31d5` a produit les neuf cellules API 30/31/36 × `mdpi`/`xhdpi`/`xxxhdpi` et passé ses sept checks. Archives, hashes, dimensions, états et médias sont techniquement conformes 9/9 ; les neuf preuves continues montrent perceptuellement HOME → monogramme → wordmark complet → intro.
-- REMOTE-INTRO-001 est implémenté sur Android/iOS/shared dans la PR `#38` : première installation embarquée et offline, média distant compatible précaché après consentement, présenté une fois au lancement suivant, puis mis en quarantaine/purgé en cas d'échec, désactivation ou révocation. Les octets éditoriaux compatibles peuvent changer sans Store ; le lecteur, le contrat, le fallback, le consentement ou le comportement exigent une release. Le canal n'est pas live avant ENV-001B/OBS-001B, CDN HTTPS immuable, IAM minimal et validation appareils.
+- REMOTE-INTRO-001 a été implémenté historiquement dans la PR `#38`, mais ADR-0021 le supersède avant la V1. INTRO-STORE-001 retire URL/téléchargement/cache/purge distants, conserve Remote Config générique et impose une révision embarquée Android/iOS distribuée exclusivement par release Store.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
@@ -98,7 +99,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Retargeter, relire puis fusionner la PR STAB-003 `#37`, puis BRAND-002/REMOTE-INTRO `#38`.
+3. Terminer et publier INTRO-STORE-001 au-dessus de `#42`, puis fusionner la pile en garantissant que le canal distant de `#38` n'atteint jamais une release V1 active.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.
@@ -117,7 +118,7 @@ Objectifs :
 - Aucun troisième client applicatif n’est introduit pour l’administration.
 - Les dispatchers sont une dépendance de couche application ; le domaine reste Kotlin pur et ne dépend d'aucun SDK asynchrone.
 - La gate d'architecture vérifie des règles déterministes d'emplacement et d'import ; une isolation physique de classpath nécessiterait un module et un ADR séparés.
-- Un remplacement d'octets vidéo conforme au contrat média est éditorial et distant ; toute modification du lecteur, du contrat, du fallback, du consentement ou du comportement passe par une release Store.
+- Tout changement des octets vidéo exige des actifs Android/iOS byte-identical, l'incrément simultané des deux révisions embarquées et une release Store ; Remote Config reste réservé aux flags UX sûrs et ne transporte aucun média.
 
 ## Problèmes rencontrés
 

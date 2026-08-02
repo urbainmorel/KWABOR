@@ -21,7 +21,7 @@
 		1A0000010000000000000050 /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000056 /* FirebasePerformance */; };
 		1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000057 /* FirebaseRemoteConfig */; };
 		1A0000010000000000000060 /* OnboardingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000061 /* OnboardingCoordinator.swift */; };
-		1A0000010000000000000062 /* IntroVideoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000063 /* IntroVideoCache.swift */; };
+		1A0000010000000000000062 /* LegacyRemoteIntroCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */; };
 		1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000065 /* IntroVideoPlayer.swift */; };
 		1A0000010000000000000066 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000067 /* OnboardingView.swift */; };
 		1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000069 /* AuthenticationSheet.swift */; };
@@ -40,6 +40,7 @@
 		1A000001000000000000008A /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000089 /* AccountDeletionView.swift */; };
 		1A000001000000000000008C /* PromoterActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008B /* PromoterActivationView.swift */; };
 		1A000001000000000000008E /* PromoterActivationSessionMarker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008D /* PromoterActivationSessionMarker.swift */; };
+		1A0000010000000000000090 /* IntroVideoPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000091 /* IntroVideoPresentationStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,7 +61,7 @@
 		1A0000010000000000000041 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		1A0000010000000000000045 /* FirebaseObservability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseObservability.swift; sourceTree = "<group>"; };
 		1A0000010000000000000061 /* OnboardingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingCoordinator.swift; sourceTree = "<group>"; };
-		1A0000010000000000000063 /* IntroVideoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoCache.swift; sourceTree = "<group>"; };
+		1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRemoteIntroCleaner.swift; sourceTree = "<group>"; };
 		1A0000010000000000000065 /* IntroVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoPlayer.swift; sourceTree = "<group>"; };
 		1A0000010000000000000067 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		1A0000010000000000000069 /* AuthenticationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationSheet.swift; sourceTree = "<group>"; };
@@ -77,6 +78,7 @@
 		1A0000010000000000000089 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
 		1A000001000000000000008B /* PromoterActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationView.swift; sourceTree = "<group>"; };
 		1A000001000000000000008D /* PromoterActivationSessionMarker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationSessionMarker.swift; sourceTree = "<group>"; };
+		1A0000010000000000000091 /* IntroVideoPresentationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoPresentationStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,7 +186,8 @@
 			isa = PBXGroup;
 			children = (
 				1A0000010000000000000061 /* OnboardingCoordinator.swift */,
-				1A0000010000000000000063 /* IntroVideoCache.swift */,
+				1A0000010000000000000091 /* IntroVideoPresentationStore.swift */,
+				1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */,
 				1A0000010000000000000065 /* IntroVideoPlayer.swift */,
 				1A0000010000000000000067 /* OnboardingView.swift */,
 				1A0000010000000000000069 /* AuthenticationSheet.swift */,
@@ -353,7 +356,8 @@
 				1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */,
 				1A0000010000000000000030 /* RootNavigation.swift in Sources */,
 				1A0000010000000000000060 /* OnboardingCoordinator.swift in Sources */,
-				1A0000010000000000000062 /* IntroVideoCache.swift in Sources */,
+				1A0000010000000000000090 /* IntroVideoPresentationStore.swift in Sources */,
+				1A0000010000000000000062 /* LegacyRemoteIntroCleaner.swift in Sources */,
 				1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */,
 				1A0000010000000000000066 /* OnboardingView.swift in Sources */,
 				1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */,

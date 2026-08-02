@@ -230,3 +230,127 @@ expect(
     !PromoterActivationLinkRoutingPolicy.hasPkceCode(callbackB),
     "A token-only callback must not be classified as PKCE."
 )
+
+private func isolatedDefaults(label: String) -> (defaults: UserDefaults, suiteName: String) {
+    let suiteName = "com.kwabor.policy-tests.\(label).\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        fatalError("The isolated UserDefaults suite must be available.")
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    return (defaults, suiteName)
+}
+
+private let legacyMigrationDefaults = isolatedDefaults(label: "legacy-intro")
+legacyMigrationDefaults.defaults.set(true, forKey: "kwabor.first_launch.intro_seen_v1")
+let migratedIntroStore = IntroVideoPresentationStore(userDefaults: legacyMigrationDefaults.defaults)
+expect(
+    migratedIntroStore.lastPresentedBundledRevision == 1,
+    "A completed legacy first launch must migrate to the fixed bundled revision 1 baseline."
+)
+expect(
+    migratedIntroStore.pendingBundledRevision() == nil,
+    "The initial bundled revision must not replay after legacy first-launch migration."
+)
+expect(
+    migratedIntroStore.pendingBundledRevision(currentRevision: 2) == 2,
+    "A strictly newer bundled revision must be presented once after an app update."
+)
+migratedIntroStore.markBundledVideoPresented(revision: 2)
+expect(
+    migratedIntroStore.pendingBundledRevision(currentRevision: 2) == nil,
+    "A bundled revision already presented must not replay."
+)
+expect(
+    migratedIntroStore.pendingBundledRevision(currentRevision: 3) == 3,
+    "Skipping directly to a later bundled revision must still present that newer revision."
+)
+legacyMigrationDefaults.defaults.removePersistentDomain(forName: legacyMigrationDefaults.suiteName)
+
+private let freshInstallDefaults = isolatedDefaults(label: "fresh-intro")
+let freshIntroStore = IntroVideoPresentationStore(userDefaults: freshInstallDefaults.defaults)
+expect(
+    freshIntroStore.pendingBundledRevision() == 1,
+    "A fresh installation must present the initial bundled revision."
+)
+freshIntroStore.markBundledVideoPresented(revision: 1)
+expect(
+    freshIntroStore.pendingBundledRevision() == nil,
+    "The initial bundled revision must be consumed exactly once."
+)
+freshInstallDefaults.defaults.removePersistentDomain(forName: freshInstallDefaults.suiteName)
+
+private let cleanupDefaults = isolatedDefaults(label: "remote-intro-cleanup")
+legacyRemoteIntroPreferenceKeys.forEach { key in
+    cleanupDefaults.defaults.set("legacy", forKey: key)
+}
+cleanupDefaults.defaults.set(true, forKey: "kwabor.first_launch.intro_seen_v1")
+cleanupDefaults.defaults.set(true, forKey: "kwabor.observability.remote_configuration_allowed")
+let cleanupRoot = FileManager.default.temporaryDirectory.appending(
+    path: "kwabor-policy-tests-\(UUID().uuidString)",
+    directoryHint: .isDirectory
+)
+let legacyCacheDirectory = cleanupRoot.appending(
+    path: legacyRemoteIntroCacheDirectoryName,
+    directoryHint: .isDirectory
+)
+do {
+    try FileManager.default.createDirectory(at: legacyCacheDirectory, withIntermediateDirectories: true)
+    try Data([0x00]).write(to: legacyCacheDirectory.appending(path: "intro-legacy.mp4"))
+} catch {
+    fatalError("The legacy cache fixture must be writable: \(error)")
+}
+expect(
+    cleanLegacyRemoteIntroStorage(
+        fileManager: .default,
+        userDefaults: cleanupDefaults.defaults,
+        cacheDirectory: legacyCacheDirectory
+    ),
+    "Legacy remote intro storage cleanup must complete."
+)
+expect(
+    legacyRemoteIntroPreferenceKeys.allSatisfy {
+        cleanupDefaults.defaults.object(forKey: $0) == nil
+    },
+    "Every app-owned remote intro preference must be removed."
+)
+expect(
+    !FileManager.default.fileExists(atPath: legacyCacheDirectory.path),
+    "The app-owned remote intro cache directory must be removed."
+)
+expect(
+    cleanupDefaults.defaults.bool(forKey: "kwabor.first_launch.intro_seen_v1"),
+    "Legacy cleanup must preserve first-launch state."
+)
+expect(
+    cleanupDefaults.defaults.bool(forKey: "kwabor.observability.remote_configuration_allowed"),
+    "Legacy cleanup must preserve generic Remote Config consent."
+)
+expect(
+    cleanupDefaults.defaults.bool(forKey: legacyRemoteIntroCleanupCompletedKey),
+    "Legacy cleanup must persist its one-time completion marker."
+)
+expect(
+    cleanLegacyRemoteIntroStorage(
+        fileManager: .default,
+        userDefaults: cleanupDefaults.defaults,
+        cacheDirectory: nil
+    ),
+    "A completed legacy cleanup must remain idempotent."
+)
+cleanupDefaults.defaults.removePersistentDomain(forName: cleanupDefaults.suiteName)
+try? FileManager.default.removeItem(at: cleanupRoot)
+
+private let unavailableCacheDefaults = isolatedDefaults(label: "unavailable-cache-root")
+expect(
+    cleanLegacyRemoteIntroStorage(
+        fileManager: .default,
+        userDefaults: unavailableCacheDefaults.defaults,
+        cacheDirectory: nil
+    ),
+    "An unavailable cache root must be treated as an already absent legacy cache."
+)
+expect(
+    unavailableCacheDefaults.defaults.bool(forKey: legacyRemoteIntroCleanupCompletedKey),
+    "Cleanup without a cache root must still persist its completion marker."
+)
+unavailableCacheDefaults.defaults.removePersistentDomain(forName: unavailableCacheDefaults.suiteName)

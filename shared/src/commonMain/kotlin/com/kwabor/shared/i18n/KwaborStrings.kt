@@ -298,7 +298,7 @@ private val frenchStrings = KwaborStrings(
     registrationObservabilityTitle = "Aidez-nous à améliorer Kwabor",
     registrationAnalyticsConsent = "Autoriser les mesures d'usage anonymisées",
     registrationDiagnosticsConsent = "Autoriser les diagnostics de stabilité",
-    registrationRemoteConfigConsent = "Autoriser les mises à jour de contenu à distance",
+    registrationRemoteConfigConsent = "Autoriser les ajustements de configuration à distance",
     registrationNotificationTitle = "Restez informé",
     registrationNotificationSupport =
     "Recevez les nouveautés utiles près de votre ville. Vous gardez le contrôle dans les paramètres.",

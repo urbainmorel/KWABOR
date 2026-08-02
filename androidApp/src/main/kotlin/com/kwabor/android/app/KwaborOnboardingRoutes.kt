@@ -2,7 +2,6 @@ package com.kwabor.android.app
 
 import android.animation.ValueAnimator
 import androidx.compose.runtime.Composable
-import com.kwabor.android.onboarding.IntroMediaSource
 import com.kwabor.android.presentation.onboarding.OnboardingIntent
 import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
@@ -16,7 +15,6 @@ import com.kwabor.shared.i18n.KwaborStrings
 @Composable
 internal fun KwaborIntroRoute(
     strings: KwaborStrings,
-    mediaSource: IntroMediaSource,
     staticFallbackRequired: Boolean,
     viewModel: OnboardingViewModel,
     launchSplashExited: Boolean,
@@ -24,7 +22,6 @@ internal fun KwaborIntroRoute(
     IntroScreen(
         strings = strings,
         state = IntroScreenState(
-            mediaSource = mediaSource,
             reducedMotion = !ValueAnimator.areAnimatorsEnabled(),
             staticFallbackRequired = staticFallbackRequired,
             launchSplashExited = launchSplashExited,

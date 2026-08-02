@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate embedded or remotely published Kwabor onboarding videos."""
+"""Validate the Store-released Kwabor onboarding assets and revision contract."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -23,16 +23,64 @@ ANDROID_FALLBACK = REPOSITORY_ROOT / "androidApp/src/main/res/drawable-nodpi/kwa
 IOS_FALLBACK = (
     REPOSITORY_ROOT / "iosApp/Kwabor/Resources/Assets.xcassets/IntroFallback.imageset/IntroFallback.png"
 )
+ANDROID_REVISION_SOURCE = (
+    REPOSITORY_ROOT / "androidApp/src/main/kotlin/com/kwabor/android/onboarding/FirstLaunchStore.kt"
+)
+IOS_REVISION_SOURCE = REPOSITORY_ROOT / "iosApp/Kwabor/Onboarding/IntroVideoPresentationStore.swift"
+STORE_ONLY_ADR = REPOSITORY_ROOT / "docs/adr/0021-store-released-onboarding-media.md"
 MAX_SIZE_BYTES = 3 * 1024 * 1024
 MIN_DURATION_SECONDS = 15.0
 MAX_DURATION_SECONDS = 25.0
 ALLOWED_PROFILES = {"Baseline", "Constrained Baseline", "Main"}
-MIN_REMOTE_URL_LENGTH = 9
-MAX_REMOTE_URL_LENGTH = 2_048
-MAX_REMOTE_REVISION = 2**63 - 1
-UNSAFE_REMOTE_URL_CHARACTERS = frozenset('\\"<>^`{|}')
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 EXPECTED_FALLBACK_DIMENSIONS = (941, 1_672)
+INITIAL_BUNDLED_REVISION = 1
+ANDROID_REVISION_PATTERN = re.compile(
+    rb"(?m)^\s*internal\s+const\s+val\s+BUNDLED_INTRO_REVISION\s*=\s*([0-9]+)L\s*$"
+)
+IOS_REVISION_PATTERN = re.compile(
+    rb"(?m)^\s*private\s+let\s+bundledIntroRevision\s*:\s*Int64\s*=\s*([0-9]+)\s*$"
+)
+ANDROID_LEGACY_BASELINE_PATTERN = re.compile(
+    rb"(?m)^\s*private\s+const\s+val\s+LEGACY_BUNDLED_INTRO_REVISION\s*=\s*([0-9]+)L\s*$"
+)
+IOS_LEGACY_BASELINE_PATTERN = re.compile(
+    rb"(?m)^\s*private\s+let\s+legacyBundledIntroBaselineRevision\s*:\s*Int64\s*=\s*([0-9]+)\s*$"
+)
+ACTIVE_CONTRACT_ROOTS = (
+    REPOSITORY_ROOT / "androidApp/src",
+    REPOSITORY_ROOT / "iosApp/Kwabor",
+    REPOSITORY_ROOT / "iosApp/Kwabor.xcodeproj/project.pbxproj",
+    REPOSITORY_ROOT / "shared/src",
+)
+SCANNED_CONTRACT_SUFFIXES = {
+    ".json",
+    ".kt",
+    ".kts",
+    ".pbxproj",
+    ".plist",
+    ".properties",
+    ".swift",
+    ".xcconfig",
+    ".xml",
+}
+FORBIDDEN_REMOTE_MEDIA_TOKENS = (
+    "intro_video_enabled",
+    "intro_video_url",
+    "intro_video_sha256",
+    "intro_video_revision",
+    "RemoteFeatureConfiguration",
+    "RemoteIntroVideoStatus",
+    "RemoteIntroVideo",
+    "FirebaseRemoteFeatureConfiguration",
+    "FirebaseRemoteIntroVideo",
+    "createRemoteFeatureConfiguration",
+    "AndroidIntroMediaManager",
+    "AndroidIntroVideoCache",
+    "IntroVideoCache",
+    "PendingRemoteIntro",
+    "PendingIntroVideo",
+)
 
 
 @dataclass(frozen=True)
@@ -270,28 +318,192 @@ def verify_fallback_assets() -> FallbackMetadata:
     )
 
 
-def validate_remote_publication(url: str, revision: int) -> None:
-    require(
-        0 < revision <= MAX_REMOTE_REVISION,
-        "Remote Config revision must be a positive signed 64-bit integer",
+def parse_revision(payload: bytes, pattern: re.Pattern[bytes], label: str) -> int:
+    matches = pattern.findall(payload)
+    require(len(matches) == 1, f"Expected exactly one {label} revision constant, found {len(matches)}")
+    revision = int(matches[0])
+    require(revision > 0, f"{label} bundled intro revision must be strictly positive")
+    return revision
+
+
+def read_current_revisions() -> tuple[int, int]:
+    android_source = read_required_bytes(ANDROID_REVISION_SOURCE)
+    ios_source = read_required_bytes(IOS_REVISION_SOURCE)
+    android_revision = parse_revision(
+        android_source,
+        ANDROID_REVISION_PATTERN,
+        "Android",
+    )
+    ios_revision = parse_revision(
+        ios_source,
+        IOS_REVISION_PATTERN,
+        "iOS",
     )
     require(
-        MIN_REMOTE_URL_LENGTH <= len(url) <= MAX_REMOTE_URL_LENGTH,
-        "CDN URL length must be between 9 and 2048 characters",
+        android_revision == ios_revision,
+        f"Android/iOS bundled intro revisions differ: {android_revision} != {ios_revision}",
     )
-    require(not any(character.isspace() for character in url), "CDN URL must not contain whitespace")
+    android_legacy_baseline = parse_revision(
+        android_source,
+        ANDROID_LEGACY_BASELINE_PATTERN,
+        "Android legacy baseline",
+    )
+    ios_legacy_baseline = parse_revision(
+        ios_source,
+        IOS_LEGACY_BASELINE_PATTERN,
+        "iOS legacy baseline",
+    )
     require(
-        not any(character in UNSAFE_REMOTE_URL_CHARACTERS for character in url),
-        "CDN URL contains a character rejected by the mobile clients",
+        android_legacy_baseline == INITIAL_BUNDLED_REVISION
+        and ios_legacy_baseline == INITIAL_BUNDLED_REVISION,
+        "Android/iOS legacy migration baselines must remain fixed at revision 1",
     )
-    try:
-        parts = urlsplit(url)
-        _ = parts.port
-    except ValueError as error:
-        raise MediaVerificationError("CDN URL has an invalid authority or port") from error
-    require(parts.scheme.lower() == "https", "CDN URL must use HTTPS")
-    require(parts.hostname is not None and "." in parts.hostname, "CDN URL must have a qualified host")
-    require(parts.username is None and parts.password is None, "CDN URL must not contain user information")
+    return android_revision, ios_revision
+
+
+def read_required_bytes(path: Path) -> bytes:
+    require(path.is_file(), f"Missing required file: {path}")
+    return path.read_bytes()
+
+
+def iter_contract_files() -> list[Path]:
+    files: list[Path] = []
+    for root in ACTIVE_CONTRACT_ROOTS:
+        if root.is_file():
+            files.append(root)
+            continue
+        require(root.is_dir(), f"Missing contract root: {root}")
+        files.extend(
+            path
+            for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in SCANNED_CONTRACT_SUFFIXES
+        )
+    return sorted(set(files))
+
+
+def verify_remote_media_contract_is_absent() -> None:
+    violations: list[str] = []
+    token_patterns = {
+        token: re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
+        for token in FORBIDDEN_REMOTE_MEDIA_TOKENS
+    }
+    for path in iter_contract_files():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for token, pattern in token_patterns.items():
+            if pattern.search(text):
+                relative_path = path.relative_to(REPOSITORY_ROOT).as_posix()
+                violations.append(f"{relative_path}: {token}")
+    require(
+        not violations,
+        "Retired remote intro media contract is still present:\n" + "\n".join(violations),
+    )
+
+
+def git_output(*arguments: str) -> bytes:
+    completed = subprocess.run(
+        ["git", *arguments],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+    )
+    require(
+        completed.returncode == 0,
+        f"Git command failed: git {' '.join(arguments)}: "
+        f"{completed.stderr.decode(encoding='utf-8', errors='replace').strip()}",
+    )
+    return completed.stdout
+
+
+def read_git_file(base_ref: str, path: Path, *, required: bool = True) -> bytes | None:
+    relative_path = path.relative_to(REPOSITORY_ROOT).as_posix()
+    completed = subprocess.run(
+        ["git", "show", f"{base_ref}:{relative_path}"],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode == 0:
+        return completed.stdout
+    if not required:
+        return None
+    error = completed.stderr.decode(encoding="utf-8", errors="replace").strip()
+    raise MediaVerificationError(f"Unable to read {relative_path} from {base_ref}: {error}")
+
+
+def parse_optional_base_revision(
+    payload: bytes | None,
+    pattern: re.Pattern[bytes],
+    label: str,
+) -> int | None:
+    if payload is None:
+        return None
+    matches = pattern.findall(payload)
+    if not matches:
+        return None
+    require(len(matches) == 1, f"Expected at most one base {label} revision, found {len(matches)}")
+    revision = int(matches[0])
+    require(revision > 0, f"Base {label} bundled intro revision must be strictly positive")
+    return revision
+
+
+def verify_revision_against_base(base_ref: str, current_revision: int, current_video: bytes) -> None:
+    resolved_ref = git_output("rev-parse", "--verify", f"{base_ref}^{{commit}}").decode().strip()
+    base_android_source = read_git_file(resolved_ref, ANDROID_REVISION_SOURCE, required=False)
+    base_ios_source = read_git_file(resolved_ref, IOS_REVISION_SOURCE, required=False)
+    base_android_revision = parse_optional_base_revision(
+        base_android_source,
+        ANDROID_REVISION_PATTERN,
+        "Android",
+    )
+    base_ios_revision = parse_optional_base_revision(
+        base_ios_source,
+        IOS_REVISION_PATTERN,
+        "iOS",
+    )
+    base_store_only_policy = read_git_file(resolved_ref, STORE_ONLY_ADR, required=False)
+    if base_store_only_policy is not None:
+        require(
+            base_android_revision is not None and base_ios_revision is not None,
+            "The base ref declares Store-only onboarding but its revision constants cannot be parsed",
+        )
+
+    if base_android_revision is None and base_ios_revision is None:
+        base_android_video = read_git_file(resolved_ref, ANDROID_ASSET)
+        base_ios_video = read_git_file(resolved_ref, IOS_ASSET)
+        require(base_android_video == base_ios_video, "Base Android/iOS onboarding videos differ")
+        require(
+            current_video == base_android_video,
+            "The Store-only migration must preserve the existing video; change it in a later revision",
+        )
+        require(
+            current_revision == INITIAL_BUNDLED_REVISION,
+            "The first Store-only bundled intro revision must initialize to 1",
+        )
+        return
+
+    require(
+        base_android_revision is not None and base_ios_revision is not None,
+        "The base ref contains only one platform bundled intro revision",
+    )
+    require(
+        base_android_revision == base_ios_revision,
+        f"Base Android/iOS bundled intro revisions differ: "
+        f"{base_android_revision} != {base_ios_revision}",
+    )
+    base_android_video = read_git_file(resolved_ref, ANDROID_ASSET)
+    base_ios_video = read_git_file(resolved_ref, IOS_ASSET)
+    require(base_android_video == base_ios_video, "Base Android/iOS onboarding videos differ")
+    video_changed = current_video != base_android_video
+    if video_changed:
+        require(
+            current_revision > base_android_revision,
+            f"Changed onboarding video requires a revision greater than {base_android_revision}",
+        )
+    else:
+        require(
+            current_revision == base_android_revision,
+            f"Unchanged onboarding video must keep revision {base_android_revision}",
+        )
 
 
 def format_summary(label: str, metadata: MediaMetadata) -> str:
@@ -305,102 +517,47 @@ def format_summary(label: str, metadata: MediaMetadata) -> str:
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Validate the byte-identical embedded onboarding assets, or one remote "
-            "campaign candidate and its Remote Config publication values."
-        )
+        description="Validate Store-released onboarding assets and their Android/iOS revision contract."
     )
     parser.add_argument(
-        "--input",
-        type=Path,
-        help="remote campaign MP4 to validate instead of the two embedded assets",
+        "--base-ref",
+        help=(
+            "optional Git ref used to enforce that video bytes and bundled revision "
+            "change together"
+        ),
     )
-    parser.add_argument("--url", help="immutable HTTPS CDN URL for the remote candidate")
-    parser.add_argument("--revision", type=int, help="strictly increasing positive Remote Config revision")
-    parser.add_argument(
-        "--expected-sha256",
-        help="fail unless the candidate bytes match this previously validated SHA-256",
-    )
-    parser.add_argument("--json", action="store_true", help="emit machine-readable validation output")
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = parse_arguments()
-    publication_requested = arguments.url is not None or arguments.revision is not None
+    android_payload = read_asset(ANDROID_ASSET)
+    ios_payload = read_asset(IOS_ASSET)
     require(
-        not publication_requested or arguments.input is not None,
-        "--url and --revision are only valid with --input",
+        android_payload == ios_payload,
+        "Android and iOS onboarding assets must contain exactly the same bytes",
     )
-    require(
-        arguments.expected_sha256 is None or arguments.input is not None,
-        "--expected-sha256 is only valid with --input",
+    current_revision, _ = read_current_revisions()
+    verify_remote_media_contract_is_absent()
+    metadata = verify_media(ANDROID_ASSET)
+    fallback_metadata = verify_fallback_assets()
+    if arguments.base_ref is not None:
+        verify_revision_against_base(
+            base_ref=arguments.base_ref,
+            current_revision=current_revision,
+            current_video=android_payload,
+        )
+
+    print(format_summary("embedded onboarding media", metadata))
+    print(
+        "OK onboarding fallback: "
+        f"{fallback_metadata.size_bytes} bytes, sha256={fallback_metadata.sha256}, "
+        f"{fallback_metadata.width}x{fallback_metadata.height}, 8-bit RGB PNG"
     )
-    require(
-        (arguments.url is None) == (arguments.revision is None),
-        "--url and --revision must be provided together",
-    )
-
-    fallback_metadata: FallbackMetadata | None = None
-    if arguments.input is None:
-        android_payload = read_asset(ANDROID_ASSET)
-        ios_payload = read_asset(IOS_ASSET)
-        require(
-            android_payload == ios_payload,
-            "Android and iOS onboarding assets must contain exactly the same bytes",
-        )
-        metadata = verify_media(ANDROID_ASSET)
-        fallback_metadata = verify_fallback_assets()
-        label = "onboarding media"
-    else:
-        metadata = verify_media(arguments.input.resolve())
-        label = "remote onboarding media candidate"
-
-    if arguments.expected_sha256 is not None:
-        expected_sha256 = arguments.expected_sha256.strip().lower()
-        require(
-            len(expected_sha256) == 64 and all(character in "0123456789abcdef" for character in expected_sha256),
-            "--expected-sha256 must contain exactly 64 hexadecimal characters",
-        )
-        require(
-            metadata.sha256 == expected_sha256,
-            f"Onboarding media SHA-256 mismatch: expected {expected_sha256}, found {metadata.sha256}",
-        )
-
-    remote_config: dict[str, str | int | bool] | None = None
-    if arguments.url is not None and arguments.revision is not None:
-        validate_remote_publication(arguments.url, arguments.revision)
-        remote_config = {
-            "intro_video_enabled": True,
-            "intro_video_url": arguments.url,
-            "intro_video_sha256": metadata.sha256,
-            "intro_video_revision": arguments.revision,
-        }
-
-    if arguments.json:
-        result: dict[str, Any] = {
-            "label": label,
-            "media": asdict(metadata),
-        }
-        if remote_config is not None:
-            result["remote_config"] = remote_config
-        if fallback_metadata is not None:
-            result["fallback"] = asdict(fallback_metadata)
-        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-        return 0
-
-    print(format_summary(label, metadata))
-    if fallback_metadata is not None:
-        print(
-            "OK onboarding fallback: "
-            f"{fallback_metadata.size_bytes} bytes, sha256={fallback_metadata.sha256}, "
-            f"{fallback_metadata.width}x{fallback_metadata.height}, 8-bit RGB PNG"
-        )
-    if remote_config is not None:
-        print("Remote Config values:")
-        for key, value in remote_config.items():
-            serialized = str(value).lower() if isinstance(value, bool) else value
-            print(f"{key}={serialized}")
+    print(f"OK bundled intro revision: Android=iOS={current_revision}")
+    if arguments.base_ref is not None:
+        print(f"OK bundled intro revision history against Git ref: {arguments.base_ref}")
+    print("OK retired remote intro media contract is absent from active source/configuration files")
     return 0
 
 

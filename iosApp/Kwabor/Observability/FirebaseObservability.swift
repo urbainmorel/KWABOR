@@ -11,12 +11,11 @@ final class FirebaseObservability {
     private let consentStore: FirebaseConsentStore
     private var remoteConfig: RemoteConfig?
     private var remoteConfigUpdateRegistration: ConfigUpdateListenerRegistration?
+    private var remoteConfigurationGeneration = 0
     private var performance: Performance?
-    private var remoteConfigurationObserver: ((FirebaseRemoteFeatureConfiguration, ObservabilityConsent) -> Void)?
 
     private(set) var consent: ObservabilityConsent
     private(set) var isConfigured = false
-    private(set) var remoteConfiguration = FirebaseRemoteFeatureConfiguration.safeDefaults
 
     init(bundle: Bundle = .main, userDefaults: UserDefaults = .standard) {
         consentStore = FirebaseConsentStore(userDefaults: userDefaults)
@@ -36,13 +35,9 @@ final class FirebaseObservability {
         remoteConfig = configureRemoteConfig()
         performance = Performance.sharedInstance()
         isConfigured = true
-        if consent.remoteConfigurationAllowed, let remoteConfig {
-            remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
-        }
         applyConsent(consent)
         if consent.remoteConfigurationAllowed {
-            startRemoteConfigurationUpdates()
-            refreshRemoteConfiguration()
+            startRemoteConfigurationSession()
         }
     }
 
@@ -53,24 +48,11 @@ final class FirebaseObservability {
         applyConsent(updatedConsent)
 
         if !updatedConsent.remoteConfigurationAllowed {
+            remoteConfigurationGeneration += 1
             stopRemoteConfigurationUpdates()
-            remoteConfiguration = .safeDefaults
-            notifyRemoteConfigurationObserver()
         } else if !remoteConfigurationWasAllowed {
-            if let remoteConfig {
-                remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
-                notifyRemoteConfigurationObserver()
-            }
-            startRemoteConfigurationUpdates()
-            refreshRemoteConfiguration()
+            startRemoteConfigurationSession()
         }
-    }
-
-    func observeRemoteConfiguration(
-        _ observer: @escaping (FirebaseRemoteFeatureConfiguration, ObservabilityConsent) -> Void
-    ) {
-        remoteConfigurationObserver = observer
-        notifyRemoteConfigurationObserver()
     }
 
     func track(_ event: AnalyticsEvent) {
@@ -116,25 +98,31 @@ final class FirebaseObservability {
         return FirebasePerformanceTrace(trace: trace)
     }
 
-    func refreshRemoteConfiguration() {
-        guard isConfigured, consent.remoteConfigurationAllowed, let remoteConfig else { return }
+    private func startRemoteConfigurationSession() {
+        guard isConfigured, consent.remoteConfigurationAllowed else { return }
+        remoteConfigurationGeneration += 1
+        let generation = remoteConfigurationGeneration
+        startRemoteConfigurationUpdates(generation: generation)
+        refreshRemoteConfiguration(generation: generation)
+    }
+
+    private func refreshRemoteConfiguration(generation: Int) {
+        guard isRemoteConfigurationGenerationActive(generation), let remoteConfig else { return }
         remoteConfig.fetchAndActivate { [weak self] _, error in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard self.consent.remoteConfigurationAllowed else { return }
+                guard self.isRemoteConfigurationGenerationActive(generation) else { return }
                 guard error == nil else {
                     self.recordDiagnostic(wireName: remoteConfigFetchFailureCode)
                     return
                 }
-                guard let remoteConfig = self.remoteConfig else { return }
-                self.remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
-                self.notifyRemoteConfigurationObserver()
             }
         }
     }
 
-    private func startRemoteConfigurationUpdates() {
-        guard isConfigured, consent.remoteConfigurationAllowed,
+    private func startRemoteConfigurationUpdates(generation: Int) {
+        guard isConfigured,
+              isRemoteConfigurationGenerationActive(generation),
               remoteConfigUpdateRegistration == nil,
               let remoteConfig else {
             return
@@ -146,7 +134,8 @@ final class FirebaseObservability {
             Task { @MainActor [weak self] in
                 self?.handleRemoteConfigurationUpdate(
                     updatedKeys: updatedKeys,
-                    failed: updateFailed
+                    failed: updateFailed,
+                    generation: generation
                 )
             }
         }
@@ -154,42 +143,39 @@ final class FirebaseObservability {
 
     private func handleRemoteConfigurationUpdate(
         updatedKeys: Set<String>?,
-        failed: Bool
+        failed: Bool,
+        generation: Int
     ) {
-        guard consent.remoteConfigurationAllowed else { return }
+        guard isRemoteConfigurationGenerationActive(generation) else { return }
         guard !failed, let updatedKeys else {
             recordDiagnostic(wireName: remoteConfigFetchFailureCode)
             return
         }
-        guard !introRemoteConfigKeys.isDisjoint(with: updatedKeys), let remoteConfig else {
-            return
-        }
+        guard !updatedKeys.isEmpty, let remoteConfig else { return }
         remoteConfig.activate { [weak self] _, error in
             let activationFailed = error != nil
             Task { @MainActor [weak self] in
-                self?.completeRemoteConfigurationActivation(failed: activationFailed)
+                self?.completeRemoteConfigurationActivation(
+                    failed: activationFailed,
+                    generation: generation
+                )
             }
         }
     }
 
-    private func completeRemoteConfigurationActivation(failed: Bool) {
-        guard consent.remoteConfigurationAllowed else { return }
-        guard !failed else {
-            recordDiagnostic(wireName: remoteConfigFetchFailureCode)
-            return
-        }
-        guard let remoteConfig else { return }
-        remoteConfiguration = FirebaseRemoteFeatureConfiguration(remoteConfig: remoteConfig)
-        notifyRemoteConfigurationObserver()
+    private func completeRemoteConfigurationActivation(failed: Bool, generation: Int) {
+        guard isRemoteConfigurationGenerationActive(generation) else { return }
+        guard failed else { return }
+        recordDiagnostic(wireName: remoteConfigFetchFailureCode)
+    }
+
+    private func isRemoteConfigurationGenerationActive(_ generation: Int) -> Bool {
+        consent.remoteConfigurationAllowed && generation == remoteConfigurationGeneration
     }
 
     private func stopRemoteConfigurationUpdates() {
         remoteConfigUpdateRegistration?.remove()
         remoteConfigUpdateRegistration = nil
-    }
-
-    private func notifyRemoteConfigurationObserver() {
-        remoteConfigurationObserver?(remoteConfiguration, consent)
     }
 
     private func applyConsent(_ consent: ObservabilityConsent) {
@@ -213,12 +199,6 @@ final class FirebaseObservability {
         let settings = RemoteConfigSettings()
         settings.minimumFetchInterval = remoteConfigFetchInterval
         config.configSettings = settings
-        config.setDefaults([
-            introVideoEnabledKey: false as NSNumber,
-            introVideoURLKey: "" as NSString,
-            introVideoSHA256Key: "" as NSString,
-            introVideoRevisionKey: 0 as NSNumber,
-        ])
         return config
     }
 }
@@ -237,100 +217,6 @@ final class FirebasePerformanceTrace {
 
     deinit {
         trace?.stop()
-    }
-}
-
-struct FirebaseRemoteFeatureConfiguration: Equatable {
-    let introVideoStatus: FirebaseRemoteIntroVideoStatus
-
-    var introVideo: FirebaseRemoteIntroVideo? {
-        switch introVideoStatus {
-        case let .candidate(video):
-            return video
-        case .unavailable, .disabled, .invalid:
-            return nil
-        }
-    }
-
-    static let safeDefaults = FirebaseRemoteFeatureConfiguration(introVideoStatus: .unavailable)
-
-    fileprivate init(remoteConfig: RemoteConfig) {
-        let enabledValue = remoteConfig[introVideoEnabledKey]
-        guard enabledValue.source == .remote else {
-            introVideoStatus = .unavailable
-            return
-        }
-        let enabled = enabledValue.boolValue
-        let urlValue = remoteConfig[introVideoURLKey].stringValue
-        let hashValue = remoteConfig[introVideoSHA256Key].stringValue.lowercased()
-        let revision = remoteConfig[introVideoRevisionKey].numberValue.int64Value
-        guard enabled else {
-            introVideoStatus = .disabled
-            return
-        }
-        if let video = FirebaseRemoteIntroVideo.create(
-            enabled: enabled,
-            urlValue: urlValue,
-            sha256: hashValue,
-            revision: revision
-        ) {
-            introVideoStatus = .candidate(video)
-        } else {
-            introVideoStatus = .invalid
-        }
-    }
-
-    private init(introVideoStatus: FirebaseRemoteIntroVideoStatus) {
-        self.introVideoStatus = introVideoStatus
-    }
-}
-
-enum FirebaseRemoteIntroVideoStatus: Equatable {
-    case unavailable
-    case disabled
-    case invalid
-    case candidate(FirebaseRemoteIntroVideo)
-
-    var preservesValidatedPendingVideo: Bool {
-        switch self {
-        case .disabled:
-            return false
-        case .unavailable, .invalid, .candidate:
-            return true
-        }
-    }
-}
-
-struct FirebaseRemoteIntroVideo: Equatable {
-    let url: URL
-    let sha256: String
-    let revision: Int64
-
-    fileprivate static func create(
-        enabled: Bool,
-        urlValue: String,
-        sha256: String,
-        revision: Int64
-    ) -> FirebaseRemoteIntroVideo? {
-        guard
-            enabled,
-            !urlValue.isEmpty,
-            urlValue.count <= maximumRemoteURLLength,
-            urlValue.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
-            urlValue.rangeOfCharacter(from: unsafeRemoteURLCharacters) == nil,
-            let components = URLComponents(string: urlValue),
-            components.scheme?.lowercased() == "https",
-            components.host?.isEmpty == false,
-            components.host?.contains(".") == true,
-            components.user == nil,
-            components.password == nil,
-            sha256.range(of: sha256Pattern, options: .regularExpression) != nil,
-            revision > 0,
-            let url = components.url
-        else {
-            return nil
-        }
-        return FirebaseRemoteIntroVideo(url: url, sha256: sha256, revision: revision)
     }
 }
 
@@ -353,19 +239,6 @@ private struct FirebaseConsentStore {
 }
 
 private let remoteConfigFetchInterval: TimeInterval = 43_200
-private let maximumRemoteURLLength = 2_048
-private let introVideoEnabledKey = "intro_video_enabled"
-private let introVideoURLKey = "intro_video_url"
-private let introVideoSHA256Key = "intro_video_sha256"
-private let introVideoRevisionKey = "intro_video_revision"
-private let introRemoteConfigKeys: Set<String> = [
-    introVideoEnabledKey,
-    introVideoURLKey,
-    introVideoSHA256Key,
-    introVideoRevisionKey,
-]
-private let sha256Pattern = "^[a-f0-9]{64}$"
-private let unsafeRemoteURLCharacters = CharacterSet(charactersIn: "\\\"<>^`{|}")
 private let notApplicable = "not_applicable"
 private let diagnosticDomain = "com.kwabor.observability"
 private let diagnosticErrorCode = 1

@@ -37,9 +37,9 @@ La vidéo est attachée derrière le wordmark, préparée en pause à la positio
 uniquement après le retrait effectif du splash, 500 ms de wordmark dans une fenêtre visible sur
 plusieurs frames et un lifecycle au premier plan. Un passage en arrière-plan ou une surface
 détachée interrompt cette autorisation.
-Lors d'un lancement ultérieur, ce même wordmark couvre aussi la décision locale encore en attente
-sur une éventuelle révision distante en cache. Une vérification lente ne peut donc pas intercaler
-l'écran générique de restauration entre le symbole système et une intro requise.
+Lors d'un lancement ultérieur, ce même wordmark couvre aussi la décision locale comparant la
+révision embarquée à la dernière révision présentée. Cette vérification locale ne peut donc pas
+intercaler l'écran générique de restauration entre le symbole système et une intro requise.
 
 Les PNG Android/iOS sont régénérables sur Windows avec :
 

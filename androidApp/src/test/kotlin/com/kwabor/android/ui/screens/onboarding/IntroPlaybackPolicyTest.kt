@@ -1,8 +1,6 @@
 package com.kwabor.android.ui.screens.onboarding
 
 import androidx.lifecycle.Lifecycle
-import com.kwabor.android.onboarding.IntroMediaSource
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,18 +8,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IntroPlaybackPolicyTest {
-    @Test
-    fun remotePlayerFailureUsesStaticFallbackWithoutReplayingBundledVideo() {
-        val source = IntroMediaSource.Remote(file = File("remote-intro.mp4"), revision = 2)
-
-        assertEquals(IntroPlaybackFailureAction.ShowStaticFallback, source.failureAction())
-    }
-
-    @Test
-    fun bundledPlayerFailureCompletesIntroWithoutBlockingNavigation() {
-        assertEquals(IntroPlaybackFailureAction.CompleteIntro, IntroMediaSource.Bundled.failureAction())
-    }
-
     @Test
     fun continuityWordmarkStaysVisibleUntilTheFirstRenderedFrame() {
         val initialVisibility = IntroContinuityVisibility.Visible
@@ -88,7 +74,7 @@ class IntroPlaybackPolicyTest {
     }
 
     @Test
-    fun reducedMotionUsesStaticFallbackWhileDefaultModeUsesVideoContinuity() {
+    fun reducedMotionOrPlaybackFailureUsesStaticFallbackWhileDefaultModeUsesVideoContinuity() {
         assertEquals(
             IntroPrimaryMode.StaticFallback,
             introPrimaryMode(reducedMotion = true, staticFallbackRequired = false),

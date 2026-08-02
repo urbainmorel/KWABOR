@@ -54,7 +54,7 @@ Kwabor n'a pas une « charte décorative » : l'identité visuelle est un **levi
 | **Logotype (wordmark)** | Symbole + `KWABOR` en capitales espacées (tracking large), même famille display que l'UI. Versions horizontale et icône seule. |
 | **App icon** | Carré ink `#0E0E10` plein, mark blanc centré, sans dégradé. Variante adaptative Android (foreground = mark, background = ink). |
 | **Watermark communautaire** | Mark Kwabor 24 px + `@username` 14/600, blanc 60 % d'opacité, **non maskable**, posé en bas-droite sur tout export du réseau social — **photos/diaporamas (MVP) et vidéos (V1.1)**. |
-| **Intro vidéo / first run** | Vidéo verticale muette embarquée + remplaçable à distance, **bouton « Passer »**, fallback statique `reduced-motion` → écran « Se connecter ou s'inscrire » (E1/E3). |
+| **Intro vidéo / first run** | Vidéo verticale muette embarquée et révisionnée avec l'app, **bouton « Passer »**, fallback statique `reduced-motion` → écran « Se connecter ou s'inscrire » (E1/E3). Son remplacement exige une release Store Android/iOS. |
 
 > Le mark fonctionnant en positif comme en négatif sert l'inversion dark mode (§3.3) : pas de re-dessin, juste un swap de couleur de remplissage.
 
@@ -254,7 +254,7 @@ Deux actions **distinctes**, jamais confondues :
 | **Banner Offline** | Pleine largeur, **persistante**, fond `ink/900` texte blanc « Vous êtes hors ligne ». | Global (au-dessus navbar) |
 | **Dialog** | Surface élevée, titre + corps + 2 actions ; **action destructive en rouge**. | Confirmations (suppression, archivage, déconnexion) |
 | **Segmented control** | 2–3 segments, actif = `ink/950` ; ex. **Personnel / Promoteur**, tri avis. | Profil, listes |
-| **Intro Video Layer** | Vidéo verticale aspectFill, muette, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué + remote. | Écran E1 |
+| **Intro Video Layer** | Vidéo verticale aspectFill, muette, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué et distribué exclusivement via les Stores. | Écran E1 |
 | **Auth Landing** | Fond image plein écran + « Découvrez le Bénin » + **pastille de langue** haut-droite + CTA S'inscrire/Se connecter + **« Ne pas s'inscrire »**. | Écran E3 |
 | **Pastille de langue** | Frosted (§3.5) `🌐 FR ▾` ; lisible sur photo, discrète ; ouvre la liste des langues livrées. | E3, E5, E6 |
 | **Bouton fournisseur d'auth** | Google (toujours) · **Apple (iOS uniquement)** ; style outline, logo + label. | E5, E6 |
@@ -464,8 +464,8 @@ Interactions : **tap → `DetailSheet`** (deep link selon le type) ; **swipe →
 
 ### Groupe E — Intro, compte & mur souple
 
-**E1. Écran d'intro vidéo** *(premier lancement, puis une fois par nouvelle révision distante)*
-Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). Une révision distante est validée et précachée après consentement, reste figée pendant la lecture et n'est présentée qu'une fois au lancement suivant ; elle ne surgit jamais en cours de session. **Analytics : taux de skip.** *(Lancements sans nouvelle révision : E3 si déconnecté, Accueil si connecté.)*
+**E1. Écran d'intro vidéo** *(premier lancement, puis une fois par nouvelle révision embarquée installée)*
+Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3), byte-identical sur Android/iOS et remplacé exclusivement par une release Store dont les deux constantes de révision sont incrémentées ensemble. La révision installée reste figée pendant la lecture, n'est présentée qu'une fois et ne surgit jamais en cours de session. **Analytics : taux de skip.** *(Lancements sans révision plus récente : E3 si déconnecté, Accueil si connecté.)*
 
 **E2. Langue — détection automatique** *(pas d'écran dans le cas courant)*
 **Principe : respecter la langue système, sans intervention.** Aucun sélecteur imposé — un écran de choix bloquant serait une friction inutile (au MVP, mono-langue FR).

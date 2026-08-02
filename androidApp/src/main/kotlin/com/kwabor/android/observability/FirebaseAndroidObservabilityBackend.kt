@@ -16,8 +16,6 @@ import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.domain.observability.PerformanceTraceName
-import com.kwabor.shared.domain.observability.RemoteFeatureConfiguration
-import com.kwabor.shared.domain.observability.createRemoteFeatureConfiguration
 
 internal class FirebaseAndroidObservabilityBackend private constructor(
     private val analytics: FirebaseAnalytics?,
@@ -56,36 +54,30 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
         return PerformanceTrace(trace::stop)
     }
 
-    override fun fetchRemoteConfiguration(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
         val config = remoteConfig ?: run {
-            onResult(null)
+            onResult(false)
             return
         }
         config.fetchAndActivate().addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                onResult(null)
-                return@addOnCompleteListener
-            }
-            onResult(config.toDomainConfiguration())
+            onResult(task.isSuccessful)
         }
     }
 
-    override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = remoteConfig?.toDomainConfiguration()
-
-    override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun startRemoteConfigurationUpdates(onResult: (Boolean) -> Unit) {
         val config = remoteConfig ?: return
         if (configUpdateRegistration != null) return
         configUpdateRegistration = config.addOnConfigUpdateListener(
             object : ConfigUpdateListener {
                 override fun onUpdate(configUpdate: ConfigUpdate) {
-                    if (!configUpdate.updatedKeys.containsIntroVideoRemoteKey()) return
+                    if (configUpdate.updatedKeys.isEmpty()) return
                     config.activate().addOnCompleteListener { task ->
-                        onResult(config.toDomainConfiguration().takeIf { task.isSuccessful })
+                        onResult(task.isSuccessful)
                     }
                 }
 
                 override fun onError(error: FirebaseRemoteConfigException) {
-                    onResult(null)
+                    onResult(false)
                 }
             },
         )
@@ -105,7 +97,6 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
                         .setMinimumFetchIntervalInSeconds(REMOTE_CONFIG_FETCH_INTERVAL_SECONDS)
                         .build(),
                 )
-                setDefaultsAsync(REMOTE_CONFIG_DEFAULTS)
             }
             return FirebaseAndroidObservabilityBackend(
                 analytics = FirebaseAnalytics.getInstance(context),
@@ -137,34 +128,5 @@ private fun AnalyticsEvent.toBundle(): Bundle = Bundle().apply {
     socialPostType?.let { postType -> putString("post_type", postType.wireName) }
 }
 
-private fun FirebaseRemoteConfig.toDomainConfiguration(): RemoteFeatureConfiguration {
-    val enabledValue = getValue(INTRO_VIDEO_ENABLED_KEY)
-    return createRemoteFeatureConfiguration(
-        introVideoAvailable = enabledValue.source == FirebaseRemoteConfig.VALUE_SOURCE_REMOTE,
-        introVideoEnabled = getBoolean(INTRO_VIDEO_ENABLED_KEY),
-        introVideoUrl = getString(INTRO_VIDEO_URL_KEY),
-        introVideoSha256 = getString(INTRO_VIDEO_SHA256_KEY),
-        introVideoRevision = getLong(INTRO_VIDEO_REVISION_KEY),
-    )
-}
-
 private const val REMOTE_CONFIG_FETCH_INTERVAL_SECONDS = 43_200L
-private const val INTRO_VIDEO_ENABLED_KEY = "intro_video_enabled"
-private const val INTRO_VIDEO_URL_KEY = "intro_video_url"
-private const val INTRO_VIDEO_SHA256_KEY = "intro_video_sha256"
-private const val INTRO_VIDEO_REVISION_KEY = "intro_video_revision"
 private const val NOT_APPLICABLE = "not_applicable"
-private val INTRO_VIDEO_REMOTE_KEYS = setOf(
-    INTRO_VIDEO_ENABLED_KEY,
-    INTRO_VIDEO_URL_KEY,
-    INTRO_VIDEO_SHA256_KEY,
-    INTRO_VIDEO_REVISION_KEY,
-)
-internal fun Set<String>.containsIntroVideoRemoteKey(): Boolean = any(INTRO_VIDEO_REMOTE_KEYS::contains)
-
-private val REMOTE_CONFIG_DEFAULTS: Map<String, Any> = mapOf(
-    INTRO_VIDEO_ENABLED_KEY to false,
-    INTRO_VIDEO_URL_KEY to "",
-    INTRO_VIDEO_SHA256_KEY to "",
-    INTRO_VIDEO_REVISION_KEY to 0L,
-)

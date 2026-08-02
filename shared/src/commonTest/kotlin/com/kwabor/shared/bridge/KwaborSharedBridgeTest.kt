@@ -1,6 +1,5 @@
 package com.kwabor.shared.bridge
 
-import com.kwabor.shared.domain.observability.DiagnosticCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -53,11 +52,14 @@ class KwaborSharedBridgeTest {
             "Recevez les nouveautés utiles près de votre ville. Vous gardez le contrôle dans les paramètres.",
             onboardingStrings.registrationNotificationSupport,
         )
+        assertEquals(
+            "Autoriser les ajustements de configuration à distance",
+            onboardingStrings.registrationRemoteConfigConsent,
+        )
         assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
         val telemetry = bridge.onboardingTelemetry()
         assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)
         assertEquals("intro_video_skipped", telemetry.skippedEvent.name.wireName)
-        assertEquals(DiagnosticCode.IntroVideoIntegrityFailed, telemetry.integrityDiagnosticCode)
         assertFalse(bridge.hasCatalogConfiguration())
     }
 
