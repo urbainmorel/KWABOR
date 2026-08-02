@@ -351,8 +351,8 @@ select is(
       'select sqlstate, message from event_transition_result'
     ) as transition(sqlstate text, message text)
   ),
-  '23514|An event under review or published must keep its event details',
-  'the waiting removal rechecks the committed event status'
+  '23514|An active catalog listing must keep its typed detail',
+  'the waiting removal rechecks the committed active-listing detail invariant'
 );
 
 select is(
