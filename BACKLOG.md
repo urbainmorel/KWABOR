@@ -82,7 +82,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Verrouiller la révision initiale `1`, l'égalité Android/iOS et le couplage octets/révision contre la base Git.
   - [ ] Confirmer provenance, droits de diffusion et approbation éditoriale de chaque média avant build Store.
   - [ ] Prouver première lecture, non-répétition, upgrade vers une révision supérieure, offline et reduced-motion sur les deux plateformes.
-- [ ] PR-INTRO-STORE-001 — PR brouillon empilée `#43` publiée sur `#42` ; validations locales et deux revues indépendantes vertes, CI GitHub en cours.
+- [ ] PR-INTRO-STORE-001 — PR brouillon empilée `#43` publiée sur `#42` ; validations locales, deux revues indépendantes et run GitHub Actions `30733200076` verts ; obtenir la revue humaine avant fusion.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
@@ -128,7 +128,12 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
   - [x] PR-EXPLORE-002A — PR brouillon `#41` publiée sur `#40` ; le run `30723036248` a passé
     `quality`, le build simulateur iOS et les preuves de lancement Android API 30/31/36.
-- [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.
+- [x] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles que le mur Android disponible.
+  - [x] Partager le runtime intents/état/effets, brancher le cache Room, la pagination, le refresh, la ville/GPS et les interactions avec soft wall d'authentification.
+  - [x] Livrer la grille SwiftUI native, ses états chargement/vide/offline/erreur, l'image pipeline borné et les politiques d'accessibilité/adaptation.
+  - [x] Ajouter un smoke test iOS simulateur qui rouvre Room et DataStore sur disque, le brancher à la CI macOS et borner son exécution.
+  - [x] Passer la porte locale complète et trois revues indépendantes sans P0/P1/P2 résiduel.
+- [ ] PR-EXPLORE-IOS-001 — Publier la PR brouillon empilée sur `#43`, obtenir les gates GitHub Actions verts puis la revue humaine.
 - [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.

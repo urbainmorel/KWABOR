@@ -10,12 +10,13 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/intro-store-release-only`, empilée sur `codex/explore-002b-contract` (`#42`) |
+| Branche active | `codex/explore-ios-001-parity`, empilée sur `codex/intro-store-release-only` (`#43`) |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
-| Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; CI en cours |
+| Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
+| Explore iOS | EXPLORE-IOS-001 implémenté localement en SwiftUI natif ; trois revues vertes, publication/CI de tranche à faire |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -43,7 +44,9 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - Le générateur est idempotent ; les cas négatifs Android/iOS/XML sont refusés. Spotless, Detekt, lint, `check`, l'APK debug et 292 tests sont verts localement. Le build de preuve injecte uniquement une URL `.invalid` et une clé factice, tandis que `quality` échoue si la matrice requise n'est pas verte.
 - Le run de clôture `30661731938` du commit `94a31d5` a produit les neuf cellules API 30/31/36 × `mdpi`/`xhdpi`/`xxxhdpi` et passé ses sept checks. Archives, hashes, dimensions, états et médias sont techniquement conformes 9/9 ; les neuf preuves continues montrent perceptuellement HOME → monogramme → wordmark complet → intro.
 - REMOTE-INTRO-001 a été implémenté historiquement dans la PR `#38`, mais ADR-0021 le supersède avant la V1. INTRO-STORE-001 retire URL/téléchargement/cache/purge distants, conserve Remote Config générique et impose une révision embarquée Android/iOS distribuée exclusivement par release Store.
-- INTRO-STORE-001 est validé localement par la porte Gradle complète, les vérificateurs média/marque/dépôt et deux revues indépendantes sans P0/P1/P2. La PR brouillon `#43` est publiée sur `#42` ; la CI GitHub du commit final est en cours.
+- INTRO-STORE-001 est validé localement par la porte Gradle complète, les vérificateurs média/marque/dépôt et deux revues indépendantes sans P0/P1/P2. La PR brouillon `#43` est publiée sur `#42` et son run GitHub Actions `30733200076` est entièrement vert.
+- EXPLORE-IOS-001 partage le runtime Explore avec Android et livre une surface SwiftUI native : grille adaptative, états chargement/vide/offline/erreur, refresh, pagination, ville/GPS, Like/Favori avec soft wall d'authentification et images HTTPS bornées. Recherche, filtres, assistant et détail restent absents tant que leurs contrats ne sont pas livrés.
+- La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. Les tests du contrôleur iOS et le smoke test Room/DataStore simulateur compilent ; leur exécution native ainsi que le build SwiftUI attendent la CI macOS de la nouvelle PR.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
@@ -58,9 +61,22 @@ Objectifs :
 - supprimer le téléchargement et le cache distants sans retirer Remote Config générique ;
 - refuser en CI tout changement d'octets sans hausse coordonnée de révision.
 
-État : implémentation, validations locales, deux revues indépendantes, commit, push et publication de
-la PR brouillon `#43` terminés. La CI GitHub, la revue humaine, les preuves sur appareils physiques et
+État : implémentation, validations locales, deux revues indépendantes, commit, push, publication de
+la PR brouillon `#43` et CI GitHub terminés. La revue humaine, les preuves sur appareils physiques et
 les validations de provenance/droits restent ouvertes.
+
+### EXPLORE-IOS-001 — Parité native du mur Explore
+
+Objectifs :
+
+- consommer le même runtime KMP et les mêmes états métier qu'Android ;
+- conserver une UI iOS native SwiftUI, adaptative et accessible ;
+- brancher le cache Room, DataStore, refresh, pagination, localisation et interactions ;
+- prouver la persistance réelle sur simulateur macOS et les configurations Xcode de la tranche.
+
+État : implémentation, porte locale et trois revues indépendantes terminées sur
+`codex/explore-ios-001-parity`. La publication de la PR empilée, le build Xcode, le smoke test
+simulateur et la CI restent à faire.
 
 ### BRAND-002 — Fidélité du splash système
 
@@ -113,7 +129,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir une CI verte puis la revue humaine de la PR INTRO-STORE-001 `#43`, et fusionner la pile en garantissant que le canal distant de `#38` n'atteint jamais une release V1 active.
+3. Publier EXPLORE-IOS-001 au-dessus de la PR INTRO-STORE-001 `#43`, obtenir sa CI verte puis les revues humaines de la pile, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.

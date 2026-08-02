@@ -7,6 +7,7 @@ import SwiftUI
 struct KwaborApp: App {
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
+    @StateObject private var exploreStore: ExploreStore
 
     @MainActor
     init() {
@@ -22,6 +23,9 @@ struct KwaborApp: App {
             supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
         )
         self.compositionRoot = compositionRoot
+        _exploreStore = StateObject(
+            wrappedValue: ExploreStore(controller: compositionRoot.exploreController)
+        )
         _coordinator = StateObject(
             wrappedValue: OnboardingCoordinator(
                 bridge: compositionRoot.bridge,
@@ -35,7 +39,7 @@ struct KwaborApp: App {
 
     var body: some Scene {
         WindowGroup {
-            OnboardingView(coordinator: coordinator)
+            OnboardingView(coordinator: coordinator, exploreStore: exploreStore)
                 .onOpenURL { url in
                     if !GIDSignIn.sharedInstance.handle(url) {
                         _ = coordinator.handleIncomingUrl(url)

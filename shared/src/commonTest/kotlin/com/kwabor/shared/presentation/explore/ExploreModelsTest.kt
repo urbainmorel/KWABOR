@@ -57,6 +57,22 @@ class ExploreModelsTest {
     }
 
     @Test
+    fun exploreUiState_exposesStableSelectedTabSemanticsForPlatformBridges() {
+        val places = initialExploreUiState(
+            strings = strings,
+            request = ExploreLoadRequest(selectedTab = ExploreTab.Places),
+        )
+        val events = places.copy(selectedTab = ExploreTab.Events)
+        val hotelsRestaurants = places.copy(selectedTab = ExploreTab.HotelsRestaurants)
+
+        assertTrue(places.isPlacesTabSelected)
+        assertFalse(places.isEventsTabSelected)
+        assertFalse(places.isHotelsRestaurantsTabSelected)
+        assertTrue(events.isEventsTabSelected)
+        assertTrue(hotelsRestaurants.isHotelsRestaurantsTabSelected)
+    }
+
+    @Test
     fun sampleExploreUiState_hasVisibleListingsAndSelectedChip() {
         val state = sampleExploreUiState(strings)
 

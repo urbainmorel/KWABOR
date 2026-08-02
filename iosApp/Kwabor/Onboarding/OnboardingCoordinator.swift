@@ -47,6 +47,11 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted && !hasCompleteAccount
     }
 
+    var exploreViewerID: String? {
+        guard hasCompleteAccount else { return nil }
+        return authState?.currentSession?.userId ?? completedRegistrationSession?.userId
+    }
+
     private var canExposeSessionDuringPromoterActivation: Bool {
         PromoterActivationSessionPolicy.canExposeSession(
             cleanupRequired: temporaryPromoterActivationSessionCleanupRequired,

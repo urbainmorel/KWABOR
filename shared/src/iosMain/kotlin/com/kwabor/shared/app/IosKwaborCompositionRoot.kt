@@ -25,6 +25,10 @@ class IosKwaborCompositionRoot(
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
 
     val bridge = KwaborSharedBridge(hasCatalogConfiguration = sharedRoot != null)
+    val exploreController = IosExploreController(
+        presenter = sharedRoot?.explorePresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
     val authController = IosAuthController(
         presenter = sharedRoot?.authPresenter,
         dispatcherProvider = dispatcherProvider,
@@ -39,6 +43,7 @@ class IosKwaborCompositionRoot(
     )
 
     fun close() {
+        exploreController.close()
         authController.close()
         registrationController.close()
         passwordRecoveryController.close()

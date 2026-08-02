@@ -354,3 +354,78 @@ expect(
     "Cleanup without a cache root must still persist its completion marker."
 )
 unavailableCacheDefaults.defaults.removePersistentDomain(forName: unavailableCacheDefaults.suiteName)
+
+private var paginationGuard = ExplorePaginationGuard()
+expect(
+    !paginationGuard.shouldLoadNext(
+        cursor: "cursor-1",
+        canLoadMore: true,
+        isNearEnd: false,
+        hasAppendError: false
+    ),
+    "Pagination must not start before the threshold is reached."
+)
+expect(
+    paginationGuard.shouldLoadNext(
+        cursor: "cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "The first eligible cursor must start one append."
+)
+expect(
+    !paginationGuard.shouldLoadNext(
+        cursor: "cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "A visible cursor must never trigger duplicate appends."
+)
+expect(
+    !paginationGuard.shouldLoadNext(
+        cursor: "cursor-2",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: true
+    ),
+    "Automatic pagination must stop on an append error."
+)
+expect(
+    paginationGuard.shouldRetry(cursor: "cursor-1", canLoadMore: true),
+    "An explicit retry must be allowed for the current cursor."
+)
+paginationGuard.reset()
+expect(
+    paginationGuard.shouldLoadNext(
+        cursor: "cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "A refresh or filter change must reset the cursor guard."
+)
+
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL(
+        "https://cdn.kwabor.example/media/card.jpg?width=720"
+    ) != nil,
+    "An HTTPS image URL with a CDN query must be accepted."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("http://cdn.kwabor.example/card.jpg") == nil,
+    "An insecure image URL must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL(" https://cdn.kwabor.example/card.jpg") == nil,
+    "An image URL containing whitespace must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://user@cdn.kwabor.example/card.jpg") == nil,
+    "An image URL containing user information must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://cdn.kwabor.example/card.jpg#fragment") == nil,
+    "An image URL fragment must be rejected."
+)

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
+    let exploreStore: ExploreStore
 
     var body: some View {
         Group {
@@ -18,6 +19,7 @@ struct OnboardingView: View {
             case .home:
                 ContentView(
                     bridge: coordinator.bridge,
+                    exploreStore: exploreStore,
                     isGuestSession: coordinator.isGuestSession,
                     strings: coordinator.strings,
                     accountSecurityController: coordinator.authController,
@@ -72,6 +74,12 @@ struct OnboardingView: View {
             Button(coordinator.strings.authConfirm, action: coordinator.dismissPromoterActivationError)
         } message: {
             Text(coordinator.promoterActivationErrorMessage ?? coordinator.strings.authPromoterInviteInvalid)
+        }
+        .onAppear {
+            exploreStore.updateViewerContext(coordinator.exploreViewerID)
+        }
+        .onChange(of: coordinator.exploreViewerID) { _, viewerID in
+            exploreStore.updateViewerContext(viewerID)
         }
     }
 }

@@ -30,7 +30,11 @@ import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.ExploreTab
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -238,6 +242,28 @@ class ExploreViewModelTest {
     }
 
     @Test
+    fun locationDisabled_mapsPlatformResultToSharedRuntimeState() = runTest {
+        val repository = ViewModelCatalogRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            locationService = ApproximateLocationService {
+                ApproximateLocationResult.LocationDisabled
+            },
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(ExploreIntent.OpenCitySelector)
+        viewModel.onIntent(ExploreIntent.RequestLocation)
+        runCurrent()
+        viewModel.effects.first()
+        viewModel.onIntent(ExploreIntent.LocationPermissionResult(granted = true))
+        advanceUntilIdle()
+
+        assertEquals(strings.exploreLocationDisabled, viewModel.state.value.locationMessage)
+        assertFalse(viewModel.state.value.isLocating)
+    }
+
+    @Test
     fun loadNext_appendsTheNextPageWithoutReplacingVisibleItems() = runTest {
         val repository = ViewModelCatalogRepository(
             firstPageCursor = "cursor-1",
@@ -347,18 +373,22 @@ class ExploreViewModelTest {
         locationService: ApproximateLocationService = ApproximateLocationService {
             ApproximateLocationResult.Unavailable
         },
-    ): ExploreViewModel = ExploreViewModel(
-        presenter = ExplorePresenter(
-            exploreFeedRepository = feedRepository,
-            catalogInteractionRepository = repository,
-            appPreferencesRepository = appPreferencesRepository,
-            clockProvider = FixedViewModelClock,
-        ),
-        locationService = locationService,
-        strings = strings,
-        coroutineScope = this,
-    ).also { viewModel ->
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
+    ): ExploreViewModel {
+        val viewModelScope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
+        requireNotNull(coroutineContext[Job]).invokeOnCompletion { viewModelScope.cancel() }
+        return ExploreViewModel(
+            presenter = ExplorePresenter(
+                exploreFeedRepository = feedRepository,
+                catalogInteractionRepository = repository,
+                appPreferencesRepository = appPreferencesRepository,
+                clockProvider = FixedViewModelClock,
+            ),
+            locationService = locationService,
+            strings = strings,
+            coroutineScope = viewModelScope,
+        ).also { viewModel ->
+            viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
+        }
     }
 }
 

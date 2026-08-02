@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     let bridge: KwaborSharedBridge
+    let exploreStore: ExploreStore
     let isGuestSession: Bool
     let strings: OnboardingStrings
     let accountSecurityController: IosAuthController?
@@ -21,6 +22,7 @@ struct ContentView: View {
 
     init(
         bridge: KwaborSharedBridge,
+        exploreStore: ExploreStore,
         isGuestSession: Bool = false,
         strings: OnboardingStrings? = nil,
         accountSecurityController: IosAuthController? = nil,
@@ -37,6 +39,7 @@ struct ContentView: View {
         onRootDeepLinkConsumed: @escaping () -> Void = {}
     ) {
         self.bridge = bridge
+        self.exploreStore = exploreStore
         self.isGuestSession = isGuestSession
         self.strings = strings ?? bridge.onboardingStrings()
         self.accountSecurityController = accountSecurityController
@@ -60,12 +63,14 @@ struct ContentView: View {
                     RootDestinationContent(
                         destination: destination,
                         bridge: bridge,
+                        exploreStore: exploreStore,
                         strings: strings,
                         accountSecurityController: accountSecurityController,
                         federatedIdentityHintStore: federatedIdentityHintStore,
                         latestAccountSecurityError: latestAccountSecurityError,
                         isSigningOutAccount: isSigningOutAccount,
                         accountSignOutErrorMessage: accountSignOutErrorMessage,
+                        onProtectedDestinationSelected: onProtectedDestinationSelected,
                         onSignOut: onSignOut,
                         onDismissSignOutError: onDismissSignOutError,
                         onAccountDeletionStateChanged: onAccountDeletionStateChanged,
@@ -124,12 +129,14 @@ struct ContentView: View {
 private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
+    let exploreStore: ExploreStore
     let strings: OnboardingStrings
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
+    let onProtectedDestinationSelected: () -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
     let onAccountDeletionStateChanged: (Bool) -> Void
@@ -137,21 +144,28 @@ private struct RootDestinationContent: View {
 
     var body: some View {
         Group {
-            if destination == .profile {
+            if destination == .home {
+                ExploreView(
+                    store: exploreStore,
+                    onAuthenticationRequired: onProtectedDestinationSelected
+                )
+                .toolbar(.hidden, for: .navigationBar)
+            } else if destination == .profile {
                 ScrollView {
                     destinationContent
                         .frame(maxWidth: profileContentMaxWidth, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .top)
                         .padding(KwaborDesignTokens.Spacing.xxl)
                 }
+                .navigationTitle(destination.label(using: bridge))
             } else {
                 destinationContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(KwaborDesignTokens.Spacing.xxl)
+                    .navigationTitle(destination.label(using: bridge))
             }
         }
         .background(KwaborDesignTokens.ColorToken.paper50)
-        .navigationTitle(destination.label(using: bridge))
     }
 
     private var destinationContent: some View {
@@ -191,7 +205,7 @@ private struct RootDestinationContent: View {
     }
 
     private var title: String {
-        destination == .home ? bridge.homeTitle() : destination.label(using: bridge)
+        destination.label(using: bridge)
     }
 }
 
@@ -244,8 +258,4 @@ private struct AccountSessionSection: View {
             Text(strings.authSignOutConfirmation)
         }
     }
-}
-
-#Preview {
-    ContentView(bridge: KwaborSharedBridge())
 }

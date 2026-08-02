@@ -88,6 +88,15 @@ data class ExploreUiState(
     val pendingAuthInteraction: PendingExploreAuthInteraction? = null,
     val queuedInteractions: List<QueuedExploreInteraction> = emptyList(),
 ) {
+    val isPlacesTabSelected: Boolean
+        get() = selectedTab == ExploreTab.Places
+
+    val isEventsTabSelected: Boolean
+        get() = selectedTab == ExploreTab.Events
+
+    val isHotelsRestaurantsTabSelected: Boolean
+        get() = selectedTab == ExploreTab.HotelsRestaurants
+
     val hasError: Boolean
         get() = errorMessage != null
 

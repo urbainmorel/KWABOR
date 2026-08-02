@@ -192,9 +192,14 @@ jobs:
             iosApp/Kwabor/Onboarding/PromoterActivationSessionMarker.swift \
             iosApp/Kwabor/Onboarding/IntroVideoPresentationStore.swift \
             iosApp/Kwabor/Onboarding/LegacyRemoteIntroCleaner.swift \
+            iosApp/Kwabor/Explore/ExplorePolicies.swift \
             iosApp/PolicyTests/main.swift \
             -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
           "$RUNNER_TEMP/kwabor-ios-policy-tests"
+
+      - name: Test shared iOS runtime on simulator
+        timeout-minutes: 45
+        run: ./gradlew :shared:iosSimulatorArm64Test
 
       - name: Build shared iOS XCFrameworks
         run: ./gradlew :shared:assembleSharedDebugXCFramework :shared:assembleSharedReleaseXCFramework
