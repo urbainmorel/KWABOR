@@ -16,7 +16,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
-| Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes, CI en cours |
+| Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run `30740826138` entièrement vert |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -46,7 +46,7 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - REMOTE-INTRO-001 a été implémenté historiquement dans la PR `#38`, mais ADR-0021 le supersède avant la V1. INTRO-STORE-001 retire URL/téléchargement/cache/purge distants, conserve Remote Config générique et impose une révision embarquée Android/iOS distribuée exclusivement par release Store.
 - INTRO-STORE-001 est validé localement par la porte Gradle complète, les vérificateurs média/marque/dépôt et deux revues indépendantes sans P0/P1/P2. La PR brouillon `#43` est publiée sur `#42` et son run GitHub Actions `30733200076` est entièrement vert.
 - EXPLORE-IOS-001 partage le runtime Explore avec Android et livre une surface SwiftUI native : grille adaptative, états chargement/vide/offline/erreur, refresh, pagination, ville/GPS, Like/Favori avec soft wall d'authentification et images HTTPS bornées. Recherche, filtres, assistant et détail restent absents tant que leurs contrats ne sont pas livrés.
-- La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. Les tests du contrôleur iOS et le smoke test Room/DataStore simulateur compilent ; leur exécution native ainsi que le build SwiftUI attendent la CI macOS de la nouvelle PR.
+- La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. La CI a ensuite fait corriger l'isolation Swift 6 des providers et l'import d'enum Kotlin au profit d'intentions iOS sémantiques. Le run final `30740826138` exécute le smoke test Room/DataStore, construit les XCFrameworks et les trois configurations Xcode simulateur, et passe `quality`, Supabase ainsi que les preuves Android API 30/31/36 ; API 30 y exerce avec succès la nouvelle recapture transitoire `75`.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
 
@@ -74,8 +74,9 @@ Objectifs :
 - brancher le cache Room, DataStore, refresh, pagination, localisation et interactions ;
 - prouver la persistance réelle sur simulateur macOS et les configurations Xcode de la tranche.
 
-État : implémentation, porte locale, trois revues indépendantes, commit, push et publication de la
-PR brouillon `#44` terminés. Le build Xcode, le smoke test simulateur et la CI sont en cours.
+État : implémentation, porte locale, trois revues indépendantes, commit, push, publication de la
+PR brouillon `#44`, build Xcode, smoke test simulateur et CI finale `30740826138` terminés. La revue
+humaine et la preuve VoiceOver/appareil physique restent ouvertes.
 
 ### BRAND-002 — Fidélité du splash système
 
@@ -128,7 +129,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir la CI verte d'EXPLORE-IOS-001 `#44`, puis les revues humaines de la pile, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
+3. Obtenir les revues humaines de la pile jusqu'à EXPLORE-IOS-001 `#44`, en garantissant que le canal distant historique de `#38` n'atteint jamais une release V1 active.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.

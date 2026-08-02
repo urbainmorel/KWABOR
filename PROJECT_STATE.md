@@ -203,12 +203,12 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - La PR brouillon INTRO-STORE-001 `#43` est publiée au-dessus d'EXPLORE-002B1 `#42` ; le run GitHub Actions `30733200076` est entièrement vert.
 - EXPLORE-IOS-001 est implémentée localement sur `codex/explore-ios-001-parity`, empilée sur INTRO-STORE-001 : le runtime Kotlin commun porte désormais les intents, l'état, les effets, la concurrence et le cycle de vie, tandis que les adaptateurs Android et iOS restent minces.
 - L'écran SwiftUI natif expose la grille adaptative, les états chargement/vide/offline/erreur, le refresh, la pagination, la ville persistée/GPS approximatif, les interactions Like/Favori avec soft wall d'authentification et un pipeline image HTTPS borné/dédupliqué/downsamplé. Recherche, filtres, assistant et navigation détail ne sont pas affichés tant que leurs contrats V1 ne sont pas livrés.
-- La validation locale EXPLORE-IOS-001 passe les vérificateurs dépôt/média/marque et la porte `spotlessCheck detekt check` ; les rapports courants comptent 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ont fait corriger les courses de sélection, les limites/annulations du pipeline image, Dynamic Type, les bandeaux, le formatage XOF partagé et le timeout simulateur, puis ne relèvent plus aucun P0/P1/P2. Le contrôleur iOS et ses politiques Swift sont couverts ; un smoke test simulateur rouvre réellement Room et DataStore via des chemins temporaires, mais son exécution native et le build Xcode de cette tranche restent à confirmer par la CI macOS.
-- La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43` ; sa CI GitHub est en cours.
+- La validation locale EXPLORE-IOS-001 passe les vérificateurs dépôt/média/marque et la porte `spotlessCheck detekt check` ; les rapports courants comptent 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ont fait corriger les courses de sélection, les limites/annulations du pipeline image, Dynamic Type, les bandeaux, le formatage XOF partagé et le timeout simulateur, puis ne relèvent plus aucun P0/P1/P2. Le contrôleur iOS et ses politiques Swift sont couverts ; le smoke test macOS rouvre réellement Room et DataStore via des chemins temporaires.
+- La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43`. Les premiers runs ont exposé puis fait corriger l'isolation Swift 6 des providers, l'import fragile d'un cas `ExploreTab` et un timeout transitoire de capture HOME Android. Le run final `30740826138` est entièrement vert : `quality`, Supabase, smoke test iOS, XCFrameworks, configurations Xcode simulateur Debug/Staging/Release et preuves Android API 30/31/36. API 30 y a exercé une recapture transitoire `75` avant de réussir, sans relancer les erreurs déterministes.
 
 ## Tâche en cours
 
-Suivre les gates macOS/Android de la PR brouillon EXPLORE-IOS-001 `#44` jusqu'au vert. Les revues humaines de `#41`, `#42`, `#43` et `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Obtenir la revue humaine de la PR brouillon EXPLORE-IOS-001 `#44`. Les revues humaines de `#41`, `#42`, `#43` et `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -227,7 +227,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
 - Explore Android consomme désormais le cache Room, le refresh et les pages suivantes. Le stockage serveur des dates d'événements est posé, mais les tris métier par onglet, filtres prix/date et plafonds sponsorisés restent bloqués par un contrat catalogue versionné et des décisions produit ; recherche, filtre, assistant et navigation fiche restent aussi à brancher.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
-- L'écran Explore iOS SwiftUI natif est implémenté localement ; sa compilation Xcode, son smoke test de persistance et sa validation VoiceOver/appareil restent à prouver avant fusion.
+- L'écran Explore iOS SwiftUI natif compile dans les trois configurations simulateur et son smoke test de persistance est vert ; la validation VoiceOver/appareil physique reste à prouver avant fusion.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
@@ -243,7 +243,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Obtenir la CI verte d'EXPLORE-IOS-001 `#44`, puis faire approuver et fusionner la pile `#35` → `#36` →
+Faire approuver puis fusionner la pile `#35` → `#36` →
 `#37` → `#38` → `#39` → `#40` → `#41` → `#42` → `#43` → `#44`. Le sous-lot Explore suivant doit
 faire valider popularité, plafond sponsorisé et
 intervalles de dates avant de versionner le RPC/cursor et les contrats mobile. La revue appareils
