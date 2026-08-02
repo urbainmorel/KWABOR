@@ -425,6 +425,11 @@ from public, anon, authenticated;
 revoke all on function app_private.catalog_point_is_within_benin(numeric, numeric)
 from public, anon, authenticated;
 
+-- CHECK constraints execute these invoker validators as the writing role. The
+-- trusted backend role does not inherit authenticated, so its targeted EXECUTE
+-- grants also require explicit schema resolution.
+grant usage on schema app_private to authenticated, service_role;
+
 grant execute on function app_private.catalog_opening_hours_is_valid(jsonb)
 to authenticated, service_role;
 grant execute on function app_private.catalog_https_url_is_valid(text)

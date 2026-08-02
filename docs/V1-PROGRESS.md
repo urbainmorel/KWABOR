@@ -17,7 +17,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` sur `#44` ; premier run exact-head partiellement vert, corrections ACL historiques en validation |
+| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` sur `#44` ; 628 tests SQL standard et builds mobiles verts, correction ACL du harnais concurrence en validation |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -65,11 +65,12 @@ Objectifs :
 État : implémentation et revues SQL/Android terminées sans P0/P1/P2. La porte locale
 `spotlessCheck detekt check` est verte en 13 min 24 s, avec 311 tests shared et 147 tests Android
 sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows. Les plans
-pgTAP sont exacts à 198 assertions détail et 57 assertions curseur. La migration et le seed ont été
-exercés avant les derniers durcissements, mais Docker local ne répond plus. Le premier run exact-head
-`30753221174` a validé Gradle, Android, iOS, le nouveau read model et le curseur ; il a révélé dans
-les suites historiques des attentes incompatibles avec les grants par colonne. Les corrections
-RLS/pgTAP minimales sont en validation sur la PR brouillon `#45`, publiée sur `#44`. DETAIL-001 demeure ouvert :
+pgTAP sont exacts à 202 assertions détail et 57 assertions curseur. La migration et le seed ont été
+exercés avant les derniers durcissements, mais la stack locale Kwabor n'est plus active. Le run
+exact-head `30754685251` a validé Gradle, Android API 30/31/36, iOS et les 628 assertions SQL
+standard. Son seul échec a isolé les ACL manquantes du rôle `dblink` éphémère dans le harnais de
+concurrence ; leur correction bornée et la preuve runtime `service_role` sont en validation sur la
+PR brouillon `#45`, publiée sur `#44`. DETAIL-001 demeure ouvert :
 aucun DetailSheet Android ni écran détail SwiftUI n'est livré par ce sous-lot.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores

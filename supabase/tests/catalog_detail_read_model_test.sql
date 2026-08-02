@@ -136,7 +136,7 @@ as $$
   $json$::jsonb;
 $$;
 
-select plan(198);
+select plan(202);
 
 insert into auth.users (
   id,
@@ -580,6 +580,71 @@ select ok(
 select ok(
   not has_function_privilege('service_role', 'public.get_catalog_detail_v1(uuid)', 'execute'),
   'service role has no direct execute grant on the public catalog detail RPC'
+);
+
+select ok(
+  has_schema_privilege('authenticated', 'app_private', 'usage')
+  and has_schema_privilege('service_role', 'app_private', 'usage')
+  and not has_schema_privilege('anon', 'app_private', 'usage'),
+  'only authenticated and trusted backend writers can resolve the private validator schema'
+);
+
+select ok(
+  (
+    select bool_and(
+      has_function_privilege('authenticated', validator.signature, 'execute')
+      and has_function_privilege('service_role', validator.signature, 'execute')
+      and not has_function_privilege('anon', validator.signature, 'execute')
+    )
+    from unnest(array[
+      'app_private.catalog_opening_hours_is_valid(jsonb)',
+      'app_private.catalog_https_url_is_valid(text)',
+      'app_private.catalog_socials_are_valid(jsonb)',
+      'app_private.catalog_text_has_mobile_whitespace(text)',
+      'app_private.catalog_text_has_canonical_edges(text)',
+      'app_private.catalog_timestamp_is_mobile_safe(timestamptz)',
+      'app_private.catalog_tags_are_valid(text[])',
+      'app_private.catalog_text_array_is_valid(text[],boolean)',
+      'app_private.catalog_point_is_within_benin(numeric,numeric)'
+    ]) validator(signature)
+  ),
+  'all catalog validators have the intended role-scoped EXECUTE matrix'
+);
+
+select ok(
+  (
+    select bool_and(
+      not procedure.prosecdef
+      and coalesce('search_path=""' = any(procedure.proconfig), false)
+    )
+    from unnest(array[
+      'app_private.catalog_opening_hours_is_valid(jsonb)'::regprocedure,
+      'app_private.catalog_https_url_is_valid(text)'::regprocedure,
+      'app_private.catalog_socials_are_valid(jsonb)'::regprocedure,
+      'app_private.catalog_text_has_mobile_whitespace(text)'::regprocedure,
+      'app_private.catalog_text_has_canonical_edges(text)'::regprocedure,
+      'app_private.catalog_timestamp_is_mobile_safe(timestamptz)'::regprocedure,
+      'app_private.catalog_tags_are_valid(text[])'::regprocedure,
+      'app_private.catalog_text_array_is_valid(text[],boolean)'::regprocedure,
+      'app_private.catalog_point_is_within_benin(numeric,numeric)'::regprocedure
+    ]) validator(function_oid)
+    join pg_catalog.pg_proc procedure on procedure.oid = validator.function_oid
+  ),
+  'catalog validators remain SECURITY INVOKER with an empty fixed search_path'
+);
+
+select is(
+  tests.affected_rows_as(
+    'service_role',
+    null,
+    $$
+      update public.listings
+      set name = name
+      where id = 'da140000-0000-4000-8000-000000000001'
+    $$
+  ),
+  1::bigint,
+  'the trusted backend can execute catalog CHECK validators during a listing write'
 );
 
 select ok(
