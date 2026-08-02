@@ -209,10 +209,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - La migration DETAIL-001A verrouille les invariants parent/enfant, les collections ordonnées, les droits Data API par colonne et le même sous-ensemble URL/temps/Unicode que le mapper mobile. Deux revues SQL indépendantes ne relèvent aucun P0/P1/P2 ; les plans statiques comptent 196 assertions détail et 57 assertions curseur.
 - Android ne montre plus Recherche, filtres, assistant, FAB ou ouverture de fiche factices. Les images Explore passent par une politique HTTPS injectée et fail-closed, sans dépendance Supabase dans l'UI. Le DetailSheet Android et l'écran détail SwiftUI restent explicitement dans DETAIL-001B et DETAIL-IOS-001.
 - La porte locale DETAIL-001A `spotlessCheck detekt check` est verte en 13 min 24 s : 311 tests shared et 147 tests Android sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows inclus. Les vérificateurs dépôt, onboarding Store-only et marque sont également verts.
+- La PR brouillon DETAIL-001A `#45` est publiée au-dessus de `#44` depuis le commit `3bb96b3`. Le run GitHub Actions `30753156962` doit encore fermer la preuve PostgreSQL finale et les builds exact-head.
 
 ## Tâche en cours
 
-Finaliser la relecture post-refactor de DETAIL-001A, publier sa PR brouillon au-dessus de `#44`, puis obtenir ses gates GitHub, notamment pgTAP et le build Xcode. Les revues humaines de `#41` à `#44` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Obtenir les gates GitHub exact-head de la PR brouillon DETAIL-001A `#45`, notamment pgTAP et le build Xcode, puis sa revue humaine. Les revues humaines de `#41` à `#45` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -247,7 +248,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier et valider DETAIL-001A au-dessus de `#44`, puis livrer DETAIL-001B sans marquer DETAIL-001
-terminé avant la parité SwiftUI. La pile `#35` → `#44` doit toujours être approuvée et fusionnée dans
+Valider la PR DETAIL-001A `#45` au-dessus de `#44`, puis livrer DETAIL-001B sans marquer DETAIL-001
+terminé avant la parité SwiftUI. La pile `#35` → `#45` doit toujours être approuvée et fusionnée dans
 l'ordre. La revue appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire, sans
 bloquer la vidéo embarquée.

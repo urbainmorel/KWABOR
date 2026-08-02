@@ -17,7 +17,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A et porte mobile locale terminés ; PR/CI et validation PostgreSQL finale à publier |
+| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` sur `#44` ; run `30753156962` et validation PostgreSQL finale en cours |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -67,7 +67,8 @@ Objectifs :
 sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows. Les plans
 pgTAP sont exacts à 196 assertions détail et 57 assertions curseur. La migration et le seed ont été
 exercés avant les derniers durcissements, mais Docker local ne répond plus ; la validation
-PostgreSQL finale, le commit, la PR empilée et sa CI restent à terminer. DETAIL-001 demeure ouvert :
+PostgreSQL finale reste à fermer par le run `30753156962` de la PR brouillon `#45`, publiée sur
+`#44` depuis `3bb96b3`. DETAIL-001 demeure ouvert :
 aucun DetailSheet Android ni écran détail SwiftUI n'est livré par ce sous-lot.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
@@ -147,7 +148,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Publier DETAIL-001A au-dessus de `#44`, obtenir ses gates, puis faire relire toute la pile dans l'ordre.
+3. Obtenir les gates exact-head et la revue humaine de DETAIL-001A `#45`, puis faire relire toute la pile dans l'ordre.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.
