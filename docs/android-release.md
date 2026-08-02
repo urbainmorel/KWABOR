@@ -72,9 +72,9 @@ renommages atomiques, l'horodatage de ce retour, le marqueur `ready` et la deman
 worker n'honore cette dernière qu'après le burst final. Celui-ci doit contenir au moins quatre
 captures postérieures au marqueur et couvrir au moins 2,5 secondes. Chaque commande est bornée à
 trois secondes ; le temps réellement inactif entre la fin d'une capture valide et le début de la
-suivante reste limité à 4,5 secondes. Un dépassement ou un timeout de commande rejette toute la
-séquence et autorise jusqu'à deux recaptures complètes ; aucune frame d'un essai rejeté n'est
-réutilisée. L'en-tête, le format, les
+suivante reste limité à 4,5 secondes. Un dépassement, un timeout de commande ou une capture HOME
+initiale vide rejette toute la séquence et autorise jusqu'à deux recaptures complètes ; aucune frame
+d'un essai rejeté n'est réutilisée. L'en-tête, le format, les
 dimensions et la taille exacte de chaque frame sont vérifiés avant conversion PNG côté hôte. Les
 budgets statiques sont de 608 633 344 octets en `xxxhdpi`, 177 324 544 en `xhdpi` et 69 497 344 en
 `mdpi`, chacun contrôlé avec 128 Mio supplémentaires réservés au système et sous le quota de

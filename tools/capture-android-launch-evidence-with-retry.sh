@@ -18,7 +18,7 @@ for ((capture_attempt = 1; capture_attempt <= maximum_capture_attempts; capture_
   fi
 
   case "${capture_status}" in
-    75) retry_reason="transient screencap idle gap" ;;
+    75) retry_reason="transient screencap acquisition failure" ;;
     124) retry_reason="bounded command timeout" ;;
     *) exit "${capture_status}" ;;
   esac

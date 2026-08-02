@@ -866,7 +866,8 @@ capture_screencap_frames() {
     "${minimum_post_ready_duration_seconds}" \
     "${minimum_post_ready_capture_span_seconds}" \
     "${screencap_maximum_frame_bytes}" \
-    "${profile_budget_bytes}" <<'ANDROID_SCREENCAP'
+    "${profile_budget_bytes}" \
+    "${screencap_retryable_gap_exit_status}" <<'ANDROID_SCREENCAP'
 set -u
 
 remote_root="$1"
@@ -886,6 +887,11 @@ minimum_post_ready_duration_seconds="$4"
 minimum_post_ready_capture_span_seconds="$5"
 maximum_frame_bytes="$6"
 maximum_total_bytes="$7"
+retryable_capture_exit_status="$8"
+if [ "${retryable_capture_exit_status}" -ne 75 ]; then
+  echo "Invalid retryable screencap exit status" >&2
+  exit 1
+fi
 umask 077
 frames_directory="${remote_root}/screencap-frames"
 timestamps_file="${remote_root}/screencap-timestamps.tsv"
@@ -1059,11 +1065,27 @@ IFS=' ' read -r started_at ignored </proc/uptime
 home_partial_file="${home_file}.partial"
 current_partial_path="${home_partial_file}"
 IFS=' ' read -r home_attempted_at ignored </proc/uptime
-if ! /system/bin/toybox timeout -s 9 "${frame_timeout_seconds}" \
-  /system/bin/screencap >"${home_partial_file}" ||
-  [ ! -s "${home_partial_file}" ]; then
+home_capture_status=0
+if /system/bin/toybox timeout -s 9 "${frame_timeout_seconds}" \
+  /system/bin/screencap >"${home_partial_file}"; then
+  :
+else
+  home_capture_status=$?
+fi
+case "${home_capture_status}" in
+  0) ;;
+  124 | 137)
+    echo "Prelaunch HOME screencap timed out (status ${home_capture_status})" >&2
+    exit "${retryable_capture_exit_status}"
+    ;;
+  *)
+    echo "Prelaunch HOME screencap failed (status ${home_capture_status})" >&2
+    exit 1
+    ;;
+esac
+if [ ! -s "${home_partial_file}" ]; then
   echo "Unable to capture the prelaunch HOME frame" >&2
-  exit 1
+  exit "${retryable_capture_exit_status}"
 fi
 IFS=' ' read -r home_completed_at ignored </proc/uptime
 home_bytes="$(/system/bin/toybox stat -c %s "${home_partial_file}")"
@@ -1339,6 +1361,7 @@ wait_for_screencap_arm() {
   local remote_root="$2"
   local nonce="$3"
   local deadline=$((SECONDS + screencap_arm_timeout_seconds + 1))
+  local screencap_status=0
 
   while ((SECONDS < deadline)); do
     if remote_screencap_marker_matches \
@@ -1347,7 +1370,19 @@ wait_for_screencap_arm() {
       return 0
     fi
     if ! kill -0 "${screencap_pid}" >/dev/null 2>&1; then
-      echo "Screencap sequence exited before capturing its HOME frame" >&2
+      if wait "${screencap_pid}"; then
+        screencap_status=0
+      else
+        screencap_status=$?
+      fi
+      active_screencap_pid=""
+      if ((screencap_status == screencap_retryable_gap_exit_status)); then
+        echo "Screencap sequence hit a transient failure before capturing its HOME frame" >&2
+        return "${screencap_status}"
+      fi
+      echo \
+        "Screencap sequence exited before capturing its HOME frame (status ${screencap_status})" \
+        >&2
       return 1
     fi
     sleep 0.05
@@ -3302,6 +3337,7 @@ for profile in "${density_profiles[@]}"; do
   screenrecord_resume_transition_bytes=""
   screenrecord_baseline_bytes=""
   screencap_pid=""
+  screencap_arm_status=0
 
   mkdir -p "${capture_directory}"
   reset_app_data \
@@ -3342,12 +3378,15 @@ for profile in "${density_profiles[@]}"; do
     >"${screencap_log}" 2>&1 &
   screencap_pid=$!
   active_screencap_pid="${screencap_pid}"
-  if ! wait_for_screencap_arm \
+  if wait_for_screencap_arm \
     "${screencap_pid}" \
     "${remote_screencap_root}" \
     "${screencap_nonce}"; then
+    :
+  else
+    screencap_arm_status=$?
     sed 's/^/screencap: /' "${screencap_log}" >&2
-    exit 1
+    exit "${screencap_arm_status}"
   fi
   if [[ "${api_level}" == "31" ]]; then
     assert_home_surface \
