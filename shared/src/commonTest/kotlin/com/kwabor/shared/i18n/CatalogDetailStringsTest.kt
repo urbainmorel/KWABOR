@@ -19,6 +19,7 @@ class CatalogDetailStringsTest {
         assertEquals("Acheter un billet", detail.ticket)
         assertEquals("Ouvre une application externe", detail.opensExternally)
         assertEquals("Impossible d’ouvrir cette action pour le moment.", detail.externalActionFailed)
+        assertEquals("Aucun lien d'inscription disponible", detail.registrationUnavailable)
         assertEquals("Fermer", detail.dismiss)
     }
 }

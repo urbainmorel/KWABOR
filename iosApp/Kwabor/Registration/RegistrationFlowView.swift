@@ -432,6 +432,8 @@ private struct RegistrationStepContent: View {
                     set: store.updateRemoteConfigurationConsent
                 )
             )
+        } footer: {
+            Text(store.strings.registrationObservabilitySupport)
         }
     }
 

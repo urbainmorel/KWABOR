@@ -42,6 +42,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 - [ ] STAB-001 — Fusionner ou fermer proprement la PR parallèle `#34`, puis resynchroniser l'état documentaire après décision.
 - [ ] STAB-002 — Retirer les messages techniques et désactiver visuellement toute action sans implémentation réelle après validation des racines V1.
+  - [x] STAB-002A — Remplacer les copies internes d'authentification, d'invitation, de consentement et
+    d'inscription externe ; rendre explicites les choix facultatifs de confidentialité sur Android/iOS.
+  - [ ] STAB-002B — Retirer le placeholder `Socle applicatif en place` et neutraliser les racines sans
+    implémentation réelle après validation de la navigation V1.
 - [x] STAB-003 — Corriger les templates et runbooks locaux, permettre le build sans fichier fournisseur, verrouiller le wrapper Gradle et refuser en CI les secrets ou artefacts mobiles suivis.
 - [ ] PR-STAB-003 — PR brouillon empilée `#37` publiée avec `quality` et `iOS simulator build` verts ; obtenir la revue humaine puis la fusionner après `#36`.
 

@@ -294,14 +294,21 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   Deno et 20/20 tests Edge verts ; reset Supabase, lint `public`/`app_private` et 753 assertions pgTAP
   verts. Ce reset a aussi intégré les correctifs SQL
   préexistants de GUIDE-001B (transaction de migration, alias historiques et assertions typées).
+- STAB-002A retire les formulations internes visibles sur le nettoyage de session et l'annulation
+  d'invitation Android. Les consentements partagés décrivent désormais les statistiques, pannes,
+  lenteurs et réglages distants sans revendiquer une anonymisation non prouvée ; Android et iOS
+  indiquent tous deux que ces choix sont facultatifs, désactivés par défaut et modifiables.
+- Validation locale STAB-002A : tests shared et Android sans échec, traitement des ressources Android,
+  compilation des tests Kotlin/Native iOS X64, `spotlessCheck`, `detekt`, `check`, lint et APK debug
+  verts. Le build SwiftUI/Xcode natif reste à exécuter sur macOS avant fusion.
 
 ## Tâche en cours
 
-SEC-001F est terminé localement sur `codex/sec-001f-account-delete-step-up`, empilé sur OPS-001A,
-sans push, relance de CI, déploiement ni publication. La prochaine tranche locale est OPS-001B pour
-les alertes et l'exercice staging ; son exécution distante dépend du provisionnement propriétaire et
-des gates d'observabilité ci-dessous. SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux
-cinq décisions produit de son audit.
+SEC-001F et STAB-002A sont terminés localement sur `codex/sec-001f-account-delete-step-up`, empilés sur
+OPS-001A, sans push, relance de CI, déploiement ni publication. STAB-002B reste suspendu à la décision
+sur les cinq racines V1. OPS-001B dépend du provisionnement propriétaire et des gates d'observabilité
+ci-dessous ; SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de
+son audit.
 
 ## Blocages / limites
 

@@ -27,7 +27,6 @@
     <string name="registration_currency_option">%1$s · %2$s</string>
     <string name="registration_legal_support">Consultez et acceptez les trois documents applicables.</string>
     <string name="registration_read_document">Lire la version %1$s</string>
-    <string name="registration_observability_support">Ces choix sont facultatifs, désactivés par défaut et modifiables dans les paramètres.</string>
     <string name="registration_observability_local_error">Impossible d’enregistrer vos choix de confidentialité. Réessayez.</string>
     <string name="registration_notification_local_error">Impossible d’enregistrer ce choix. Réessayez.</string>
     <string name="registration_back_accessibility">Revenir à l’étape précédente</string>
@@ -78,17 +77,17 @@
     <string name="profile_delete_account_confirm">Supprimer définitivement</string>
     <string name="profile_delete_account_apple_device">Ce compte utilise Apple. Supprimez-le depuis Kwabor sur votre appareil iOS.</string>
     <string name="promoter_activation_loading">Vérification de votre invitation…</string>
-    <string name="promoter_activation_closing">Fermeture sécurisée de l’invitation…</string>
+    <string name="promoter_activation_closing">Annulation en cours…</string>
     <string name="promoter_activation_title">Activez votre compte %1$s</string>
-    <string name="promoter_activation_support">Confirmez votre identité avec votre mot de passe ou avec Google. Votre établissement est déjà prérempli.</string>
+    <string name="promoter_activation_support">Confirmez votre identité avec votre mot de passe ou Google. Les informations de votre établissement sont déjà ajoutées.</string>
     <string name="promoter_activation_password">Confirmer avec mon mot de passe</string>
     <string name="promoter_activation_error_title">Invitation indisponible</string>
     <string name="promoter_activation_retry">Réessayer</string>
     <string name="promoter_activation_success_title">Compte %1$s activé</string>
     <string name="promoter_activation_success_support">Votre accès Promoteur et votre établissement sont prêts. Vous pouvez maintenant continuer vers l’accueil.</string>
     <string name="promoter_activation_home">Retour à l’accueil</string>
-    <string name="auth_session_restore_error_title">Sécurisation de la session interrompue</string>
-    <string name="auth_session_restore_error_support">Kwabor doit terminer la fermeture de la session temporaire avant toute connexion. Vérifiez votre accès au réseau, puis réessayez.</string>
+    <string name="auth_session_restore_error_title">Connexion temporairement indisponible</string>
+    <string name="auth_session_restore_error_support">Vérifiez votre connexion Internet, puis réessayez.</string>
     <string name="common_cancel">Annuler</string>
     <string name="common_close">Fermer</string>
     <string name="detail_loading">Chargement de la fiche</string>
@@ -100,5 +99,5 @@
     <string name="detail_tags">À savoir</string>
     <string name="detail_menu_unavailable">Menu non renseigné</string>
     <string name="detail_registration_available">Inscription préalable disponible</string>
-    <string name="detail_registration_unavailable">Accès sans inscription externe</string>
+    <string name="detail_registration_unavailable">Aucun lien d’inscription disponible</string>
 </resources>

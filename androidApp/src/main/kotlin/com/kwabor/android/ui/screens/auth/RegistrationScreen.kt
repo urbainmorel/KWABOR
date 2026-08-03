@@ -307,7 +307,7 @@ private fun ObservabilityStep(
     RegistrationScrollableColumn(modifier) {
         StepHeading(
             strings.registrationObservabilityTitle,
-            stringResource(R.string.registration_observability_support),
+            strings.registrationObservabilitySupport,
         )
         ConsentSwitchRow(
             label = strings.registrationAnalyticsConsent,
