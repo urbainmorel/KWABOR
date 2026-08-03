@@ -184,6 +184,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 - [ ] PROFILE-001 — Livrer profils personnel/public, publications, contenus, favoris, statistiques et édition.
 - [ ] SETTINGS-001 — Livrer sécurité, sessions, préférences, thème, langue/devise/date, légal et Danger Zone.
+  - [x] SETTINGS-001A — Séparer Profil et Paramètres sur Android/iOS, afficher l'identité et la méthode
+    de connexion, puis livrer déconnexion et suppression de compte sans faux réglage.
 - [ ] SOCIAL-001 — Ajouter schéma/RLS feed, follows, post likes, médias, compteurs et pagination.
 - [ ] SOCIAL-002 — Livrer le feed photo/diaporama Android avec mention ≤ 25 %, Like, suivi et partage.
 - [ ] SOCIAL-IOS-001 — Livrer le feed SwiftUI avec parité fonctionnelle et accessibilité.

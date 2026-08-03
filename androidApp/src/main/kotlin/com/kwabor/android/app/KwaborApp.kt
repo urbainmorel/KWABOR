@@ -55,9 +55,10 @@ import com.kwabor.android.ui.screens.detail.CatalogDetailPlatformDependencies
 import com.kwabor.android.ui.screens.detail.CatalogDetailSheet
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenUiModel
-import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
-import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
-import com.kwabor.shared.domain.auth.AuthenticationMethod
+import com.kwabor.android.ui.screens.profile.ProfileScreen
+import com.kwabor.android.ui.screens.profile.ProfileScreenUiModel
+import com.kwabor.android.ui.screens.settings.SettingsScreen
+import com.kwabor.android.ui.screens.settings.SettingsScreenUiModel
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
@@ -244,7 +245,7 @@ private object AuthEffectDispatcher {
                 }
                 AuthEffect.SignedOut -> {
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
-                    actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
+                    actions.onAuthenticationEnded()
                     actions.onDestinationResolved()
                     actions.onDeepLinksReset()
                     dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
@@ -252,7 +253,7 @@ private object AuthEffectDispatcher {
                 }
                 AuthEffect.AccountDeleted -> {
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
-                    actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
+                    actions.onAuthenticationEnded()
                     actions.onDestinationResolved()
                     actions.onDeepLinksReset()
                     dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
@@ -480,18 +481,28 @@ private fun KwaborRootNavHost(
         )
         rootAnchorRoutes(paddingValues = paddingValues, strings = strings)
         composable<ProfileRoute> {
-            ProfileSessionScreen(
-                model = ProfileSessionUiModel(
-                    email = state.auth.currentSession?.email ?: strings.authConnectedSession,
-                    authenticationMethod = state.auth.currentSession?.authenticationMethod
-                        ?: AuthenticationMethod.Email,
+            ProfileScreen(
+                model = ProfileScreenUiModel(email = state.auth.currentSession?.email),
+                strings = strings,
+                onSettingsRequested = {
+                    navController.navigate(SettingsRoute) { launchSingleTop = true }
+                },
+                modifier = Modifier.padding(paddingValues),
+            )
+        }
+        composable<SettingsRoute> {
+            SettingsScreen(
+                model = SettingsScreenUiModel(
+                    email = state.auth.currentSession?.email,
+                    authenticationMethod = state.auth.currentSession?.authenticationMethod,
                     authAccessState = state.authAccess,
                 ),
                 strings = strings,
                 actions = remember(dependencies.authViewModel) {
-                    dependencies.authViewModel.profileSessionActions()
+                    dependencies.authViewModel.settingsScreenActions()
                 },
-                modifier = Modifier.padding(paddingValues),
+                onBack = { navController.popBackStack() },
+                modifier = Modifier.padding(bottom = paddingValues.calculateBottomPadding()),
             )
         }
     }
@@ -576,6 +587,7 @@ private fun AuthEffectHandler(
 private data class RootEffectActions(
     val onDestinationRequested: (RootNavigationDestination) -> Unit,
     val onAuthenticatedDestinationRequested: (RootNavigationDestination) -> Unit,
+    val onAuthenticationEnded: () -> Unit,
     val onDestinationResolved: () -> Unit,
     val onDeepLinksReset: () -> Unit,
 )
@@ -600,6 +612,7 @@ private fun kwaborAppEffectActions(
     root = RootEffectActions(
         onDestinationRequested = requestDestination,
         onAuthenticatedDestinationRequested = navController::navigateToRoot,
+        onAuthenticationEnded = navController::resetToHomeAfterAuthenticationEnd,
         onDestinationResolved = onDestinationResolved,
         onDeepLinksReset = deepLinkCallbacks.onReset,
     ),

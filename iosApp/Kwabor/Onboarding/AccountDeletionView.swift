@@ -100,43 +100,84 @@ final class AccountDeletionStore: ObservableObject {
     }
 }
 
-struct AccountDeletionSection: View {
-    let controller: IosAuthController
+struct AccountDangerZoneSection: View {
+    let controller: IosAuthController?
     let strings: OnboardingStrings
-    let identityHintStore: FederatedIdentityHintPersisting
+    let identityHintStore: FederatedIdentityHintPersisting?
     let latestAuthError: () -> String?
+    let isSigningOut: Bool
+    let signOutErrorMessage: String?
+    let onSignOut: () -> Void
+    let onDismissSignOutError: () -> Void
     let onDeletionStateChanged: (Bool) -> Void
     let onDeleted: () -> Void
-    @State private var isPresented = false
+    @State private var isDeletionPresented = false
+    @State private var isSignOutConfirmationPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
             Text(strings.dangerZoneTitle)
                 .font(.headline)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
-            Text(strings.authDeleteAccountWarning)
-                .font(.callout)
-                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
-            Button(strings.authDeleteAccount, role: .destructive) {
-                isPresented = true
+
+            Button(role: .destructive) {
+                isSignOutConfirmationPresented = true
+            } label: {
+                HStack {
+                    Text(strings.authSignOut)
+                    Spacer()
+                    if isSigningOut {
+                        ProgressView()
+                            .accessibilityLabel(strings.authSignOut)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
             }
-            .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            .disabled(isSigningOut)
+
+            if let signOutErrorMessage {
+                Text(signOutErrorMessage)
+                    .font(.callout)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                    .accessibilityLabel(signOutErrorMessage)
+                    .onDisappear(perform: onDismissSignOutError)
+            }
+
+            if controller != nil, identityHintStore != nil {
+                Divider()
+                Text(strings.authDeleteAccountWarning)
+                    .font(.callout)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                Button(strings.authDeleteAccount, role: .destructive) {
+                    isDeletionPresented = true
+                }
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(isSigningOut)
+            }
         }
         .padding(KwaborDesignTokens.Spacing.lg)
         .background(KwaborDesignTokens.ColorToken.surface0)
         .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
-        .sheet(isPresented: $isPresented) {
-            AccountDeletionConfirmationView(
-                controller: controller,
-                strings: strings,
-                identityHintStore: identityHintStore,
-                latestAuthError: latestAuthError,
-                onDeletionStateChanged: onDeletionStateChanged,
-                onDeleted: {
-                    isPresented = false
-                    onDeleted()
-                }
-            )
+        .alert(strings.authSignOutTitle, isPresented: $isSignOutConfirmationPresented) {
+            Button(strings.authCancel, role: .cancel) {}
+            Button(strings.authConfirm, role: .destructive, action: onSignOut)
+        } message: {
+            Text(strings.authSignOutConfirmation)
+        }
+        .sheet(isPresented: $isDeletionPresented) {
+            if let controller, let identityHintStore {
+                AccountDeletionConfirmationView(
+                    controller: controller,
+                    strings: strings,
+                    identityHintStore: identityHintStore,
+                    latestAuthError: latestAuthError,
+                    onDeletionStateChanged: onDeletionStateChanged,
+                    onDeleted: {
+                        isDeletionPresented = false
+                        onDeleted()
+                    }
+                )
+            }
         }
     }
 }

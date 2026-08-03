@@ -1,27 +1,37 @@
-package com.kwabor.android.ui.screens.profile
+package com.kwabor.android.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +57,7 @@ import com.kwabor.android.ui.screens.auth.GoogleSignInButton
 import com.kwabor.shared.domain.auth.AuthenticationMethod
 import com.kwabor.shared.i18n.KwaborStrings
 
-internal data class ProfileSessionScreenActions(
+internal data class SettingsScreenActions(
     val onRequestSignOut: () -> Unit,
     val onCancelSignOut: () -> Unit,
     val onConfirmSignOut: () -> Unit,
@@ -57,57 +67,133 @@ internal data class ProfileSessionScreenActions(
     val onDeleteAccountWithGoogle: (String) -> Unit,
 )
 
-internal data class ProfileSessionUiModel(
-    val email: String,
-    val authenticationMethod: AuthenticationMethod,
+internal data class SettingsScreenUiModel(
+    val email: String?,
+    val authenticationMethod: AuthenticationMethod?,
     val authAccessState: AuthAccessUiState,
 )
 
-internal object ProfileSessionScreen {
+internal data class SettingsAccountPresentation(
+    val email: String,
+    val authenticationMethod: String,
+    val accountDeletionAvailable: Boolean,
+)
+
+private data class SettingsScaffoldUiModel(
+    val account: SettingsAccountPresentation,
+    val authAccessState: AuthAccessUiState,
+)
+
+internal fun settingsAccountPresentation(
+    email: String?,
+    authenticationMethod: AuthenticationMethod?,
+    strings: KwaborStrings,
+): SettingsAccountPresentation = SettingsAccountPresentation(
+    email = strings.settings.accountEmail(email),
+    authenticationMethod = strings.settings.authenticationMethodName(authenticationMethod),
+    accountDeletionAvailable = authenticationMethod != null,
+)
+
+internal object SettingsScreen {
     @Composable
     operator fun invoke(
-        model: ProfileSessionUiModel,
+        model: SettingsScreenUiModel,
         strings: KwaborStrings,
-        actions: ProfileSessionScreenActions,
+        actions: SettingsScreenActions,
+        onBack: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
-        Surface(modifier = modifier.fillMaxSize()) {
-            ProfileSessionContent(
-                email = model.email,
-                authAccessState = model.authAccessState,
-                strings = strings,
-                actions = actions,
+        val account = settingsAccountPresentation(
+            email = model.email,
+            authenticationMethod = model.authenticationMethod,
+            strings = strings,
+        )
+        SettingsScaffold(
+            model = SettingsScaffoldUiModel(account, model.authAccessState),
+            strings = strings,
+            actions = actions,
+            onBack = onBack,
+            modifier = modifier,
+        )
+        SensitiveSettingsDialogs(model = model, strings = strings, actions = actions)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsScaffold(
+    model: SettingsScaffoldUiModel,
+    strings: KwaborStrings,
+    actions: SettingsScreenActions,
+    onBack: () -> Unit,
+    modifier: Modifier,
+) {
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
+        topBar = {
+            TopAppBar(
+                title = { Text(strings.settings.title) },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = strings.registrationBack,
+                        )
+                    }
+                },
             )
-        }
-        if (model.authAccessState.signOutConfirmationVisible) {
-            SignOutConfirmationDialog(
-                loading = model.authAccessState.signOutInProgress,
-                strings = strings,
-                actions = actions,
-            )
-        }
-        if (model.authAccessState.accountDeletionDialogVisible) {
-            AccountDeletionDialog(
-                model = AccountDeletionDialogUiModel(
-                    authenticationMethod = model.authenticationMethod,
-                    state = model.authAccessState,
-                    strings = strings,
-                ),
-                actions = actions,
-            )
-        }
+        },
+    ) { paddingValues ->
+        SettingsContent(
+            account = model.account,
+            authAccessState = model.authAccessState,
+            strings = strings,
+            actions = actions,
+            modifier = Modifier.padding(paddingValues),
+        )
     }
 }
 
 @Composable
-private fun ProfileSessionContent(
-    email: String,
+private fun SensitiveSettingsDialogs(
+    model: SettingsScreenUiModel,
+    strings: KwaborStrings,
+    actions: SettingsScreenActions,
+) {
+    if (model.authAccessState.signOutConfirmationVisible) {
+        SignOutConfirmationDialog(
+            loading = model.authAccessState.signOutInProgress,
+            strings = strings,
+            actions = actions,
+        )
+    }
+    val authenticationMethod = model.authenticationMethod
+    if (model.authAccessState.accountDeletionDialogVisible && authenticationMethod != null) {
+        AccountDeletionDialog(
+            model = AccountDeletionDialogUiModel(
+                authenticationMethod = authenticationMethod,
+                state = model.authAccessState,
+                strings = strings,
+            ),
+            actions = actions,
+        )
+    }
+}
+
+@Composable
+private fun SettingsContent(
+    account: SettingsAccountPresentation,
     authAccessState: AuthAccessUiState,
     strings: KwaborStrings,
-    actions: ProfileSessionScreenActions,
+    actions: SettingsScreenActions,
+    modifier: Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .imePadding()
             .verticalScroll(rememberScrollState())
@@ -115,80 +201,109 @@ private fun ProfileSessionContent(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Top,
     ) {
-        AccountSummary(email = email, authAccessState = authAccessState, strings = strings)
-        Spacer(Modifier.height(KwaborSpacing.Xxl))
-        DangerZone(authAccessState = authAccessState, strings = strings, actions = actions)
-    }
-}
-
-@Composable
-private fun AccountSummary(email: String, authAccessState: AuthAccessUiState, strings: KwaborStrings) {
-    Text(
-        text = strings.authAccount,
-        modifier = Modifier.semantics { heading() },
-        style = MaterialTheme.typography.headlineSmall,
-    )
-    Spacer(Modifier.height(KwaborSpacing.Sm))
-    Text(
-        text = stringResource(R.string.profile_connected_as, email),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.secondary,
-    )
-    authAccessState.signOutErrorMessage?.let { error ->
-        Spacer(Modifier.height(KwaborSpacing.Lg))
-        Text(
-            text = error,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium,
+        AccountSection(account = account, strings = strings)
+        Spacer(Modifier.height(KwaborSpacing.Xxxl))
+        DangerZone(
+            authAccessState = authAccessState,
+            accountDeletionAvailable = account.accountDeletionAvailable,
+            strings = strings,
+            actions = actions,
         )
     }
 }
 
 @Composable
-private fun DangerZone(
-    authAccessState: AuthAccessUiState,
-    strings: KwaborStrings,
-    actions: ProfileSessionScreenActions,
-) {
-    Text(
-        text = strings.dangerZoneTitle,
-        modifier = Modifier.semantics { heading() },
-        color = MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.titleMedium,
-    )
+private fun AccountSection(account: SettingsAccountPresentation, strings: KwaborStrings) {
+    SectionHeading(title = strings.settings.accountSectionTitle)
     Spacer(Modifier.height(KwaborSpacing.Lg))
-    DangerZoneButton(
-        title = strings.authSignOut,
-        enabled = !authAccessState.signOutInProgress,
-        onClick = actions.onRequestSignOut,
-    )
-    Spacer(Modifier.height(KwaborSpacing.Xxl))
-    Text(
-        text = strings.authDeleteAccountWarning,
-        color = MaterialTheme.colorScheme.secondary,
-        style = MaterialTheme.typography.bodyMedium,
-    )
+    LabeledValue(label = strings.settings.emailLabel, value = account.email)
     Spacer(Modifier.height(KwaborSpacing.Lg))
-    DangerZoneButton(
-        title = stringResource(R.string.profile_delete_account),
-        enabled = !authAccessState.signOutInProgress,
-        onClick = actions.onRequestAccountDeletion,
+    LabeledValue(
+        label = strings.settings.authenticationMethodLabel,
+        value = account.authenticationMethod,
     )
 }
 
 @Composable
-private fun DangerZoneButton(title: String, enabled: Boolean, onClick: () -> Unit) {
+private fun DangerZone(
+    authAccessState: AuthAccessUiState,
+    accountDeletionAvailable: Boolean,
+    strings: KwaborStrings,
+    actions: SettingsScreenActions,
+) {
+    SectionHeading(title = strings.dangerZoneTitle, isDestructive = true)
+    Spacer(Modifier.height(KwaborSpacing.Lg))
+    SignOutDangerAction(authAccessState = authAccessState, strings = strings, actions = actions)
+    Spacer(Modifier.height(KwaborSpacing.Xxxl))
+    Text(
+        text = strings.authDeleteAccountWarning,
+        color = MaterialTheme.colorScheme.secondary,
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Lg))
     OutlinedButton(
-        onClick = onClick,
+        onClick = actions.onRequestAccountDeletion,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget),
-        enabled = enabled,
+        enabled = accountDeletionAvailable &&
+            !authAccessState.signOutInProgress &&
+            !authAccessState.accountDeletionInProgress,
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
     ) {
-        Text(title)
+        Text(
+            text = stringResource(R.string.profile_delete_account),
+            style = MaterialTheme.typography.bodyLarge,
+        )
     }
+}
+
+@Composable
+private fun SignOutDangerAction(
+    authAccessState: AuthAccessUiState,
+    strings: KwaborStrings,
+    actions: SettingsScreenActions,
+) {
+    authAccessState.signOutErrorMessage?.let { error ->
+        Text(
+            text = error,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(KwaborSpacing.Lg))
+    }
+    OutlinedButton(
+        onClick = actions.onRequestSignOut,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget),
+        enabled = !authAccessState.signOutInProgress,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) {
+        Text(text = strings.authSignOut, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun SectionHeading(title: String, isDestructive: Boolean = false) {
+    Text(
+        text = title,
+        modifier = Modifier.semantics { heading() },
+        color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        style = MaterialTheme.typography.titleMedium,
+    )
+}
+
+@Composable
+private fun LabeledValue(label: String, value: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.secondary,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Xs))
+    Text(text = value, style = MaterialTheme.typography.bodyLarge)
 }
 
 private data class AccountDeletionDialogUiModel(
@@ -210,7 +325,7 @@ private data class AccountDeletionFormActions(
 )
 
 @Composable
-private fun AccountDeletionDialog(model: AccountDeletionDialogUiModel, actions: ProfileSessionScreenActions) {
+private fun AccountDeletionDialog(model: AccountDeletionDialogUiModel, actions: SettingsScreenActions) {
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     val confirmationPhrase = model.strings.authDeleteAccountConfirmationPhrase
@@ -239,7 +354,7 @@ private fun AccountDeletionAlert(
     model: AccountDeletionDialogUiModel,
     form: AccountDeletionForm,
     formActions: AccountDeletionFormActions,
-    actions: ProfileSessionScreenActions,
+    actions: SettingsScreenActions,
 ) {
     AlertDialog(
         onDismissRequest = {
@@ -277,7 +392,7 @@ private fun AccountDeletionDialogContent(
     model: AccountDeletionDialogUiModel,
     form: AccountDeletionForm,
     formActions: AccountDeletionFormActions,
-    actions: ProfileSessionScreenActions,
+    actions: SettingsScreenActions,
 ) {
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Text(stringResource(R.string.profile_delete_account_support))
@@ -410,7 +525,7 @@ private fun AccountDeletionConfirmButton(
 }
 
 @Composable
-private fun SignOutConfirmationDialog(loading: Boolean, strings: KwaborStrings, actions: ProfileSessionScreenActions) {
+private fun SignOutConfirmationDialog(loading: Boolean, strings: KwaborStrings, actions: SettingsScreenActions) {
     AlertDialog(
         onDismissRequest = { if (!loading) actions.onCancelSignOut() },
         title = { Text(strings.authSignOutTitle) },

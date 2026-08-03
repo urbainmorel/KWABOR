@@ -260,17 +260,22 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   propriétaire. Les commandes, chemins, liens locaux et règles mobile-only/vidéo Store-only ont été
   contrôlés contre le dépôt ; aucun code applicatif, workflow, secret ou environnement distant n'a
   été modifié.
+- SETTINGS-001A sépare désormais Profil et Paramètres sur Android Compose et iOS SwiftUI. Profil
+  reste minimal ; Paramètres affiche l'adresse e-mail, la méthode de connexion et une Danger Zone
+  réelle regroupant déconnexion et suppression de compte avec confirmation et réauthentification.
+- Les libellés et fallbacks sont partagés en Kotlin. Une fin de session purge les piles Android
+  sauvegardées et recrée la pile Profil iOS lorsque l'identité change, afin d'éviter de restaurer
+  l'état ou les données d'un compte précédent.
+- Validation locale SETTINGS-001A : tests shared/Android, compilation Android et Kotlin/Native iOS,
+  Spotless, Detekt, lint, pureté du domaine, schémas Room, `check` et APK debug verts. Les deux
+  contre-revues finales Android/iOS ne relèvent plus aucun P1/P2.
 
 ## Tâche en cours
 
-DOC-001 est terminé localement sur `codex/doc-001-documentation-system`, empilé sur
-`codex/actions-001c-detail-deeplink`, sans push. ACTIONS-001C1 reste à valider sous Swift/Xcode et
-sur un parcours connecté avant publication ; l'installation, la résolution et les intents Android
-froid/chaud sont déjà prouvés. Le partage HTTPS public et le signalement restent ouverts.
-- L'audit `docs/audits/2026-08-03-actions-001c-reporting-readiness.md` confirme qu'aucun signalement
-  de fiche n'existe encore. Il propose ACTIONS-001C2, fortement typé et transactionnel, mais suspend
-  l'implémentation à cinq décisions produit : authentification, cible initiale, détail du motif Autre,
-  seuil fiche et conservation des preuves après suppression de compte.
+SETTINGS-001A est terminé localement sur `codex/settings-001a-account-security`, empilé sur DOC-001,
+sans push, relance de CI ni publication. SETTINGS-001 reste ouvert : mot de passe, 2FA, gestion des
+appareils/sessions, notifications, thème, langue, devise, date et surfaces légales ne sont pas encore
+livrés. ACTIONS-001C2 reste suspendu aux cinq décisions produit tracées dans son audit.
 
 ## Blocages / limites
 
@@ -291,6 +296,9 @@ froid/chaud sont déjà prouvés. Le partage HTTPS public et le signalement rest
 - Les PolicyTests et sources SwiftUI ACTIONS-001C1 ont été revus statiquement, mais Swift/Xcode sont
   absents de ce poste Windows. Leur compilation native et le parcours `onOpenURL` restent à prouver
   sur macOS avant publication de la branche.
+- Les sources SwiftUI SETTINGS-001A ont été revues statiquement, mais Swift/Xcode sont absents de ce
+  poste Windows. Leur compilation native et les parcours VoiceOver restent à prouver sur macOS ; le
+  rendu et TalkBack Android doivent aussi être vérifiés sur appareils configurés avant publication.
 - `kwabor://listing/<uuid>` est volontairement interne et sans fallback. Un domaine HTTPS officiel,
   ses fichiers d'association, les fallbacks Store/serveur et le contrat de signalement sont requis
   avant de pouvoir livrer le partage public demandé par ACTIONS-001C.
@@ -323,8 +331,8 @@ froid/chaud sont déjà prouvés. Le partage HTTPS public et le signalement rest
 
 ## Prochaine tâche logique
 
-Faire valider les cinq décisions de l'audit ACTIONS-001C2, puis implémenter le signalement d'une
-fiche. En parallèle, valider ACTIONS-001C1 sous Swift/Xcode et sur appareils configurés, sans relancer
-la CI ni publier une branche sans accord explicite. Le domaine HTTPS officiel reste à décider pour
-terminer le partage public, sans CTA factice. La vidéo d'intro reste embarquée : tout changement
-d'octets exige une nouvelle release Android/iOS dans les Stores.
+Valider SETTINGS-001A sous Swift/Xcode, VoiceOver et TalkBack sur appareils configurés avant toute
+publication. Le prochain lot local sans dépendance propriétaire est OPS-001A : documenter les
+incidents Auth/session/suppression et leurs procédures de récupération. ACTIONS-001C2 attend toujours
+les cinq décisions produit de son audit. La vidéo d'intro reste embarquée : tout changement d'octets
+exige une nouvelle release Android/iOS dans les Stores.

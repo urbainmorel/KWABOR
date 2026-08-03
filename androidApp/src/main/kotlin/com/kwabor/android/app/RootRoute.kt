@@ -26,6 +26,11 @@ internal data object NotificationsRoute
 @Serializable
 internal data object ProfileRoute
 
+@Serializable
+internal data object SettingsRoute {
+    val rootDestination = RootNavigationDestination.Profile
+}
+
 internal fun NavDestination.toRootDestination(): RootNavigationDestination? = when {
     hasRoute<HomeRoute>() -> RootNavigationDestination.Home
     hasRoute<GuideDiscoveryRoute>() -> RootNavigationDestination.Home
@@ -33,6 +38,7 @@ internal fun NavDestination.toRootDestination(): RootNavigationDestination? = wh
     hasRoute<AddRoute>() -> RootNavigationDestination.Add
     hasRoute<NotificationsRoute>() -> RootNavigationDestination.Notifications
     hasRoute<ProfileRoute>() -> RootNavigationDestination.Profile
+    hasRoute<SettingsRoute>() -> SettingsRoute.rootDestination
     else -> null
 }
 
@@ -51,4 +57,21 @@ internal fun NavHostController.navigateToRoot(destination: RootNavigationDestina
         RootNavigationDestination.Notifications -> navigate(NotificationsRoute, options)
         RootNavigationDestination.Profile -> navigate(ProfileRoute, options)
     }
+}
+
+internal fun NavHostController.resetToHomeAfterAuthenticationEnd() {
+    navigate(HomeRoute) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = false
+        }
+        launchSingleTop = true
+        restoreState = false
+    }
+    clearBackStack(HomeRoute)
+    clearBackStack(GuideDiscoveryRoute)
+    clearBackStack(SocialRoute)
+    clearBackStack(AddRoute)
+    clearBackStack(NotificationsRoute)
+    clearBackStack(ProfileRoute)
+    clearBackStack(SettingsRoute)
 }

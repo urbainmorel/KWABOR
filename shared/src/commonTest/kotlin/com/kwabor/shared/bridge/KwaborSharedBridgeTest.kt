@@ -23,6 +23,9 @@ class KwaborSharedBridgeTest {
         assertEquals("Accueil", onboardingStrings.home)
         assertEquals("Réessayer", onboardingStrings.retry)
         assertEquals("Chargement", onboardingStrings.loading)
+        val settingsStrings = onboardingStrings.settings
+        assertEquals("Paramètres", settingsStrings.title)
+        assertEquals("Adresse e-mail indisponible", settingsStrings.emailUnavailable)
         assertEquals("Continuer avec Google", onboardingStrings.authSignInWithGoogle)
         assertEquals("Continuer avec Apple", onboardingStrings.authSignInWithApple)
         assertEquals("ou", onboardingStrings.authOrSeparator)

@@ -8,6 +8,10 @@ struct ContentView: View {
     @ObservedObject var catalogDetailStore: CatalogDetailStore
     let isGuestSession: Bool
     let strings: OnboardingStrings
+    let settingsStrings: SettingsStrings
+    let accountEmail: String?
+    let accountAuthenticationMethod: AuthenticationMethod?
+    let accountSessionIdentity: String?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
@@ -32,6 +36,10 @@ struct ContentView: View {
         catalogDetailStore: CatalogDetailStore,
         isGuestSession: Bool = false,
         strings: OnboardingStrings? = nil,
+        settingsStrings: SettingsStrings? = nil,
+        accountEmail: String? = nil,
+        accountAuthenticationMethod: AuthenticationMethod? = nil,
+        accountSessionIdentity: String? = nil,
         accountSecurityController: IosAuthController? = nil,
         federatedIdentityHintStore: FederatedIdentityHintPersisting? = nil,
         latestAccountSecurityError: @escaping () -> String? = { nil },
@@ -53,7 +61,12 @@ struct ContentView: View {
         self.guideDiscoveryStore = guideDiscoveryStore
         self.catalogDetailStore = catalogDetailStore
         self.isGuestSession = isGuestSession
-        self.strings = strings ?? bridge.onboardingStrings()
+        let resolvedStrings = strings ?? bridge.onboardingStrings()
+        self.strings = resolvedStrings
+        self.settingsStrings = settingsStrings ?? resolvedStrings.settings
+        self.accountEmail = accountEmail
+        self.accountAuthenticationMethod = accountAuthenticationMethod
+        self.accountSessionIdentity = accountSessionIdentity
         self.accountSecurityController = accountSecurityController
         self.federatedIdentityHintStore = federatedIdentityHintStore
         self.latestAccountSecurityError = latestAccountSecurityError
@@ -82,6 +95,9 @@ struct ContentView: View {
                             exploreStore: exploreStore,
                             guideDiscoveryStore: guideDiscoveryStore,
                             strings: strings,
+                            settingsStrings: settingsStrings,
+                            accountEmail: accountEmail,
+                            accountAuthenticationMethod: accountAuthenticationMethod,
                             accountSecurityController: accountSecurityController,
                             federatedIdentityHintStore: federatedIdentityHintStore,
                             latestAccountSecurityError: latestAccountSecurityError,
@@ -95,6 +111,12 @@ struct ContentView: View {
                             onAccountDeleted: onAccountDeleted
                         )
                     }
+                    .id(
+                        RootNavigationStackIdentity(
+                            destination: destination,
+                            accountSessionIdentity: accountSessionIdentity
+                        )
+                    )
                     .tabItem {
                         Label(destination.label(using: bridge), systemImage: destination.systemImage)
                     }
@@ -184,12 +206,25 @@ struct ContentView: View {
     }
 }
 
+private struct RootNavigationStackIdentity: Hashable {
+    let destination: RootDestination
+    let accountSessionIdentity: String?
+
+    init(destination: RootDestination, accountSessionIdentity: String?) {
+        self.destination = destination
+        self.accountSessionIdentity = destination == .profile ? accountSessionIdentity : nil
+    }
+}
+
 private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let strings: OnboardingStrings
+    let settingsStrings: SettingsStrings
+    let accountEmail: String?
+    let accountAuthenticationMethod: AuthenticationMethod?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
@@ -214,7 +249,7 @@ private struct RootDestinationContent: View {
                 .toolbar(.hidden, for: .navigationBar)
             } else if destination == .profile {
                 ScrollView {
-                    destinationContent
+                    profileContent
                         .frame(maxWidth: profileContentMaxWidth, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .top)
                         .padding(KwaborDesignTokens.Spacing.xxl)
@@ -243,27 +278,45 @@ private struct RootDestinationContent: View {
             Text(bridge.foundationStatus())
                 .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(.secondary)
-
-            if destination == .profile {
-                AccountSessionSection(
-                    strings: strings,
-                    isSigningOut: isSigningOutAccount,
-                    errorMessage: accountSignOutErrorMessage,
-                    onSignOut: onSignOut,
-                    onDismissError: onDismissSignOutError
-                )
-                if let accountSecurityController, let federatedIdentityHintStore {
-                    AccountDeletionSection(
-                        controller: accountSecurityController,
-                        strings: strings,
-                        identityHintStore: federatedIdentityHintStore,
-                        latestAuthError: latestAccountSecurityError,
-                        onDeletionStateChanged: onAccountDeletionStateChanged,
-                        onDeleted: onAccountDeleted
-                    )
-                }
-            }
         }
+    }
+
+    private var profileContent: some View {
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
+            ProfileAccountIdentity(
+                title: settingsStrings.accountSectionTitle,
+                email: displayedAccountEmail
+            )
+
+            NavigationLink {
+                AccountSettingsView(
+                    settingsStrings: settingsStrings,
+                    onboardingStrings: strings,
+                    email: displayedAccountEmail,
+                    authenticationMethodName: displayedAuthenticationMethodName,
+                    accountSecurityController: accountSecurityController,
+                    federatedIdentityHintStore: federatedIdentityHintStore,
+                    latestAccountSecurityError: latestAccountSecurityError,
+                    isSigningOutAccount: isSigningOutAccount,
+                    accountSignOutErrorMessage: accountSignOutErrorMessage,
+                    onSignOut: onSignOut,
+                    onDismissSignOutError: onDismissSignOutError,
+                    onAccountDeletionStateChanged: onAccountDeletionStateChanged,
+                    onAccountDeleted: onAccountDeleted
+                )
+            } label: {
+                SettingsNavigationRow(strings: settingsStrings)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var displayedAccountEmail: String {
+        settingsStrings.accountEmail(rawValue: accountEmail)
+    }
+
+    private var displayedAuthenticationMethodName: String {
+        settingsStrings.authenticationMethodName(authenticationMethod: accountAuthenticationMethod)
     }
 
     private var title: String {
@@ -273,51 +326,149 @@ private struct RootDestinationContent: View {
 
 private let profileContentMaxWidth: CGFloat = 560
 
-private struct AccountSessionSection: View {
-    let strings: OnboardingStrings
-    let isSigningOut: Bool
-    let errorMessage: String?
-    let onSignOut: () -> Void
-    let onDismissError: () -> Void
-    @State private var isConfirmationPresented = false
+private struct ProfileAccountIdentity: View {
+    let title: String
+    let email: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
-            Text(strings.authAccount)
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.sm) {
+            Text(title)
                 .font(.headline)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            Text(email)
+                .font(.body)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(KwaborDesignTokens.Spacing.lg)
+        .background(KwaborDesignTokens.ColorToken.surface0)
+        .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
+        .accessibilityElement(children: .combine)
+    }
+}
 
-            Button(role: .destructive) {
-                isConfirmationPresented = true
-            } label: {
-                HStack {
-                    Text(strings.authSignOut)
-                    Spacer()
-                    if isSigningOut {
-                        ProgressView()
-                            .accessibilityLabel(strings.authSignOut)
-                    }
-                }
-                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-            }
-            .disabled(isSigningOut)
+private struct SettingsNavigationRow: View {
+    let strings: SettingsStrings
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
-                    .accessibilityLabel(errorMessage)
-                    .onDisappear(perform: onDismissError)
+    var body: some View {
+        HStack(spacing: KwaborDesignTokens.Spacing.md) {
+            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.xs) {
+                Text(strings.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+                Text(strings.profileEntrySubtitle)
+                    .font(.body)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: KwaborDesignTokens.Spacing.sm)
+            Image(systemName: "chevron.right")
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                .accessibilityHidden(true)
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: KwaborDesignTokens.Sizing.minimumAccessibleTouchTarget,
+            alignment: .leading
+        )
+        .padding(KwaborDesignTokens.Spacing.lg)
+        .background(KwaborDesignTokens.ColorToken.surface0)
+        .contentShape(Rectangle())
+        .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct AccountSettingsView: View {
+    let settingsStrings: SettingsStrings
+    let onboardingStrings: OnboardingStrings
+    let email: String
+    let authenticationMethodName: String
+    let accountSecurityController: IosAuthController?
+    let federatedIdentityHintStore: FederatedIdentityHintPersisting?
+    let latestAccountSecurityError: () -> String?
+    let isSigningOutAccount: Bool
+    let accountSignOutErrorMessage: String?
+    let onSignOut: () -> Void
+    let onDismissSignOutError: () -> Void
+    let onAccountDeletionStateChanged: (Bool) -> Void
+    let onAccountDeleted: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
+                AccountIdentitySection(
+                    strings: settingsStrings,
+                    email: email,
+                    authenticationMethodName: authenticationMethodName
+                )
+                AccountDangerZoneSection(
+                    controller: accountSecurityController,
+                    strings: onboardingStrings,
+                    identityHintStore: federatedIdentityHintStore,
+                    latestAuthError: latestAccountSecurityError,
+                    isSigningOut: isSigningOutAccount,
+                    signOutErrorMessage: accountSignOutErrorMessage,
+                    onSignOut: onSignOut,
+                    onDismissSignOutError: onDismissSignOutError,
+                    onDeletionStateChanged: onAccountDeletionStateChanged,
+                    onDeleted: onAccountDeleted
+                )
+            }
+            .frame(maxWidth: profileContentMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .padding(KwaborDesignTokens.Spacing.xxl)
+        }
+        .background(KwaborDesignTokens.ColorToken.paper50)
+        .navigationTitle(settingsStrings.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+    }
+}
+
+private struct AccountIdentitySection: View {
+    let strings: SettingsStrings
+    let email: String
+    let authenticationMethodName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.sm) {
+            Text(strings.accountSectionTitle)
+                .font(.headline)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            AccountIdentityValueRow(label: strings.emailLabel, value: email)
+            Divider()
+            AccountIdentityValueRow(
+                label: strings.authenticationMethodLabel,
+                value: authenticationMethodName
+            )
         }
         .padding(KwaborDesignTokens.Spacing.lg)
         .background(KwaborDesignTokens.ColorToken.surface0)
         .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
-        .alert(strings.authSignOutTitle, isPresented: $isConfirmationPresented) {
-            Button(strings.authCancel, role: .cancel) {}
-            Button(strings.authConfirm, role: .destructive, action: onSignOut)
-        } message: {
-            Text(strings.authSignOutConfirmation)
+    }
+}
+
+private struct AccountIdentityValueRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.xs) {
+            Text(label)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            Text(value)
+                .font(.body)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                .textSelection(.enabled)
         }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: KwaborDesignTokens.Sizing.minimumAccessibleTouchTarget,
+            alignment: .leading
+        )
+        .accessibilityElement(children: .combine)
     }
 }

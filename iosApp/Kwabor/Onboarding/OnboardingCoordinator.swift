@@ -69,6 +69,14 @@ final class OnboardingCoordinator: ObservableObject {
         return authState?.currentSession?.userId ?? completedRegistrationSession?.userId
     }
 
+    var accountSettingsSession: AuthSession? {
+        guard hasCompleteAccount else { return nil }
+        if authState?.isAuthenticated == true {
+            return authState?.currentSession
+        }
+        return completedRegistrationSession
+    }
+
     private var canExposeSessionDuringPromoterActivation: Bool {
         PromoterActivationSessionPolicy.canExposeSession(
             cleanupRequired: temporaryPromoterActivationSessionCleanupRequired,

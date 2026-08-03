@@ -6,6 +6,7 @@ class OnboardingStrings internal constructor(
     auth: OnboardingAuthStrings,
     security: OnboardingSecurityStrings,
     registration: OnboardingRegistrationStrings,
+    settings: SettingsStrings,
 ) {
     val home: String = common.home
     val retry: String = common.retry
@@ -112,6 +113,7 @@ class OnboardingStrings internal constructor(
     val registrationLegalRequired: String = registration.registrationLegalRequired
     val registrationLegalUnavailable: String = registration.registrationLegalUnavailable
     val registrationComplete: String = registration.registrationComplete
+    val settings: SettingsStrings = settings
 }
 
 internal data class OnboardingCommonStrings(
@@ -240,6 +242,7 @@ internal fun KwaborStrings.toOnboardingStrings(): OnboardingStrings = Onboarding
     auth = toOnboardingAuthStrings(),
     security = toOnboardingSecurityStrings(),
     registration = toOnboardingRegistrationStrings(),
+    settings = settings,
 )
 
 private fun KwaborStrings.toOnboardingCommonStrings(): OnboardingCommonStrings = OnboardingCommonStrings(

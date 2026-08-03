@@ -15,7 +15,7 @@ import com.kwabor.android.ui.screens.auth.PasswordRecoveryScreenActions
 import com.kwabor.android.ui.screens.auth.PromoterActivationScreenActions
 import com.kwabor.android.ui.screens.auth.RegistrationScreenActions
 import com.kwabor.android.ui.screens.auth.SignInScreenActions
-import com.kwabor.android.ui.screens.profile.ProfileSessionScreenActions
+import com.kwabor.android.ui.screens.settings.SettingsScreenActions
 
 @Composable
 internal fun AuthPlatformEffectHandler(dependencies: KwaborAppDependencies) {
@@ -111,7 +111,7 @@ internal fun AuthViewModel.passwordRecoveryActions(): PasswordRecoveryScreenActi
     },
 )
 
-internal fun AuthViewModel.profileSessionActions(): ProfileSessionScreenActions = ProfileSessionScreenActions(
+internal fun AuthViewModel.settingsScreenActions(): SettingsScreenActions = SettingsScreenActions(
     onRequestSignOut = { onIntent(AuthIntent.RequestSignOut) },
     onCancelSignOut = { onIntent(AuthIntent.CancelSignOut) },
     onConfirmSignOut = { onIntent(AuthIntent.ConfirmSignOut) },
