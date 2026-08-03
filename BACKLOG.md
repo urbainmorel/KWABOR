@@ -169,9 +169,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] ACTIONS-001C1 — Livrer localement la route interne stricte de fiche Android/iOS : validation
     UUID partagée, dernier lien valide restaurable, attente intro/bootstrap/E3, ouverture Accueil puis
     détail, acquittement conditionnel et invalidation lors des resets sensibles.
-  - [ ] PR-ACTIONS-001C1 — Valider les PolicyTests et le parcours `onOpenURL` sous Xcode/macOS, puis
-    l'intent froid/chaud sur Android installé avant toute publication de la branche.
+  - [ ] PR-ACTIONS-001C1 — Installation, résolution et intents froid/chaud validés sur l'AVD Android
+    API 30 ; valider encore les PolicyTests, `onOpenURL` sous Xcode/macOS et le parcours connecté sur
+    appareils configurés avant toute publication de la branche.
   - [ ] ACTIONS-001C — Livrer partage et signalement réels avec contrats serveur et parcours natifs.
+    - [ ] ACTIONS-001C2 — Après validation des décisions de
+      [`l'audit du 3 août`](docs/audits/2026-08-03-actions-001c-reporting-readiness.md), livrer le
+      signalement fortement typé d'une fiche : RPC idempotent, RLS/ACL, UI Android/iOS et analytics
+      sans PII.
   - [ ] ACTIONS-001D — Livrer le claim sécurisé relié aux organisations vérifiées et aux droits RLS.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.
 

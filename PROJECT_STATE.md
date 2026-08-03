@@ -248,12 +248,23 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   APK debug et compilation Kotlin iOS Simulator verts en 12 min 31 s ; 379 tests shared et 190 tests
   Android sans échec. L'APK contient l'hôte `listing`, les vérificateurs dépôt et intro Store-only sont
   verts, et deux contre-revues ne relèvent plus de P1/P2.
+- Preuve Android installée ACTIONS-001C1 : l'APK `0.1.0-debug` est installé sur l'AVD API 30,
+  `cmd package resolve-activity` associe la route valide à `com.kwabor.android/.MainActivity`, le
+  lancement à froid crée et reprend cette activité, puis un second UUID est livré à chaud au même
+  processus. Aucun crash ni ANR KWABOR n'est observé ; la preuve visuelle de la fiche connectée reste
+  hors de portée sans configuration Supabase locale et sur cet AVD dont les processus système
+  `Pixel Launcher`/`Interface` déclenchent des ANR.
 
 ## Tâche en cours
 
 Clore ACTIONS-001C1 à la frontière locale : conserver le lot sur sa branche sans push, puis obtenir la
-validation Swift/Xcode et la preuve d'intent Android sur un appareil ou émulateur avant publication.
+validation Swift/Xcode et le parcours connecté de bout en bout sur appareils configurés avant
+publication. L'installation, la résolution et la livraison d'intent Android froid/chaud sont prouvées.
 Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
+- L'audit `docs/audits/2026-08-03-actions-001c-reporting-readiness.md` confirme qu'aucun signalement
+  de fiche n'existe encore. Il propose ACTIONS-001C2, fortement typé et transactionnel, mais suspend
+  l'implémentation à cinq décisions produit : authentification, cible initiale, détail du motif Autre,
+  seuil fiche et conservation des preuves après suppression de compte.
 
 ## Blocages / limites
 
@@ -287,6 +298,9 @@ Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
 - Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, et ouvre le DetailSheet connecté. Explore iOS ouvre aussi la fiche SwiftUI native. Les actions réelles, la carte, les avis, les tris métier par onglet, les filtres prix/date et les plafonds sponsorisés restent à livrer ; recherche et assistant ne sont pas affichés tant que leurs contrats manquent.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
+- L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
+  mais pas l'affichage connecté de la fiche : l'APK n'a pas de configuration Supabase et les ANR
+  observés concernent les processus système de l'AVD, pas KWABOR.
 - L'écran Explore iOS SwiftUI natif compile dans les trois configurations simulateur et son smoke test de persistance est vert ; la validation VoiceOver/appareil physique reste à prouver avant fusion.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
@@ -303,7 +317,8 @@ Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
 
 ## Prochaine tâche logique
 
-Valider ACTIONS-001C1 sous Swift/Xcode et sur un appareil ou émulateur Android, sans relancer la CI ni
-publier la branche sans accord explicite. Décider ensuite du domaine HTTPS officiel et du contrat
-serveur de signalement pour terminer ACTIONS-001C, sans CTA factice. La vidéo d'intro reste embarquée :
-tout changement d'octets exige une nouvelle release Android/iOS dans les Stores.
+Valider ACTIONS-001C1 sous Swift/Xcode et exécuter le parcours connecté sur appareils configurés,
+sans relancer la CI ni publier la branche sans accord explicite. Faire valider les cinq décisions de
+l'audit ACTIONS-001C2, puis implémenter le signalement d'une fiche. Le domaine HTTPS officiel reste à
+décider pour terminer le partage public, sans CTA factice. La vidéo d'intro reste embarquée : tout
+changement d'octets exige une nouvelle release Android/iOS dans les Stores.
