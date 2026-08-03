@@ -32,10 +32,14 @@ object KwaborSizing {
     val FloatingActionButton = 56.dp
     val FloatingPill = 36.dp
     val BrandMark = 96.dp
+    val DetailSheetMaxWidth = 640.dp
+    val DetailHeroMinimumHeight = 320.dp
+    val DetailGalleryThumbnail = 72.dp
 }
 
 object KwaborAlpha {
     const val SCRIM_LOW = 0.35f
     const val SCRIM_HIGH = 0.72f
+    const val SCRIM_HERO = 0.86f
     const val FROSTED_SURFACE = 0.18f
 }

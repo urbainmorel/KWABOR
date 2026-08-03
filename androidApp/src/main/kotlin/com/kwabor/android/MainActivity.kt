@@ -27,6 +27,7 @@ import com.kwabor.android.media.PublicHttpsListingMediaUrlPolicy
 import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
+import com.kwabor.android.presentation.detail.CatalogDetailViewModel
 import com.kwabor.android.presentation.explore.ExploreViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.shared.app.DispatcherProvider
@@ -37,6 +38,7 @@ import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
+import com.kwabor.shared.presentation.detail.catalogDetailMinuteTicks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,6 +99,7 @@ class MainActivity : ComponentActivity() {
         dispatchPendingAuthCallback(configuredAuthViewModel)
         val dependencies = KwaborAppDependencies(
             exploreViewModel = createExploreViewModel(configuredApp.compositionRoot, strings),
+            catalogDetailViewModel = createCatalogDetailViewModel(configuredApp.compositionRoot, strings),
             authViewModel = configuredAuthViewModel,
             onboardingViewModel = createOnboardingViewModel(
                 applicationState,
@@ -134,6 +137,23 @@ class MainActivity : ComponentActivity() {
             }
         },
     )[ExploreViewModel::class.java]
+
+    private fun createCatalogDetailViewModel(
+        compositionRoot: KwaborCompositionRoot,
+        strings: KwaborStrings,
+    ): CatalogDetailViewModel = ViewModelProvider(
+        owner = this,
+        factory = viewModelFactory {
+            initializer {
+                CatalogDetailViewModel(
+                    presenter = compositionRoot.catalogDetailPresenter,
+                    strings = strings,
+                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                    temporalTicks = catalogDetailMinuteTicks(),
+                )
+            }
+        },
+    )[CatalogDetailViewModel::class.java]
 
     private fun createAuthViewModel(
         configuredApp: ConfiguredApp,

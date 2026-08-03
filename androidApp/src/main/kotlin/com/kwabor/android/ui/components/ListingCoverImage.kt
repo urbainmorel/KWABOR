@@ -8,13 +8,18 @@ import coil3.compose.AsyncImage
 import com.kwabor.android.media.ListingMediaUrlPolicy
 
 @Composable
-internal fun ListingCoverImage(imageUrl: String?, mediaUrlPolicy: ListingMediaUrlPolicy, modifier: Modifier) {
+internal fun ListingCoverImage(
+    imageUrl: String?,
+    mediaUrlPolicy: ListingMediaUrlPolicy,
+    modifier: Modifier,
+    contentDescription: String? = null,
+) {
     val safeImageUrl = remember(imageUrl, mediaUrlPolicy) {
         mediaUrlPolicy.safeUrlOrNull(imageUrl)
     } ?: return
     AsyncImage(
         model = safeImageUrl,
-        contentDescription = null,
+        contentDescription = contentDescription,
         modifier = modifier,
         contentScale = ContentScale.Crop,
     )

@@ -16,6 +16,8 @@ import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.authPresentationModule
+import com.kwabor.shared.presentation.detail.CatalogDetailPresenter
+import com.kwabor.shared.presentation.detail.catalogDetailPresentationModule
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.explorePresentationModule
 import io.github.jan.supabase.auth.SessionManager
@@ -33,6 +35,7 @@ class KwaborCompositionRoot internal constructor(
     val dispatcherProvider: DispatcherProvider = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
     val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
+    val catalogDetailPresenter: CatalogDetailPresenter by lazy { application.koin.get() }
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
@@ -71,6 +74,7 @@ internal fun createKwaborCompositionRootOrNull(
             catalogDataModule(hasAuthentication = authSessionManager != null),
             exploreDataModule(hasPersistence = persistenceConfiguration != null),
             explorePresentationModule(hasPersistence = persistenceConfiguration != null),
+            catalogDetailPresentationModule,
             organizationDataModule,
         )
         if (authSessionManager != null) {

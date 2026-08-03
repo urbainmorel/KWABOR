@@ -41,6 +41,7 @@ import com.kwabor.android.presentation.auth.AuthPlatformUiState
 import com.kwabor.android.presentation.auth.AuthSurface
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.PromoterActivationUiState
+import com.kwabor.android.presentation.detail.CatalogDetailViewModel
 import com.kwabor.android.presentation.explore.ExploreEffect
 import com.kwabor.android.presentation.explore.ExploreIntent
 import com.kwabor.android.presentation.explore.ExploreViewModel
@@ -51,8 +52,8 @@ import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
+import com.kwabor.android.ui.screens.detail.CatalogDetailSheet
 import com.kwabor.android.ui.screens.explore.ExploreScreen
-import com.kwabor.android.ui.screens.explore.ExploreScreenActions
 import com.kwabor.android.ui.screens.explore.ExploreScreenUiModel
 import com.kwabor.android.ui.screens.profile.ProfileSessionScreen
 import com.kwabor.android.ui.screens.profile.ProfileSessionUiModel
@@ -63,6 +64,7 @@ import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.PasswordRecoveryUiState
 import com.kwabor.shared.presentation.auth.RegistrationUiState
+import com.kwabor.shared.presentation.detail.CatalogDetailIntent
 import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
 import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
@@ -138,6 +140,7 @@ private fun SoftWallOverlay(surface: AuthSurface, strings: KwaborStrings, authVi
 
 internal data class KwaborAppDependencies(
     val exploreViewModel: ExploreViewModel,
+    val catalogDetailViewModel: CatalogDetailViewModel,
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
     val legalDocumentLauncher: LegalDocumentLauncher,
@@ -199,6 +202,7 @@ private data class CollectedAuthenticationState(
 
 private data class HomeShellDependencies(
     val exploreViewModel: ExploreViewModel,
+    val catalogDetailViewModel: CatalogDetailViewModel,
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
@@ -319,6 +323,7 @@ private fun KwaborEntryContent(
         OnboardingEntry.Home -> KwaborAppContent(
             dependencies = HomeShellDependencies(
                 exploreViewModel = dependencies.exploreViewModel,
+                catalogDetailViewModel = dependencies.catalogDetailViewModel,
                 authViewModel = dependencies.authViewModel,
                 onboardingViewModel = dependencies.onboardingViewModel,
                 listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
@@ -395,6 +400,7 @@ private fun KwaborNavigationShell(
     onDestinationSelected: (RootNavigationDestination) -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val detailState by dependencies.catalogDetailViewModel.state.collectAsStateWithLifecycle()
     val selectedDestination = backStackEntry?.destination?.toRootDestination() ?: RootNavigationDestination.Home
 
     Scaffold(
@@ -414,6 +420,14 @@ private fun KwaborNavigationShell(
             state = state,
         )
     }
+    CatalogDetailSheet(
+        state = detailState,
+        strings = strings,
+        mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+        actions = remember(dependencies.catalogDetailViewModel) {
+            dependencies.catalogDetailViewModel.sheetActions
+        },
+    )
 }
 
 @Composable
@@ -427,9 +441,8 @@ private fun KwaborRootNavHost(
     NavHost(navController = navController, startDestination = HomeRoute) {
         composable<HomeRoute> {
             ExploreRoute(
-                exploreViewModel = dependencies.exploreViewModel,
+                dependencies = dependencies,
                 strings = strings,
-                mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
                 isGuestSession = !state.auth.isAuthenticated,
                 modifier = Modifier.padding(paddingValues),
             )
@@ -573,13 +586,12 @@ private fun KwaborBottomNavigation(
 
 @Composable
 private fun ExploreRoute(
-    exploreViewModel: ExploreViewModel,
+    dependencies: HomeShellDependencies,
     strings: KwaborStrings,
-    mediaUrlPolicy: ListingMediaUrlPolicy,
     isGuestSession: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val exploreState by exploreViewModel.state.collectAsStateWithLifecycle()
+    val exploreState by dependencies.exploreViewModel.state.collectAsStateWithLifecycle()
 
     ExploreScreen(
         model = ExploreScreenUiModel(
@@ -587,26 +599,19 @@ private fun ExploreRoute(
             isGuestSession = isGuestSession,
         ),
         strings = strings,
-        mediaUrlPolicy = mediaUrlPolicy,
+        mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
         modifier = modifier,
-        actions = remember(exploreViewModel) { exploreViewModel.screenActions },
+        actions = remember(dependencies.exploreViewModel, dependencies.catalogDetailViewModel) {
+            dependencies.exploreViewModel.detailEnabledScreenActions(
+                onListingClick = { listingId ->
+                    dependencies.catalogDetailViewModel.onIntent(
+                        CatalogDetailIntent.Open(listingId),
+                    )
+                },
+            )
+        },
     )
 }
-
-private val ExploreViewModel.screenActions: ExploreScreenActions
-    get() = ExploreScreenActions(
-        onTabSelected = { tab -> onIntent(ExploreIntent.SelectTab(tab)) },
-        onChipSelected = { chip -> onIntent(ExploreIntent.SelectChip(chip)) },
-        onRetry = { onIntent(ExploreIntent.Retry) },
-        onRefresh = { onIntent(ExploreIntent.Refresh) },
-        onLoadNext = { onIntent(ExploreIntent.LoadNext) },
-        onCityClick = { onIntent(ExploreIntent.OpenCitySelector) },
-        onCityDismiss = { onIntent(ExploreIntent.CloseCitySelector) },
-        onCitySelected = { cityId -> onIntent(ExploreIntent.SelectCity(cityId)) },
-        onUseLocation = { onIntent(ExploreIntent.RequestLocation) },
-        onLikeClick = { listingId -> onIntent(ExploreIntent.ToggleLike(listingId)) },
-        onFavoriteClick = { listingId -> onIntent(ExploreIntent.ToggleFavorite(listingId)) },
-    )
 
 @Composable
 private fun KwaborRootContent(

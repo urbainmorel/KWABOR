@@ -371,6 +371,7 @@ as $$
     value is not null
     and coalesce(array_ndims(value), 1) = 1
     and (not require_non_empty or cardinality(value) > 0)
+    and cardinality(value) <= 20
     and cardinality(value) = (
       select count(distinct item)
       from unnest(value) item
@@ -379,6 +380,7 @@ as $$
       (
         select bool_and(
           app_private.catalog_text_has_canonical_edges(item)
+          and char_length(item) between 1 and 80
           and item !~ '[[:cntrl:]]'
         )
         from unnest(value) item
@@ -781,9 +783,11 @@ create table public.room_types (
   updated_at timestamptz not null default now(),
   constraint room_types_name_valid check (
     app_private.catalog_text_has_canonical_edges(name)
+    and char_length(name) between 1 and 80
+    and name !~ '[[:cntrl:]]'
   ),
   constraint room_types_price_non_negative check (price_xof >= 0),
-  constraint room_types_display_order_non_negative check (display_order >= 0),
+  constraint room_types_display_order_range check (display_order between 0 and 19),
   constraint room_types_listing_name_unique unique (listing_id, name),
   constraint room_types_listing_order_unique unique (listing_id, display_order)
 );
@@ -863,9 +867,11 @@ create table public.ticket_tiers (
   updated_at timestamptz not null default now(),
   constraint ticket_tiers_label_valid check (
     app_private.catalog_text_has_canonical_edges(label)
+    and char_length(label) between 1 and 80
+    and label !~ '[[:cntrl:]]'
   ),
   constraint ticket_tiers_price_non_negative check (price_xof >= 0),
-  constraint ticket_tiers_display_order_non_negative check (display_order >= 0),
+  constraint ticket_tiers_display_order_range check (display_order between 0 and 19),
   constraint ticket_tiers_listing_label_unique unique (listing_id, label),
   constraint ticket_tiers_listing_order_unique unique (listing_id, display_order)
 );

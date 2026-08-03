@@ -174,6 +174,7 @@ data class KwaborStrings(
     val cafes: String,
     val culture: String,
     val touristGuides: String,
+    val detail: CatalogDetailStrings,
 )
 
 fun stringsFor(locale: AppLocale): KwaborStrings = when (locale) {
@@ -365,4 +366,5 @@ private val frenchStrings = KwaborStrings(
     cafes = "Cafés",
     culture = "Culture",
     touristGuides = "Guides touristiques",
+    detail = frenchCatalogDetailStrings,
 )

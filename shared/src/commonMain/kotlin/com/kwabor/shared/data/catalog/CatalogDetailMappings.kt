@@ -73,7 +73,7 @@ private fun CatalogDetailPayloadDto.toCommonDomain(): CatalogDetailCommon {
         openingHours = openingHours.toOpeningHoursDomain(),
         contact = contact.toDomain(),
         socialLinks = socials.toSocialLinksDomain(),
-        tags = tags.requireCatalogTextValues("tags"),
+        tags = tags.requireCatalogTags("tags"),
         verified = verified,
         isClaimable = isClaimable,
         metrics = metrics.toDomain(),
@@ -126,8 +126,8 @@ private fun CatalogDetailPayloadDto.toFoodDomain(common: CatalogDetailCommon): C
 
     return CatalogDetail.Establishment.Food(
         common = common,
-        cuisines = payload.cuisines.requireCatalogTextValues("detail.cuisines"),
-        meals = payload.meals.requireCatalogTextValues("detail.meals"),
+        cuisines = payload.cuisines.requireCatalogTypedTextValues("detail.cuisines"),
+        meals = payload.meals.requireCatalogTypedTextValues("detail.meals"),
         acceptsReservations = payload.reservation,
         menuUrl = payload.menuUrl?.requireCatalogHttpsUrl("detail.menu_url"),
     )
@@ -155,9 +155,9 @@ private fun CatalogDetailPayloadDto.toGuideDomain(common: CatalogDetailCommon): 
 
     return CatalogDetail.Establishment.Guide(
         common = common,
-        languages = payload.languages.requireCatalogTextValues("detail.languages"),
-        zones = payload.zones.requireCatalogTextValues("detail.zones"),
-        specialties = payload.specialties.requireCatalogTextValues("detail.specialties"),
+        languages = payload.languages.requireCatalogTypedTextValues("detail.languages"),
+        zones = payload.zones.requireCatalogTypedTextValues("detail.zones"),
+        specialties = payload.specialties.requireCatalogTypedTextValues("detail.specialties"),
         indicativePrice = indicativePrice ?: invalidCatalogDetail("detail.guide.price", common.price.toString()),
         accreditation = payload.accreditation?.requireCatalogText("detail.accreditation"),
         experienceYears = payload.experienceYears,

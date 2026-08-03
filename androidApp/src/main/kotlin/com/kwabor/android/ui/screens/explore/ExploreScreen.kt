@@ -287,7 +287,7 @@ private fun LazyGridScope.exploreGridItems(
                 strings = strings,
                 mediaUrlPolicy = mediaUrlPolicy,
                 actions = ListingCardActions(
-                    onClick = null,
+                    onClick = { actions.onListingClick(listing.id) },
                     onLikeClick = { actions.onLikeClick(listing.id) },
                     onFavoriteClick = { actions.onFavoriteClick(listing.id) },
                 ),

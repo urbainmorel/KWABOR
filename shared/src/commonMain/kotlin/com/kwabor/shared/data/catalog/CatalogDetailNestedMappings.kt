@@ -85,13 +85,15 @@ internal fun CatalogDetailAmenityDto.toDomain(): CatalogAmenity = CatalogAmenity
 )
 
 internal fun List<CatalogRoomTypeDto>.toDomainRoomTypes(): List<CatalogRoomType> {
-    val roomTypes = sortedBy(CatalogRoomTypeDto::displayOrder).map { room ->
-        CatalogRoomType(
-            name = room.name.requireCatalogText("detail.room_types.name"),
-            price = room.priceXof.toNonNegativeMoney("room_types.price_xof"),
-            order = room.displayOrder.requireNonNegative("room_types.display_order"),
-        )
-    }
+    val roomTypes = requireCatalogNestedItemCount("detail.room_types")
+        .sortedBy(CatalogRoomTypeDto::displayOrder)
+        .map { room ->
+            CatalogRoomType(
+                name = room.name.requireCatalogShortText("detail.room_types.name"),
+                price = room.priceXof.toNonNegativeMoney("room_types.price_xof"),
+                order = room.displayOrder.requireCatalogNestedDisplayOrder("room_types.display_order"),
+            )
+        }
     val hasDuplicateOrder = roomTypes.map(CatalogRoomType::order).distinct().size != roomTypes.size
     val hasDuplicateName = roomTypes.map(CatalogRoomType::name).distinct().size != roomTypes.size
     if (hasDuplicateOrder || hasDuplicateName) {
@@ -174,7 +176,9 @@ private fun CatalogEventTicketingDto.toPaidDomain(price: CatalogPrice): CatalogE
     if (tiers.isEmpty()) {
         invalidCatalogDetail("detail.ticketing.tiers", "missing")
     }
-    val mappedTiers = tiers.sortedBy(CatalogTicketTierDto::displayOrder).map(CatalogTicketTierDto::toDomain)
+    val mappedTiers = tiers.requireCatalogNestedItemCount("detail.ticketing.tiers")
+        .sortedBy(CatalogTicketTierDto::displayOrder)
+        .map(CatalogTicketTierDto::toDomain)
     mappedTiers.requireValidTicketTiers(price)
     return CatalogEventTicketing.Paid(externalUrl = ticketUrl, tiers = mappedTiers)
 }
@@ -185,9 +189,9 @@ private fun CatalogTicketTierDto.toDomain(): CatalogTicketTier {
         invalidCatalogDetail("ticket_tiers.price_xof", "0")
     }
     return CatalogTicketTier(
-        label = label.requireCatalogText("ticket_tiers.label"),
+        label = label.requireCatalogShortText("ticket_tiers.label"),
         price = mappedPrice,
-        order = displayOrder.requireNonNegative("ticket_tiers.display_order"),
+        order = displayOrder.requireCatalogNestedDisplayOrder("ticket_tiers.display_order"),
     )
 }
 

@@ -207,19 +207,23 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - La PR brouillon EXPLORE-IOS-001 `#44` est publiée au-dessus d'INTRO-STORE-001 `#43`. Les premiers runs ont exposé puis fait corriger l'isolation Swift 6 des providers, l'import fragile d'un cas `ExploreTab` et un timeout transitoire de capture HOME Android. Le run exact-head `30741677132` est entièrement vert : `quality`, Supabase, smoke test iOS, XCFrameworks, configurations Xcode simulateur Debug/Staging/Release et preuves Android API 30/31/36.
 - DETAIL-001A introduit un read model atomique `get_catalog_detail_v1` en `security invoker`, limité aux fiches publiées et versionné par `schema_version`. Les six variantes fermées, médias officiels, horaires, services, chambres, billetterie, métriques et statut de claim sont projetés vers des DTO séparés puis un domaine Kotlin pur.
 - La migration DETAIL-001A verrouille les invariants parent/enfant, les collections ordonnées, les droits Data API par colonne et le même sous-ensemble URL/temps/Unicode que le mapper mobile. Deux revues SQL indépendantes ne relèvent aucun P0/P1/P2 ; les plans statiques comptent 202 assertions détail et 57 assertions curseur.
-- Android ne montre plus Recherche, filtres, assistant, FAB ou ouverture de fiche factices. Les images Explore passent par une politique HTTPS injectée et fail-closed, sans dépendance Supabase dans l'UI. Le DetailSheet Android et l'écran détail SwiftUI restent explicitement dans DETAIL-001B et DETAIL-IOS-001.
+- Android ne montre plus Recherche, filtres, assistant ou FAB factices. Les images Explore passent par une politique HTTPS injectée et fail-closed, sans dépendance Supabase dans l'UI ; DETAIL-001B livre maintenant l'ouverture de fiche réelle. L'écran détail SwiftUI reste explicitement dans DETAIL-IOS-001.
 - La porte locale DETAIL-001A `spotlessCheck detekt check` est verte en 13 min 24 s : 311 tests shared et 147 tests Android sans échec, lint, pureté du domaine, schémas Room et compilations Kotlin iOS sous Windows inclus. Les vérificateurs dépôt, onboarding Store-only et marque sont également verts.
 - La PR brouillon DETAIL-001A `#45` est publiée au-dessus de `#44`. Le run exact-head `30759824206` est entièrement vert : Gradle, Android API 30/31/36, iOS, 632 assertions PostgreSQL standard et les 12 assertions multi-connexion. Les runs intermédiaires ont permis de borner les ACL du rôle `dblink`, d'exercer réellement les validateurs `service_role` et PostGIS, puis d'aligner les fixtures historiques sur les invariants de détail en limitant les rôles runtime aux validateurs ciblés et sans leur transférer les ACL supplémentaires du harnais local.
+- DETAIL-001B connecte Explore Android à un `DetailSheet` Compose global : hero et galerie d'images officielles, six variantes typées, métriques, description extensible, prix XOF, horaires, services, localisation textuelle et états chargement/introuvable/offline/erreur. Les seules actions exposées sont celles réellement livrées : fermer, réessayer, choisir une image et développer la description.
+- Le runtime partagé annule et ignore les réponses obsolètes, conserve la source seulement pendant l'ouverture et recalcule chaque minute les statuts Ouvert/Fermé et Événement terminé sans nouvel appel réseau. Les lieux liés des événements sont conservés et la borne de fin est inclusive.
+- Les libellés courts du read model sont désormais bornés de façon identique en SQL et Kotlin : tags `10 × 24`, tableaux typés `20 × 80`, et au plus 20 chambres ou paliers de 80 caractères Unicode, sans contrôles. Les projections dédupliquent les libellés traduits. Le plan détail compte maintenant 211 assertions ; son exécution Supabase attend la CI de la PR empilée.
+- La porte locale complète DETAIL-001B est verte en 9 min 56 s : `spotlessCheck`, `detekt`, `check`, lint, APK Android, compilations iOS, 330 tests shared et 156 tests Android sans échec. Les vérificateurs dépôt, onboarding Store-only et marque sont verts. Trois revues indépendantes ont fait corriger robustesse, temporalité, petite hauteur, TalkBack, Unicode, contraste, clés Compose et couleurs métier ; leurs passes finales ne relèvent aucun P0/P1/P2.
 
 ## Tâche en cours
 
-Obtenir la revue humaine de la PR brouillon DETAIL-001A `#45`. Les revues humaines de `#41` à `#45` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Publier DETAIL-001B en PR brouillon empilée sur DETAIL-001A `#45`, obtenir sa CI exact-head puis sa revue humaine. Les revues humaines de `#41` à `#45` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
 
 - Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
-- La navigation globale, les CTA factices, le détail, l'administration opérateur, les contenus réels, le pipeline média et la validation native/appareil d'Explore iOS bloquent encore une V1 commercialement exploitable.
+- La navigation globale complète, les actions réelles du détail, sa parité SwiftUI, l'administration opérateur, les contenus réels, le pipeline média et les validations natives/appareils bloquent encore une V1 commercialement exploitable.
 - SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, fusionnée puis déployée.
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
@@ -230,7 +234,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
-- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes. Le read model détail est posé, mais le DetailSheet Android, l'écran SwiftUI correspondant, les tris métier par onglet, les filtres prix/date et les plafonds sponsorisés restent à livrer ; recherche et assistant ne sont pas affichés tant que leurs contrats manquent.
+- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, et ouvre le DetailSheet connecté. L'écran détail SwiftUI, les actions réelles, la carte, les tris métier par onglet, les filtres prix/date et les plafonds sponsorisés restent à livrer ; recherche et assistant ne sont pas affichés tant que leurs contrats manquent.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'écran Explore iOS SwiftUI natif compile dans les trois configurations simulateur et son smoke test de persistance est vert ; la validation VoiceOver/appareil physique reste à prouver avant fusion.
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
@@ -248,7 +252,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Valider la PR DETAIL-001A `#45` au-dessus de `#44`, puis livrer DETAIL-001B sans marquer DETAIL-001
-terminé avant la parité SwiftUI. La pile `#35` → `#45` doit toujours être approuvée et fusionnée dans
-l'ordre. La revue appareils BRAND-002 et ENV-001B/OBS-001B restent des gates propriétaire, sans
-bloquer la vidéo embarquée.
+Publier et valider la PR DETAIL-001B au-dessus de DETAIL-001A `#45`, puis livrer DETAIL-IOS-001 sans
+marquer DETAIL-001 terminé avant la parité SwiftUI et les actions réelles. La pile `#35` → `#45`
+doit toujours être approuvée et fusionnée dans l'ordre. La revue appareils BRAND-002 et
+ENV-001B/OBS-001B restent des gates propriétaire, sans bloquer la vidéo embarquée.

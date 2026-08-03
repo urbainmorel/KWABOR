@@ -10,14 +10,14 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/detail-001a-read-model`, empilée sur `codex/explore-ios-001-parity` (`#44`) |
+| Branche active | `codex/detail-001b-android-sheet`, empilée sur `codex/detail-001a-read-model` (`#45`) |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` sur `#44` ; run exact-head `30759824206` entièrement vert, 632 tests SQL standard et 12 tests concurrents réussis |
+| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android validé localement et en attente de publication empilée |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -71,8 +71,27 @@ plus active, mais le run exact-head `30759824206` a validé Gradle, Android API 
 chemin runtime `service_role`, les dépendances PostGIS et les fixtures actives sont désormais
 exercés avec des ACL runtime limitées aux validateurs ciblés, sans reprendre les droits
 supplémentaires du harnais local. La PR brouillon `#45` est publiée sur `#44` et attend sa revue
-humaine. DETAIL-001 demeure ouvert :
-aucun DetailSheet Android ni écran détail SwiftUI n'est livré par ce sous-lot.
+humaine. DETAIL-001 demeure ouvert : le sous-lot A ne livrait lui-même aucune surface, mais
+DETAIL-001B fournit désormais le DetailSheet Android ; l'écran détail SwiftUI et les actions réelles
+restent à livrer.
+
+### DETAIL-001B — DetailSheet Android connecté
+
+Objectifs :
+
+- ouvrir une fiche depuis Explore dans une sheet globale 92 % mobile / 85 % tablette ;
+- rendre les six variantes, images officielles, états d'erreur, horaires et statuts temporels ;
+- conserver une surface honnête sans CTA, carte ou action non implémentés ;
+- garantir accessibilité, faible hauteur, Unicode et payloads bornés sur Android modestes.
+
+État local : la porte `spotlessCheck detekt check`, le lint, l'APK Android, les compilations iOS,
+330 tests shared et 156 tests Android sont verts en 9 min 56 s. Le runtime partagé traite les
+réponses obsolètes et actualise les statuts temporels sans réseau. Les bornes
+SQL/Kotlin des libellés courts et collections imbriquées portent le plan pgTAP détail à 211
+assertions ; leur exécution attend
+la CI Supabase de la PR empilée, le Docker Kwabor local restant arrêté. Les vérificateurs dépôt,
+onboarding Store-only et marque sont verts. Trois revues indépendantes ont été traitées sans
+P0/P1/P2 résiduel. La publication et la CI exact-head restent à terminer avant revue humaine.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
 
@@ -151,11 +170,11 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir la revue humaine de DETAIL-001A `#45`, puis faire relire toute la pile dans l'ordre.
+3. Obtenir la revue humaine de DETAIL-001A `#45`, publier DETAIL-001B au-dessus puis faire relire la pile dans l'ordre.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.
-7. Livrer DETAIL-001B Android puis DETAIL-IOS-001 sans réintroduire de CTA factice.
+7. Livrer DETAIL-IOS-001 et ACTIONS-001 sans réintroduire de CTA factice.
 8. Reprendre EXPLORE-002B2 après validation des règles de classement et de sponsoring.
 
 ## Décisions techniques actées pendant la reprise

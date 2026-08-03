@@ -136,7 +136,7 @@ as $$
   $json$::jsonb;
 $$;
 
-select plan(202);
+select plan(211);
 
 insert into auth.users (
   id,
@@ -1358,6 +1358,21 @@ select ok(
 );
 
 select ok(
+  app_private.catalog_text_array_is_valid(
+    array(select 'valeur-' || item::text from generate_series(1, 20) item),
+    false
+  )
+  and app_private.catalog_text_array_is_valid(array[repeat('🐕', 80)], false)
+  and not app_private.catalog_text_array_is_valid(
+    array(select 'valeur-' || item::text from generate_series(1, 21) item),
+    false
+  )
+  and not app_private.catalog_text_array_is_valid(array[repeat('🐕', 81)], false)
+  and not app_private.catalog_text_array_is_valid(array[E'fran\nçais'], false),
+  'typed catalog arrays enforce 20 values, 80 Unicode characters and no controls'
+);
+
+select ok(
   app_private.catalog_text_has_canonical_edges('Texte interieur valide')
   and not app_private.catalog_text_has_canonical_edges(E'\tTexte invalide')
   and not app_private.catalog_text_has_canonical_edges(E'Texte invalide\n'),
@@ -1648,6 +1663,57 @@ select throws_ok(
   'projected room names reject leading tabulation'
 );
 
+select lives_ok(
+  $sql$
+    update public.room_types
+    set name = repeat('🐕', 80)
+    where listing_id = 'da110000-0000-4000-8000-000000000001'
+      and display_order = 0
+  $sql$,
+  'projected room names accept exactly 80 Unicode characters'
+);
+
+update public.room_types
+set name = 'Standard'
+where listing_id = 'da110000-0000-4000-8000-000000000001'
+  and display_order = 0;
+
+select throws_ok(
+  $sql$
+    update public.room_types
+    set name = repeat('🐕', 81)
+    where listing_id = 'da110000-0000-4000-8000-000000000001'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "room_types" violates check constraint "room_types_name_valid"',
+  'projected room names reject more than 80 Unicode characters'
+);
+
+select throws_ok(
+  $sql$
+    update public.room_types
+    set name = E'Suite\nVIP'
+    where listing_id = 'da110000-0000-4000-8000-000000000001'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "room_types" violates check constraint "room_types_name_valid"',
+  'projected room names reject internal controls'
+);
+
+select throws_ok(
+  $sql$
+    update public.room_types
+    set display_order = 20
+    where listing_id = 'da110000-0000-4000-8000-000000000001'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "room_types" violates check constraint "room_types_display_order_range"',
+  'room types are limited to twenty distinct display positions'
+);
+
 select throws_ok(
   $sql$
     update public.nightlife_details
@@ -1680,6 +1746,57 @@ select throws_ok(
   '23514',
   'new row for relation "ticket_tiers" violates check constraint "ticket_tiers_label_valid"',
   'projected ticket labels reject trailing line breaks'
+);
+
+select lives_ok(
+  $sql$
+    update public.ticket_tiers
+    set label = repeat('🐕', 80)
+    where listing_id = '00000000-0000-4000-8000-000000000104'
+      and display_order = 0
+  $sql$,
+  'projected ticket labels accept exactly 80 Unicode characters'
+);
+
+update public.ticket_tiers
+set label = 'Standard'
+where listing_id = '00000000-0000-4000-8000-000000000104'
+  and display_order = 0;
+
+select throws_ok(
+  $sql$
+    update public.ticket_tiers
+    set label = repeat('🐕', 81)
+    where listing_id = '00000000-0000-4000-8000-000000000104'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "ticket_tiers" violates check constraint "ticket_tiers_label_valid"',
+  'projected ticket labels reject more than 80 Unicode characters'
+);
+
+select throws_ok(
+  $sql$
+    update public.ticket_tiers
+    set label = E'Standard\nVIP'
+    where listing_id = '00000000-0000-4000-8000-000000000104'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "ticket_tiers" violates check constraint "ticket_tiers_label_valid"',
+  'projected ticket labels reject internal controls'
+);
+
+select throws_ok(
+  $sql$
+    update public.ticket_tiers
+    set display_order = 20
+    where listing_id = '00000000-0000-4000-8000-000000000104'
+      and display_order = 0
+  $sql$,
+  '23514',
+  'new row for relation "ticket_tiers" violates check constraint "ticket_tiers_display_order_range"',
+  'ticket tiers are limited to twenty distinct display positions'
 );
 
 select throws_ok(

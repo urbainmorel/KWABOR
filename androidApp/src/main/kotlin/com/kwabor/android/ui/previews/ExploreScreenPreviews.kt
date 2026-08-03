@@ -41,6 +41,7 @@ fun ExploreScreenDarkPreview() {
 private val previewExploreActions = ExploreScreenActions(
     onTabSelected = {},
     onChipSelected = {},
+    onListingClick = {},
     onLikeClick = {},
     onFavoriteClick = {},
     onRetry = {},

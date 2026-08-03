@@ -93,6 +93,14 @@ tirets simples). Les clés étrangères de
 ville et la clé taxonomique composite propagent cet invariant aux identifiants et sous-types
 projetés depuis `listings`, y compris pour un lieu d'événement.
 
+Les listes destinées aux chips de détail sont également bornées pour protéger le payload public et
+la mesure UI sur les appareils modestes : les tags conservent leur contrat de 10 valeurs de 24
+caractères Unicode maximum ; cuisines, repas, langues, zones et spécialités acceptent au plus 20
+valeurs de 80 caractères. Les collections de chambres et de paliers acceptent elles aussi au plus
+20 éléments, grâce à leurs positions uniques bornées à `0..19`; leurs libellés sont limités à 80
+caractères. Ces textes courts refusent les caractères de contrôle, côté stockage comme dans le
+mapper Kotlin.
+
 Tous les liens projetés utilisent le même sous-ensemble sûr que le mapper Ktor : texte trimé de
 2 048 octets UTF-8 maximum, schéma HTTPS, DNS canonique multi-label non local, port absent ou
 exactement `:443`, sans forme rembourrée telle que `:0443`, IP, IPv6, userinfo, fragment, antislash

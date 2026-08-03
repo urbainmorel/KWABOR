@@ -243,7 +243,7 @@ Présentation **immersive** en **modal sheet remontante (92 % hauteur)**, ouvert
 - **Établissement :** badge catégorie (« Hôtel 4★ », « Restaurant »…) ; **pill d'ouverture dynamique** (Ouvert/Fermé, tap → **horaires 7 jours**) ; **rangée de services à icônes** ; **chip prix mode plein** (tap → **convertisseur de devise**, §6.14) ; selon le sous-type : **bloc « Types de chambres / tarifs »** (hébergement), **chips cuisine + bouton « Voir le menu »** (restauration), **caractéristiques + pill « Âge minimum »** (vie nocturne/club) ; **contact direct** (appel, WhatsApp, site, email) ; **liens réseaux sociaux** ; CTA bas = **Contacter** (noir), « à partir de … » à gauche.
 - **Événement :** **pastille date** sur le hero ; date/heure + lieu (rattaché ou adresse) ; **bloc billetterie multi-tranches** (Standard, VIP… **prix en mode plein, jamais compact**) ; **infos organisateur** (nom + contact) ; capacité ; CTA bas = **« Acheter un billet » rouge** (deep-link externe si `URL_billet`, badge **« Gratuit »** si prix = 0).
 
-**Revendication.** Sur toute fiche **non revendiquée**, un bandeau « Vous gérez cet établissement ? **Revendiquer** » ouvre le flow claim (§6.12.7).
+**Revendication.** Un bandeau « Vous gérez cet établissement ? **Revendiquer** » n’est affiché que pour une fiche de classe **Commerciale ou Événementielle** dont le signal public `is_claimable` vaut `true`, et ouvre le flow claim (§6.12.7). Il n’est **jamais affiché sur une fiche Patrimoniale**.
 
 **Signalement.** Toute fiche peut être signalée via la Share Sheet (motifs en §6.7).
 

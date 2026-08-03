@@ -91,4 +91,14 @@
     <string name="auth_session_restore_error_support">Kwabor doit terminer la fermeture de la session temporaire avant toute connexion. Vérifiez votre accès au réseau, puis réessayez.</string>
     <string name="common_cancel">Annuler</string>
     <string name="common_close">Fermer</string>
+    <string name="detail_loading">Chargement de la fiche</string>
+    <string name="detail_not_found_title">Cette fiche n’est plus disponible</string>
+    <string name="detail_offline_title">Fiche indisponible hors ligne</string>
+    <string name="detail_error_title">Impossible d’afficher cette fiche</string>
+    <string name="detail_select_image">Afficher l’image : %1$s</string>
+    <string name="detail_metrics">Informations principales</string>
+    <string name="detail_tags">À savoir</string>
+    <string name="detail_menu_unavailable">Menu non renseigné</string>
+    <string name="detail_registration_available">Inscription préalable disponible</string>
+    <string name="detail_registration_unavailable">Accès sans inscription externe</string>
 </resources>

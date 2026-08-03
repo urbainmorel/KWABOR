@@ -178,14 +178,6 @@ internal fun String.requireCatalogText(fieldName: String): String {
     return this
 }
 
-internal fun List<String>.requireCatalogTextValues(fieldName: String): List<String> {
-    forEachIndexed { index, value -> value.requireCatalogText("$fieldName[$index]") }
-    if (distinct().size != size) {
-        invalidCatalogDetail(fieldName, "duplicate")
-    }
-    return toList()
-}
-
 internal fun String.requireCatalogHttpsUrl(fieldName: String): String =
     CatalogUrlValidator.requireHttps(this, fieldName)
 
