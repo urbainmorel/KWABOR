@@ -131,6 +131,8 @@ private fun detailContentState(content: CatalogDetailContentUiModel): CatalogDet
             openingHours = emptyList(),
             amenities = emptyList(),
             location = CatalogDetailLocationUiModel("Cotonou", null, null, null, null),
+            directions = null,
+            contact = null,
             tags = emptyList(),
             content = content,
         ),
@@ -144,7 +146,7 @@ private fun endedEventContent(): CatalogDetailContentUiModel.Event = CatalogDeta
     venueLabel = "Cotonou",
     organizerLabel = "Kwabor",
     capacityLabel = null,
-    ticketing = CatalogDetailTicketingUiModel.Free(registrationAvailable = false),
+    ticketing = CatalogDetailTicketingUiModel.Free(externalUrl = null),
     isEnded = true,
 )
 

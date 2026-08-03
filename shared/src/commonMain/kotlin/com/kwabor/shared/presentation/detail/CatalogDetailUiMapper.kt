@@ -28,6 +28,8 @@ internal fun CatalogDetail.toCatalogDetailUiModel(
             .map { amenity -> amenity.labelKey.toCatalogLabel(detailStrings) }
             .distinct(),
         location = toDetailLocationUiModel(),
+        directions = toDetailDirectionsUiModel(),
+        contact = toDetailContactUiModel(),
         tags = commonModel.tags.map(String::toDisplayWords).distinct(),
         content = toCatalogDetailVariantUiModel(detailStrings, nowEpochMilliseconds),
     )

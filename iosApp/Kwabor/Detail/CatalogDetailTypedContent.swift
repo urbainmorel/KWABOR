@@ -5,6 +5,7 @@ struct CatalogDetailTypedContent: View {
     let content: CatalogDetailContentUiModel
     let strings: CatalogDetailStrings
     let commonStrings: KwaborStrings
+    let onOpenExternal: @MainActor (CatalogDetailExternalURLTarget) -> Void
 
     @ViewBuilder
     var body: some View {
@@ -52,8 +53,19 @@ struct CatalogDetailTypedContent: View {
             CatalogDetailLabelGroup(title: strings.meals, labels: food.meals)
             Text(food.reservationLabel)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
-            Text(food.menuAvailable ? strings.menuAvailable : strings.menuUnavailable)
-                .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            if let menuURL = food.menuUrl,
+               CatalogDetailExternalURLPolicy.url(for: .https(menuURL)) != nil {
+                CatalogDetailExternalButton(
+                    title: strings.menu,
+                    systemImage: "menucard",
+                    tint: KwaborDesignTokens.ColorToken.ink950,
+                    accessibilityHint: strings.opensExternally,
+                    action: { onOpenExternal(.https(menuURL)) }
+                )
+            } else {
+                Text(strings.menuUnavailable)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+            }
         }
     }
 
@@ -81,16 +93,6 @@ struct CatalogDetailTypedContent: View {
 
     private func eventContent(_ event: CatalogDetailContentUiModelEvent) -> some View {
         CatalogDetailSection(title: event.heading) {
-            if event.isEnded {
-                Text(strings.eventEnded)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
-                    .padding(.horizontal, KwaborDesignTokens.Spacing.md)
-                    .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .background(KwaborDesignTokens.ColorToken.ink100)
-                    .clipShape(Capsule())
-                    .accessibilityLabel(strings.eventEnded)
-            }
             CatalogDetailFact(label: strings.startsAt, value: event.startsAtLabel)
             if let endsAt = event.endsAtLabel {
                 CatalogDetailFact(label: strings.endsAt, value: endsAt)
@@ -216,7 +218,9 @@ private struct CatalogDetailTicketing: View {
             Text(strings.freeEvent)
                 .font(.body.weight(.semibold))
             Text(
-                free.registrationAvailable
+                free.externalUrl.flatMap {
+                    CatalogDetailExternalURLPolicy.url(for: .https($0))
+                } != nil
                     ? strings.registrationAvailable
                     : strings.registrationUnavailable
             )

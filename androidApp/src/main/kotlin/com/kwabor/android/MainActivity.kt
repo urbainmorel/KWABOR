@@ -23,6 +23,7 @@ import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
 import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
 import com.kwabor.android.auth.SharedPreferencesPromoterActivationSessionStore
 import com.kwabor.android.auth.UuidIdempotencyKeyProvider
+import com.kwabor.android.detail.AndroidDetailExternalActionLauncher
 import com.kwabor.android.media.PublicHttpsListingMediaUrlPolicy
 import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthViewModel
@@ -107,6 +108,7 @@ class MainActivity : ComponentActivity() {
             ),
             legalDocumentLauncher = AndroidLegalDocumentLauncher(applicationContext),
             listingMediaUrlPolicy = PublicHttpsListingMediaUrlPolicy,
+            detailExternalActionLauncher = AndroidDetailExternalActionLauncher(applicationContext),
         )
 
         setContent {

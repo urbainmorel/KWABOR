@@ -194,6 +194,7 @@ jobs:
             iosApp/Kwabor/Onboarding/LegacyRemoteIntroCleaner.swift \
             iosApp/Kwabor/Explore/ExplorePolicies.swift \
             iosApp/Kwabor/Detail/CatalogDetailPolicies.swift \
+            iosApp/Kwabor/Detail/CatalogDetailExternalURLPolicy.swift \
             iosApp/PolicyTests/main.swift \
             -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
           "$RUNNER_TEMP/kwabor-ios-policy-tests"

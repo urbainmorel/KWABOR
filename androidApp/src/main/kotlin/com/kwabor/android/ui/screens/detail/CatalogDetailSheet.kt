@@ -19,11 +19,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -37,11 +44,13 @@ import com.kwabor.android.R
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
-import com.kwabor.android.media.ListingMediaUrlPolicy
+import com.kwabor.android.detail.DetailExternalAction
+import com.kwabor.android.detail.DetailExternalActionLauncher
 import com.kwabor.android.ui.components.KwaborLoadingState
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,12 +58,17 @@ import kotlinx.coroutines.launch
 internal fun CatalogDetailSheet(
     state: CatalogDetailUiState,
     strings: KwaborStrings,
-    mediaUrlPolicy: ListingMediaUrlPolicy,
+    platformDependencies: CatalogDetailPlatformDependencies,
     actions: CatalogDetailSheetActions,
     modifier: Modifier = Modifier,
 ) {
     if (state == CatalogDetailUiState.Closed) return
 
+    val externalActionState = rememberCatalogDetailExternalActionState(
+        state = state,
+        strings = strings,
+        launcher = platformDependencies.externalActionLauncher,
+    )
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val sheetHeightFraction = detailSheetHeightFraction(maxWidth.value)
         val heroHeight = detailHeroHeight(maxHeight * sheetHeightFraction)
@@ -62,26 +76,135 @@ internal fun CatalogDetailSheet(
         val contentActions = rememberAnimatedSheetActions(actions, sheetState)
         val contentResources = CatalogDetailContentResources(
             strings = strings,
-            mediaUrlPolicy = mediaUrlPolicy,
+            mediaUrlPolicy = platformDependencies.mediaUrlPolicy,
             actions = contentActions,
+            externalActionCallbacks = externalActionState.callbacks,
             heroHeight = heroHeight,
         )
-        ModalBottomSheet(
-            onDismissRequest = actions.onDismiss,
+        CatalogDetailPrimaryBottomSheet(
+            state = state,
+            resources = contentResources,
             sheetState = sheetState,
-            sheetMaxWidth = KwaborSizing.DetailSheetMaxWidth,
-            shape = RoundedCornerShape(topStart = KwaborRadius.Sheet, topEnd = KwaborRadius.Sheet),
-            containerColor = MaterialTheme.colorScheme.surface,
-            dragHandle = null,
+            snackbarHostState = externalActionState.snackbarHostState,
+            sheetHeightFraction = sheetHeightFraction,
+        )
+        CatalogDetailContactOverlay(externalActionState, strings)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+private data class CatalogDetailExternalActionState(
+    val model: CatalogDetailExternalActionUiModel?,
+    val contactSheetState: SheetState,
+    val snackbarHostState: SnackbarHostState,
+    val callbacks: CatalogDetailExternalActionCallbacks,
+    val isContactSheetVisible: Boolean,
+    val onContactDismiss: () -> Unit,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun rememberCatalogDetailExternalActionState(
+    state: CatalogDetailUiState,
+    strings: KwaborStrings,
+    launcher: DetailExternalActionLauncher,
+): CatalogDetailExternalActionState {
+    val contentModel = (state as? CatalogDetailUiState.Content)?.model
+    val contentId = contentModel?.id
+    val model = remember(contentModel) { contentModel?.toExternalActionUiModel() }
+    val contactSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var isContactSheetVisible by rememberSaveable(contentId) { mutableStateOf(false) }
+    val currentLauncher = rememberUpdatedState(launcher)
+    val currentFailureMessage = rememberUpdatedState(strings.detail.externalActionFailed)
+    val currentDismissLabel = rememberUpdatedState(strings.detail.dismiss)
+    val onLaunch = remember(snackbarHostState, coroutineScope, contentId) {
+        { action: DetailExternalAction ->
+            isContactSheetVisible = false
+            if (currentLauncher.value.launch(action).shouldShowGenericError) {
+                coroutineScope.showExternalActionError(
+                    snackbarHostState,
+                    currentFailureMessage.value,
+                    currentDismissLabel.value,
+                )
+            }
+        }
+    }
+    return CatalogDetailExternalActionState(
+        model = model,
+        contactSheetState = contactSheetState,
+        snackbarHostState = snackbarHostState,
+        callbacks = CatalogDetailExternalActionCallbacks(
+            onLaunch = onLaunch,
+            onContactRequested = { isContactSheetVisible = true },
+        ),
+        isContactSheetVisible = isContactSheetVisible,
+        onContactDismiss = { isContactSheetVisible = false },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogDetailPrimaryBottomSheet(
+    state: CatalogDetailUiState,
+    resources: CatalogDetailContentResources,
+    sheetState: SheetState,
+    snackbarHostState: SnackbarHostState,
+    sheetHeightFraction: Float,
+) {
+    ModalBottomSheet(
+        onDismissRequest = resources.actions.onDismiss,
+        sheetState = sheetState,
+        sheetMaxWidth = KwaborSizing.DetailSheetMaxWidth,
+        shape = RoundedCornerShape(topStart = KwaborRadius.Sheet, topEnd = KwaborRadius.Sheet),
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = null,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(sheetHeightFraction),
         ) {
-            CatalogDetailSheetBody(
-                state = state,
-                resources = contentResources,
+            CatalogDetailSheetBody(state, resources, Modifier.fillMaxSize())
+            SnackbarHost(
+                hostState = snackbarHostState,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(sheetHeightFraction),
+                    .align(Alignment.BottomCenter)
+                    .padding(KwaborSpacing.Lg)
+                    .externalActionErrorSemantics(),
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogDetailContactOverlay(state: CatalogDetailExternalActionState, strings: KwaborStrings) {
+    if (!state.isContactSheetVisible) return
+    val contact = state.model?.contact ?: return
+    DetailContactBottomSheet(
+        contact = contact,
+        strings = strings.detail,
+        sheetState = state.contactSheetState,
+        onDismiss = state.onContactDismiss,
+        onLaunch = state.callbacks.onLaunch,
+    )
+}
+
+private fun CoroutineScope.showExternalActionError(
+    hostState: SnackbarHostState,
+    message: String,
+    dismissLabel: String,
+) {
+    launch {
+        hostState.currentSnackbarData?.dismiss()
+        hostState.showSnackbar(
+            message = message,
+            actionLabel = dismissLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
     }
 }
 

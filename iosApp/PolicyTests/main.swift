@@ -655,3 +655,249 @@ expect(
     ) == "likes",
     "Counts other than one must use the plural label."
 )
+
+private let directionsURL = CatalogDetailExternalURLPolicy.url(
+    for: .directions(
+        latitude: 6.370293,
+        longitude: 2.391236,
+        label: "Fondation Zinsou"
+    )
+)
+private let directionsComponents = directionsURL.flatMap {
+    URLComponents(url: $0, resolvingAgainstBaseURL: false)
+}
+expect(
+    directionsComponents?.scheme == "https" &&
+        directionsComponents?.host == "www.google.com" &&
+        directionsComponents?.path == "/maps/dir/",
+    "Directions must use the official Google Maps HTTPS URL endpoint."
+)
+expect(
+    directionsComponents?.queryItems?.first(where: { $0.name == "api" })?.value == "1",
+    "The Google Maps URL must explicitly select Maps URLs API version 1."
+)
+expect(
+    directionsComponents?.queryItems?.first(where: { $0.name == "destination" })?.value ==
+        "6.370293,2.391236",
+    "Directions must preserve the validated destination coordinates."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: .nan,
+        longitude: 2.391236,
+        label: "Fondation Zinsou"
+    ) == nil,
+    "Non-finite direction coordinates must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: 91,
+        longitude: 2.391236,
+        label: "Fondation Zinsou"
+    ) == nil,
+    "Out-of-range latitude must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: 6.370293,
+        longitude: -181,
+        label: "Fondation Zinsou"
+    ) == nil,
+    "Out-of-range longitude must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: 6.370293,
+        longitude: 2.391236,
+        label: " \n"
+    ) == nil,
+    "A blank or control-bearing directions label must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: 6.370293,
+        longitude: 2.391236,
+        label: String(repeating: "a", count: 80)
+    ) != nil,
+    "A directions label exactly at the catalog 80-character boundary must be accepted."
+)
+expect(
+    CatalogDetailExternalURLPolicy.directionsURL(
+        latitude: 6.370293,
+        longitude: 2.391236,
+        label: String(repeating: "a", count: 81)
+    ) == nil,
+    "A directions label above the catalog 80-character boundary must fail closed."
+)
+
+expect(
+    CatalogDetailExternalURLPolicy.url(for: .phone("+2290197000000"))?.absoluteString ==
+        "tel:+2290197000000",
+    "A valid Beninese phone number must produce a tel URL."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("2290197000000") == nil,
+    "A phone number without the Beninese calling-code prefix must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+229 01 97 00 00 00") == nil,
+    "A formatted phone number must not bypass strict Beninese validation."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+2290197000000,123") == nil,
+    "Telephone pause and extension injection must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+٢٢٩٠١٩٧٠٠٠٠٠٠") == nil,
+    "Non-ASCII digits must not enter a telephone URL."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+22912345") != nil &&
+        CatalogDetailExternalURLPolicy.phoneURL("+229123456789012") != nil,
+    "Beninese phone numbers at both national-length boundaries must be accepted."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+2291234") == nil &&
+        CatalogDetailExternalURLPolicy.phoneURL("+2291234567890123") == nil,
+    "Beninese phone numbers outside the 5-to-12-digit national range must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.phoneURL("+2280197000000") == nil,
+    "A foreign phone number must fail closed for the Benin-only catalog."
+)
+
+expect(
+    CatalogDetailExternalURLPolicy.url(for: .whatsapp("+2290197000000"))?.absoluteString ==
+        "https://wa.me/2290197000000",
+    "A valid WhatsApp number must use the canonical wa.me HTTPS URL."
+)
+expect(
+    CatalogDetailExternalURLPolicy.whatsappURL("+02290197000000") == nil,
+    "An invalid country prefix must fail closed for WhatsApp."
+)
+expect(
+    CatalogDetailExternalURLPolicy.whatsappURL("+2290197000000?text=secret") == nil,
+    "WhatsApp query injection must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.whatsappURL("+22912345") != nil &&
+        CatalogDetailExternalURLPolicy.whatsappURL("+229123456789012") != nil,
+    "WhatsApp must accept both Beninese national-length boundaries."
+)
+expect(
+    CatalogDetailExternalURLPolicy.whatsappURL("+2280197000000") == nil,
+    "WhatsApp must reject a foreign phone number."
+)
+
+private let emailURL = CatalogDetailExternalURLPolicy.url(
+    for: .email("bonjour+guide@KWABOR.example")
+)
+private let emailComponents = emailURL.flatMap {
+    URLComponents(url: $0, resolvingAgainstBaseURL: false)
+}
+expect(
+    emailComponents?.scheme == "mailto" &&
+        emailComponents?.path == "bonjour+guide@kwabor.example",
+    "A valid email must produce a mailto URL with a canonical domain."
+)
+expect(
+    CatalogDetailExternalURLPolicy.emailURL("bonjour@example.com\r\nBcc:attacker@example.com") == nil,
+    "Email header injection must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.emailURL("bonjour@@example.com") == nil,
+    "An email with multiple separators must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.emailURL(".bonjour@example.com") == nil,
+    "An invalid local email part must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.emailURL("bonjour@service.internal") == nil,
+    "An internal email domain must fail closed."
+)
+
+expect(
+    CatalogDetailExternalURLPolicy.url(
+        for: .https("https://tickets.kwabor.example/event/42?source=app")
+    ) != nil,
+    "A canonical public HTTPS target must be accepted."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example:443/event/42"
+    ) != nil,
+    "The canonical HTTPS port must be accepted."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "http://tickets.kwabor.example/event/42"
+    ) == nil,
+    "Non-HTTPS external targets must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://user:password@tickets.kwabor.example/event/42"
+    ) == nil,
+    "Credentials in an external target must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example/event/42#checkout"
+    ) == nil,
+    "Fragments in an external target must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example:444/event/42"
+    ) == nil,
+    "A non-canonical HTTPS port must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL("https://localhost/event/42") == nil &&
+        CatalogDetailExternalURLPolicy.acceptedHTTPSURL("https://service.internal/event/42") == nil &&
+        CatalogDetailExternalURLPolicy.acceptedHTTPSURL("https://127.0.0.1/event/42") == nil,
+    "Local, internal, and IP-shaped hosts must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://0x7f.0x0.0x0.0x1/event/42"
+    ) == nil,
+    "A historical hexadecimal IPv4 loopback form must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://Tickets.kwabor.example/event/42"
+    ) == nil,
+    "A non-canonical host must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example/%"
+    ) == nil,
+    "Malformed percent encoding must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example/%0Acheckout"
+    ) == nil,
+    "Percent-encoded controls must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example/%5Ccheckout"
+    ) == nil,
+    "A percent-encoded backslash must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example\\@attacker.example/event/42"
+    ) == nil,
+    "A literal backslash parser ambiguity must fail closed."
+)
+expect(
+    CatalogDetailExternalURLPolicy.acceptedHTTPSURL(
+        "https://tickets.kwabor.example/" + String(repeating: "a", count: 2_100)
+    ) == nil,
+    "Oversized external targets must fail closed before parsing."
+)

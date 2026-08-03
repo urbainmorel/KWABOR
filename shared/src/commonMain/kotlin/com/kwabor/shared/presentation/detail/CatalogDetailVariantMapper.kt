@@ -44,7 +44,7 @@ private fun CatalogDetail.Establishment.Food.toFoodUiModel(
     cuisines = cuisines.map(String::toDisplayWords).distinct(),
     meals = meals.map(String::toDisplayWords).distinct(),
     reservationLabel = if (acceptsReservations) strings.reservationsAccepted else strings.reservationsNotAccepted,
-    menuAvailable = menuUrl != null,
+    menuUrl = menuUrl,
 )
 
 private fun CatalogDetail.Establishment.Nightlife.toNightlifeUiModel(
@@ -99,8 +99,9 @@ private fun CatalogDetail.Event.eventVenueLabel(strings: CatalogDetailStrings): 
 }
 
 private fun CatalogEventTicketing.toUiModel(): CatalogDetailTicketingUiModel = when (this) {
-    is CatalogEventTicketing.Free -> CatalogDetailTicketingUiModel.Free(registrationAvailable = externalUrl != null)
+    is CatalogEventTicketing.Free -> CatalogDetailTicketingUiModel.Free(externalUrl = externalUrl)
     is CatalogEventTicketing.Paid -> CatalogDetailTicketingUiModel.Paid(
+        externalUrl = externalUrl,
         tiers = tiers.map { tier -> CatalogDetailPricedItemUiModel(tier.label, tier.price) },
     )
 }

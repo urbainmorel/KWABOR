@@ -33,6 +33,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kwabor.android.auth.LegalDocumentLauncher
 import com.kwabor.android.design.KwaborTheme
+import com.kwabor.android.detail.DetailExternalActionLauncher
 import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.android.presentation.auth.AuthAccessUiState
 import com.kwabor.android.presentation.auth.AuthEffect
@@ -52,6 +53,7 @@ import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
+import com.kwabor.android.ui.screens.detail.CatalogDetailPlatformDependencies
 import com.kwabor.android.ui.screens.detail.CatalogDetailSheet
 import com.kwabor.android.ui.screens.explore.ExploreScreen
 import com.kwabor.android.ui.screens.explore.ExploreScreenUiModel
@@ -145,6 +147,7 @@ internal data class KwaborAppDependencies(
     val onboardingViewModel: OnboardingViewModel,
     val legalDocumentLauncher: LegalDocumentLauncher,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
+    val detailExternalActionLauncher: DetailExternalActionLauncher,
 )
 
 internal data class KwaborAppRuntimeState(
@@ -206,6 +209,7 @@ private data class HomeShellDependencies(
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
+    val detailExternalActionLauncher: DetailExternalActionLauncher,
 )
 
 private object AuthEffectDispatcher {
@@ -327,6 +331,7 @@ private fun KwaborEntryContent(
                 authViewModel = dependencies.authViewModel,
                 onboardingViewModel = dependencies.onboardingViewModel,
                 listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+                detailExternalActionLauncher = dependencies.detailExternalActionLauncher,
             ),
             state = HomeShellState(
                 auth = state.auth,
@@ -423,7 +428,10 @@ private fun KwaborNavigationShell(
     CatalogDetailSheet(
         state = detailState,
         strings = strings,
-        mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+        platformDependencies = CatalogDetailPlatformDependencies(
+            mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+            externalActionLauncher = dependencies.detailExternalActionLauncher,
+        ),
         actions = remember(dependencies.catalogDetailViewModel) {
             dependencies.catalogDetailViewModel.sheetActions
         },

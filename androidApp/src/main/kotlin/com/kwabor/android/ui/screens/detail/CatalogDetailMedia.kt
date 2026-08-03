@@ -27,10 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -47,6 +49,7 @@ import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.android.ui.components.ListingCoverImage
+import com.kwabor.shared.presentation.detail.CatalogDetailContentUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailMediaUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailUiModel
 
@@ -70,10 +73,39 @@ internal fun DetailHero(
             onDismiss = resources.actions.onDismiss,
             modifier = Modifier.align(Alignment.TopStart),
         )
+        if ((model.content as? CatalogDetailContentUiModel.Event)?.isEnded == true) {
+            DetailHeroEventEndedRibbon(
+                label = resources.strings.detail.eventEnded,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        }
         DetailHeroTitle(
             model = model,
             verifiedLabel = resources.strings.detail.verified,
             modifier = Modifier.align(Alignment.BottomStart),
+        )
+    }
+}
+
+@Composable
+private fun DetailHeroEventEndedRibbon(label: String, modifier: Modifier) {
+    Surface(
+        modifier = modifier
+            .padding(top = KwaborSpacing.Xxxl, end = KwaborSpacing.Xxl)
+            .rotate(EVENT_ENDED_RIBBON_ROTATION_DEGREES)
+            .clearAndSetSemantics {
+                contentDescription = label
+                traversalIndex = HERO_EVENT_ENDED_TRAVERSAL_INDEX
+            },
+        shape = RoundedCornerShape(KwaborRadius.Control),
+        color = KwaborColors.Ink500,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = KwaborSpacing.Xl, vertical = KwaborSpacing.Sm),
+            color = KwaborColors.Surface0,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
@@ -255,4 +287,6 @@ private fun selectedGalleryBorder(selected: Boolean): Modifier = if (selected) {
 
 private const val HERO_CLOSE_TRAVERSAL_INDEX = 0f
 private const val HERO_TITLE_TRAVERSAL_INDEX = 1f
+private const val HERO_EVENT_ENDED_TRAVERSAL_INDEX = 1.5f
 private const val HERO_IMAGE_TRAVERSAL_INDEX = 2f
+private const val EVENT_ENDED_RIBBON_ROTATION_DEGREES = 45f

@@ -55,6 +55,8 @@ data class CatalogDetailUiModel(
     val openingHours: List<CatalogDetailOpeningDayUiModel>,
     val amenities: List<String>,
     val location: CatalogDetailLocationUiModel,
+    val directions: CatalogDetailDirectionsUiModel?,
+    val contact: CatalogDetailContactUiModel?,
     val tags: List<String>,
     val content: CatalogDetailContentUiModel,
 )
@@ -91,6 +93,19 @@ data class CatalogDetailLocationUiModel(
     val longitude: Double?,
 )
 
+data class CatalogDetailDirectionsUiModel(
+    val latitude: Double,
+    val longitude: Double,
+    val label: String,
+)
+
+data class CatalogDetailContactUiModel(
+    val phoneNumber: String?,
+    val whatsappNumber: String?,
+    val websiteUrl: String?,
+    val emailAddress: String?,
+)
+
 data class CatalogDetailFactUiModel(
     val label: String,
     val value: String,
@@ -122,7 +137,7 @@ sealed interface CatalogDetailContentUiModel {
         val cuisines: List<String>,
         val meals: List<String>,
         val reservationLabel: String,
-        val menuAvailable: Boolean,
+        val menuUrl: String?,
     ) : CatalogDetailContentUiModel
 
     data class Nightlife(
@@ -152,7 +167,10 @@ sealed interface CatalogDetailContentUiModel {
 }
 
 sealed interface CatalogDetailTicketingUiModel {
-    data class Free(val registrationAvailable: Boolean) : CatalogDetailTicketingUiModel
+    data class Free(val externalUrl: String?) : CatalogDetailTicketingUiModel
 
-    data class Paid(val tiers: List<CatalogDetailPricedItemUiModel>) : CatalogDetailTicketingUiModel
+    data class Paid(
+        val externalUrl: String,
+        val tiers: List<CatalogDetailPricedItemUiModel>,
+    ) : CatalogDetailTicketingUiModel
 }

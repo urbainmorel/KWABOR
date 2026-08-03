@@ -16,13 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import com.kwabor.android.R
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSpacing
+import com.kwabor.android.detail.DetailExternalAction
 import com.kwabor.android.ui.components.PriceTag
 import com.kwabor.android.ui.components.PriceTagMode
 import com.kwabor.android.ui.components.PriceTagOptions
@@ -38,15 +37,28 @@ internal fun DetailTypedContent(
     content: CatalogDetailContentUiModel,
     strings: CatalogDetailStrings,
     commonStrings: KwaborStrings,
+    externalActions: CatalogDetailExternalActionPresentation,
     modifier: Modifier,
 ) {
     when (content) {
         is CatalogDetailContentUiModel.Place -> DetailPlace(content, strings, modifier)
         is CatalogDetailContentUiModel.Lodging -> DetailLodging(content, strings, commonStrings, modifier)
-        is CatalogDetailContentUiModel.Food -> DetailFood(content, strings, modifier)
+        is CatalogDetailContentUiModel.Food -> DetailFood(
+            content = content,
+            strings = strings,
+            menuAction = externalActions.model.menu,
+            onExternalAction = externalActions.callbacks.onLaunch,
+            modifier = modifier,
+        )
         is CatalogDetailContentUiModel.Nightlife -> DetailFacts(content.heading, content.facts, modifier)
         is CatalogDetailContentUiModel.Guide -> DetailGuide(content, strings, commonStrings, modifier)
-        is CatalogDetailContentUiModel.Event -> DetailEvent(content, strings, commonStrings, modifier)
+        is CatalogDetailContentUiModel.Event -> DetailEvent(
+            content = content,
+            strings = strings,
+            commonStrings = commonStrings,
+            hasSafeExternalTicket = externalActions.model.primary is CatalogDetailPrimaryExternalAction.Ticket,
+            modifier = modifier,
+        )
     }
 }
 
@@ -79,21 +91,26 @@ private fun DetailLodging(
 }
 
 @Composable
-private fun DetailFood(content: CatalogDetailContentUiModel.Food, strings: CatalogDetailStrings, modifier: Modifier) {
+private fun DetailFood(
+    content: CatalogDetailContentUiModel.Food,
+    strings: CatalogDetailStrings,
+    menuAction: DetailExternalAction.Https?,
+    onExternalAction: (DetailExternalAction) -> Unit,
+    modifier: Modifier,
+) {
     TypedDetailSection(title = content.heading, modifier = modifier) {
         TypedDetailLabelGroup(strings.cuisines, content.cuisines)
         TypedDetailLabelGroup(strings.meals, content.meals)
         Text(text = content.reservationLabel, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = if (content.menuAvailable) {
-                strings.menuAvailable
-            } else {
-                stringResource(
-                    R.string.detail_menu_unavailable,
-                )
-            },
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (menuAction == null) {
+            Text(text = strings.menuUnavailable, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            DetailMenuButton(
+                label = strings.menu,
+                opensExternally = strings.opensExternally,
+                onClick = { onExternalAction(menuAction) },
+            )
+        }
     }
 }
 
@@ -125,32 +142,17 @@ private fun DetailEvent(
     content: CatalogDetailContentUiModel.Event,
     strings: CatalogDetailStrings,
     commonStrings: KwaborStrings,
+    hasSafeExternalTicket: Boolean,
     modifier: Modifier,
 ) {
     TypedDetailSection(title = content.heading, modifier = modifier) {
-        if (content.isEnded) DetailEventEndedBadge(strings.eventEnded)
         TypedDetailFact(label = strings.startsAt, value = content.startsAtLabel)
         content.endsAtLabel?.let { end -> TypedDetailFact(label = strings.endsAt, value = end) }
         TypedDetailFact(label = strings.venue, value = content.venueLabel)
         TypedDetailFact(label = strings.organizer, value = content.organizerLabel)
         content.capacityLabel?.let { capacity -> TypedDetailFact(label = strings.capacity, value = capacity) }
         TypedDetailSubheading(strings.ticketing)
-        DetailEventTicketing(content.ticketing, strings, commonStrings)
-    }
-}
-
-@Composable
-private fun DetailEventEndedBadge(label: String) {
-    Surface(
-        shape = RoundedCornerShape(KwaborRadius.Pill),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = KwaborSpacing.Md, vertical = KwaborSpacing.Sm),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        DetailEventTicketing(content.ticketing, strings, commonStrings, hasSafeExternalTicket)
     }
 }
 
@@ -159,15 +161,16 @@ private fun DetailEventTicketing(
     ticketing: CatalogDetailTicketingUiModel,
     strings: CatalogDetailStrings,
     commonStrings: KwaborStrings,
+    hasSafeExternalTicket: Boolean,
 ) {
     when (ticketing) {
         is CatalogDetailTicketingUiModel.Free -> {
             Text(text = strings.freeEvent, style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = if (ticketing.registrationAvailable) {
-                    stringResource(R.string.detail_registration_available)
+                text = if (hasSafeExternalTicket) {
+                    strings.registrationAvailable
                 } else {
-                    stringResource(R.string.detail_registration_unavailable)
+                    strings.registrationUnavailable
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,

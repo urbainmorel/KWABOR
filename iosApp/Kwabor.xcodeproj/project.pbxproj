@@ -54,6 +54,7 @@
 		1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A8 /* CatalogDetailMedia.swift */; };
 		1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AA /* CatalogDetailSections.swift */; };
 		1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AC /* CatalogDetailTypedContent.swift */; };
+		1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -105,6 +106,7 @@
 		1A00000100000000000000A8 /* CatalogDetailMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailMedia.swift; sourceTree = "<group>"; };
 		1A00000100000000000000AA /* CatalogDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSections.swift; sourceTree = "<group>"; };
 		1A00000100000000000000AC /* CatalogDetailTypedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailTypedContent.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailExternalURLPolicy.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -264,6 +266,7 @@
 				1A00000100000000000000A8 /* CatalogDetailMedia.swift */,
 				1A00000100000000000000AA /* CatalogDetailSections.swift */,
 				1A00000100000000000000AC /* CatalogDetailTypedContent.swift */,
+				1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */,
 			);
 			path = Detail;
 			sourceTree = "<group>";
@@ -440,6 +443,7 @@
 				1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */,
 				1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */,
 				1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */,
+				1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

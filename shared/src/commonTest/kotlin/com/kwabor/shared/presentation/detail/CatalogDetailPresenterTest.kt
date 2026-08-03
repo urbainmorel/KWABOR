@@ -44,6 +44,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -86,6 +87,101 @@ class CatalogDetailPresenterTest {
         assertFalse(content.model.media.any { media -> media.url == DETAIL_VIDEO_URL })
         assertTrue(content.model.media.all { media -> media.alt.isNotBlank() })
         assertEquals(0, content.selectedMediaIndex)
+    }
+
+    @Test
+    fun load_exposesTypedDirectionsContactAndMenuTargets() = runTest {
+        val source = catalogDetailFixture(variant = DetailFixtureVariant.Food)
+        val repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) }
+
+        val state = CatalogDetailPresenter(repository, FixedDetailClock(DETAIL_TEST_NOW)).load(
+            listingId = source.common.id,
+            strings = strings,
+        )
+
+        val model = assertIs<CatalogDetailUiState.Content>(state).model
+        assertEquals(
+            CatalogDetailDirectionsUiModel(
+                latitude = 6.370293,
+                longitude = 2.391236,
+                label = "Restaurant Kwabor",
+            ),
+            model.directions,
+        )
+        assertEquals(
+            CatalogDetailContactUiModel(
+                phoneNumber = "+2290100000000",
+                whatsappNumber = "+2290100000000",
+                websiteUrl = "https://kwabor.test/contact",
+                emailAddress = "contact@kwabor.test",
+            ),
+            model.contact,
+        )
+        val food = assertIs<CatalogDetailContentUiModel.Food>(model.content)
+        assertEquals("https://kwabor.test/menu", food.menuUrl)
+    }
+
+    @Test
+    fun load_omitsDirectionsAndContactWhenNoTargetIsAvailable() = runTest {
+        val base = assertIs<CatalogDetail.Establishment.Food>(
+            catalogDetailFixture(variant = DetailFixtureVariant.Food),
+        )
+        val source = base.copy(
+            common = base.common.copy(
+                location = base.common.location.copy(geoPoint = null),
+                contact = ListingContact(
+                    phone = null,
+                    whatsapp = null,
+                    externalUrl = null,
+                    email = null,
+                ),
+            ),
+        )
+        val repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) }
+
+        val state = CatalogDetailPresenter(repository, FixedDetailClock(DETAIL_TEST_NOW)).load(
+            listingId = source.common.id,
+            strings = strings,
+        )
+
+        val model = assertIs<CatalogDetailUiState.Content>(state).model
+        assertNull(model.directions)
+        assertNull(model.contact)
+    }
+
+    @Test
+    fun load_omitsContactForPlaceAndEventEvenWhenTheirPayloadContainsContactData() = runTest {
+        listOf(DetailFixtureVariant.Place, DetailFixtureVariant.Event).forEach { variant ->
+            val source = catalogDetailFixture(variant = variant)
+            val repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) }
+
+            val state = CatalogDetailPresenter(repository, FixedDetailClock(DETAIL_TEST_NOW)).load(
+                listingId = source.common.id,
+                strings = strings,
+            )
+
+            assertNull(assertIs<CatalogDetailUiState.Content>(state).model.contact)
+        }
+    }
+
+    @Test
+    fun load_preservesFreeEventRegistrationUrl() = runTest {
+        val base = assertIs<CatalogDetail.Event>(catalogDetailFixture(variant = DetailFixtureVariant.Event))
+        val source = base.copy(
+            ticketing = CatalogEventTicketing.Free(externalUrl = "https://tickets.kwabor.test/register"),
+        )
+        val repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) }
+
+        val state = CatalogDetailPresenter(repository, FixedDetailClock(DETAIL_TEST_NOW)).load(
+            listingId = source.common.id,
+            strings = strings,
+        )
+
+        val event = assertIs<CatalogDetailContentUiModel.Event>(
+            assertIs<CatalogDetailUiState.Content>(state).model.content,
+        )
+        val ticketing = assertIs<CatalogDetailTicketingUiModel.Free>(event.ticketing)
+        assertEquals("https://tickets.kwabor.test/register", ticketing.externalUrl)
     }
 
     @Test
@@ -272,6 +368,14 @@ class CatalogDetailPresenterTest {
         assertEquals("Cotonou", location.addressLabel)
         assertEquals(6.38, location.latitude)
         assertEquals(2.39, location.longitude)
+        assertEquals(
+            CatalogDetailDirectionsUiModel(
+                latitude = 6.38,
+                longitude = 2.39,
+                label = "Place de l’Étoile Rouge",
+            ),
+            assertIs<CatalogDetailUiState.Content>(state).model.directions,
+        )
     }
 
     @Test
@@ -339,7 +443,7 @@ private fun assertVariantMapping(
             assertEquals(strings.food, food.heading)
             assertEquals(listOf("Béninoise"), food.cuisines)
             assertEquals(strings.reservationsAccepted, food.reservationLabel)
-            assertTrue(food.menuAvailable)
+            assertEquals("https://kwabor.test/menu", food.menuUrl)
         }
 
         DetailFixtureVariant.Nightlife -> {
@@ -360,7 +464,8 @@ private fun assertVariantMapping(
             val event = assertIs<CatalogDetailContentUiModel.Event>(content)
             assertEquals(strings.event, event.heading)
             assertEquals("Place de l’Étoile Rouge · Cotonou", event.venueLabel)
-            assertIs<CatalogDetailTicketingUiModel.Paid>(event.ticketing)
+            val ticketing = assertIs<CatalogDetailTicketingUiModel.Paid>(event.ticketing)
+            assertEquals("https://tickets.kwabor.test/event", ticketing.externalUrl)
         }
     }
     assertFalse(content.heading.contains('.'))

@@ -14,6 +14,7 @@ object KwaborColors {
     val Surface0 = Color(color = 0xFFFFFFFF)
     val Sponsored = Color(color = 0xFFF4B400)
     val Ticket = Color(color = 0xFFC5283D)
+    val TicketDark = Color(color = 0xFFFF6B74)
     val DarkBackground = Color(color = 0xFF0B0B0C)
     val DarkSurface = Color(color = 0xFF161619)
     val DarkText = Color(color = 0xFFF2F2F4)
