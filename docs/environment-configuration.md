@@ -163,9 +163,9 @@ rotation du secret ; voir
 [configuration Apple](https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple).
 
 Pour l'activation Promoteur, ajouter exactement `kwabor://auth/promoter-activate` aux redirects
-autorisés du projet Supabase, déployer la migration AUTH-005 puis la fonction `account-delete`. Le
-token d'invitation brut ne doit apparaître ni dans une table, ni dans les logs d'exploitation, ni
-dans Analytics. L'envoi email/WhatsApp des invitations n'est pas encore livré : l'opérateur
+autorisés du projet Supabase, déployer les migrations AUTH-005 et SEC-001F puis la fonction
+`account-delete`. Le token d'invitation brut ne doit apparaître ni dans une table, ni dans les logs
+d'exploitation, ni dans Analytics. L'envoi email/WhatsApp des invitations n'est pas encore livré : l'opérateur
 habilité doit utiliser une procédure serveur contrôlée et ne jamais republier un lien dans un canal
 collectif.
 
@@ -178,12 +178,26 @@ secondes dans le futur. Une AMR absente/malformée, `otp`, `magiclink`, `token_r
 ancienne ou un timestamp futur doit être refusé. Si un fournisseur réel n'émet pas cette forme, ne
 pas élargir silencieusement la règle : bloquer le tier et revoir sa configuration Auth.
 
+Pour la suppression, le client mobile crée à chaque tentative une session Supabase Auth éphémère,
+isolée avec `MemorySessionManager`, sans persistance, auto-refresh ni callbacks de cycle de vie, et
+avec `LogLevel.NONE`. Mot de passe, ID token et nonce vont uniquement à Supabase Auth. Le body
+`account-delete` contient exactement `idempotency_key`; email, fournisseur et tout secret primaire
+y sont interdits.
+
 Après déploiement de `account-delete`, vérifier explicitement qu'une requête sans bearer, avec bearer
 invalide ou avec identité ré-authentifiée différente reçoit un refus. `verify_jwt=true` reste
 obligatoire : la plateforme Supabase valide le JWT avant l'exécution, puis
-`withSupabase({ auth: 'user' })` exige le contexte utilisateur et `getUser()` confirme encore
-l'utilisateur live. Aucun de ces contrôles ne doit être désactivé ou remplacé par la seule lecture
-des claims du token.
+`withSupabase({ auth: 'user' })` exige le contexte utilisateur. Le handler impose
+`userClaims.id = jwtClaims.sub = getUser().id`, un `session_id` UUID et une entrée AMR finale
+`password` ou `oauth` vieille d'au plus 300 secondes, avec au plus 30 secondes de tolérance future.
+Le RPC serveur-only `prepare_account_deletion_with_session` vérifie ensuite la même session dans
+`auth.sessions` et la verrouille jusqu'à la première mutation. Aucun de ces contrôles ne doit être
+désactivé ou remplacé par la seule lecture des claims du token ou par deux opérations non atomiques.
+
+L'en-tête `Authorization` porte toujours le bearer de la session éphémère et reste un secret. Avant
+d'ouvrir la fonction aux utilisateurs staging, documenter, approuver et tester avec un compte
+synthétique la politique Supabase réelle d'accès, de rétention et d'expurgation des en-têtes
+d'invocation, ainsi que tous les Log Drains. Ne jamais exporter l'en-tête ou son contenu comme preuve.
 
 ### Réconciliation des suppressions de compte
 
@@ -213,10 +227,12 @@ demandes dont l'utilisateur Auth a déjà disparu, les clôt, puis purge les tom
 équivalent avant d'ouvrir la suppression de compte. La réconciliation se fait sans exposer
 l'identifiant dans les logs :
 
-- si l'utilisateur Auth existe, lui faire reprendre la suppression avec une session et une
-  ré-authentification fraîches ; une nouvelle clé client reprend la clé effective déjà préparée ;
-- si l'utilisateur Auth n'existe plus, laisser la fonction privilégiée refaire le nettoyage et
-  marquer la demande `completed` avec sa clé effective ;
+- si l'utilisateur Auth existe, lui faire reprendre la suppression avec une nouvelle session Auth
+  principale puis éphémère fraîche depuis la Danger Zone ; la sentinelle de profil pseudonymisée
+  reste lisible uniquement par son propriétaire, non modifiable et masquée au public, et une nouvelle
+  clé client reprend la clé effective déjà préparée après redémarrage ;
+- si l'utilisateur Auth n'existe plus, aucune reprise client n'est possible : seule la fonction
+  privilégiée refait le nettoyage et marque la demande `completed` avec sa clé effective ;
 - ne jamais supprimer manuellement un utilisateur Auth encore présent sur la seule base d'un
   tombstone `prepared`.
 
@@ -263,9 +279,14 @@ L'intégration `OBS-001A` est prête côté code et workflows. Les releases exig
 - Sign in with Apple est activé sur l'App ID, présent dans les profils signés et configuré dans
   Supabase avec les audiences natives attendues.
 - La connexion fédérée, l'activation Promoteur et la ré-authentification de suppression sont prouvées
-  sur appareils signés staging ; activation avec `password`/`oauth` de moins de cinq minutes
-  réussit, tandis qu'AMR absente, OTP/magic-link, preuve ancienne, timestamp futur, tombstone,
-  identité différente et bearer absent échouent.
+  sur appareils signés staging. Les parcours email/mot de passe, Google Android/iOS et Apple iOS
+  émettent chacun un `sub` égal à l'utilisateur ré-authentifié, un `session_id` UUID et une AMR finale
+  `password`/`oauth` de moins de 300 secondes ; AMR absente/malformée,
+  OTP/magic-link/Recovery/token refresh, preuve ancienne, timestamp futur au-delà de 30 secondes,
+  session absente/révoquée, tombstone, identité différente et bearer absent échouent avant la
+  première mutation.
+- La politique d'accès, de rétention et d'expurgation des en-têtes d'invocation `account-delete` et
+  des éventuels Log Drains est approuvée et testée sur staging sans exporter de bearer.
 - Le job quotidien de réconciliation des tombstones `prepared` est actif et alerté ; la rétention
   technique de 30 jours des tombstones `completed` est validée par le propriétaire et le
   responsable légal.

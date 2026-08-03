@@ -275,17 +275,33 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Deux revues indépendantes ont corrigé la reprise d'un tombstone `prepared`, les capacités
   organisation/Storage non livrées, la session conservée après un échec de lecture profil et le
   nettoyage Keychain du premier lancement iOS.
-- L'audit OPS-001A révèle un blocage sécurité : `account-delete` transporte actuellement le mot de
-  passe ou l'ID token et le nonce dans un body que la documentation Supabase décrit comme observable
-  dans les invocations, sans garantie documentée d'expurgation ou de désactivation. Le correctif
-  SEC-001F est cadré mais pas encore implémenté.
+- SEC-001F est implémentée localement : chaque tentative utilise un client Supabase Auth/Functions
+  éphémère, isolé par `MemorySessionManager`, sans sauvegarde, auto-refresh ni callbacks de cycle de
+  vie, avec `LogLevel.NONE`.
+  Mot de passe, ID token et nonce vont uniquement à Supabase Auth ; le body `account-delete` contient
+  exactement `idempotency_key`, puis la session temporaire est nettoyée dans un contexte non annulable.
+- L'Edge Function exige cumulativement `userClaims.id = jwtClaims.sub`, un `session_id` UUID, une AMR
+  finale `password`/`oauth` vieille d'au plus 300 secondes avec 30 secondes de tolérance future, et le
+  même utilisateur retourné par `getUser()`. La première mutation passe par le RPC privilégié atomique
+  `prepare_account_deletion_with_session`, qui verrouille la session Auth vivante jusqu'au commit.
+- Un tombstone `prepared` avec utilisateur Auth présent est désormais reprenable après redémarrage :
+  le profil est réduit à une sentinelle pseudonymisée, privée et non modifiable, puis la reconnexion au
+  même compte permet une nouvelle ré-authentification éphémère depuis la Danger Zone. Si l'utilisateur
+  Auth a déjà disparu, seule la réconciliation serveur idempotente peut marquer `completed` ; aucune
+  suppression DBA n'est autorisée.
+- Validation locale SEC-001F : 389 tests partagés Android host et 196 tests Android app sans échec,
+  compilation des tests Kotlin/Native iOS X64, `spotlessCheck`, `detekt` et `check` verts ; format/check
+  Deno et 20/20 tests Edge verts ; reset Supabase, lint `public`/`app_private` et 753 assertions pgTAP
+  verts. Ce reset a aussi intégré les correctifs SQL
+  préexistants de GUIDE-001B (transaction de migration, alias historiques et assertions typées).
 
 ## Tâche en cours
 
-OPS-001A est terminé localement sur `codex/ops-001a-auth-incident-runbook`, empilé sur SETTINGS-001A,
-sans push, relance de CI ni publication. La prochaine tranche locale critique est SEC-001F, qui doit
-retirer les secrets du transport Edge et restaurer une reprise sûre des suppressions interrompues.
-SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
+SEC-001F est terminé localement sur `codex/sec-001f-account-delete-step-up`, empilé sur OPS-001A,
+sans push, relance de CI, déploiement ni publication. La prochaine tranche locale est OPS-001B pour
+les alertes et l'exercice staging ; son exécution distante dépend du provisionnement propriétaire et
+des gates d'observabilité ci-dessous. SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux
+cinq décisions produit de son audit.
 
 ## Blocages / limites
 
@@ -329,12 +345,16 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
-- `account-delete` ne peut pas être activée sur un staging partagé ni en production tant que
-  SEC-001F n'a pas retiré les credentials de son body. Même après ce correctif, la politique réelle
-  de rétention/expurgation des headers d'invocation et les éventuels Log Drains doivent être prouvés.
-- Un tombstone `prepared` avec utilisateur Auth présent n'est reprenable depuis le mobile que tant
-  que l'écran et son token restent utilisables. Après redémarrage ou expiration, aucun chemin livré
-  ne sort actuellement le compte de l'impasse ; SEC-001F doit couvrir ce scénario sans suppression DBA.
+- Le correctif SEC-001F retire les credentials du body, mais l'ouverture d'`account-delete` aux
+  utilisateurs staging et production reste interdite jusqu'à preuve réelle des claims AMR
+  email/mot de passe, Google et Apple, et jusqu'à validation de la politique de
+  rétention/expurgation des en-têtes d'invocation, des accès aux logs et des éventuels Log Drains.
+  L'en-tête `Authorization` reste un secret ; seuls des comptes synthétiques peuvent servir à lever
+  ces gates sur staging.
+- Un tombstone `prepared` avec utilisateur Auth présent se reprend après reconnexion au même compte,
+  grâce à une sentinelle de profil pseudonymisée puis une nouvelle session éphémère fraîche. Après
+  suppression Auth, seule la réconciliation serveur peut terminer l'opération ; toute suppression
+  manuelle DBA d'un utilisateur encore présent reste interdite.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
@@ -347,8 +367,8 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 
 ## Prochaine tâche logique
 
-Implémenter SEC-001F : ré-authentification dans un client Supabase Auth éphémère sans persistance,
-body Edge réduit à la clé d'idempotence, vérification serveur de l'AMR et de la session live, nouvel
-ADR et tests Kotlin/Deno/pgTAP. OPS-001B viendra ensuite pour les alertes et l'exercice staging.
+Préparer OPS-001B : raccorder les alertes non-PII, prouver le cron/fallback et exécuter l'exercice
+staging seulement après provisionnement. Avant d'activer `account-delete`, prouver les AMR réelles
+email, Google et Apple et faire approuver/tester la politique des en-têtes et journaux d'invocation.
 La vidéo d'intro reste embarquée : tout changement d'octets exige une nouvelle release Android/iOS
 dans les Stores.

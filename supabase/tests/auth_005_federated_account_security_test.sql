@@ -1311,21 +1311,6 @@ select is(
 );
 
 reset role;
-insert into public.profiles (
-  user_id,
-  first_name,
-  last_name,
-  city_id,
-  onboarding_completed_at
-)
-values (
-  'a5000000-0000-4000-8000-000000000005',
-  'Donnee',
-  'Reintroduite',
-  'cotonou',
-  now()
-);
-
 select tests.use_auth_context(
   'authenticated',
   'a5000000-0000-4000-8000-000000000005'
@@ -1341,7 +1326,7 @@ select throws_ok(
   $sql$,
   '42501',
   'Account deletion in progress',
-  'a prepared deletion tombstone blocks promoter activation even if a profile is reintroduced'
+  'a prepared deletion tombstone blocks promoter activation while the retry profile is retained'
 );
 select throws_ok(
   $sql$
@@ -1429,8 +1414,8 @@ select is(
     from public.profiles
     where user_id = 'a5000000-0000-4000-8000-000000000005'
   ),
-  0,
-  'account deletion preparation removes the user profile'
+  1,
+  'account deletion preparation retains the profile until Auth deletion succeeds'
 );
 select tests.use_auth_context(
   'authenticated',

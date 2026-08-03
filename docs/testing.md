@@ -70,17 +70,49 @@ lot. Ne jamais utiliser un reset destructif sur staging ou production. Le harnai
 
 ## Edge Function `account-delete`
 
-Depuis `supabase/functions/account-delete` :
+SEC-001F utilise la porte ciblée suivante depuis la racine du dépôt avant toute validation hébergée :
 
 ```powershell
-deno install --frozen
-deno fmt --check .
-deno lint *.ts
-deno check *.ts
-deno test core_test.ts identity_test.ts
+.\gradlew.bat :shared:testAndroidHostTest --tests "*AccountDeletion*" --console=plain
+.\gradlew.bat :shared:compileTestKotlinIosX64 --console=plain
+supabase db reset --local --yes
+supabase test db
 ```
 
-La CI utilise Deno 2.9.4.
+Depuis `supabase/functions/account-delete`, utiliser la même version Deno que la CI :
+
+```powershell
+npx -y deno@2.9.4 fmt --check .
+npx -y deno@2.9.4 check --config deno.json index.ts
+npx -y deno@2.9.4 test --config deno.json core_test.ts identity_test.ts
+```
+
+La preuve locale du 3 août 2026 est verte : tests Kotlin ciblés Android, compilation des tests
+Kotlin/Native iOS X64, format/check Deno, 20/20 tests Edge, reset complet, lint
+`public`/`app_private` et 753 assertions pgTAP. Ce total est un instantané, pas une valeur à figer dans
+un script.
+
+Les tests de suppression doivent continuer à prouver cumulativement :
+
+- client Auth éphémère avec `MemorySessionManager`, sans persistance, refresh automatique ni
+  callbacks de cycle de vie, et avec `LogLevel.NONE` ; credential envoyé seulement à Auth, identité
+  temporaire égale à la session principale et nettoyage non annulable sans effacer la session
+  principale sur échec ;
+- body Edge composé exactement de `idempotency_key`, refus de tout champ supplémentaire ou secret ;
+- égalité `userClaims.id`/`jwtClaims.sub`/`getUser().id`, `session_id` UUID, dernière AMR
+  `password`/`oauth` dans la fenêtre de 300 secondes avec 30 secondes de tolérance future ;
+- vérification et verrouillage atomiques de la session Auth vivante avant la première mutation, ACL
+  `service_role` uniquement, puis reprise utilisateur avec reconnexion principale et nouvelle session
+  éphémère si Auth existe encore ;
+- sentinelle de profil pseudonymisée retenue uniquement pour son propriétaire, sans donnée de profil
+  fournie par l'utilisateur, masquée au public et non modifiable sous tombstone ; refus de `completed`
+  tant que l'utilisateur Auth existe ;
+- après suppression Auth, nettoyage final et clôture directe ou par la réconciliation serveur
+  idempotente.
+
+Ces tests locaux ne prouvent pas les AMR réellement émises par email, Google ou Apple sur staging,
+ni la politique de rétention/expurgation des en-têtes d'invocation ou des Log Drains. Ces deux preuves
+restent des gates hébergées avant activation de `account-delete`.
 
 ## Intégrité, marque et média
 

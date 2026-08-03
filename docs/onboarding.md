@@ -90,30 +90,54 @@ la suppression gagne toujours, sans réimporter ensuite une session devenue inva
 ### Danger Zone et suppression de compte
 
 La suppression exige la confirmation exacte `SUPPRIMER`, puis une ré-authentification récente par
-mot de passe ou par un nouvel ID token Google/Apple avec nonce. La fonction serveur compare
-l'identité ré-authentifiée au bearer courant, vérifie les blocages de propriété d'organisation et
-d'objets Storage, puis prépare l'effacement avec une clé d'idempotence. Les politiques Storage
-restrictives partagent le verrou de suppression : un upload déjà engagé finit avant la vérification,
-et tout nouvel upload attend puis échoue dès que le tombstone existe.
+mot de passe ou par un nouvel ID token Google/Apple avec nonce. Le data layer crée pour chaque
+tentative un client Supabase Auth/Functions dédié avec `MemorySessionManager`, sans persistance,
+auto-refresh ni callbacks de cycle de vie, et avec `LogLevel.NONE`. Le secret primaire est envoyé
+exclusivement à Supabase Auth. L'identifiant obtenu doit être strictement égal à celui de la session
+principale ; une identité différente échoue sans remplacer ni effacer cette session.
 
-La préparation supprime le profil, les rôles, acceptations juridiques et données utilisateur
-rattachées, et neutralise les attributions résiduelles de fiches. La fonction révoque ensuite toutes
-les sessions, revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Un retry
-immédiat depuis le même écran et avec un token encore utilisable retrouve la même opération serveur,
-même avec une nouvelle clé client. Après redémarrage ou expiration du token, aucun chemin livré ne
-reprend toutefois un tombstone `prepared` si l'utilisateur Auth existe encore : c'est un no-go suivi
-par SEC-001F, jamais une raison de supprimer le compte directement en base.
+Le client éphémère appelle ensuite `account-delete` avec un body JSON contenant exactement
+`idempotency_key`. L'Edge Function exige que `userClaims.id`, `jwtClaims.sub` et l'utilisateur live
+retourné par `getUser()` désignent le même UUID. Le claim `session_id` doit être un UUID et l'entrée
+AMR la plus récente doit être `password` ou `oauth`, dater d'au plus 300 secondes et ne pas dépasser
+l'horloge serveur de plus de 30 secondes. Toute AMR absente, malformée, OTP, magic link, Recovery,
+token refresh, trop ancienne ou trop future est refusée.
 
-Le transport actuel de cette preuve dans le body de l'Edge Function est lui-même un no-go staging
-partagé/production jusqu'à SEC-001F ; voir le
-[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md).
+La première mutation utilise le RPC privilégié `prepare_account_deletion_with_session` : il vérifie
+et verrouille atomiquement la ligne `auth.sessions` du même utilisateur avant de préparer
+l'effacement. La fonction vérifie ensuite les blocages de propriété d'organisation et d'objets
+Storage. Les politiques Storage restrictives partagent le verrou de suppression : un upload déjà
+engagé finit avant la vérification, et tout nouvel upload attend puis échoue dès que le tombstone
+existe.
+
+La préparation anonymise les invitations, supprime les données applicatives rejouables, les rôles et
+les acceptations juridiques, puis neutralise les attributions résiduelles de fiches. Elle remplace
+provisoirement le profil par une sentinelle pseudonymisée comme ancre de routage, la masque aux
+lecteurs publics et interdit toute mutation grâce au tombstone. La fonction révoque ensuite toutes
+les sessions,
+revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Si une tentative s'arrête
+avec un tombstone `prepared` et un utilisateur Auth encore présent, l'utilisateur se reconnecte au
+même compte, rouvre la Danger Zone et crée une nouvelle session éphémère ; la clé effective serveur
+est reprise, y compris après redémarrage ou expiration de l'ancien token. La sentinelle retenue est
+supprimée seulement après la disparition de l'utilisateur Auth. À partir de ce point, aucune preuve
+utilisateur ne peut être recréée : seule la réconciliation serveur termine l'opération.
+
+Le body ne transporte plus aucun mot de passe, ID token, nonce, email ou fournisseur. L'ouverture aux
+utilisateurs staging et production reste néanmoins interdite tant que les AMR réellement émises pour
+email/mot de passe, Google et Apple ne sont pas prouvées, et tant que la politique d'accès, de
+rétention et d'expurgation des en-têtes d'invocation et des éventuels Log Drains n'est pas validée.
+Seuls des comptes synthétiques servent à ces preuves staging. L'en-tête `Authorization` reste un
+secret ; voir le
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md) et
+[l'ADR-0025](adr/0025-ephemeral-account-deletion-step-up-session.md).
 
 Le tombstone privé `account_deletion_requests` conserve seulement un identifiant utilisateur
 pseudonyme, une clé d'idempotence, un statut et des horodatages. Il ne contient aucun email, nom,
 contenu ou credential. Une ligne `prepared` interdit les écritures produit jusqu'à reprise. Si le
-compte Auth existe encore, seule la reprise immédiate ci-dessus fonctionne actuellement ; s'il a déjà
+compte Auth existe encore, l'utilisateur reprend avec une session éphémère fraîche ; s'il a déjà
 disparu, la réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le
-tombstone. Les tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa
+tombstone. Aucun opérateur ne supprime manuellement un utilisateur Auth encore présent. Les
+tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa
 mention dans la
 politique de confidentialité restent une gate juridique avant release candidate.
 
@@ -202,9 +226,11 @@ mais ne peut ni choisir, ni télécharger, ni désactiver la vidéo d'intro.
 32. Lien Promoteur reçu avec une session existante : session jamais remplacée ni déconnectée, y compris si le lien est invalide.
 33. Lien Promoteur sans session : session temporaire conservée jusqu'à activation, puis supprimée en cas d'annulation ou de prévisualisation invalide.
 34. Activation réussie : rôle Promoteur vérifié et rôle Éditeur seulement ; aucun rôle critique ni transfert de `owner_id`.
-35. Suppression sans la phrase exacte, avec mot de passe faux ou identité sociale différente : aucune préparation ni révocation.
+35. Suppression sans la phrase exacte, avec mot de passe faux ou identité sociale différente : aucune préparation ni révocation, et session principale inchangée.
 36. Propriété d'organisation ou objets Storage restants : suppression bloquée avec message utilisateur sûr et données intactes avant résolution.
-37. Double appui, retry réseau ou redémarrage avec une autre clé client : une seule préparation effective et aucune double suppression.
-38. Échec après état `prepared` avec compte Auth encore présent : reprise utilisateur fraîche ; écritures produit bloquées entre-temps.
+37. Double appui, retry réseau ou redémarrage avec une nouvelle session/clé client : une seule préparation effective et aucune double suppression.
+38. Échec après état `prepared` avec compte Auth encore présent : reprise par une ré-authentification éphémère fraîche ; écritures produit bloquées entre-temps.
 39. Compte Auth déjà absent mais tombstone encore `prepared` : réconciliation serveur vers `completed`, sans suppression manuelle d'un compte présent.
 40. Suppression réussie : toutes les sessions révoquées, session locale et destinations privées effacées, retour à l'accueil invité.
+41. Body Edge avec email, mot de passe, ID token, nonce, fournisseur ou tout champ supplémentaire : requête refusée avant mutation.
+42. `session_id` absent/invalide, AMR absente/malformée/non forte/ancienne/trop future, session Auth absente ou `getUser()` différent : requête refusée avant mutation.

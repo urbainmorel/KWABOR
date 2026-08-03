@@ -4,6 +4,7 @@
 - **Date** : 2026-07-27
 - **Décideurs** : Équipe
 - **Remplace** : —
+- **Complété par** : ADR-0025 pour la preuve de ré-authentification de suppression
 
 ## Contexte et problème
 

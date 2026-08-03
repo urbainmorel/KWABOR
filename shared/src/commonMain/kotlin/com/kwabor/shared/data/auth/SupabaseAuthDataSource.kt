@@ -1,13 +1,12 @@
 package com.kwabor.shared.data.auth
 
 import io.github.jan.supabase.auth.Auth
-import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 
 internal class SupabaseAuthDataSource(
     auth: Auth,
     postgrest: Postgrest,
-    functions: Functions,
+    accountDeletionStepUpSessionFactory: AccountDeletionStepUpSessionFactory,
     passwordRecoverySessionStore: PasswordRecoverySessionStore,
 ) : AuthDataSource,
     AuthSessionDataSource by SupabaseAuthSessionDataSource(
@@ -32,6 +31,6 @@ internal class SupabaseAuthDataSource(
     ),
     AccountSecurityAuthDataSource by SupabaseAccountSecurityAuthDataSource(
         auth = auth,
-        functions = functions,
+        stepUpSessionFactory = accountDeletionStepUpSessionFactory,
         passwordRecoverySessionStore = passwordRecoverySessionStore,
     )

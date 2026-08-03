@@ -3,12 +3,14 @@ package com.kwabor.shared.data.auth
 import com.kwabor.shared.domain.auth.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.postgrest
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 internal val authDataModule: Module = module {
+    single<AccountDeletionStepUpSessionFactory> {
+        SupabaseAccountDeletionStepUpSessionFactory(environment = get())
+    }
     single<AuthDataSource> {
         val auth = get<SupabaseClient>().auth
         val passwordRecoverySessionStore = auth.sessionManager as? PasswordRecoverySessionStore
@@ -16,7 +18,7 @@ internal val authDataModule: Module = module {
         SupabaseAuthDataSource(
             auth = auth,
             postgrest = get<SupabaseClient>().postgrest,
-            functions = get<SupabaseClient>().functions,
+            accountDeletionStepUpSessionFactory = get(),
             passwordRecoverySessionStore = passwordRecoverySessionStore,
         )
     }

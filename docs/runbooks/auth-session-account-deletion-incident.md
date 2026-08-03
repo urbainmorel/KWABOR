@@ -1,7 +1,7 @@
 # Incident Auth, session et suppression de compte
 
-> Runbook OPS-001A pour les parcours réellement livrés par AUTH-003 à AUTH-005 et
-> SETTINGS-001A. Il couvre Android, iOS, Supabase Auth et la fonction
+> Runbook OPS-001A, complété par SEC-001F, pour les parcours réellement livrés par
+> AUTH-003 à AUTH-005 et SETTINGS-001A. Il couvre Android, iOS, Supabase Auth et la fonction
 > `account-delete`. Il n'autorise aucune mutation distante à lui seul.
 
 ## But et périmètre
@@ -13,7 +13,9 @@ configuration Google/Apple et le job de réconciliation des suppressions.
 
 Le comportement de référence est décrit dans [l'onboarding mobile](../onboarding.md),
 [la configuration des environnements](../environment-configuration.md) et
-[l'ADR-0017](../adr/0017-native-federated-auth-promoter-activation-account-deletion.md).
+[l'ADR-0017](../adr/0017-native-federated-auth-promoter-activation-account-deletion.md),
+complété par
+[l'ADR-0025](../adr/0025-ephemeral-account-deletion-step-up-session.md).
 Les environnements Kwabor staging/production ne sont pas encore provisionnés : les
 procédures distantes ci-dessous sont donc des gates de mise en service, pas une preuve
 qu'elles ont déjà été exécutées.
@@ -24,16 +26,29 @@ restent ouverts dans SETTINGS-001 et OPS-001.
 
 ## Gate de mise en service de la suppression
 
-Le `POST account-delete` livré transporte actuellement soit le mot de passe, soit
-l'ID token social et son nonce dans le body. La documentation Supabase indique que la
-vue des invocations peut inclure les headers et le body de la requête. Le dépôt ne
-prouve ni une expurgation de ces valeurs, ni la désactivation de cette collecte.
+Le correctif SEC-001F est livré localement. Le client ré-authentifie auprès de Supabase Auth dans
+une session éphémère avec `MemorySessionManager`, sans persistance et avec `LogLevel.NONE`. Le
+`POST account-delete` accepte un
+body JSON contenant exactement `idempotency_key` ; mot de passe, ID token, nonce, email et
+fournisseur sont refusés. La preuve envoyée à Functions est uniquement le JWT temporaire dans
+l'en-tête `Authorization` standard.
 
-La suppression de compte reste donc **interdite en staging partagé et en production**
-tant que le protocole n'envoie pas uniquement des données non secrètes ou qu'une
-garantie officielle, configurée et testée de non-journalisation n'est pas apportée.
-Une présence confirmée de credentials dans les journaux est un P0 : suspendre la
-fonction, restreindre les accès, préserver les seules métadonnées nécessaires et
+L'ouverture de la suppression aux utilisateurs reste néanmoins **interdite en staging et en
+production** tant que :
+
+- les claims `session_id` et `amr` réellement émis par email/mot de passe, Google Android/iOS et
+  Apple iOS n'ont pas été capturés de façon sûre sur des comptes synthétiques et validés contre la
+  fenêtre de 300 secondes avec 30 secondes de tolérance future ;
+- la politique Supabase réelle d'accès, de rétention et d'expurgation des en-têtes d'invocation,
+  ainsi que tout Log Drain, n'a pas été documentée, approuvée et testée. Le bearer reste un secret.
+
+Le déploiement staging nécessaire à cette vérification est borné à des comptes synthétiques et ne
+constitue jamais une ouverture fonctionnelle aux testeurs ou aux utilisateurs. La preuve conserve
+seulement la méthode AMR, ses bornes temporelles et le résultat ; jamais le JWT, le bearer ou le
+`session_id` brut.
+
+Une présence confirmée de credentials primaires ou d'un bearer en clair dans les journaux est un
+P0 : suspendre la fonction, restreindre les accès, préserver les seules métadonnées nécessaires et
 appliquer la procédure sécurité/vie privée de rotation et de notification appropriée.
 
 ## Autorité et règles de sécurité
@@ -55,7 +70,10 @@ il n'est utilisé que dans une console sécurisée et n'apparaît pas dans le co
 
 Ne jamais :
 
-- contourner RLS, `verify_jwt=true`, la vérification live de l'utilisateur ou le nonce ;
+- contourner RLS, `verify_jwt=true`, `withSupabase({ auth: 'user' })`, la vérification `getUser()`,
+  les contrôles `sub`/`session_id`/AMR ou le nonce ;
+- remplacer le RPC atomique `prepare_account_deletion_with_session` par une vérification de session
+  séparée de la première mutation ;
 - fournir une clé `service_role` à un client ou l'utiliser depuis l'application ;
 - effacer directement `auth.users`, `account_deletion_requests` ou un marqueur local ;
 - modifier `storage.objects.owner_id` pour forcer une suppression ;
@@ -102,9 +120,10 @@ Dans le Dashboard du tier exact :
   `token_revoked` et `user_deleted`, sans exporter de PII ;
 - **Functions > account-delete > Invocations** : utiliser uniquement la liste et ses
   métadonnées agrégées (fenêtre UTC, code HTTP, durée). Ne jamais ouvrir, copier ou
-  exporter les headers, le bearer ou le body de cette fonction tant que le gate de
-  non-journalisation ci-dessus n'est pas levé. Le code actuel ne journalise pas le
-  détail interne des 503 ; ne pas déduire leur étape exacte sans l'état PostgreSQL ;
+  exporter les en-têtes ou le bearer. Le body SEC-001F ne contient que la clé d'idempotence,
+  qui reste une donnée restreinte et ne doit pas être exportée. Le code ne journalise pas le
+  détail interne des 503 ; ne pas déduire leur étape exacte sans l'état PostgreSQL. La revue
+  des en-têtes et Log Drains utilise uniquement un compte synthétique et une procédure approuvée ;
 - **Integrations > Cron** ou les tables `cron.job`/`cron.job_run_details` : confirmer
   présence, activité et dernière exécution ;
 - observabilité mobile seulement si le consentement est acquis. Les événements
@@ -230,9 +249,9 @@ est volontairement conservatrice :
 - un `completed` au-delà de 30 jours après approbation juridique et exécution réussie :
   P1 de purge ;
 - un `prepared` dont l'utilisateur Auth existe encore n'est pas réconcilié par le cron.
-  La reprise utilisateur n'est possible que si l'écran et son token authentifié restent
-  utilisables ; après redémarrage ou expiration, l'absence de chemin livré est un P1.
-  Ce cas ne doit jamais déclencher une suppression DBA.
+  L'utilisateur reprend avec une nouvelle session Auth éphémère fraîche, même après redémarrage ou
+  expiration. Un échec répété de ce parcours est P1. Ce cas ne doit jamais déclencher une
+  suppression DBA.
 
 Le délai de 26 heures correspond à un cycle quotidien complet plus deux heures de
 marge opérationnelle. Aucun moniteur distant n'implémente encore ces seuils : la mise
@@ -275,8 +294,9 @@ et mot de passe à huit caractères minimum. Elle ne prouve pas la configuration
    fournisseur activé dans le même projet Supabase.
 3. Vérifier que le flux reste natif et que chaque tentative utilise un nouveau nonce.
    Ne jamais copier un ID token ou un nonce pour diagnostiquer.
-4. Un ID token doit correspondre à une identité déjà liée lors de la réauthentification
-   de suppression. Un autre UUID est un refus attendu, pas une raison d'élargir l'audience.
+4. Pour une suppression, le nouvel ID token et son nonce vont uniquement à Supabase Auth dans le
+   client éphémère. L'UUID obtenu doit correspondre à la session principale ; un autre UUID est un
+   refus attendu, pas une raison d'élargir l'audience.
 5. Une erreur de configuration publique embarquée exige un nouveau build du bon tier ;
    ne jamais rediriger un binaire vers un autre projet.
 6. Apple peut omettre le nom après la première autorisation : ce n'est pas un incident.
@@ -308,6 +328,9 @@ Une session n'est authentifiée que si elle est à la fois `Standard` et `Comple
 6. Un stockage de session illisible est purgé par le client. Une reconnexion est ensuite
    normale ; aucune extraction du stockage sécurisé par le support n'est autorisée.
 7. Si la session Recovery ou Promoteur ouvre une destination privée, classer P0.
+8. La session de ré-authentification de suppression utilise `MemorySessionManager`, n'est ni
+   restaurée ni auto-refreshée et force `LogLevel.NONE`. Elle est nettoyée dans un contexte non
+   annulable sur succès, erreur ou annulation ; elle ne doit jamais remplacer la session principale.
 
 Le timestamp d'expiration est transporté par le domaine, mais le dépôt ne prouve pas une
 politique proactive complète de refresh UI. Diagnostiquer les événements de refresh réels
@@ -335,9 +358,9 @@ des appareils n'est pas encore livrée.
 | HTTP / code | Sens actuel | Action |
 | --- | --- | --- |
 | `204` | Suppression et marquage terminés, ou retry idempotent déjà terminé | Vérifier Auth absent, session locale effacée et état agrégé sain |
-| `400 invalid_request` | Payload, type ou clé client invalide | Vérifier compatibilité du binaire ; incident P1 si produit par une version publiée |
-| `401 unauthorized` | Bearer absent/invalide ou utilisateur live absent sans tombstone reprenable | Si Auth existe, reprendre une session normale ; si Auth est absent sans tombstone, qualifier sécurité/vie privée sans recréer le compte ; ne jamais injecter de bearer opérateur |
-| `401 reauthentication_failed` | Identité fraîche absente ou différente | Refaire la réauthentification du même compte |
+| `400 invalid_request` | Body non JSON, supérieur à 256 octets, clé invalide ou champ autre que `idempotency_key` | Vérifier compatibilité du binaire ; incident P1 si produit par une version publiée |
+| `401 unauthorized` | Bearer/contexte signé invalide ou identités vérifiées incohérentes | Recommencer depuis l'application ; ne jamais injecter de bearer opérateur |
+| `401 reauthentication_failed` | AMR/session fraîche invalide, `getUser()` absent ou session Auth non vivante au RPC atomique | Refaire la ré-authentification du même compte ; si l'échec se répète sur un compte synthétique, vérifier les claims réels du tier sans les exporter |
 | `409 organization_ownership_conflict` | Propriété d'organisation active | Capacité de transfert/fermeture non livrée : escalader produit/sécurité, no-go pour ce compte et aucun SQL direct |
 | `409 storage_objects_conflict` | Au moins un objet Storage appartient encore au compte | Procédure opérateur de nettoyage média non livrée : escalader, no-go pour ce compte et ne jamais neutraliser `owner_id` |
 | `503 deletion_prepared_retryable` | Préparation faite, révocation/suppression Auth non terminée | Lire le tombstone et l'existence Auth, puis suivre la matrice ci-dessous |
@@ -353,19 +376,20 @@ compteur de retries, ni `last_error`.
 | Tombstone | Utilisateur Auth | Reprise autorisée |
 | --- | --- | --- |
 | absent | présent | Recommencer depuis l'application avec confirmation et réauthentification |
-| `prepared` | présent, écran/token encore utilisable | Réessayer immédiatement depuis le même parcours ; une nouvelle clé client retrouve la clé serveur effective |
-| `prepared` | présent, après redémarrage/expiration | P1 : aucun chemin de reprise client ou serveur contrôlé n'est livré ; préserver l'état et escalader sans suppression DBA |
+| `prepared` | présent, écran/token encore utilisable | Réessayer depuis le même parcours ; une nouvelle clé client retrouve la clé serveur effective |
+| `prepared` | présent, après redémarrage/expiration | Se reconnecter au même compte, rouvrir la Danger Zone puis fournir une nouvelle preuve éphémère ; la clé serveur effective est réutilisée |
 | `prepared` | absent | Le cron privilégié rejoue le nettoyage puis marque `completed` |
 | `completed` | absent | Aucun retry utilisateur ; vérifier purge locale et rétention |
 | absent | absent | Le compte n'est pas reprenable par ce mécanisme ; qualifier sécurité/vie privée avant toute action |
 
-La préparation nettoie les données applicatives principales, mais les campagnes et
-paiements disparaissent actuellement avec la cascade de suppression Auth, pas pendant
-l'état intermédiaire `prepared`. Aucun objet Storage n'est supprimé automatiquement.
-Après nettoyage du profil, une reconnexion peut classer le compte comme incomplet tandis
-que le tombstone interdit de refaire l'onboarding. Cela explique le blocage de la ligne
-`prepared` avec Auth présent après perte du token. Un chemin serveur revu reste à livrer ;
-conserver ces limites dans l'analyse d'impact.
+La préparation nettoie les données applicatives principales, mais les campagnes et paiements
+disparaissent actuellement avec la cascade de suppression Auth, pas pendant l'état intermédiaire
+`prepared`. Aucun objet Storage n'est supprimé automatiquement. Le profil est réduit à une sentinelle
+pseudonymisée pour que la reconnexion principale restaure l'accès à la Danger Zone ; les noms,
+médias, bio, ville et préférences d'origine sont effacés, et la sentinelle est invisible aux autres
+lecteurs et non modifiable sous tombstone. Le finalizer refuse de clôturer tant que l'utilisateur Auth
+existe, puis rejoue le nettoyage complet après sa disparition. Après disparition de l'utilisateur
+Auth, seule la réconciliation serveur est autorisée.
 
 ## Réconciliation contrôlée
 
@@ -413,23 +437,34 @@ versionnée. Une correction durable passe par une migration forward-only revue.
 
 Sur stack isolée puis staging, avec comptes synthétiques uniquement :
 
+Les preuves locales SEC-001F sont acquises : tests Kotlin ciblés Android, compilation des tests
+Kotlin/Native iOS X64, format/check Deno et 20/20 tests Edge, reset Supabase, lint
+`public`/`app_private` et 753 assertions pgTAP. Elles prouvent le contrat du dépôt, pas les claims ni
+la politique de journaux d'un projet hébergé.
+
 1. exécuter les tests Edge Function et pgTAP décrits dans le
    [guide de tests](../testing.md#edge-function-account-delete) ;
 2. prouver email/mot de passe, OTP, Recovery interrompue/reprise et réponse neutre pour
    une adresse inconnue ;
-3. prouver Google Android/iOS et Apple iOS avec les vrais clients du tier ;
+3. prouver sur comptes synthétiques l'AMR email/mot de passe, Google Android/iOS et Apple iOS avec
+   les vrais clients du tier ; chaque JWT doit porter le même `sub`, un `session_id` UUID et une AMR
+   finale `password`/`oauth` dans les bornes 300/30 secondes ;
 4. couper le réseau pendant une restauration et vérifier le blocage + retry fail-closed ;
 5. vérifier qu'une déconnexion ordinaire reste locale et qu'une suppression révoque les
    sessions globalement ;
-6. couvrir `ownership_conflict`, `storage_conflict`, retry avec nouvelle clé et panne
-   après suppression Auth ;
-7. confirmer `verify_jwt=true`, refus sans bearer, bearer invalide et identité différente ;
-8. prouver présence, activité et exécution réelle du cron, puis l'alerte de 26 heures ;
-9. faire approuver la durée et la mention de rétention avant toute purge production ;
-10. archiver les preuves expurgées et obtenir la double revue.
+6. couvrir `ownership_conflict`, `storage_conflict`, retry après redémarrage avec nouvelle session et
+   nouvelle clé, puis panne après suppression Auth traitée uniquement par la réconciliation serveur ;
+7. confirmer `verify_jwt=true`, le body exact, les refus sans bearer, bearer invalide, identité
+   différente, AMR invalide et session absente/révoquée avant la première mutation ;
+8. faire approuver et tester la politique d'accès/rétention/expurgation des en-têtes d'invocation et
+   des éventuels Log Drains sans exporter de bearer ;
+9. prouver présence, activité et exécution réelle du cron, puis l'alerte de 26 heures ;
+10. faire approuver la durée et la mention de rétention avant toute purge production ;
+11. archiver les preuves expurgées et obtenir la double revue.
 
-La mise en service reste **no-go** tant qu'un fournisseur réel, SMTP, le cron, les
-alertes, la rétention juridique et les parcours appareils Android/iOS ne sont pas prouvés.
+La mise en service reste **no-go** tant que les AMR email/Google/Apple, la politique et les tests
+d'en-têtes/logs, SMTP, le cron, les alertes, la rétention juridique et les parcours appareils
+Android/iOS ne sont pas prouvés.
 
 ## Critères de clôture d'un incident
 
