@@ -17,7 +17,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android dans la PR brouillon `#46`, CI exact-head en attente |
+| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android dans la PR brouillon `#46`, run exact-head `30775732082` entièrement vert |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -88,11 +88,11 @@ Objectifs :
 330 tests shared et 156 tests Android sont verts en 9 min 56 s. Le runtime partagé traite les
 réponses obsolètes et actualise les statuts temporels sans réseau. Les bornes
 SQL/Kotlin des libellés courts et collections imbriquées portent le plan pgTAP détail à 211
-assertions ; leur exécution attend
-la CI Supabase de la PR empilée, le Docker Kwabor local restant arrêté. Les vérificateurs dépôt,
-onboarding Store-only et marque sont verts. Trois revues indépendantes ont été traitées sans
-P0/P1/P2 résiduel. La PR brouillon `#46` est publiée au-dessus de `#45` ; sa CI exact-head reste à
-terminer avant revue humaine.
+assertions. Le run exact-head `30775732082` valide Gradle, Android API 30/31/36, iOS, les 641
+assertions PostgreSQL standard et les 12 assertions concurrentes sur la stack isolée ; le Docker
+Kwabor local reste arrêté. Les vérificateurs dépôt, onboarding Store-only et marque sont verts.
+Trois revues indépendantes ont été traitées sans P0/P1/P2 résiduel. La PR brouillon `#46` est
+publiée au-dessus de `#45` et attend sa revue humaine.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
 
