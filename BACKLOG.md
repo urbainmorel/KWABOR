@@ -149,7 +149,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] PR-DETAIL-001B — PR brouillon `#46` publiée au-dessus de `#45` ; le run exact-head
     `30775732082` valide Gradle, Android API 30/31/36, iOS, les 641 tests SQL standard et les
     12 tests concurrents. Obtenir la revue humaine.
-  - [ ] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
+  - [x] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
+  - [ ] PR-DETAIL-IOS-001 — PR brouillon `#47` publiée au-dessus de `#46` ; le run exact-head
+    `30780564021` valide Gradle, Supabase, Android API 30/31/36, les tests Swift, le runtime iOS,
+    les XCFrameworks et les configurations Xcode simulateur Debug/Staging/Release. Obtenir la revue
+    humaine et la preuve VoiceOver sur appareil.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
 - [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide et claim.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.

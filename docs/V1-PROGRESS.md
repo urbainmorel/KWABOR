@@ -6,18 +6,18 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 
 | Élément | État |
 | --- | --- |
-| Date du snapshot | 2 août 2026 |
+| Date du snapshot | 3 août 2026 |
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/detail-001b-android-sheet`, empilée sur `codex/detail-001a-read-model` (`#45`) |
+| Branche active | `codex/detail-ios-001-swiftui`, empilée sur `codex/detail-001b-android-sheet` (`#46`) |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android dans la PR brouillon `#46`, run exact-head `30775732082` entièrement vert |
+| Détail catalogue | DETAIL-001A dans `#45`, DETAIL-001B Android dans `#46` et DETAIL-IOS-001 SwiftUI dans `#47` ; run exact-head `30780564021` entièrement vert |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -72,7 +72,7 @@ chemin runtime `service_role`, les dépendances PostGIS et les fixtures actives 
 exercés avec des ACL runtime limitées aux validateurs ciblés, sans reprendre les droits
 supplémentaires du harnais local. La PR brouillon `#45` est publiée sur `#44` et attend sa revue
 humaine. DETAIL-001 demeure ouvert : le sous-lot A ne livrait lui-même aucune surface, mais
-DETAIL-001B fournit désormais le DetailSheet Android ; l'écran détail SwiftUI et les actions réelles
+DETAIL-001B fournit le DetailSheet Android et DETAIL-IOS-001 sa parité SwiftUI ; les actions réelles
 restent à livrer.
 
 ### DETAIL-001B — DetailSheet Android connecté
@@ -93,6 +93,24 @@ assertions PostgreSQL standard et les 12 assertions concurrentes sur la stack is
 Kwabor local reste arrêté. Les vérificateurs dépôt, onboarding Store-only et marque sont verts.
 Trois revues indépendantes ont été traitées sans P0/P1/P2 résiduel. La PR brouillon `#46` est
 publiée au-dessus de `#45` et attend sa revue humaine.
+
+### DETAIL-IOS-001 — DetailSheet SwiftUI natif
+
+Objectifs :
+
+- ouvrir depuis Explore une sheet globale et adaptative, avec parité fonctionnelle Android ;
+- rendre les six variantes, les médias officiels, les champs typés et tous les états réseau ;
+- borner le pipeline image et couvrir Dynamic Type, VoiceOver et les tailles d'écran ;
+- ne montrer aucune action qui ne fonctionne pas réellement.
+
+État : la fiche SwiftUI native est livrée avec galerie, description extensible, prix XOF, horaires,
+services, localisation et statuts temporels. La porte locale passe `check`, Spotless, Detekt, lint,
+pureté du domaine, schémas Room et compilations Kotlin/Native iOS et Android, avec 330 tests shared
+et 156 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2. La PR
+brouillon `#47` est publiée au-dessus de `#46` ; son run exact-head `30780564021` valide la qualité
+Gradle/Supabase, Android API 30/31/36, les tests Swift, le runtime iOS, les XCFrameworks et les builds
+Xcode simulateur Debug/Staging/Release. La preuve VoiceOver sur appareil physique reste requise ; le
+thème sombre complet appartient à SETTINGS-001 et les actions/carte/avis restent hors de ce lot.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
 
@@ -171,11 +189,11 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir la revue humaine de DETAIL-001A `#45`, valider DETAIL-001B `#46` au-dessus puis faire relire la pile dans l'ordre.
+3. Obtenir les revues humaines de DETAIL-001A `#45`, DETAIL-001B `#46` et DETAIL-IOS-001 `#47`, puis faire relire la pile dans l'ordre.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.
-7. Livrer DETAIL-IOS-001 et ACTIONS-001 sans réintroduire de CTA factice.
+7. Livrer ACTIONS-001 sans réintroduire de CTA factice ; conserver DETAIL-001 ouvert jusqu'aux actions réelles.
 8. Reprendre EXPLORE-002B2 après validation des règles de classement et de sponsoring.
 
 ## Décisions techniques actées pendant la reprise
