@@ -1,4 +1,6 @@
-set lock_timeout = '5s';
+begin;
+
+set local lock_timeout = '5s';
 
 create table public.guide_languages (
   id text primary key,
@@ -144,7 +146,7 @@ begin
         hint = 'Reduce every guide language, zone and specialty array to at most twenty values before retrying.';
   end if;
 
-  select legacy.listing_id, legacy.value
+  select detail.listing_id, legacy.value
   into invalid_record
   from public.guide_details detail
   cross join lateral unnest(detail.languages) with ordinality as legacy(value, display_ordinal)
@@ -157,7 +159,7 @@ begin
         or lower(language.label) = lower(btrim(legacy.value))
       )
   ) <> 1
-  order by legacy.listing_id, legacy.display_ordinal
+  order by detail.listing_id, legacy.display_ordinal
   limit 1;
 
   if found then
@@ -196,7 +198,7 @@ begin
         hint = 'Deduplicate guide_details.languages before retrying.';
   end if;
 
-  select legacy.listing_id, legacy.value
+  select detail.listing_id, legacy.value
   into invalid_record
   from public.guide_details detail
   cross join lateral unnest(detail.specialties) with ordinality as legacy(value, display_ordinal)
@@ -209,7 +211,7 @@ begin
         or lower(specialty.label) = lower(btrim(legacy.value))
       )
   ) <> 1
-  order by legacy.listing_id, legacy.display_ordinal
+  order by detail.listing_id, legacy.display_ordinal
   limit 1;
 
   if found then
@@ -248,7 +250,7 @@ begin
         hint = 'Deduplicate guide_details.specialties before retrying.';
   end if;
 
-  select legacy.listing_id, legacy.value
+  select detail.listing_id, legacy.value
   into invalid_record
   from public.guide_details detail
   cross join lateral unnest(detail.zones) with ordinality as legacy(value, display_ordinal)
@@ -262,7 +264,7 @@ begin
         or lower(city.name) = lower(btrim(legacy.value))
       )
   ) <> 1
-  order by legacy.listing_id, legacy.display_ordinal
+  order by detail.listing_id, legacy.display_ordinal
   limit 1;
 
   if found then
@@ -431,7 +433,7 @@ begin
         hint = 'Add one active canonical guide_languages row or correct guide_details.languages before retrying.';
   end if;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(language.id order by legacy.display_ordinal),
     '{}'::text[]
   )
@@ -488,7 +490,7 @@ begin
         hint = 'Enable exactly one matching city or correct guide_details.zones before retrying.';
   end if;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(city.id order by legacy.display_ordinal),
     '{}'::text[]
   )
@@ -545,7 +547,7 @@ begin
         hint = 'Add one active canonical guide_specialties row or correct guide_details.specialties before retrying.';
   end if;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(specialty.id order by legacy.display_ordinal),
     '{}'::text[]
   )
@@ -682,7 +684,7 @@ begin
     )
   into invalid_mapping;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(city.id order by legacy.display_ordinal, city.id),
     '{}'::text[]
   )
@@ -697,7 +699,7 @@ begin
       or pg_catalog.lower(city.name) = pg_catalog.lower(pg_catalog.btrim(legacy.value))
     );
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(language.id order by legacy.display_ordinal, language.id),
     '{}'::text[]
   )
@@ -711,7 +713,7 @@ begin
       or pg_catalog.lower(language.label) = pg_catalog.lower(pg_catalog.btrim(legacy.value))
     );
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(specialty.id order by legacy.display_ordinal, specialty.id),
     '{}'::text[]
   )
@@ -725,7 +727,7 @@ begin
       or pg_catalog.lower(specialty.label) = pg_catalog.lower(pg_catalog.btrim(legacy.value))
     );
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(link.city_id order by link.display_order),
     '{}'::text[]
   )
@@ -733,7 +735,7 @@ begin
   from public.guide_service_cities link
   where link.listing_id = target_listing_id;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(link.language_id order by link.display_order),
     '{}'::text[]
   )
@@ -741,7 +743,7 @@ begin
   from public.guide_service_languages link
   where link.listing_id = target_listing_id;
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.array_agg(link.specialty_id order by link.display_order),
     '{}'::text[]
   )
@@ -1557,4 +1559,4 @@ to anon, authenticated;
 grant execute on function public.list_guide_services_v1(text, text, text, text, integer)
 to anon, authenticated;
 
-reset lock_timeout;
+commit;

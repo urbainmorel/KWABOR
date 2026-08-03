@@ -183,9 +183,9 @@ $$;
 
 select plan(77);
 
-select results_eq(
-  $$
-    select table_name::text
+select is(
+  (
+    select array_agg(table_name::text order by table_name)
     from information_schema.tables
     where table_schema = 'public'
       and table_name in (
@@ -195,16 +195,14 @@ select results_eq(
         'guide_service_languages',
         'guide_service_specialties'
       )
-    order by table_name
-  $$,
-  $$
-    values
-      ('guide_languages'),
-      ('guide_service_cities'),
-      ('guide_service_languages'),
-      ('guide_service_specialties'),
-      ('guide_specialties')
-  $$,
+  ),
+  array[
+    'guide_languages',
+    'guide_service_cities',
+    'guide_service_languages',
+    'guide_service_specialties',
+    'guide_specialties'
+  ]::text[],
   'guide discovery creates only the five normalized public tables'
 );
 
@@ -723,8 +721,8 @@ update public.listings
 set
   status = 'publie',
   published_at = case id
-    when 'b1000000-0000-4000-8000-000000000102'::uuid then '2026-08-01 08:00:00+00'
-    else '2026-08-03 08:00:00+00'
+    when 'b1000000-0000-4000-8000-000000000102'::uuid then '2026-08-01 08:00:00+00'::timestamptz
+    else '2026-08-03 08:00:00+00'::timestamptz
   end
 where id in (
   'b1000000-0000-4000-8000-000000000101',
