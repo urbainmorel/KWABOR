@@ -4,6 +4,7 @@ import SwiftUI
 struct ExploreCard: View {
     let listing: ExploreListingItem
     let strings: KwaborStrings
+    let onOpen: () -> Void
     let onLike: () -> Void
     let onFavorite: () -> Void
 
@@ -13,24 +14,48 @@ struct ExploreCard: View {
 
     var body: some View {
         ZStack {
-            ExploreRemoteImage(rawURL: listing.coverImageUrl)
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    KwaborDesignTokens.ColorToken.ink950.opacity(KwaborDesignTokens.Alpha.scrimLow),
-                    KwaborDesignTokens.ColorToken.ink950.opacity(KwaborDesignTokens.Alpha.scrimHigh),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.sm) {
-                HStack(alignment: .top, spacing: KwaborDesignTokens.Spacing.sm) {
-                    if listing.sponsored {
-                        SponsoredBadge(label: strings.sponsored)
-                    } else if let rating = listing.ratingLabel {
-                        ExploreRatingBadge(rating: rating)
+            Button(action: onOpen) {
+                ZStack {
+                    ExploreRemoteImage(rawURL: listing.coverImageUrl)
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            KwaborDesignTokens.ColorToken.ink950.opacity(
+                                KwaborDesignTokens.Alpha.scrimLow
+                            ),
+                            KwaborDesignTokens.ColorToken.ink950.opacity(
+                                KwaborDesignTokens.Alpha.scrimHigh
+                            ),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.sm) {
+                        HStack(alignment: .top, spacing: KwaborDesignTokens.Spacing.sm) {
+                            if listing.sponsored {
+                                SponsoredBadge(label: strings.sponsored)
+                            } else if let rating = listing.ratingLabel {
+                                ExploreRatingBadge(rating: rating)
+                            }
+                            Spacer(minLength: KwaborDesignTokens.Sizing.touchTarget)
+                        }
+                        Spacer(minLength: KwaborDesignTokens.Spacing.sm)
+                        ExploreCardInformation(
+                            listing: listing,
+                            priceLabel: priceLabel
+                        )
                     }
-                    Spacer(minLength: 0)
+                    .padding(KwaborDesignTokens.Spacing.md)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(accessibilitySummary)
+            .accessibilitySortPriority(3)
+
+            VStack {
+                HStack {
+                    Spacer()
                     VStack(spacing: KwaborDesignTokens.Spacing.sm) {
                         ExploreCardActionButton(
                             label: strings.like,
@@ -50,12 +75,7 @@ struct ExploreCard: View {
                         )
                     }
                 }
-                Spacer(minLength: KwaborDesignTokens.Spacing.sm)
-                ExploreCardInformation(
-                    listing: listing,
-                    strings: strings,
-                    priceLabel: priceLabel
-                )
+                Spacer()
             }
             .padding(KwaborDesignTokens.Spacing.md)
         }
@@ -63,11 +83,22 @@ struct ExploreCard: View {
         .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
         .accessibilityElement(children: .contain)
     }
+
+    private var accessibilitySummary: String {
+        var parts = [listing.title, listing.cityLabel]
+        if listing.sponsored {
+            parts.append(strings.sponsored)
+        }
+        if !listing.sponsored, let rating = listing.ratingLabel {
+            parts.append("\(strings.rating) \(rating)")
+        }
+        parts.append(priceLabel)
+        return parts.joined(separator: ". ")
+    }
 }
 
 private struct ExploreCardInformation: View {
     let listing: ExploreListingItem
-    let strings: KwaborStrings
     let priceLabel: String
 
     var body: some View {
@@ -88,21 +119,7 @@ private struct ExploreCardInformation: View {
                 .background(KwaborDesignTokens.ColorToken.ink100)
                 .clipShape(Capsule())
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySummary)
-        .accessibilitySortPriority(3)
-    }
-
-    private var accessibilitySummary: String {
-        var parts = [listing.title, listing.cityLabel]
-        if listing.sponsored {
-            parts.append(strings.sponsored)
-        }
-        if !listing.sponsored, let rating = listing.ratingLabel {
-            parts.append("\(strings.rating) \(rating)")
-        }
-        parts.append(priceLabel)
-        return parts.joined(separator: ". ")
+        .accessibilityHidden(true)
     }
 }
 

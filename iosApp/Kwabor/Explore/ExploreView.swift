@@ -4,6 +4,7 @@ import UIKit
 
 struct ExploreView: View {
     @ObservedObject var store: ExploreStore
+    let onListingOpen: (String) -> Void
     let onAuthenticationRequired: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -14,7 +15,8 @@ struct ExploreView: View {
             GeometryReader { proxy in
                 ExploreScrollContent(
                     store: store,
-                    columns: gridColumns(availableWidth: proxy.size.width)
+                    columns: gridColumns(availableWidth: proxy.size.width),
+                    onListingOpen: onListingOpen
                 )
             }
         }
@@ -67,6 +69,7 @@ struct ExploreView: View {
 private struct ExploreScrollContent: View {
     @ObservedObject var store: ExploreStore
     let columns: [GridItem]
+    let onListingOpen: (String) -> Void
 
     var body: some View {
         ScrollView {
@@ -82,7 +85,11 @@ private struct ExploreScrollContent: View {
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .combine)
                 }
-                ExploreFeedContent(store: store, columns: columns)
+                ExploreFeedContent(
+                    store: store,
+                    columns: columns,
+                    onListingOpen: onListingOpen
+                )
                 ExploreAppendFooter(store: store)
             }
             .padding(.horizontal, KwaborDesignTokens.Spacing.lg)
@@ -207,6 +214,7 @@ private struct ExploreSelectionPill: View {
 private struct ExploreFeedContent: View {
     @ObservedObject var store: ExploreStore
     let columns: [GridItem]
+    let onListingOpen: (String) -> Void
 
     var body: some View {
         if !store.isConfigured {
@@ -244,6 +252,7 @@ private struct ExploreFeedContent: View {
                     ExploreCard(
                         listing: listing,
                         strings: store.strings,
+                        onOpen: { onListingOpen(listing.id) },
                         onLike: { store.toggleLike(listing.id) },
                         onFavorite: { store.toggleFavorite(listing.id) }
                     )

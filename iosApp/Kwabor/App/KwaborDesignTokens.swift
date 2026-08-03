@@ -35,6 +35,10 @@ enum KwaborDesignTokens {
         static let touchTarget: CGFloat = 44
         static let minimumAccessibleTouchTarget: CGFloat = 48
         static let exploreTabletBreakpoint: CGFloat = 600
+        static let detailGalleryThumbnail: CGFloat = 72
+        static let detailStateMinimumHeight: CGFloat = 240
+        static let detailAccessibilityHeroMinimumHeight: CGFloat = 420
+        static let hairline: CGFloat = 2
     }
 
     enum Alpha {

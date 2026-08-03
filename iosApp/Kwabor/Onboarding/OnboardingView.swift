@@ -4,6 +4,7 @@ import SwiftUI
 struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
     let exploreStore: ExploreStore
+    let catalogDetailStore: CatalogDetailStore
 
     var body: some View {
         Group {
@@ -20,6 +21,7 @@ struct OnboardingView: View {
                 ContentView(
                     bridge: coordinator.bridge,
                     exploreStore: exploreStore,
+                    catalogDetailStore: catalogDetailStore,
                     isGuestSession: coordinator.isGuestSession,
                     strings: coordinator.strings,
                     accountSecurityController: coordinator.authController,

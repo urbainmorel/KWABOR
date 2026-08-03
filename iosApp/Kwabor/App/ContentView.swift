@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    @ObservedObject var catalogDetailStore: CatalogDetailStore
     let isGuestSession: Bool
     let strings: OnboardingStrings
     let accountSecurityController: IosAuthController?
@@ -23,6 +24,7 @@ struct ContentView: View {
     init(
         bridge: KwaborSharedBridge,
         exploreStore: ExploreStore,
+        catalogDetailStore: CatalogDetailStore,
         isGuestSession: Bool = false,
         strings: OnboardingStrings? = nil,
         accountSecurityController: IosAuthController? = nil,
@@ -40,6 +42,7 @@ struct ContentView: View {
     ) {
         self.bridge = bridge
         self.exploreStore = exploreStore
+        self.catalogDetailStore = catalogDetailStore
         self.isGuestSession = isGuestSession
         self.strings = strings ?? bridge.onboardingStrings()
         self.accountSecurityController = accountSecurityController
@@ -57,41 +60,69 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: destinationBinding) {
-            ForEach(RootDestination.allCases) { destination in
-                NavigationStack {
-                    RootDestinationContent(
-                        destination: destination,
-                        bridge: bridge,
-                        exploreStore: exploreStore,
-                        strings: strings,
-                        accountSecurityController: accountSecurityController,
-                        federatedIdentityHintStore: federatedIdentityHintStore,
-                        latestAccountSecurityError: latestAccountSecurityError,
-                        isSigningOutAccount: isSigningOutAccount,
-                        accountSignOutErrorMessage: accountSignOutErrorMessage,
-                        onProtectedDestinationSelected: onProtectedDestinationSelected,
-                        onSignOut: onSignOut,
-                        onDismissSignOutError: onDismissSignOutError,
-                        onAccountDeletionStateChanged: onAccountDeletionStateChanged,
-                        onAccountDeleted: onAccountDeleted
-                    )
+        GeometryReader { proxy in
+            TabView(selection: destinationBinding) {
+                ForEach(RootDestination.allCases) { destination in
+                    NavigationStack {
+                        RootDestinationContent(
+                            destination: destination,
+                            bridge: bridge,
+                            exploreStore: exploreStore,
+                            strings: strings,
+                            accountSecurityController: accountSecurityController,
+                            federatedIdentityHintStore: federatedIdentityHintStore,
+                            latestAccountSecurityError: latestAccountSecurityError,
+                            isSigningOutAccount: isSigningOutAccount,
+                            accountSignOutErrorMessage: accountSignOutErrorMessage,
+                            onProtectedDestinationSelected: onProtectedDestinationSelected,
+                            onListingOpen: catalogDetailStore.open,
+                            onSignOut: onSignOut,
+                            onDismissSignOutError: onDismissSignOutError,
+                            onAccountDeletionStateChanged: onAccountDeletionStateChanged,
+                            onAccountDeleted: onAccountDeleted
+                        )
+                    }
+                    .tabItem {
+                        Label(destination.label(using: bridge), systemImage: destination.systemImage)
+                    }
+                    .tag(destination)
                 }
-                .tabItem {
-                    Label(destination.label(using: bridge), systemImage: destination.systemImage)
-                }
-                .tag(destination)
             }
-        }
-        .onAppear(perform: applyPendingRootDeepLink)
-        .onChange(of: rootDeepLinkDestinationKey) { _, _ in applyPendingRootDeepLink() }
-        .onChange(of: isGuestSession) { _, isGuest in
-            if isGuest {
-                selectedDestination = .home
-            } else {
+            .sheet(isPresented: catalogDetailPresentationBinding) {
+                CatalogDetailSheet(store: catalogDetailStore)
+                    .presentationDetents([
+                        .fraction(
+                            CatalogDetailLayoutPolicy.sheetHeightFraction(
+                                forWidth: proxy.size.width
+                            )
+                        ),
+                    ])
+                    .presentationContentInteraction(.scrolls)
+            }
+            .onAppear(perform: applyPendingRootDeepLink)
+            .onChange(of: rootDeepLinkDestinationKey) { _, _ in
                 applyPendingRootDeepLink()
             }
+            .onChange(of: isGuestSession) { _, isGuest in
+                if isGuest {
+                    selectedDestination = .home
+                } else {
+                    applyPendingRootDeepLink()
+                }
+            }
+            .onDisappear(perform: catalogDetailStore.dismiss)
         }
+    }
+
+    private var catalogDetailPresentationBinding: Binding<Bool> {
+        Binding(
+            get: { catalogDetailStore.isPresented },
+            set: { isPresented in
+                if !isPresented {
+                    catalogDetailStore.dismiss()
+                }
+            }
+        )
     }
 
     private var destinationBinding: Binding<RootDestination> {
@@ -137,6 +168,7 @@ private struct RootDestinationContent: View {
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let onProtectedDestinationSelected: () -> Void
+    let onListingOpen: (String) -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
     let onAccountDeletionStateChanged: (Bool) -> Void
@@ -147,6 +179,7 @@ private struct RootDestinationContent: View {
             if destination == .home {
                 ExploreView(
                     store: exploreStore,
+                    onListingOpen: onListingOpen,
                     onAuthenticationRequired: onProtectedDestinationSelected
                 )
                 .toolbar(.hidden, for: .navigationBar)

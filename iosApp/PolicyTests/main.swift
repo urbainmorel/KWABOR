@@ -429,3 +429,229 @@ expect(
     ExploreRemoteImageURLPolicy.acceptedURL("https://cdn.kwabor.example/card.jpg#fragment") == nil,
     "An image URL fragment must be rejected."
 )
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://cdn.kwabor.example:443/card.jpg") != nil,
+    "The canonical HTTPS port must be accepted."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://cdn.kwabor.example:444/card.jpg") == nil,
+    "A non-HTTPS port must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://localhost/card.jpg") == nil,
+    "Localhost must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://assets.internal/card.jpg") == nil,
+    "Internal DNS suffixes must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://127.0.0.1/card.jpg") == nil,
+    "Private and loopback IPv4-shaped hosts must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://CDN.kwabor.example/card.jpg") == nil,
+    "Non-canonical uppercase hosts must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL("https://-cdn.kwabor.example/card.jpg") == nil,
+    "DNS labels with an invalid leading character must be rejected."
+)
+expect(
+    ExploreRemoteImageURLPolicy.acceptedURL(
+        "https://cdn.kwabor.example/" + String(repeating: "a", count: 2_100)
+    ) == nil,
+    "Oversized image URLs must be rejected before parsing."
+)
+
+private func approximatelyEqual(
+    _ first: CGFloat,
+    _ second: CGFloat,
+    tolerance: CGFloat = 0.000_001
+) -> Bool {
+    abs(first - second) <= tolerance
+}
+
+expect(
+    CatalogDetailLayoutPolicy.sheetHeightFraction(forWidth: 0) == 0.92,
+    "A zero-width transient layout must keep the mobile detail detent."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetHeightFraction(forWidth: 599.999) == 0.92,
+    "A detail sheet below the tablet breakpoint must use the 92 percent detent."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetHeightFraction(forWidth: 600) == 0.85,
+    "The 600-point breakpoint must switch to the tablet detail detent."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetHeightFraction(forWidth: 1_024) == 0.85,
+    "A tablet detail sheet must use the 85 percent detent."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetHeightFraction(forWidth: .nan) == 0.92,
+    "An invalid measured width must fail safely to the mobile detail detent."
+)
+
+expect(
+    CatalogDetailLayoutPolicy.heroHeight(forSheetHeight: 500) == 320,
+    "A short detail sheet must retain the 320-point hero minimum."
+)
+expect(
+    approximatelyEqual(
+        CatalogDetailLayoutPolicy.heroHeight(forSheetHeight: 800),
+        464
+    ),
+    "A regular detail hero must occupy 58 percent of the sheet height."
+)
+expect(
+    CatalogDetailLayoutPolicy.heroHeight(forSheetHeight: 0) == 320,
+    "A transient zero-height sheet must retain the hero minimum."
+)
+expect(
+    CatalogDetailLayoutPolicy.heroHeight(forSheetHeight: .infinity) == 320,
+    "A non-finite sheet height must fail safely to the hero minimum."
+)
+
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: 390) == 390,
+    "A phone detail sheet must preserve its available width."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: 640) == 640,
+    "The detail sheet maximum width must remain usable exactly at its boundary."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: 1_024) == 640,
+    "A tablet detail sheet must be capped at 640 points."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: -1) == 0,
+    "A negative transient width must be clamped to zero."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: .infinity) == 640,
+    "An unbounded width must still respect the detail maximum."
+)
+expect(
+    CatalogDetailLayoutPolicy.sheetWidth(availableWidth: .nan) == 0,
+    "An invalid measured width must fail safely to zero."
+)
+expect(
+    CatalogDetailLayoutPolicy.maximumContentWidth == 640,
+    "The detail content width exposed to SwiftUI must be capped at 640 points."
+)
+
+private let shortDescription = "Une description courte."
+expect(
+    !CatalogDetailDescriptionPolicy.needsExpansion(shortDescription),
+    "A short detail description must not offer expansion."
+)
+expect(
+    CatalogDetailDescriptionPolicy.preview(shortDescription) == shortDescription,
+    "A short detail description must remain unchanged."
+)
+
+private let exactLimitDescription = String(repeating: "a", count: 150)
+expect(
+    !CatalogDetailDescriptionPolicy.needsExpansion(exactLimitDescription),
+    "A description exactly at the preview limit must not offer expansion."
+)
+expect(
+    CatalogDetailDescriptionPolicy.preview(exactLimitDescription) == exactLimitDescription,
+    "A description exactly at the preview limit must remain unchanged."
+)
+
+private let unbrokenDescription = String(repeating: "a", count: 151)
+expect(
+    CatalogDetailDescriptionPolicy.needsExpansion(unbrokenDescription),
+    "A description above the preview limit must offer expansion."
+)
+expect(
+    CatalogDetailDescriptionPolicy.preview(unbrokenDescription) ==
+        String(repeating: "a", count: 150) + "…",
+    "A long unbroken description must fall back to a safe 150-character preview."
+)
+
+private let wordBoundaryDescription =
+    String(repeating: "a", count: 125) + " " + String(repeating: "b", count: 40)
+expect(
+    CatalogDetailDescriptionPolicy.preview(wordBoundaryDescription) ==
+        String(repeating: "a", count: 125) + "…",
+    "A preview must use the last word boundary between 120 and 150 characters."
+)
+
+private let minimumBoundaryDescription =
+    String(repeating: "a", count: 120) + "\n" + String(repeating: "b", count: 40)
+expect(
+    CatalogDetailDescriptionPolicy.preview(minimumBoundaryDescription) ==
+        String(repeating: "a", count: 120) + "…",
+    "A whitespace boundary exactly at 120 characters must be accepted."
+)
+
+private let tooEarlyBoundaryDescription =
+    String(repeating: "a", count: 119) + " " + String(repeating: "b", count: 40)
+private let tooEarlyBoundaryPreview = CatalogDetailDescriptionPolicy.preview(
+    tooEarlyBoundaryDescription
+)
+expect(
+    tooEarlyBoundaryPreview.dropLast().count == 150,
+    "A word boundary before 120 characters must not shorten the preview."
+)
+expect(
+    tooEarlyBoundaryPreview.hasSuffix("…"),
+    "Every collapsed long description must end with an ellipsis."
+)
+
+private let familyEmoji = "👨‍👩‍👧‍👦"
+private let emojiDescription = String(repeating: familyEmoji, count: 151)
+private let emojiPreview = CatalogDetailDescriptionPolicy.preview(emojiDescription)
+expect(
+    emojiPreview.dropLast().count == 150,
+    "Unicode grapheme clusters must not be split by detail truncation."
+)
+expect(
+    emojiPreview.dropLast().allSatisfy { String($0) == familyEmoji },
+    "A composed family emoji must remain byte-logically intact in the preview."
+)
+expect(
+    emojiPreview.hasSuffix("…"),
+    "A Unicode detail preview must end with one ellipsis."
+)
+
+private let combiningGrapheme = "e\u{301}"
+private let combiningDescription = String(repeating: combiningGrapheme, count: 151)
+private let combiningPreview = CatalogDetailDescriptionPolicy.preview(combiningDescription)
+expect(
+    combiningPreview.dropLast().count == 150,
+    "A combining-mark grapheme must count as one visible preview character."
+)
+expect(
+    combiningPreview.dropLast().allSatisfy { String($0) == combiningGrapheme },
+    "Combining marks must remain attached to their base character."
+)
+
+expect(
+    CatalogDetailLabelPolicy.pluralizedLabel(
+        count: 0,
+        singular: "avis",
+        plural: "avis"
+    ) == "avis",
+    "Zero must use the supplied French plural label."
+)
+expect(
+    CatalogDetailLabelPolicy.pluralizedLabel(
+        count: 1,
+        singular: "vue",
+        plural: "vues"
+    ) == "vue",
+    "Exactly one item must use the singular label."
+)
+expect(
+    CatalogDetailLabelPolicy.pluralizedLabel(
+        count: 2,
+        singular: "like",
+        plural: "likes"
+    ) == "likes",
+    "Counts other than one must use the plural label."
+)

@@ -8,6 +8,7 @@ struct KwaborApp: App {
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
+    @StateObject private var catalogDetailStore: CatalogDetailStore
 
     @MainActor
     init() {
@@ -26,6 +27,9 @@ struct KwaborApp: App {
         _exploreStore = StateObject(
             wrappedValue: ExploreStore(controller: compositionRoot.exploreController)
         )
+        _catalogDetailStore = StateObject(
+            wrappedValue: CatalogDetailStore(controller: compositionRoot.catalogDetailController)
+        )
         _coordinator = StateObject(
             wrappedValue: OnboardingCoordinator(
                 bridge: compositionRoot.bridge,
@@ -39,7 +43,11 @@ struct KwaborApp: App {
 
     var body: some Scene {
         WindowGroup {
-            OnboardingView(coordinator: coordinator, exploreStore: exploreStore)
+            OnboardingView(
+                coordinator: coordinator,
+                exploreStore: exploreStore,
+                catalogDetailStore: catalogDetailStore
+            )
                 .onOpenURL { url in
                     if !GIDSignIn.sharedInstance.handle(url) {
                         _ = coordinator.handleIncomingUrl(url)

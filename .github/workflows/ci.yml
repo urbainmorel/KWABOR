@@ -186,13 +186,14 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
-      - name: Test pure Swift auth policies
+      - name: Test pure Swift policies
         run: |
           xcrun swiftc \
             iosApp/Kwabor/Onboarding/PromoterActivationSessionMarker.swift \
             iosApp/Kwabor/Onboarding/IntroVideoPresentationStore.swift \
             iosApp/Kwabor/Onboarding/LegacyRemoteIntroCleaner.swift \
             iosApp/Kwabor/Explore/ExplorePolicies.swift \
+            iosApp/Kwabor/Detail/CatalogDetailPolicies.swift \
             iosApp/PolicyTests/main.swift \
             -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
           "$RUNNER_TEMP/kwabor-ios-policy-tests"

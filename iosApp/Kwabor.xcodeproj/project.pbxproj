@@ -48,6 +48,12 @@
 		1A000001000000000000009A /* ExploreCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009B /* ExploreCard.swift */; };
 		1A000001000000000000009C /* ExploreCitySelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009D /* ExploreCitySelector.swift */; };
 		1A000001000000000000009E /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009F /* ExploreView.swift */; };
+		1A00000100000000000000A3 /* CatalogDetailPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A2 /* CatalogDetailPolicies.swift */; };
+		1A00000100000000000000A5 /* CatalogDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A4 /* CatalogDetailStore.swift */; };
+		1A00000100000000000000A7 /* CatalogDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A6 /* CatalogDetailSheet.swift */; };
+		1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A8 /* CatalogDetailMedia.swift */; };
+		1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AA /* CatalogDetailSections.swift */; };
+		1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AC /* CatalogDetailTypedContent.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -93,6 +99,12 @@
 		1A000001000000000000009B /* ExploreCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreCard.swift; sourceTree = "<group>"; };
 		1A000001000000000000009D /* ExploreCitySelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreCitySelector.swift; sourceTree = "<group>"; };
 		1A000001000000000000009F /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A2 /* CatalogDetailPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailPolicies.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A4 /* CatalogDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A6 /* CatalogDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSheet.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A8 /* CatalogDetailMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailMedia.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AA /* CatalogDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSections.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AC /* CatalogDetailTypedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailTypedContent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +140,7 @@
 			children = (
 				1A0000010000000000000015 /* App */,
 				1A0000010000000000000035 /* Config */,
+				1A00000100000000000000A1 /* Detail */,
 				1A00000100000000000000A0 /* Explore */,
 				1A000001000000000000006C /* Onboarding */,
 				1A0000010000000000000046 /* Observability */,
@@ -240,6 +253,19 @@
 				1A000001000000000000009F /* ExploreView.swift */,
 			);
 			path = Explore;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000A1 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000A2 /* CatalogDetailPolicies.swift */,
+				1A00000100000000000000A4 /* CatalogDetailStore.swift */,
+				1A00000100000000000000A6 /* CatalogDetailSheet.swift */,
+				1A00000100000000000000A8 /* CatalogDetailMedia.swift */,
+				1A00000100000000000000AA /* CatalogDetailSections.swift */,
+				1A00000100000000000000AC /* CatalogDetailTypedContent.swift */,
+			);
+			path = Detail;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -408,6 +434,12 @@
 				1A000001000000000000009A /* ExploreCard.swift in Sources */,
 				1A000001000000000000009C /* ExploreCitySelector.swift in Sources */,
 				1A000001000000000000009E /* ExploreView.swift in Sources */,
+				1A00000100000000000000A3 /* CatalogDetailPolicies.swift in Sources */,
+				1A00000100000000000000A5 /* CatalogDetailStore.swift in Sources */,
+				1A00000100000000000000A7 /* CatalogDetailSheet.swift in Sources */,
+				1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */,
+				1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */,
+				1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

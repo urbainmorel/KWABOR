@@ -14,6 +14,7 @@ actor ExploreImagePipeline {
 
     private let imageCache = NSCache<NSString, UIImage>()
     private let session: URLSession
+    private let sessionDelegate: ExploreImageSessionDelegate
     private let downloadLimiter = ExploreImageDownloadLimiter(maxConcurrent: maximumConcurrentImageDownloads)
     private var inFlightRequests: [String: InFlightRequest] = [:]
 
@@ -28,7 +29,13 @@ actor ExploreImagePipeline {
         configuration.timeoutIntervalForRequest = imageRequestTimeoutSeconds
         configuration.timeoutIntervalForResource = imageResourceTimeoutSeconds
         configuration.httpMaximumConnectionsPerHost = maximumConcurrentImageDownloads
-        session = URLSession(configuration: configuration)
+        let sessionDelegate = ExploreImageSessionDelegate()
+        self.sessionDelegate = sessionDelegate
+        session = URLSession(
+            configuration: configuration,
+            delegate: sessionDelegate,
+            delegateQueue: nil
+        )
         imageCache.countLimit = imageMemoryCacheCount
         imageCache.totalCostLimit = imageMemoryCacheCostBytes
     }
@@ -142,6 +149,7 @@ actor ExploreImagePipeline {
             }
             guard let response = response as? HTTPURLResponse,
                   (200..<300).contains(response.statusCode),
+                  ExploreRemoteImageURLPolicy.acceptedURL(response.url?.absoluteString) != nil,
                   response.mimeType?.lowercased().hasPrefix(imageMimePrefix) == true else {
                 return nil
             }
@@ -185,6 +193,22 @@ actor ExploreImagePipeline {
             }
             return UIImage(cgImage: thumbnail)
         }
+    }
+}
+
+private final class ExploreImageSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard ExploreRemoteImageURLPolicy.acceptedURL(request.url?.absoluteString) != nil else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
     }
 }
 
@@ -247,10 +271,16 @@ private actor ExploreImageDownloadLimiter {
 
 struct ExploreRemoteImage: View {
     let rawURL: String?
+    let accessibilityLabel: String?
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
+
+    init(rawURL: String?, accessibilityLabel: String? = nil) {
+        self.rawURL = rawURL
+        self.accessibilityLabel = accessibilityLabel
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -281,7 +311,8 @@ struct ExploreRemoteImage: View {
                 )
             }
         }
-        .accessibilityHidden(true)
+        .accessibilityLabel(accessibilityLabel ?? "")
+        .accessibilityHidden(accessibilityLabel == nil)
     }
 
     private func requestKey(size: CGSize) -> ExploreImageRequestKey? {
