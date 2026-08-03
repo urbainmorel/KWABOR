@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Verify Kwabor configuration templates, ignored secrets and Gradle wrapper."""
+"""Verify critical Kwabor repository configuration and release invariants."""
 
 from __future__ import annotations
 
 import hashlib
+import plistlib
 import re
 import subprocess
 import sys
@@ -13,6 +14,12 @@ from pathlib import Path, PurePosixPath
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 TIERS = ("DEVELOPMENT", "STAGING", "PRODUCTION")
+IOS_PRIVACY_MANIFEST_PATH = "iosApp/Kwabor/Resources/PrivacyInfo.xcprivacy"
+IOS_USER_DEFAULTS_API_TYPE = "NSPrivacyAccessedAPICategoryUserDefaults"
+
+# Audited against Apple's approved reasons for required-reason APIs.
+# https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons
+IOS_USER_DEFAULTS_REASON = "CA92.1"
 
 # Audited against https://gradle.org/release-checksums/.
 GRADLE_DISTRIBUTION_URL = (
@@ -353,18 +360,56 @@ def verify_git_hygiene() -> None:
     )
 
 
+def verify_ios_privacy_manifest() -> None:
+    manifest_path = REPOSITORY_ROOT / IOS_PRIVACY_MANIFEST_PATH
+    require(
+        manifest_path.is_file(),
+        f"Missing required file: {IOS_PRIVACY_MANIFEST_PATH}",
+    )
+    try:
+        with manifest_path.open("rb") as manifest_file:
+            manifest = plistlib.load(manifest_file)
+    except (OSError, plistlib.InvalidFileException) as error:
+        raise RepositoryIntegrityError(
+            f"{IOS_PRIVACY_MANIFEST_PATH} is not a valid property list: {error}"
+        ) from error
+
+    require(
+        isinstance(manifest, dict),
+        f"{IOS_PRIVACY_MANIFEST_PATH} must contain a dictionary",
+    )
+    accessed_api_types = manifest.get("NSPrivacyAccessedAPITypes")
+    require(
+        isinstance(accessed_api_types, list),
+        f"{IOS_PRIVACY_MANIFEST_PATH} must declare NSPrivacyAccessedAPITypes as an array",
+    )
+    expected_accessed_api_types = [
+        {
+            "NSPrivacyAccessedAPIType": IOS_USER_DEFAULTS_API_TYPE,
+            "NSPrivacyAccessedAPITypeReasons": [IOS_USER_DEFAULTS_REASON],
+        }
+    ]
+    require(
+        accessed_api_types == expected_accessed_api_types,
+        f"{IOS_PRIVACY_MANIFEST_PATH} must exactly declare app-only UserDefaults "
+        f"with reason {IOS_USER_DEFAULTS_REASON}",
+    )
+
+
 def main() -> int:
     try:
         verify_configuration_templates()
         verify_gradle_wrapper()
         verify_git_hygiene()
+        verify_ios_privacy_manifest()
     except RepositoryIntegrityError as error:
         print(f"ERROR repository integrity: {error}", file=sys.stderr)
         return 1
 
     print(
         "OK repository integrity: configuration templates complete, "
-        "sensitive artifacts untracked, Gradle 9.4.1 wrapper checksummed"
+        "sensitive artifacts untracked, Gradle 9.4.1 wrapper checksummed, "
+        "iOS UserDefaults privacy reason declared"
     )
     return 0
 

@@ -116,7 +116,9 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - IOS-REL-001 implémentée sur branche : configurations Xcode `Debug`, `Staging` et `Release` reliées respectivement aux tiers development/staging/production et aux XCFrameworks KMP debug/release attendus.
 - Version, Team ID, profil et paramètres Supabase iOS sont injectés via xcconfig ou build settings ; aucune valeur fournisseur réelle ni certificat n'est versionné.
 - Entitlements APNs et Sign in with Apple ajoutés avec valeurs development/production par configuration ; leur validité finale reste contrôlée par l'App ID et le provisioning profile Apple du propriétaire.
-- Privacy Manifest initial ajouté comme ressource de cible, sans tracking, collecte propre à l'hôte ni Required Reason API déclarée à ce stade ; réaudit obligatoire à chaque SDK/feature collectrice.
+- Privacy Manifest initial ajouté comme ressource de cible, sans tracking. IOS-PRIVACY-001A déclare
+  désormais l'accès direct de l'hôte à `UserDefaults` avec la raison Apple `CA92.1` ; le réaudit des
+  données collectées et des SDK reste obligatoire avant la publication Store.
 - Icône iOS 1024 opaque générée depuis `kwabor_icone_app.png` et launch screen natif ink/wordmark ajoutés ; le logo horizontal est une copie exacte de `kwabor_2.png`, affichée en aspect fit sans détourage, recoloration ni redessin.
 - Workflow manuel `iOS archive artifact` ajouté : protection `main`, GitHub Environment, version Apple stricte, keychain/profil temporaires, validation équipe/bundle/capacités, archive signée, dSYM, manifest, signature, checksum et nettoyage après échec.
 - La CI macOS construit désormais les XCFrameworks debug/release puis les configurations simulateur Debug/Staging/Release sans signature.
@@ -301,19 +303,28 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Validation locale STAB-002A : tests shared et Android sans échec, traitement des ressources Android,
   compilation des tests Kotlin/Native iOS X64, `spotlessCheck`, `detekt`, `check`, lint et APK debug
   verts. Le build SwiftUI/Xcode natif reste à exécuter sur macOS avant fusion.
+- IOS-PRIVACY-001A déclare dans le manifest embarqué l'accès direct à `UserDefaults` avec la raison
+  Apple `CA92.1`. Le vérificateur d'intégrité impose exactement cette déclaration auditée et le runbook
+  ne présente plus le manifest actuel comme une preuve Store complète.
+- Validation locale IOS-PRIVACY-001A : syntaxe Python, parsing plist, intégrité du dépôt, contrat vidéo
+  Store-only, révision Android/iOS et assets de marque verts. Le Privacy Report Xcode reste à générer
+  sur macOS dans IOS-PRIVACY-001B.
 
 ## Tâche en cours
 
-SEC-001F et STAB-002A sont terminés localement sur `codex/sec-001f-account-delete-step-up`, empilés sur
-OPS-001A, sans push, relance de CI, déploiement ni publication. STAB-002B reste suspendu à la décision
-sur les cinq racines V1. OPS-001B dépend du provisionnement propriétaire et des gates d'observabilité
-ci-dessous ; SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de
-son audit.
+SEC-001F, STAB-002A et IOS-PRIVACY-001A sont terminés localement sur
+`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A, sans push, relance de CI, déploiement ni
+publication. STAB-002B reste suspendu à la décision sur les cinq racines V1. OPS-001B dépend du
+provisionnement propriétaire et des gates d'observabilité ci-dessous ; SETTINGS-001 reste ouvert et
+ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
 ## Blocages / limites
 
 - Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
 - La navigation globale complète, les actions réelles du détail, l'administration opérateur, les contenus réels, le pipeline média et les validations natives/appareils bloquent encore une V1 commercialement exploitable.
+- IOS-PRIVACY-001B doit encore inventorier les données de l'hôte et des SDK, valider les finalités et
+  la liaison au compte, puis rapprocher le manifest du Privacy Report Xcode et d'App Store Connect.
+  IOS-PRIVACY-001A seul ne constitue donc pas une preuve de conformité Store complète.
 - SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, fusionnée puis déployée.
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.

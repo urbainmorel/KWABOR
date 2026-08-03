@@ -42,9 +42,24 @@ python -B tools/verify-brand-assets.py
 
 ## Privacy Manifest
 
-`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation : aucun tracking ni Required Reason API utilisée directement ; les événements produit restent non liés, tandis que la ville de profil est déclarée comme localisation approximative liée au compte pour la fonctionnalité et, après consentement, Analytics. La coordonnée ponctuelle utilisée pour proposer cette ville n'est ni transmise ni conservée.
+`PrivacyInfo.xcprivacy` est une ressource de la cible. L'hôte ne déclare aucun tracking. Il déclare son
+accès direct à `UserDefaults` avec la raison approuvée `CA92.1`, car les préférences concernées restent
+accessibles uniquement à Kwabor : état de présentation de l'intro, reprise d'authentification,
+consentements, amorçage des notifications et marqueurs de migration. Le fichier déclare aussi
+actuellement les interactions produit non liées et la ville de profil comme localisation approximative
+liée au compte. La coordonnée ponctuelle utilisée pour proposer cette ville n'est ni transmise ni
+conservée. Apple documente les catégories et raisons autorisées dans
+[Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
-Ce fichier doit être réaudité dès qu'une feature collecte une donnée ou qu'un SDK est mis à jour. Firebase et chaque SDK tiers gardent leur propre manifest pour leurs collectes internes ; le manifest applicatif ne recopie que les données définies par l'hôte. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les ressources et rejette les clés invalides : [Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files), [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk). Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
+Les déclarations de données collectées ne constituent pas encore une preuve Store complète. Avant la
+release, `IOS-PRIVACY-001B` doit inventorier les données réellement traitées par l'hôte et les SDK,
+valider leurs finalités et leur liaison au compte, puis rapprocher le résultat du Privacy Report Xcode
+et du questionnaire App Store Connect. Les manifests fournis par les SDK tiers ne dispensent pas
+Kwabor de ce contrôle global. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les
+ressources et rejette les clés invalides :
+[Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files),
+[Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk).
+Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
 
 Avant chaque release candidate : générer le Privacy Report Xcode, rapprocher le résultat du code et des SDK présents, puis mettre à jour les formulaires App Store Connect.
 

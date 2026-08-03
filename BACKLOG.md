@@ -71,6 +71,13 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [x] PR-IOS-REL-001 — PR `#27` mergée après `quality`, pgTAP et les trois configurations simulateur vertes.
+- [ ] IOS-PRIVACY-001 — Aligner le Privacy Manifest et les déclarations App Store sur les traitements
+  réellement livrés.
+  - [x] IOS-PRIVACY-001A — Déclarer l'accès direct à `UserDefaults` avec la raison Apple `CA92.1`,
+    verrouiller cette déclaration dans le vérificateur d'intégrité et corriger le runbook iOS.
+  - [ ] IOS-PRIVACY-001B — Inventorier les données de l'hôte et des SDK, valider collecte, finalités,
+    liaison au compte et tracking avec le propriétaire, puis contrôler le Privacy Report Xcode et le
+    questionnaire App Store Connect.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
   - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et la capacité Remote Config générique sur appareils avec consentement, valeurs sûres et révocation ; aucun canal média n'y est autorisé.
