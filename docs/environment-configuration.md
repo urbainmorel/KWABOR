@@ -205,7 +205,8 @@ idempotente d'un profil auparavant complet échoue avec `42501`. Après chaque m
 deux refus avec un JWT encore valide afin de couvrir le délai d'expiration des access tokens révoqués.
 
 Une alerte d'exploitation doit signaler toute ligne `prepared` restée au-delà du délai défini par le
-runbook incident. Quand `pg_cron` est disponible, la migration installe le job
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md). Quand
+`pg_cron` est disponible, la migration installe le job
 `kwabor-account-deletion-reconcile` chaque jour à `03:23 UTC`. Il refait le nettoyage idempotent des
 demandes dont l'utilisateur Auth a déjà disparu, les clôt, puis purge les tombstones `completed`
 âgés de plus de 30 jours. Sans `pg_cron`, le déploiement doit fournir un ordonnanceur privilégié

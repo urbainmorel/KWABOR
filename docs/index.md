@@ -46,6 +46,7 @@
 
 | Runbook | Quand l'utiliser |
 | --- | --- |
+| [Incident Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md) | Diagnostiquer et reprendre un parcours Auth ou une suppression interrompue |
 | [Vidéo d'introduction Store-only](runbooks/onboarding-video-store-release.md) | Remplacer ou qualifier le média embarqué |
 | [Préflight des autorisations](runbooks/security-authorization-preflight.md) | Avant toute migration de sécurité sur une base persistante |
 | [Onboarding mobile](onboarding.md) | Comprendre et diagnostiquer le premier lancement/auth |

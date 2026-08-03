@@ -269,13 +269,23 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Validation locale SETTINGS-001A : tests shared/Android, compilation Android et Kotlin/Native iOS,
   Spotless, Detekt, lint, pureté du domaine, schémas Room, `check` et APK debug verts. Les deux
   contre-revues finales Android/iOS ne relèvent plus aucun P1/P2.
+- OPS-001A livre un runbook Auth/session/suppression relié aux guides d'environnement et de
+  déploiement. Il couvre les états réellement implémentés, les diagnostics PostgreSQL en lecture
+  seule, le seuil cron de 26 heures, les limites de rétention et les mutations interdites.
+- Deux revues indépendantes ont corrigé la reprise d'un tombstone `prepared`, les capacités
+  organisation/Storage non livrées, la session conservée après un échec de lecture profil et le
+  nettoyage Keychain du premier lancement iOS.
+- L'audit OPS-001A révèle un blocage sécurité : `account-delete` transporte actuellement le mot de
+  passe ou l'ID token et le nonce dans un body que la documentation Supabase décrit comme observable
+  dans les invocations, sans garantie documentée d'expurgation ou de désactivation. Le correctif
+  SEC-001F est cadré mais pas encore implémenté.
 
 ## Tâche en cours
 
-SETTINGS-001A est terminé localement sur `codex/settings-001a-account-security`, empilé sur DOC-001,
-sans push, relance de CI ni publication. SETTINGS-001 reste ouvert : mot de passe, 2FA, gestion des
-appareils/sessions, notifications, thème, langue, devise, date et surfaces légales ne sont pas encore
-livrés. ACTIONS-001C2 reste suspendu aux cinq décisions produit tracées dans son audit.
+OPS-001A est terminé localement sur `codex/ops-001a-auth-incident-runbook`, empilé sur SETTINGS-001A,
+sans push, relance de CI ni publication. La prochaine tranche locale critique est SEC-001F, qui doit
+retirer les secrets du transport Edge et restaurer une reprise sûre des suppressions interrompues.
+SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
 ## Blocages / limites
 
@@ -319,6 +329,12 @@ livrés. ACTIONS-001C2 reste suspendu aux cinq décisions produit tracées dans 
 - La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
 - AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
+- `account-delete` ne peut pas être activée sur un staging partagé ni en production tant que
+  SEC-001F n'a pas retiré les credentials de son body. Même après ce correctif, la politique réelle
+  de rétention/expurgation des headers d'invocation et les éventuels Log Drains doivent être prouvés.
+- Un tombstone `prepared` avec utilisateur Auth présent n'est reprenable depuis le mobile que tant
+  que l'écran et son token restent utilisables. Après redémarrage ou expiration, aucun chemin livré
+  ne sort actuellement le compte de l'impasse ; SEC-001F doit couvrir ce scénario sans suppression DBA.
 - La suppression de compte exige avant release un seuil d'alerte pour les tombstones `prepared`, la preuve d'exécution du job quotidien et la validation juridique de la rétention technique de 30 jours.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
@@ -331,8 +347,8 @@ livrés. ACTIONS-001C2 reste suspendu aux cinq décisions produit tracées dans 
 
 ## Prochaine tâche logique
 
-Valider SETTINGS-001A sous Swift/Xcode, VoiceOver et TalkBack sur appareils configurés avant toute
-publication. Le prochain lot local sans dépendance propriétaire est OPS-001A : documenter les
-incidents Auth/session/suppression et leurs procédures de récupération. ACTIONS-001C2 attend toujours
-les cinq décisions produit de son audit. La vidéo d'intro reste embarquée : tout changement d'octets
-exige une nouvelle release Android/iOS dans les Stores.
+Implémenter SEC-001F : ré-authentification dans un client Supabase Auth éphémère sans persistance,
+body Edge réduit à la clé d'idempotence, vérification serveur de l'AMR et de la session live, nouvel
+ADR et tests Kotlin/Deno/pgTAP. OPS-001B viendra ensuite pour les alertes et l'exercice staging.
+La vidéo d'intro reste embarquée : tout changement d'octets exige une nouvelle release Android/iOS
+dans les Stores.

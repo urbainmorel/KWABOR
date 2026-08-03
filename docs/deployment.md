@@ -69,6 +69,9 @@ Avant toute migration persistante :
 6. obtenir l'approbation avant production ;
 7. surveiller erreurs, auth et intégrité des données après application.
 
+Toute anomalie de connexion, restauration ou suppression suit le
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md).
+
 Les migrations sont forward-only. Ne jamais utiliser `git reset`, une suppression de migration ou
 un reset Supabase pour « annuler » un changement déjà appliqué.
 
@@ -106,8 +109,9 @@ garantit pas le retour immédiat de tous les appareils à un ancien binaire.
 ### Backend
 
 Préférer une migration corrective forward-only. Si l'intégrité ou la sécurité est compromise,
-isoler les écritures concernées, appliquer le runbook incident et restaurer uniquement depuis une
-sauvegarde prouvée avec approbation explicite.
+isoler les écritures concernées, appliquer le
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md) lorsque ce
+périmètre est touché et restaurer uniquement depuis une sauvegarde prouvée avec approbation explicite.
 
 ## Après déploiement
 

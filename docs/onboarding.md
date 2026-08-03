@@ -47,7 +47,7 @@ La déconnexion utilisateur est accessible depuis Profil et exige une confirmati
 Elle retire la session de cet appareil, les destinations protégées en attente et revient sur
 l'accueil invité. La révocation des autres appareils reste réservée aux paramètres de sécurité.
 
-## AUTH-005 implémentée sur branche, validations finales en attente
+## Auth fédérée, activation Promoteur et suppression livrées par AUTH-005
 
 Google est acquis nativement sur Android et iOS. Sign in with Apple est acquis par
 `AuthenticationServices` sur iOS uniquement et apparaît au même niveau que Google. Chaque tentative
@@ -99,15 +99,22 @@ et tout nouvel upload attend puis échoue dès que le tombstone existe.
 La préparation supprime le profil, les rôles, acceptations juridiques et données utilisateur
 rattachées, et neutralise les attributions résiduelles de fiches. La fonction révoque ensuite toutes
 les sessions, revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Un retry
-réutilise la même opération serveur, y compris si l'application redémarre avec une nouvelle clé
-client.
+immédiat depuis le même écran et avec un token encore utilisable retrouve la même opération serveur,
+même avec une nouvelle clé client. Après redémarrage ou expiration du token, aucun chemin livré ne
+reprend toutefois un tombstone `prepared` si l'utilisateur Auth existe encore : c'est un no-go suivi
+par SEC-001F, jamais une raison de supprimer le compte directement en base.
+
+Le transport actuel de cette preuve dans le body de l'Edge Function est lui-même un no-go staging
+partagé/production jusqu'à SEC-001F ; voir le
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md).
 
 Le tombstone privé `account_deletion_requests` conserve seulement un identifiant utilisateur
 pseudonyme, une clé d'idempotence, un statut et des horodatages. Il ne contient aucun email, nom,
 contenu ou credential. Une ligne `prepared` interdit les écritures produit jusqu'à reprise. Si le
-compte Auth existe encore, l'utilisateur reprend avec une preuve fraîche ; s'il a déjà disparu, la
-réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le tombstone. Les
-tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa mention dans la
+compte Auth existe encore, seule la reprise immédiate ci-dessus fonctionne actuellement ; s'il a déjà
+disparu, la réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le
+tombstone. Les tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa
+mention dans la
 politique de confidentialité restent une gate juridique avant release candidate.
 
 Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.

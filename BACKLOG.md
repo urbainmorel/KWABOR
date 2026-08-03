@@ -225,9 +225,15 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] SEC-001C — Obtenir la revue humaine puis fusionner la PR `#35`.
   - [ ] SEC-001D — Exécuter la préflight des données historiques, prouver sauvegarde/restauration et approuver toute quarantaine avant déploiement persistant.
   - [ ] SEC-001E — Qualifier Storage, rate limiting, secrets, advisors et tests IDOR restants sur staging.
+  - [ ] SEC-001F — Retirer mot de passe, ID token et nonce du body `account-delete`, ré-authentifier
+    via un client Auth éphémère, puis vérifier côté serveur AMR fraîche, session live et identité avant
+    toute mutation. Prouver aussi le traitement d'un tombstone `prepared` après redémarrage.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
 - [x] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
+  - [x] OPS-001A — Livrer le runbook Auth/session/suppression avec diagnostics en lecture seule,
+    seuils cron, reprises autorisées, no-go explicites et revue indépendante.
+  - [ ] OPS-001B — Raccorder les alertes non-PII, prouver cron/fallback et exécuter l'exercice staging.
 - [ ] BETA-001 — Exécuter la bêta 10 Android/5 iOS sur sept jours avec zéro P0/P1 et ≥ 99,5 % sans crash.
 - [ ] STORE-ANDROID-001 — Produire AAB signé, fiche Play, privacy/data safety et plan de rollout.
 - [ ] STORE-IOS-001 — Produire archive/TestFlight, fiche App Store, privacy et validation de signature.
