@@ -51,4 +51,5 @@ private val previewExploreActions = ExploreScreenActions(
     onCityDismiss = {},
     onCitySelected = {},
     onUseLocation = {},
+    onGuideDiscoveryClick = {},
 )

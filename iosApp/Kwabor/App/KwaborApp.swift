@@ -8,6 +8,7 @@ struct KwaborApp: App {
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
+    @StateObject private var guideDiscoveryStore: GuideDiscoveryStore
     @StateObject private var catalogDetailStore: CatalogDetailStore
 
     @MainActor
@@ -24,11 +25,16 @@ struct KwaborApp: App {
             supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
         )
         self.compositionRoot = compositionRoot
-        _exploreStore = StateObject(
-            wrappedValue: ExploreStore(controller: compositionRoot.exploreController)
-        )
-        _catalogDetailStore = StateObject(
-            wrappedValue: CatalogDetailStore(controller: compositionRoot.catalogDetailController)
+        let exploreStore = ExploreStore(controller: compositionRoot.exploreController)
+        let catalogDetailStore = CatalogDetailStore(controller: compositionRoot.catalogDetailController)
+        _exploreStore = StateObject(wrappedValue: exploreStore)
+        _catalogDetailStore = StateObject(wrappedValue: catalogDetailStore)
+        _guideDiscoveryStore = StateObject(
+            wrappedValue: GuideDiscoveryStore(
+                controller: compositionRoot.guideDiscoveryController,
+                commonStrings: exploreStore.strings,
+                onGuideOpen: catalogDetailStore.open
+            )
         )
         _coordinator = StateObject(
             wrappedValue: OnboardingCoordinator(
@@ -46,6 +52,7 @@ struct KwaborApp: App {
             OnboardingView(
                 coordinator: coordinator,
                 exploreStore: exploreStore,
+                guideDiscoveryStore: guideDiscoveryStore,
                 catalogDetailStore: catalogDetailStore
             )
                 .onOpenURL { url in

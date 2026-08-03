@@ -174,6 +174,7 @@ data class KwaborStrings(
     val cafes: String,
     val culture: String,
     val touristGuides: String,
+    val guideDiscovery: GuideDiscoveryStrings,
     val detail: CatalogDetailStrings,
 )
 
@@ -366,5 +367,6 @@ private val frenchStrings = KwaborStrings(
     cafes = "Cafés",
     culture = "Culture",
     touristGuides = "Guides touristiques",
+    guideDiscovery = frenchGuideDiscoveryStrings,
     detail = frenchCatalogDetailStrings,
 )

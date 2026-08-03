@@ -156,6 +156,18 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     humaine et la preuve VoiceOver sur appareil.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
 - [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide et claim.
+  - [x] ACTIONS-001A — Livrer les actions externes réellement disponibles sur Android/iOS : itinéraire,
+    téléphone, WhatsApp, site, email, menu et billetterie, avec désactivation des événements terminés.
+  - [ ] PR-ACTIONS-001A — PR brouillon `#48` publiée au-dessus de DETAIL-IOS-001 ; Android API 30/31
+    et iOS sont verts. La preuve brute API 36 reste à rejouer après accord explicite sur le correctif
+    minimal du harnais, sans relâcher les critères d'acceptation.
+  - [x] GUIDE-001B — Livrer localement la découverte publique « Trouver un guide » : contrat RPC
+    versionné, filtres destination/langue/spécialité, pagination, cartes et ouverture du détail sur
+    Android Compose et iOS SwiftUI, sans nouvel onglet racine ni sponsoring.
+  - [ ] PR-GUIDE-001B — Valider la migration sur une stack Supabase isolée et les sources Swift sous
+    Xcode/macOS, puis publier la branche empilée après décision sur la CI API 36.
+  - [ ] ACTIONS-001C — Livrer partage et signalement réels avec contrats serveur et parcours natifs.
+  - [ ] ACTIONS-001D — Livrer le claim sécurisé relié aux organisations vérifiées et aux droits RLS.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.
 
 ### Profil, paramètres, Social et contribution

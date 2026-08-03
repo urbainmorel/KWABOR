@@ -55,6 +55,9 @@
 		1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AA /* CatalogDetailSections.swift */; };
 		1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AC /* CatalogDetailTypedContent.swift */; };
 		1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */; };
+		1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B1 /* GuideDiscoveryStore.swift */; };
+		1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B3 /* GuideDiscoveryCard.swift */; };
+		1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B5 /* GuideDiscoveryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -107,6 +110,9 @@
 		1A00000100000000000000AA /* CatalogDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSections.swift; sourceTree = "<group>"; };
 		1A00000100000000000000AC /* CatalogDetailTypedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailTypedContent.swift; sourceTree = "<group>"; };
 		1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailExternalURLPolicy.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B1 /* GuideDiscoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B3 /* GuideDiscoveryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryCard.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B5 /* GuideDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +150,7 @@
 				1A0000010000000000000035 /* Config */,
 				1A00000100000000000000A1 /* Detail */,
 				1A00000100000000000000A0 /* Explore */,
+				1A00000100000000000000B6 /* Guide */,
 				1A000001000000000000006C /* Onboarding */,
 				1A0000010000000000000046 /* Observability */,
 				1A0000010000000000000076 /* Registration */,
@@ -269,6 +276,16 @@
 				1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */,
 			);
 			path = Detail;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000B6 /* Guide */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000B1 /* GuideDiscoveryStore.swift */,
+				1A00000100000000000000B3 /* GuideDiscoveryCard.swift */,
+				1A00000100000000000000B5 /* GuideDiscoveryView.swift */,
+			);
+			path = Guide;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -444,6 +461,9 @@
 				1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */,
 				1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */,
 				1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */,
+				1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */,
+				1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */,
+				1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

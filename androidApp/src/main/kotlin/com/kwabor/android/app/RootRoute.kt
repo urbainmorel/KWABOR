@@ -12,6 +12,9 @@ import kotlinx.serialization.Serializable
 internal data object HomeRoute
 
 @Serializable
+internal data object GuideDiscoveryRoute
+
+@Serializable
 internal data object SocialRoute
 
 @Serializable
@@ -25,6 +28,7 @@ internal data object ProfileRoute
 
 internal fun NavDestination.toRootDestination(): RootNavigationDestination? = when {
     hasRoute<HomeRoute>() -> RootNavigationDestination.Home
+    hasRoute<GuideDiscoveryRoute>() -> RootNavigationDestination.Home
     hasRoute<SocialRoute>() -> RootNavigationDestination.Social
     hasRoute<AddRoute>() -> RootNavigationDestination.Add
     hasRoute<NotificationsRoute>() -> RootNavigationDestination.Notifications

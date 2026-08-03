@@ -3,6 +3,7 @@ package com.kwabor.android.design
 import androidx.compose.ui.graphics.Color
 
 object KwaborColors {
+    val Transparent = Color.Transparent
     val Ink950 = Color(color = 0xFF0E0E10)
     val Ink900 = Color(color = 0xFF1A1A1C)
     val Ink700 = Color(color = 0xFF3C3C41)

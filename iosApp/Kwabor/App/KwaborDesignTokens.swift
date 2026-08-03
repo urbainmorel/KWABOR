@@ -39,6 +39,12 @@ enum KwaborDesignTokens {
         static let detailStateMinimumHeight: CGFloat = 240
         static let detailAccessibilityHeroMinimumHeight: CGFloat = 420
         static let hairline: CGFloat = 2
+        static let outline: CGFloat = 1
+        static let guideTabletBreakpoint: CGFloat = 700
+        static let guideCardHeroHeight: CGFloat = 220
+        static let guideStateMinimumHeight: CGFloat = 220
+        static let guideSkeletonLineHeight: CGFloat = 14
+        static let guideSkeletonLastLineWidth: CGFloat = 180
     }
 
     enum Alpha {

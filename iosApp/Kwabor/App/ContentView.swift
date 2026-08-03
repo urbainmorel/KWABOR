@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let guideDiscoveryStore: GuideDiscoveryStore
     @ObservedObject var catalogDetailStore: CatalogDetailStore
     let isGuestSession: Bool
     let strings: OnboardingStrings
@@ -24,6 +25,7 @@ struct ContentView: View {
     init(
         bridge: KwaborSharedBridge,
         exploreStore: ExploreStore,
+        guideDiscoveryStore: GuideDiscoveryStore,
         catalogDetailStore: CatalogDetailStore,
         isGuestSession: Bool = false,
         strings: OnboardingStrings? = nil,
@@ -42,6 +44,7 @@ struct ContentView: View {
     ) {
         self.bridge = bridge
         self.exploreStore = exploreStore
+        self.guideDiscoveryStore = guideDiscoveryStore
         self.catalogDetailStore = catalogDetailStore
         self.isGuestSession = isGuestSession
         self.strings = strings ?? bridge.onboardingStrings()
@@ -68,6 +71,7 @@ struct ContentView: View {
                             destination: destination,
                             bridge: bridge,
                             exploreStore: exploreStore,
+                            guideDiscoveryStore: guideDiscoveryStore,
                             strings: strings,
                             accountSecurityController: accountSecurityController,
                             federatedIdentityHintStore: federatedIdentityHintStore,
@@ -161,6 +165,7 @@ private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let guideDiscoveryStore: GuideDiscoveryStore
     let strings: OnboardingStrings
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
@@ -179,6 +184,7 @@ private struct RootDestinationContent: View {
             if destination == .home {
                 ExploreView(
                     store: exploreStore,
+                    guideDiscoveryStore: guideDiscoveryStore,
                     onListingOpen: onListingOpen,
                     onAuthenticationRequired: onProtectedDestinationSelected
                 )

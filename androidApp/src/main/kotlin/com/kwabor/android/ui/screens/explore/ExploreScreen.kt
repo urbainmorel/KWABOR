@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -245,6 +246,9 @@ private fun ExploreListingsGrid(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 ExploreHeader(state, strings, content.isGuestSession, actions)
             }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                ExploreGuideDiscoveryEntry(strings = strings, onClick = actions.onGuideDiscoveryClick)
+            }
             exploreGridItems(
                 state = state,
                 strings = strings,
@@ -355,6 +359,46 @@ private fun ExploreHeader(
         Text(text = strings.homeTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         ExploreTabs(state.selectedTab, strings, actions.onTabSelected)
         ExploreChips(state.chips, state.selectedChipId, actions.onChipSelected)
+    }
+}
+
+@Composable
+private fun ExploreGuideDiscoveryEntry(strings: KwaborStrings, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { role = Role.Button },
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(KwaborRadius.Control),
+    ) {
+        Row(
+            modifier = Modifier.padding(KwaborSpacing.Lg),
+            horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PersonSearch,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+            ) {
+                Text(
+                    text = strings.guideDiscovery.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = strings.guideDiscovery.entrySubtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

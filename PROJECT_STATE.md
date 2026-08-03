@@ -218,11 +218,30 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - DETAIL-IOS-001 livre une sheet SwiftUI globale et adaptative ouverte depuis Explore : six variantes typées, états chargement/introuvable/offline/erreur, galerie HTTPS bornée, description, prix XOF, horaires, services, localisation, Dynamic Type et VoiceOver. Aucun CTA factice n'est exposé.
 - La porte locale DETAIL-IOS-001 passe `check`, Spotless, Detekt, lint, pureté du domaine, schémas Room, compilations Kotlin/Native iOS et Android, avec 330 tests shared et 156 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2.
 - La PR brouillon DETAIL-IOS-001 `#47` est publiée au-dessus de DETAIL-001B `#46`. Son run exact-head `30780564021` est entièrement vert : qualité Gradle et Supabase, preuves Android API 30/31/36, tests Swift, runtime iOS, XCFrameworks et configurations Xcode simulateur Debug/Staging/Release.
+- ACTIONS-001A livre sur Android et iOS les actions externes réellement disponibles dans le détail :
+  itinéraire, téléphone, WhatsApp, site, email, menu et billetterie. Les événements terminés sont
+  explicitement signalés et leur billetterie est désactivée. La PR brouillon empilée `#48` porte le
+  commit `300ff9b` ; Android API 30/31 et iOS sont verts. API 36 lance bien l'application mais la
+  capture brute du harnais a échoué deux fois, sans preuve d'une régression applicative.
+- GUIDE-001B est implémentée localement sur `codex/actions-001b-guide-discovery`, empilée sur
+  ACTIONS-001A. Un contrat public versionné et publié-only fournit les référentiels et guides par
+  destination couverte, langue et spécialité, avec pagination opaque et ordre organique stable.
+  Les tableaux historiques restent la surface d'écriture de transition ; des synchroniseurs privés,
+  contraintes différées, ACL/RLS et gardes de référentiels empêchent toute divergence.
+- Android Compose et iOS SwiftUI exposent « Trouver un guide » comme écran enfant de l'Accueil,
+  sans sixième destination racine. Les écrans couvrent chargement, erreur, vide, refresh, pagination,
+  filtres, cartes photo-first, prix indicatif XOF, accessibilité et ouverture du détail catalogue.
+  Le premier appel réseau ne part qu'à l'ouverture explicite de l'écran.
+- Validation locale GUIDE-001B : `spotlessCheck`, `detekt` et `check` verts en 15 min 14 s, Android
+  lint/pureté du domaine/compilations Kotlin iOS verts, 369 tests shared et 178 tests Android sans
+  échec. La migration et son plan `77/77` passent `pglast`; les vérificateurs dépôt, marque et intro
+  Store-only sont verts. Les revues finales shared, Android, iOS et SQL ne relèvent plus de P1/P2.
 
 ## Tâche en cours
 
-Obtenir la revue humaine de la PR brouillon DETAIL-IOS-001 `#47`, empilée sur DETAIL-001B `#46`. Les revues humaines de `#41` à `#47` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
-La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
+Clore GUIDE-001B à la frontière locale : intégrer les dernières revues, conserver le lot sur sa branche
+sans push, puis attendre l'accord explicite avant toute modification/reprise de la CI API 36 ou
+publication de la branche. Les revues humaines de la pile restent requises dans l'ordre.
 
 ## Blocages / limites
 
@@ -234,6 +253,15 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
 - Le moteur Docker local Kwabor n'est pas actif après l'arrêt code 137 de son conteneur Supabase. Il n'a pas été redémarré pour ne pas perturber les autres projets ; le run exact-head `30759824206` fournit la preuve finale sur une stack isolée avec 632 assertions standard et 12 assertions concurrentes vertes.
+- Les 77 assertions GUIDE-001B ont été vérifiées statiquement mais pas exécutées contre PostgreSQL :
+  Docker/Supabase local n'a volontairement pas été redémarré. Une stack isolée est obligatoire avant
+  publication ou déploiement de la migration.
+- Les sources SwiftUI GUIDE-001B et leur intégration Xcode ont été revues statiquement, mais Xcode
+  n'est pas disponible sur ce poste Windows. Compilation, tests Swift et preuve VoiceOver restent à
+  exécuter sur macOS avant publication.
+- Le job Android API 36 de la PR `#48` échoue au stade de capture PNG brute malgré un cold start
+  réussi. Le correctif de harnais proposé reste limité à quatre cœurs et `swiftshader`, sans changer
+  les seuils de preuve ; aucune modification ni nouvelle exécution n'est autorisée sans accord explicite.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
@@ -257,7 +285,8 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Valider la PR DETAIL-IOS-001 `#47` au-dessus de DETAIL-001B `#46`, puis livrer ACTIONS-001 sans
-réintroduire de CTA factice. DETAIL-001 reste ouvert jusqu'aux actions réelles. La pile `#35` → `#47`
-doit toujours être approuvée et fusionnée dans l'ordre. La revue appareils BRAND-002 et
-ENV-001B/OBS-001B restent des gates propriétaire, sans bloquer la vidéo embarquée.
+Après accord explicite, appliquer une seule fois le correctif minimal du harnais API 36 et rejouer la
+CI de `#48`. Si elle est verte, publier GUIDE-001B, exécuter pgTAP sur une stack Supabase isolée et
+valider Swift/Xcode sur macOS. Poursuivre ensuite ACTIONS-001 par partage/signalement puis claim, sans
+CTA factice. La vidéo d'intro reste embarquée : tout changement d'octets exige une nouvelle release
+Android/iOS dans les Stores.

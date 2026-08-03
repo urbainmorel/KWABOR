@@ -5,11 +5,13 @@ import com.kwabor.shared.data.catalog.catalogDataModule
 import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
 import com.kwabor.shared.data.explore.exploreDataModule
+import com.kwabor.shared.data.guide.guideDiscoveryDataModule
 import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
+import com.kwabor.shared.domain.guide.GuideDiscoveryRepository
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
@@ -20,6 +22,8 @@ import com.kwabor.shared.presentation.detail.CatalogDetailPresenter
 import com.kwabor.shared.presentation.detail.catalogDetailPresentationModule
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.explorePresentationModule
+import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
+import com.kwabor.shared.presentation.guide.guideDiscoveryPresentationModule
 import io.github.jan.supabase.auth.SessionManager
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
@@ -33,9 +37,11 @@ class KwaborCompositionRoot internal constructor(
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
     val dispatcherProvider: DispatcherProvider = application.koin.get()
+    val guideDiscoveryRepository: GuideDiscoveryRepository = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
     val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
     val catalogDetailPresenter: CatalogDetailPresenter by lazy { application.koin.get() }
+    val guideDiscoveryPresenter: GuideDiscoveryPresenter by lazy { application.koin.get() }
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
@@ -73,8 +79,10 @@ internal fun createKwaborCompositionRootOrNull(
             ),
             catalogDataModule(hasAuthentication = authSessionManager != null),
             exploreDataModule(hasPersistence = persistenceConfiguration != null),
+            guideDiscoveryDataModule,
             explorePresentationModule(hasPersistence = persistenceConfiguration != null),
             catalogDetailPresentationModule,
+            guideDiscoveryPresentationModule,
             organizationDataModule,
         )
         if (authSessionManager != null) {

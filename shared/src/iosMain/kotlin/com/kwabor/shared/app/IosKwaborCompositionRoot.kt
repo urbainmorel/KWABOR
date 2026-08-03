@@ -29,6 +29,10 @@ class IosKwaborCompositionRoot(
         presenter = sharedRoot?.explorePresenter,
         dispatcherProvider = dispatcherProvider,
     )
+    val guideDiscoveryController = IosGuideDiscoveryController(
+        presenter = sharedRoot?.guideDiscoveryPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
     val catalogDetailController = IosCatalogDetailController(
         presenter = sharedRoot?.catalogDetailPresenter,
         dispatcherProvider = dispatcherProvider,
@@ -48,6 +52,7 @@ class IosKwaborCompositionRoot(
 
     fun close() {
         exploreController.close()
+        guideDiscoveryController.close()
         catalogDetailController.close()
         authController.close()
         registrationController.close()

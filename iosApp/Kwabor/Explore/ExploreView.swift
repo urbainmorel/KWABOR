@@ -4,6 +4,7 @@ import UIKit
 
 struct ExploreView: View {
     @ObservedObject var store: ExploreStore
+    @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let onListingOpen: (String) -> Void
     let onAuthenticationRequired: () -> Void
 
@@ -15,6 +16,7 @@ struct ExploreView: View {
             GeometryReader { proxy in
                 ExploreScrollContent(
                     store: store,
+                    guideDiscoveryStore: guideDiscoveryStore,
                     columns: gridColumns(availableWidth: proxy.size.width),
                     onListingOpen: onListingOpen
                 )
@@ -68,6 +70,7 @@ struct ExploreView: View {
 
 private struct ExploreScrollContent: View {
     @ObservedObject var store: ExploreStore
+    @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let columns: [GridItem]
     let onListingOpen: (String) -> Void
 
@@ -76,6 +79,7 @@ private struct ExploreScrollContent: View {
             LazyVStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
                 ExploreTransientBanners(store: store)
                 ExploreHeader(store: store)
+                GuideDiscoveryEntryLink(store: guideDiscoveryStore)
                 if store.state.isRefreshing {
                     HStack(spacing: KwaborDesignTokens.Spacing.sm) {
                         ProgressView()

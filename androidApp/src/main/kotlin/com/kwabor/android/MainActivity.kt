@@ -30,6 +30,7 @@ import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
 import com.kwabor.android.presentation.detail.CatalogDetailViewModel
 import com.kwabor.android.presentation.explore.ExploreViewModel
+import com.kwabor.android.presentation.guide.GuideDiscoveryViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.app.KwaborCompositionRoot
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
         val dependencies = KwaborAppDependencies(
             exploreViewModel = createExploreViewModel(configuredApp.compositionRoot, strings),
             catalogDetailViewModel = createCatalogDetailViewModel(configuredApp.compositionRoot, strings),
+            guideDiscoveryViewModel = createGuideDiscoveryViewModel(configuredApp.compositionRoot, strings),
             authViewModel = configuredAuthViewModel,
             onboardingViewModel = createOnboardingViewModel(
                 applicationState,
@@ -156,6 +158,22 @@ class MainActivity : ComponentActivity() {
             }
         },
     )[CatalogDetailViewModel::class.java]
+
+    private fun createGuideDiscoveryViewModel(
+        compositionRoot: KwaborCompositionRoot,
+        strings: KwaborStrings,
+    ): GuideDiscoveryViewModel = ViewModelProvider(
+        owner = this,
+        factory = viewModelFactory {
+            initializer {
+                GuideDiscoveryViewModel(
+                    presenter = compositionRoot.guideDiscoveryPresenter,
+                    strings = strings.guideDiscovery,
+                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                )
+            }
+        },
+    )[GuideDiscoveryViewModel::class.java]
 
     private fun createAuthViewModel(
         configuredApp: ConfiguredApp,

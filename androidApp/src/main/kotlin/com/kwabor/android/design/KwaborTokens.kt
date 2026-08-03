@@ -27,6 +27,10 @@ object KwaborSizing {
     const val EXPLORE_MOBILE_GRID_COLUMNS = 2
     const val EXPLORE_TABLET_GRID_COLUMNS = 3
     const val EXPLORE_LOAD_MORE_THRESHOLD = 4
+    const val GUIDE_MOBILE_GRID_COLUMNS = 1
+    const val GUIDE_TABLET_GRID_COLUMNS = 2
+    const val GUIDE_LOAD_MORE_THRESHOLD = 2
+    const val GUIDE_CARD_IMAGE_ASPECT_RATIO = 1.6f
     val GoogleLogo = 20.dp
     val BottomNavigationHeight = 76.dp
     val FloatingActionButton = 56.dp

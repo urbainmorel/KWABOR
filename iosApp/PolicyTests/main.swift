@@ -407,6 +407,40 @@ expect(
     "A refresh or filter change must reset the cursor guard."
 )
 
+private var guidePaginationGuard = ExplorePaginationGuard()
+expect(
+    !guidePaginationGuard.shouldLoadNext(
+        cursor: nil,
+        canLoadMore: false,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "Guide discovery must not append when the shared state has no next page."
+)
+expect(
+    !guidePaginationGuard.shouldLoadNext(
+        cursor: "guide-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: true
+    ),
+    "Guide discovery must wait for an explicit retry after an append failure."
+)
+expect(
+    guidePaginationGuard.shouldRetry(cursor: "guide-cursor-1", canLoadMore: true),
+    "Guide discovery must allow one explicit retry for the failed cursor."
+)
+guidePaginationGuard.reset()
+expect(
+    guidePaginationGuard.shouldLoadNext(
+        cursor: "guide-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "A guide filter change must allow the new query to reuse an opaque cursor value."
+)
+
 expect(
     ExploreRemoteImageURLPolicy.acceptedURL(
         "https://cdn.kwabor.example/media/card.jpg?width=720"

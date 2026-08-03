@@ -16,4 +16,5 @@ data class ExploreScreenActions(
     val onCityDismiss: () -> Unit,
     val onCitySelected: (String) -> Unit,
     val onUseLocation: () -> Unit,
+    val onGuideDiscoveryClick: () -> Unit,
 )
