@@ -498,6 +498,210 @@ expect(
     "Oversized image URLs must be rejected before parsing."
 )
 
+private func catalogDetailPostBootstrapAction(
+    pending: PendingInternalDeepLink,
+    isIntroComplete: Bool = true,
+    isSessionRestoreComplete: Bool = true,
+    isBlockingFlowActive: Bool = false,
+    hasAuthenticatedAccount: Bool = false,
+    hasExplicitGuestAccess: Bool = false
+) -> CatalogDetailDeepLinkPostBootstrapAction {
+    CatalogDetailDeepLinkPostBootstrapPolicy.action(
+        hasPendingListing: pending.catalogDetailListingID != nil,
+        isIntroComplete: isIntroComplete,
+        isSessionRestoreComplete: isSessionRestoreComplete,
+        isBlockingFlowActive: isBlockingFlowActive,
+        hasAuthenticatedAccount: hasAuthenticatedAccount,
+        hasExplicitGuestAccess: hasExplicitGuestAccess
+    )
+}
+
+private func requireCatalogDetailDelivery(
+    _ pending: PendingInternalDeepLink,
+    _ message: String
+) -> CatalogDetailDeepLinkDelivery {
+    guard let delivery = pending.catalogDetailDelivery else {
+        fatalError(message)
+    }
+    return delivery
+}
+
+private let deepLinkListingID = "11111111-2222-4333-8444-555555555555"
+private let replacementDeepLinkListingID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+private var pendingDeepLink = PendingInternalDeepLink()
+expect(
+    InternalDeepLinkIngressPolicy.shouldRetain(
+        validatedDestinationExists: true,
+        isSigningOut: false,
+        isDeletingAccount: false
+    ),
+    "A validated navigation link must be retainable in a stable authentication state."
+)
+expect(
+    !InternalDeepLinkIngressPolicy.shouldRetain(
+        validatedDestinationExists: true,
+        isSigningOut: true,
+        isDeletingAccount: false
+    ) &&
+        !InternalDeepLinkIngressPolicy.shouldRetain(
+            validatedDestinationExists: true,
+            isSigningOut: false,
+            isDeletingAccount: true
+        ) &&
+        !InternalDeepLinkIngressPolicy.shouldRetain(
+            validatedDestinationExists: false,
+            isSigningOut: false,
+            isDeletingAccount: false
+        ),
+    "Sign-out, account deletion and invalid destinations must reject ingress."
+)
+expect(
+    pendingDeepLink.rootDestinationKey == nil &&
+        pendingDeepLink.catalogDetailListingID == nil,
+    "Internal deep-link state must start empty."
+)
+expect(
+    catalogDetailPostBootstrapAction(pending: pendingDeepLink) == .wait,
+    "Post-bootstrap routing must wait when no listing deep link is pending."
+)
+pendingDeepLink.enqueueRoot(destinationKey: "profile")
+expect(
+    pendingDeepLink.rootDestinationKey == "profile" &&
+        pendingDeepLink.catalogDetailListingID == nil,
+    "A root deep link must be the only pending navigation target."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+expect(
+    pendingDeepLink.rootDestinationKey == nil &&
+        pendingDeepLink.catalogDetailListingID == deepLinkListingID,
+    "A listing deep link must replace a pending root destination atomically."
+)
+private let initialDeepLinkDelivery = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The first valid listing must create a delivery."
+)
+expect(
+    catalogDetailPostBootstrapAction(
+        pending: pendingDeepLink,
+        isIntroComplete: false
+    ) == .wait,
+    "A listing deep link must remain pending while the launch intro is visible."
+)
+expect(
+    catalogDetailPostBootstrapAction(
+        pending: pendingDeepLink,
+        isSessionRestoreComplete: false
+    ) == .wait,
+    "A listing deep link must remain pending until session bootstrap completes."
+)
+expect(
+    catalogDetailPostBootstrapAction(pending: pendingDeepLink) == .wait,
+    "E3 must remain visible until the user explicitly authenticates or confirms guest access."
+)
+private let pendingBeforeGuestDisclosureCancellation = pendingDeepLink
+expect(
+    catalogDetailPostBootstrapAction(pending: pendingDeepLink) == .wait &&
+        pendingDeepLink == pendingBeforeGuestDisclosureCancellation,
+    "Cancelling the explicit guest disclosure must preserve the pending listing without reopening it."
+)
+expect(
+    catalogDetailPostBootstrapAction(
+        pending: pendingDeepLink,
+        hasAuthenticatedAccount: true
+    ) == .openWhenHome,
+    "An authenticated account must open the pending listing after bootstrap."
+)
+expect(
+    catalogDetailPostBootstrapAction(
+        pending: pendingDeepLink,
+        hasExplicitGuestAccess: true
+    ) == .openWhenHome,
+    "Explicitly confirmed guest access must open the pending listing."
+)
+expect(
+    catalogDetailPostBootstrapAction(
+        pending: pendingDeepLink,
+        isBlockingFlowActive: true,
+        hasAuthenticatedAccount: true
+    ) == .wait,
+    "A sensitive or modal flow must defer opening even for an authenticated account."
+)
+private let pendingBeforeInvalidDeepLink = pendingDeepLink
+expect(
+    !pendingDeepLink.enqueueCatalogDetail(validatedListingID: nil) &&
+        pendingDeepLink == pendingBeforeInvalidDeepLink,
+    "An invalid parsed deep link must not replace the last valid pending listing."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+private let coalescedDeepLinkDelivery = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The coalesced listing must retain its delivery."
+)
+expect(
+    pendingDeepLink.catalogDetailListingID == deepLinkListingID &&
+        coalescedDeepLinkDelivery == initialDeepLinkDelivery,
+    "An identical deep link received before consumption must coalesce in the single pending slot."
+)
+expect(
+    pendingDeepLink.acknowledgeCatalogDetail(delivery: initialDeepLinkDelivery) &&
+        !pendingDeepLink.acknowledgeCatalogDetail(delivery: initialDeepLinkDelivery),
+    "The matching listing deep-link delivery must be acknowledged exactly once."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+private let repeatedDeepLinkDelivery = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The same listing after consumption must create another delivery."
+)
+expect(
+    repeatedDeepLinkDelivery != initialDeepLinkDelivery &&
+        pendingDeepLink.acknowledgeCatalogDetail(delivery: repeatedDeepLinkDelivery),
+    "The same listing received after consumption must form a new delivery."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+private let deliveryBeforeReplacement = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The listing before replacement must have a delivery."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: replacementDeepLinkListingID)
+private let replacementDeepLinkDelivery = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The replacement listing must create a delivery."
+)
+expect(
+    pendingDeepLink.catalogDetailListingID == replacementDeepLinkListingID &&
+        replacementDeepLinkDelivery != deliveryBeforeReplacement &&
+        !pendingDeepLink.isCurrentCatalogDetail(delivery: deliveryBeforeReplacement) &&
+        pendingDeepLink.isCurrentCatalogDetail(delivery: replacementDeepLinkDelivery) &&
+        !pendingDeepLink.acknowledgeCatalogDetail(delivery: deliveryBeforeReplacement) &&
+        pendingDeepLink.acknowledgeCatalogDetail(delivery: replacementDeepLinkDelivery),
+    "The last different valid listing must replace the previous pending destination."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+pendingDeepLink.enqueueRoot(destinationKey: "home")
+expect(
+    pendingDeepLink.rootDestinationKey == "home" &&
+        pendingDeepLink.catalogDetailListingID == nil,
+    "A later root deep link must replace a pending listing destination."
+)
+expect(
+    pendingDeepLink.consumeRoot() && !pendingDeepLink.consumeRoot(),
+    "A root deep link must also be claimable exactly once."
+)
+pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+private let deliveryBeforeSensitiveReset = requireCatalogDetailDelivery(
+    pendingDeepLink,
+    "The pending listing before a sensitive reset must have a delivery."
+)
+pendingDeepLink.clear()
+expect(
+    pendingDeepLink.rootDestinationKey == nil &&
+        pendingDeepLink.catalogDetailListingID == nil &&
+        !pendingDeepLink.isCurrentCatalogDetail(delivery: deliveryBeforeSensitiveReset) &&
+        !pendingDeepLink.acknowledgeCatalogDetail(delivery: deliveryBeforeSensitiveReset) &&
+        catalogDetailPostBootstrapAction(pending: pendingDeepLink) == .wait,
+    "Sensitive resets must clear every pending internal deep link."
+)
+
 private func approximatelyEqual(
     _ first: CGFloat,
     _ second: CGFloat,

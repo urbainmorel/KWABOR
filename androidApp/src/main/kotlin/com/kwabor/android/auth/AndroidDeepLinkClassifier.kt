@@ -2,11 +2,14 @@ package com.kwabor.android.auth
 
 import com.kwabor.shared.domain.auth.PromoterActivationDeepLinkParser
 import com.kwabor.shared.domain.auth.PromoterActivationDeepLinkResult
+import com.kwabor.shared.presentation.detail.CatalogDetailDeepLinkParser
+import com.kwabor.shared.presentation.detail.CatalogDetailDeepLinkResult
 import java.net.URI
 import java.net.URISyntaxException
 
 internal enum class AndroidDeepLinkDestination {
     RootNavigation,
+    CatalogDetail,
     PromoterActivation,
     Rejected,
 }
@@ -17,6 +20,7 @@ internal object AndroidDeepLinkClassifier {
         return when {
             uri.isPromoterActivationUri() -> rawUrl.promoterActivationDestination()
             uri.isRootNavigationUri() -> AndroidDeepLinkDestination.RootNavigation
+            uri.isCatalogDetailUri() -> rawUrl.catalogDetailDestination()
             else -> AndroidDeepLinkDestination.Rejected
         }
     }
@@ -47,15 +51,29 @@ private fun URI.isRootNavigationUri(): Boolean {
     return fragment == null
 }
 
+private fun URI.isCatalogDetailUri(): Boolean {
+    if (!host.equals(KWABOR_LISTING_HOST, ignoreCase = true)) return false
+    if (userInfo != null) return false
+    if (query != null) return false
+    return fragment == null
+}
+
 private fun String.promoterActivationDestination(): AndroidDeepLinkDestination =
     when (PromoterActivationDeepLinkParser.parse(this)) {
         is PromoterActivationDeepLinkResult.Accepted -> AndroidDeepLinkDestination.PromoterActivation
         is PromoterActivationDeepLinkResult.Rejected -> AndroidDeepLinkDestination.Rejected
     }
 
+private fun String.catalogDetailDestination(): AndroidDeepLinkDestination =
+    when (CatalogDetailDeepLinkParser.parse(this)) {
+        is CatalogDetailDeepLinkResult.Accepted -> AndroidDeepLinkDestination.CatalogDetail
+        is CatalogDetailDeepLinkResult.Rejected -> AndroidDeepLinkDestination.Rejected
+    }
+
 private const val KWABOR_SCHEME = "kwabor"
 private const val KWABOR_AUTH_HOST = "auth"
 private const val KWABOR_APP_HOST = "app"
+private const val KWABOR_LISTING_HOST = "listing"
 private const val PROMOTER_ACTIVATION_PATH = "/promoter-activate"
 private const val NO_PORT = -1
 private const val MAXIMUM_DEEP_LINK_LENGTH = 12_288

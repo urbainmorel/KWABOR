@@ -3,6 +3,7 @@ package com.kwabor.shared.bridge
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KwaborSharedBridgeTest {
@@ -68,5 +69,18 @@ class KwaborSharedBridgeTest {
         val bridge = KwaborSharedBridge(hasCatalogConfiguration = true)
 
         assertTrue(bridge.hasCatalogConfiguration())
+    }
+
+    @Test
+    fun exposesOnlyAcceptedCatalogDetailDeepLinksToNativeHosts() {
+        val bridge = KwaborSharedBridge()
+        val listingId = "123e4567-e89b-42d3-a456-426614174000"
+
+        assertEquals(
+            listingId,
+            bridge.catalogDetailListingIdForDeepLink("KWABOR://LISTING/${listingId.uppercase()}"),
+        )
+        assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/$listingId?source=share"))
+        assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/not-a-uuid"))
     }
 }

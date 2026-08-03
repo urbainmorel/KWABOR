@@ -19,7 +19,7 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var accountSignOutErrorMessage: String?
     @Published private(set) var promoterActivationContext: PromoterActivationContext?
     @Published private(set) var promoterActivationErrorMessage: String?
-    @Published private(set) var pendingRootDeepLinkDestinationKey: String?
+    @Published private var pendingInternalDeepLink = PendingInternalDeepLink()
     @Published private(set) var interruptedRegistrationEmail: String?
     @Published var isAuthenticationPresented = false
     @Published var isRegistrationPresented = false
@@ -47,6 +47,23 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted && !hasCompleteAccount
     }
 
+    var pendingRootDeepLinkDestinationKey: String? {
+        pendingInternalDeepLink.rootDestinationKey
+    }
+
+    var catalogDetailDeepLinkDeliveryReadyForOpening: CatalogDetailDeepLinkDelivery? {
+        let action = CatalogDetailDeepLinkPostBootstrapPolicy.action(
+            hasPendingListing: pendingInternalDeepLink.catalogDetailDelivery != nil,
+            isIntroComplete: !shouldPresentLaunchIntro,
+            isSessionRestoreComplete: sessionRestoreCompleted,
+            isBlockingFlowActive: isCatalogDetailDeepLinkOpeningBlocked,
+            hasAuthenticatedAccount: hasCompleteAccount,
+            hasExplicitGuestAccess: guestAccessGranted
+        )
+        guard action == .openWhenHome else { return nil }
+        return pendingInternalDeepLink.catalogDetailDelivery
+    }
+
     var exploreViewerID: String? {
         guard hasCompleteAccount else { return nil }
         return authState?.currentSession?.userId ?? completedRegistrationSession?.userId
@@ -71,6 +88,18 @@ final class OnboardingCoordinator: ObservableObject {
         !AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) || requiresInterruptedRegistrationPasswordSignIn
+    }
+
+    private var isCatalogDetailDeepLinkOpeningBlocked: Bool {
+        route != .home ||
+        requiresProtectedAuthentication ||
+        isSigningOutAccount ||
+        isAuthenticationPresented ||
+        isRegistrationPresented ||
+        isPromoterActivationPresented ||
+        shouldPresentRegistrationAfterAuthenticationDismissal ||
+        authState?.hasPasswordRecoverySession == true ||
+        (authState?.hasSession == true && !hasCompleteAccount)
     }
 
     private let observability: FirebaseObservability
@@ -341,18 +370,47 @@ final class OnboardingCoordinator: ObservableObject {
                 return true
             }
         }
-        guard !requiresProtectedAuthentication else {
+        let catalogDetailListingID = bridge.catalogDetailListingIdForDeepLink(
+            rawUrl: url.absoluteString
+        )
+        if let catalogDetailListingID {
+            guard InternalDeepLinkIngressPolicy.shouldRetain(
+                validatedDestinationExists: true,
+                isSigningOut: isSigningOutAccount,
+                isDeletingAccount: isDeletingAccount
+            ) else { return true }
+            pendingInternalDeepLink.enqueueCatalogDetail(
+                validatedListingID: catalogDetailListingID
+            )
             return true
         }
-        guard let routeKey = bridge.rootDestinationKeyForDeepLink(rawUrl: url.absoluteString) else {
-            return false
+        let rootDestinationKey = bridge.rootDestinationKeyForDeepLink(
+            rawUrl: url.absoluteString
+        )
+        if let rootDestinationKey {
+            guard InternalDeepLinkIngressPolicy.shouldRetain(
+                validatedDestinationExists: true,
+                isSigningOut: isSigningOutAccount,
+                isDeletingAccount: isDeletingAccount
+            ) else { return true }
+            pendingInternalDeepLink.enqueueRoot(destinationKey: rootDestinationKey)
+            return true
         }
-        pendingRootDeepLinkDestinationKey = routeKey
-        return true
+        return requiresProtectedAuthentication
     }
 
     func consumeRootDeepLinkDestination() {
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.consumeRoot()
+    }
+
+    func isCurrentCatalogDetailDeepLink(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        catalogDetailDeepLinkDeliveryReadyForOpening != nil &&
+        pendingInternalDeepLink.isCurrentCatalogDetail(delivery: delivery)
+    }
+
+    @discardableResult
+    func acknowledgeCatalogDetailDeepLink(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        pendingInternalDeepLink.acknowledgeCatalogDetail(delivery: delivery)
     }
 
     func completePromoterActivation(_ result: PromoterActivationResult) {
@@ -385,7 +443,7 @@ final class OnboardingCoordinator: ObservableObject {
         isPromoterActivationPresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
         resolveRoute()
         processPendingPromoterActivationCallbackIfPossible()
     }
@@ -427,6 +485,7 @@ final class OnboardingCoordinator: ObservableObject {
 
     func signOutCurrentAccount() {
         guard !isSigningOutAccount else { return }
+        pendingInternalDeepLink.clear()
         accountSignOutErrorMessage = nil
         isSigningOutAccount = true
         guestAccessGranted = true
@@ -441,7 +500,7 @@ final class OnboardingCoordinator: ObservableObject {
                 completedRegistrationSession = nil
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
-                pendingRootDeepLinkDestinationKey = nil
+                pendingInternalDeepLink.clear()
                 registrationController.reset()
             } else {
                 guestAccessGranted = false
@@ -459,6 +518,7 @@ final class OnboardingCoordinator: ObservableObject {
         guard isDeletingAccount != isInProgress else { return }
         isDeletingAccount = isInProgress
         if isInProgress {
+            pendingInternalDeepLink.clear()
             invalidatePromoterActivationCallbacksForAccountDeletion()
         } else if temporaryPromoterActivationSessionCleanupRequired {
             clearTemporaryPromoterActivationSessionBeforeBootstrap()
@@ -489,7 +549,7 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
         resolveRoute()
     }
 
@@ -995,7 +1055,7 @@ final class OnboardingCoordinator: ObservableObject {
         isGuestDisclosurePresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
         resolveRoute()
         authController.signOut { [weak self] completed in
             guard let self else { return }
@@ -1101,7 +1161,7 @@ final class OnboardingCoordinator: ObservableObject {
         isGuestDisclosurePresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
     }
 
     private func markFirstLaunchCompletedIfEligible() {

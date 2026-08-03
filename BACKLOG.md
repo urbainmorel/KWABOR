@@ -166,6 +166,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     Android Compose et iOS SwiftUI, sans nouvel onglet racine ni sponsoring.
   - [ ] PR-GUIDE-001B — Valider la migration sur une stack Supabase isolée et les sources Swift sous
     Xcode/macOS, puis publier la branche empilée après décision sur la CI API 36.
+  - [x] ACTIONS-001C1 — Livrer localement la route interne stricte de fiche Android/iOS : validation
+    UUID partagée, dernier lien valide restaurable, attente intro/bootstrap/E3, ouverture Accueil puis
+    détail, acquittement conditionnel et invalidation lors des resets sensibles.
+  - [ ] PR-ACTIONS-001C1 — Valider les PolicyTests et le parcours `onOpenURL` sous Xcode/macOS, puis
+    l'intent froid/chaud sur Android installé avant toute publication de la branche.
   - [ ] ACTIONS-001C — Livrer partage et signalement réels avec contrats serveur et parcours natifs.
   - [ ] ACTIONS-001D — Livrer le claim sécurisé relié aux organisations vérifiées et aux droits RLS.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.

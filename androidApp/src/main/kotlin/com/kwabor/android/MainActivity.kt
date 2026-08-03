@@ -5,10 +5,13 @@ import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.kwabor.android.app.AndroidDeepLinkSlotViewModel
+import com.kwabor.android.app.AndroidSensitiveAuthDeepLinkPolicy
 import com.kwabor.android.app.KwaborApp
 import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
@@ -46,7 +49,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
-    private val pendingDeepLink = MutableStateFlow<String?>(null)
+    private val deepLinkSlotViewModel by viewModels<AndroidDeepLinkSlotViewModel>()
     private val launchSplashExited = MutableStateFlow(false)
     private var pendingAuthCallback: String? = null
     private var authViewModel: AuthViewModel? = null
@@ -117,9 +120,12 @@ class MainActivity : ComponentActivity() {
             KwaborApp(
                 dependencies = dependencies,
                 runtimeState = KwaborAppRuntimeState(
-                    pendingDeepLink = pendingDeepLink,
+                    pendingDeepLink = deepLinkSlotViewModel.delivery,
                     launchSplashExited = launchSplashExited,
-                    onDeepLinkConsumed = { pendingDeepLink.value = null },
+                    onDeepLinkAcknowledged = { deliveryId ->
+                        deepLinkSlotViewModel.acknowledge(deliveryId)
+                    },
+                    onDeepLinksReset = deepLinkSlotViewModel::resetForSensitiveAuthTransition,
                 ),
             )
         }
@@ -245,9 +251,23 @@ class MainActivity : ComponentActivity() {
         val data = sourceIntent.data ?: return
         sourceIntent.data = null
         val rawUrl = data.toString()
-        when (AndroidDeepLinkClassifier.classify(rawUrl)) {
+        val destination = AndroidDeepLinkClassifier.classify(rawUrl)
+        when (destination) {
             AndroidDeepLinkDestination.PromoterActivation -> acceptPromoterAuthCallback(rawUrl)
-            AndroidDeepLinkDestination.RootNavigation -> pendingDeepLink.value = rawUrl
+            AndroidDeepLinkDestination.RootNavigation,
+            AndroidDeepLinkDestination.CatalogDetail,
+            -> {
+                val authAccess = authViewModel?.accessState?.value
+                if (
+                    AndroidSensitiveAuthDeepLinkPolicy.shouldRetainNavigation(
+                        destination = destination,
+                        signOutInProgress = authAccess?.signOutInProgress == true,
+                        accountDeletionInProgress = authAccess?.accountDeletionInProgress == true,
+                    )
+                ) {
+                    deepLinkSlotViewModel.offer(rawUrl)
+                }
+            }
             AndroidDeepLinkDestination.Rejected -> Unit
         }
     }

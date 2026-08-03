@@ -236,12 +236,24 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   lint/pureté du domaine/compilations Kotlin iOS verts, 369 tests shared et 178 tests Android sans
   échec. La migration et son plan `77/77` passent `pglast`; les vérificateurs dépôt, marque et intro
   Store-only sont verts. Les revues finales shared, Android, iOS et SQL ne relèvent plus de P1/P2.
+- ACTIONS-001C1 est implémentée localement sur `codex/actions-001c-detail-deeplink`, empilée sur
+  GUIDE-001B : la route interne stricte `kwabor://listing/<uuid>` ouvre une fiche depuis Android ou
+  iOS sans être exposée comme lien de partage public. Le domaine HTTPS, les App Links/Universal Links
+  et le signalement restent explicitement hors de ce sous-lot.
+- Android conserve le dernier lien valide dans un `SavedStateHandle`, coalesce un doublon en attente,
+  protège l'acquittement par identifiant et restaure la demande après recréation. Android et iOS
+  attendent l'intro, la restauration et le choix E3 explicite, puis ordonnent Accueil → ouverture →
+  acquittement ; une déconnexion ou suppression de compte invalide immédiatement la demande.
+- Validation locale ACTIONS-001C1 : `check`, Spotless, Detekt, lint, pureté du domaine, schémas Room,
+  APK debug et compilation Kotlin iOS Simulator verts en 12 min 31 s ; 379 tests shared et 190 tests
+  Android sans échec. L'APK contient l'hôte `listing`, les vérificateurs dépôt et intro Store-only sont
+  verts, et deux contre-revues ne relèvent plus de P1/P2.
 
 ## Tâche en cours
 
-Clore GUIDE-001B à la frontière locale : intégrer les dernières revues, conserver le lot sur sa branche
-sans push, puis attendre l'accord explicite avant toute modification/reprise de la CI API 36 ou
-publication de la branche. Les revues humaines de la pile restent requises dans l'ordre.
+Clore ACTIONS-001C1 à la frontière locale : conserver le lot sur sa branche sans push, puis obtenir la
+validation Swift/Xcode et la preuve d'intent Android sur un appareil ou émulateur avant publication.
+Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
 
 ## Blocages / limites
 
@@ -259,6 +271,12 @@ publication de la branche. Les revues humaines de la pile restent requises dans 
 - Les sources SwiftUI GUIDE-001B et leur intégration Xcode ont été revues statiquement, mais Xcode
   n'est pas disponible sur ce poste Windows. Compilation, tests Swift et preuve VoiceOver restent à
   exécuter sur macOS avant publication.
+- Les PolicyTests et sources SwiftUI ACTIONS-001C1 ont été revus statiquement, mais Swift/Xcode sont
+  absents de ce poste Windows. Leur compilation native et le parcours `onOpenURL` restent à prouver
+  sur macOS avant publication de la branche.
+- `kwabor://listing/<uuid>` est volontairement interne et sans fallback. Un domaine HTTPS officiel,
+  ses fichiers d'association, les fallbacks Store/serveur et le contrat de signalement sont requis
+  avant de pouvoir livrer le partage public demandé par ACTIONS-001C.
 - Le job Android API 36 de la PR `#48` échoue au stade de capture PNG brute malgré un cold start
   réussi. Le correctif de harnais proposé reste limité à quatre cœurs et `swiftshader`, sans changer
   les seuils de preuve ; aucune modification ni nouvelle exécution n'est autorisée sans accord explicite.
@@ -285,8 +303,7 @@ publication de la branche. Les revues humaines de la pile restent requises dans 
 
 ## Prochaine tâche logique
 
-Après accord explicite, appliquer une seule fois le correctif minimal du harnais API 36 et rejouer la
-CI de `#48`. Si elle est verte, publier GUIDE-001B, exécuter pgTAP sur une stack Supabase isolée et
-valider Swift/Xcode sur macOS. Poursuivre ensuite ACTIONS-001 par partage/signalement puis claim, sans
-CTA factice. La vidéo d'intro reste embarquée : tout changement d'octets exige une nouvelle release
-Android/iOS dans les Stores.
+Valider ACTIONS-001C1 sous Swift/Xcode et sur un appareil ou émulateur Android, sans relancer la CI ni
+publier la branche sans accord explicite. Décider ensuite du domaine HTTPS officiel et du contrat
+serveur de signalement pour terminer ACTIONS-001C, sans CTA factice. La vidéo d'intro reste embarquée :
+tout changement d'octets exige une nouvelle release Android/iOS dans les Stores.

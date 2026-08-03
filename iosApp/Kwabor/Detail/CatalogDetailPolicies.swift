@@ -1,5 +1,99 @@
 import Foundation
 
+struct CatalogDetailDeepLinkDelivery: Equatable {
+    let listingID: String
+    let revision: UInt64
+}
+
+struct PendingInternalDeepLink: Equatable {
+    private(set) var rootDestinationKey: String?
+    private(set) var catalogDetailListingID: String?
+    private var catalogDetailDeliveryRevision: UInt64 = 0
+
+    init() {}
+
+    var catalogDetailDelivery: CatalogDetailDeepLinkDelivery? {
+        guard let catalogDetailListingID else { return nil }
+        return CatalogDetailDeepLinkDelivery(
+            listingID: catalogDetailListingID,
+            revision: catalogDetailDeliveryRevision
+        )
+    }
+
+    mutating func enqueueRoot(destinationKey: String) {
+        rootDestinationKey = destinationKey
+        catalogDetailListingID = nil
+    }
+
+    @discardableResult
+    mutating func enqueueCatalogDetail(validatedListingID: String?) -> Bool {
+        guard let validatedListingID else { return false }
+        rootDestinationKey = nil
+        guard catalogDetailListingID != validatedListingID else { return true }
+        catalogDetailDeliveryRevision &+= 1
+        catalogDetailListingID = validatedListingID
+        return true
+    }
+
+    @discardableResult
+    mutating func consumeRoot() -> Bool {
+        guard rootDestinationKey != nil else { return false }
+        rootDestinationKey = nil
+        return true
+    }
+
+    func isCurrentCatalogDetail(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        catalogDetailDelivery == delivery
+    }
+
+    @discardableResult
+    mutating func acknowledgeCatalogDetail(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        guard isCurrentCatalogDetail(delivery: delivery) else { return false }
+        catalogDetailListingID = nil
+        return true
+    }
+
+    mutating func clear() {
+        rootDestinationKey = nil
+        catalogDetailListingID = nil
+    }
+}
+
+enum InternalDeepLinkIngressPolicy {
+    static func shouldRetain(
+        validatedDestinationExists: Bool,
+        isSigningOut: Bool,
+        isDeletingAccount: Bool
+    ) -> Bool {
+        validatedDestinationExists && !isSigningOut && !isDeletingAccount
+    }
+}
+
+enum CatalogDetailDeepLinkPostBootstrapAction: Equatable {
+    case wait
+    case openWhenHome
+}
+
+enum CatalogDetailDeepLinkPostBootstrapPolicy {
+    static func action(
+        hasPendingListing: Bool,
+        isIntroComplete: Bool,
+        isSessionRestoreComplete: Bool,
+        isBlockingFlowActive: Bool,
+        hasAuthenticatedAccount: Bool,
+        hasExplicitGuestAccess: Bool
+    ) -> CatalogDetailDeepLinkPostBootstrapAction {
+        guard hasPendingListing,
+              isIntroComplete,
+              isSessionRestoreComplete,
+              !isBlockingFlowActive,
+              hasAuthenticatedAccount || hasExplicitGuestAccess else {
+            return .wait
+        }
+        return .openWhenHome
+    }
+}
+
 enum CatalogDetailLayoutPolicy {
     static let mobileSheetHeightFraction: CGFloat = 0.92
     static let tabletSheetHeightFraction: CGFloat = 0.85

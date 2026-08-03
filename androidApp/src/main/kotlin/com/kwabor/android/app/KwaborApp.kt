@@ -65,8 +65,6 @@ import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.PasswordRecoveryUiState
 import com.kwabor.shared.presentation.auth.RegistrationUiState
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
-import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
-import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
 import com.kwabor.shared.presentation.navigation.label
 import com.kwabor.shared.presentation.onboarding.OnboardingEntry
@@ -79,8 +77,13 @@ internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: Kwabor
     val strings = stringsFor(AppLocale.French)
     OnboardingEffectHandler(dependencies = dependencies)
     AuthPlatformEffectHandler(dependencies = dependencies)
+    SensitiveAuthDeepLinkResetHandler(
+        signOutInProgress = state.authAccess.signOutInProgress,
+        accountDeletionInProgress = state.authAccess.accountDeletionInProgress,
+        onReset = runtimeState.onDeepLinksReset,
+    )
     KwaborTheme {
-        KwaborThemedContent(state, strings, dependencies, runtimeState.onDeepLinkConsumed)
+        KwaborThemedContent(state, strings, dependencies, runtimeState)
     }
 }
 
@@ -89,7 +92,7 @@ private fun KwaborThemedContent(
     state: KwaborCollectedState,
     strings: KwaborStrings,
     dependencies: KwaborAppDependencies,
-    onDeepLinkConsumed: () -> Unit,
+    runtimeState: KwaborAppRuntimeState,
 ) {
     when (state.authPlatform.surface) {
         AuthSurface.Registration -> RegistrationSurface(
@@ -123,7 +126,7 @@ private fun KwaborThemedContent(
             state = state,
             strings = strings,
             dependencies = dependencies,
-            onDeepLinkConsumed = onDeepLinkConsumed,
+            runtimeState = runtimeState,
         )
     }
     SoftWallOverlay(state.authPlatform.surface, strings, dependencies.authViewModel)
@@ -150,15 +153,16 @@ internal data class KwaborAppDependencies(
 )
 
 internal data class KwaborAppRuntimeState(
-    val pendingDeepLink: StateFlow<String?>,
+    val pendingDeepLink: StateFlow<AndroidDeepLinkDelivery?>,
     val launchSplashExited: StateFlow<Boolean>,
-    val onDeepLinkConsumed: () -> Unit,
+    val onDeepLinkAcknowledged: (Long) -> Unit,
+    val onDeepLinksReset: () -> Unit,
 )
 
 private class KwaborCollectedState(
     val authentication: CollectedAuthenticationState,
     val onboarding: OnboardingUiState,
-    val deepLink: String?,
+    val deepLink: AndroidDeepLinkDelivery?,
     val launchSplashExited: Boolean,
 ) {
     val auth: AuthUiState get() = authentication.auth
@@ -210,7 +214,17 @@ private data class HomeShellDependencies(
     val onboardingViewModel: OnboardingViewModel,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
     val detailExternalActionLauncher: DetailExternalActionLauncher,
-)
+) {
+    constructor(dependencies: KwaborAppDependencies) : this(
+        exploreViewModel = dependencies.exploreViewModel,
+        catalogDetailViewModel = dependencies.catalogDetailViewModel,
+        guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
+        authViewModel = dependencies.authViewModel,
+        onboardingViewModel = dependencies.onboardingViewModel,
+        listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+        detailExternalActionLauncher = dependencies.detailExternalActionLauncher,
+    )
+}
 
 private object AuthEffectDispatcher {
     val dispatch: (AuthEffect, String?, HomeShellDependencies, RootEffectActions) -> Unit =
@@ -232,7 +246,7 @@ private object AuthEffectDispatcher {
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
-                    actions.onDeepLinkConsumed()
+                    actions.onDeepLinksReset()
                     dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.SignOutNavigationHandled)
                 }
@@ -240,7 +254,7 @@ private object AuthEffectDispatcher {
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
-                    actions.onDeepLinkConsumed()
+                    actions.onDeepLinksReset()
                     dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.AccountDeletionNavigationHandled)
                 }
@@ -248,7 +262,7 @@ private object AuthEffectDispatcher {
                     dependencies.syncExploreViewerContext()
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
-                    actions.onDeepLinkConsumed()
+                    actions.onDeepLinksReset()
                 }
             }
         }
@@ -257,8 +271,22 @@ private object AuthEffectDispatcher {
 private data class HomeShellState(
     val auth: AuthUiState,
     val authAccess: AuthAccessUiState,
-    val deepLink: String?,
-)
+    val deepLink: AndroidDeepLinkDelivery?,
+) {
+    constructor(state: KwaborCollectedState) : this(
+        auth = state.auth,
+        authAccess = state.authAccess,
+        deepLink = AndroidDeepLinkDispatchPolicy.readyDelivery(
+            delivery = state.deepLink,
+            eligibility = AndroidDeepLinkHomeEligibility(
+                isSessionRestoreComplete = state.isSessionRestoreComplete,
+                isIntroRequired = state.onboarding.isIntroRequired,
+                isAuthenticated = state.auth.isAuthenticated,
+                isGuestSession = state.onboarding.isGuestSession,
+            ),
+        ),
+    )
+}
 
 @Composable
 private fun collectKwaborAppState(
@@ -309,7 +337,7 @@ private fun KwaborEntryContent(
     state: KwaborCollectedState,
     strings: KwaborStrings,
     dependencies: KwaborAppDependencies,
-    onDeepLinkConsumed: () -> Unit,
+    runtimeState: KwaborAppRuntimeState,
 ) {
     when (entry) {
         OnboardingEntry.RestoringSession -> SessionRestoreScreen(strings = strings)
@@ -325,21 +353,10 @@ private fun KwaborEntryContent(
             viewModel = dependencies.onboardingViewModel,
         )
         OnboardingEntry.Home -> KwaborAppContent(
-            dependencies = HomeShellDependencies(
-                exploreViewModel = dependencies.exploreViewModel,
-                catalogDetailViewModel = dependencies.catalogDetailViewModel,
-                guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
-                authViewModel = dependencies.authViewModel,
-                onboardingViewModel = dependencies.onboardingViewModel,
-                listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
-                detailExternalActionLauncher = dependencies.detailExternalActionLauncher,
-            ),
-            state = HomeShellState(
-                auth = state.auth,
-                authAccess = state.authAccess,
-                deepLink = state.deepLink.takeIf { state.isSessionRestoreComplete },
-            ),
-            onDeepLinkConsumed = onDeepLinkConsumed,
+            dependencies = HomeShellDependencies(dependencies),
+            state = HomeShellState(state),
+            onDeepLinkAcknowledged = runtimeState.onDeepLinkAcknowledged,
+            onDeepLinksReset = runtimeState.onDeepLinksReset,
         )
     }
 }
@@ -359,9 +376,9 @@ private fun SessionRestoreScreen(strings: KwaborStrings) {
 private fun KwaborAppContent(
     dependencies: HomeShellDependencies,
     state: HomeShellState,
-    onDeepLinkConsumed: () -> Unit,
+    onDeepLinkAcknowledged: (Long) -> Unit,
+    onDeepLinksReset: () -> Unit,
 ) {
-    val strings = stringsFor(AppLocale.French)
     val navController = rememberNavController()
     var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
     val requestDestination = rootDestinationRequester(
@@ -371,13 +388,14 @@ private fun KwaborAppContent(
         { destination -> pendingDestinationKey = destination.routeKey },
     )
 
-    val effectActions = RootEffectActions(
-        onDestinationRequested = requestDestination,
-        onAuthenticatedDestinationRequested = navController::navigateToRoot,
-        onDestinationResolved = { pendingDestinationKey = null },
-        onDeepLinkConsumed = onDeepLinkConsumed,
+    val actions = kwaborAppEffectActions(
+        navController,
+        dependencies.catalogDetailViewModel,
+        requestDestination,
+        { pendingDestinationKey = null },
+        KwaborDeepLinkCallbacks(onDeepLinkAcknowledged, onDeepLinksReset),
     )
-    DeepLinkEffectHandler(deepLink = state.deepLink, actions = effectActions)
+    DeepLinkEffectHandler(deepLink = state.deepLink, actions = actions.deepLink)
     ExploreViewerContextHandler(
         viewerId = state.auth.exploreViewerId,
         exploreViewModel = dependencies.exploreViewModel,
@@ -390,11 +408,11 @@ private fun KwaborAppContent(
     AuthEffectHandler(
         pendingDestinationKey = pendingDestinationKey,
         dependencies = dependencies,
-        actions = effectActions,
+        actions = actions.root,
     )
     KwaborNavigationShell(
         navController = navController,
-        strings = strings,
+        strings = stringsFor(AppLocale.French),
         dependencies = dependencies,
         state = state,
         onDestinationSelected = requestDestination,
@@ -520,19 +538,6 @@ private inline fun <reified Route : Any> NavGraphBuilder.rootAnchor(
 }
 
 @Composable
-private fun DeepLinkEffectHandler(deepLink: String?, actions: RootEffectActions) {
-    val currentActions by rememberUpdatedState(actions)
-    LaunchedEffect(deepLink) {
-        val currentDeepLink = deepLink ?: return@LaunchedEffect
-        when (val result = RootDeepLinkParser.parse(currentDeepLink)) {
-            is RootDeepLinkResult.Accepted -> currentActions.onDestinationRequested(result.destination)
-            is RootDeepLinkResult.Rejected -> Unit
-        }
-        currentActions.onDeepLinkConsumed()
-    }
-}
-
-@Composable
 private fun ExploreEffectHandler(dependencies: HomeShellDependencies) {
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -572,7 +577,40 @@ private data class RootEffectActions(
     val onDestinationRequested: (RootNavigationDestination) -> Unit,
     val onAuthenticatedDestinationRequested: (RootNavigationDestination) -> Unit,
     val onDestinationResolved: () -> Unit,
-    val onDeepLinkConsumed: () -> Unit,
+    val onDeepLinksReset: () -> Unit,
+)
+
+private data class KwaborAppEffectActions(
+    val root: RootEffectActions,
+    val deepLink: AndroidNavigationDeepLinkDispatchActions,
+)
+
+private data class KwaborDeepLinkCallbacks(
+    val onAcknowledged: (Long) -> Unit,
+    val onReset: () -> Unit,
+)
+
+private fun kwaborAppEffectActions(
+    navController: NavHostController,
+    catalogDetailViewModel: CatalogDetailViewModel,
+    requestDestination: (RootNavigationDestination) -> Unit,
+    onDestinationResolved: () -> Unit,
+    deepLinkCallbacks: KwaborDeepLinkCallbacks,
+): KwaborAppEffectActions = KwaborAppEffectActions(
+    root = RootEffectActions(
+        onDestinationRequested = requestDestination,
+        onAuthenticatedDestinationRequested = navController::navigateToRoot,
+        onDestinationResolved = onDestinationResolved,
+        onDeepLinksReset = deepLinkCallbacks.onReset,
+    ),
+    deepLink = AndroidNavigationDeepLinkDispatchActions(
+        onRootDestination = requestDestination,
+        onHomeDestination = { navController.navigateToRoot(RootNavigationDestination.Home) },
+        onCatalogDetailOpen = { listingId ->
+            catalogDetailViewModel.onIntent(CatalogDetailIntent.Open(listingId))
+        },
+        onAcknowledged = deepLinkCallbacks.onAcknowledged,
+    ),
 )
 
 private val AuthUiState.exploreViewerId: String?

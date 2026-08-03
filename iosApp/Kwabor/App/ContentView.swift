@@ -20,6 +20,9 @@ struct ContentView: View {
     let onAccountDeleted: () -> Void
     let rootDeepLinkDestinationKey: String?
     let onRootDeepLinkConsumed: () -> Void
+    let catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery?
+    let isCatalogDetailDeepLinkCurrent: (CatalogDetailDeepLinkDelivery) -> Bool
+    let onCatalogDetailDeepLinkAcknowledged: (CatalogDetailDeepLinkDelivery) -> Bool
     @State private var selectedDestination = RootDestination.home
 
     init(
@@ -40,7 +43,10 @@ struct ContentView: View {
         onAccountDeletionStateChanged: @escaping (Bool) -> Void = { _ in },
         onAccountDeleted: @escaping () -> Void = {},
         rootDeepLinkDestinationKey: String? = nil,
-        onRootDeepLinkConsumed: @escaping () -> Void = {}
+        onRootDeepLinkConsumed: @escaping () -> Void = {},
+        catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery? = nil,
+        isCatalogDetailDeepLinkCurrent: @escaping (CatalogDetailDeepLinkDelivery) -> Bool = { _ in false },
+        onCatalogDetailDeepLinkAcknowledged: @escaping (CatalogDetailDeepLinkDelivery) -> Bool = { _ in false }
     ) {
         self.bridge = bridge
         self.exploreStore = exploreStore
@@ -60,6 +66,9 @@ struct ContentView: View {
         self.onAccountDeleted = onAccountDeleted
         self.rootDeepLinkDestinationKey = rootDeepLinkDestinationKey
         self.onRootDeepLinkConsumed = onRootDeepLinkConsumed
+        self.catalogDetailDeepLinkDelivery = catalogDetailDeepLinkDelivery
+        self.isCatalogDetailDeepLinkCurrent = isCatalogDetailDeepLinkCurrent
+        self.onCatalogDetailDeepLinkAcknowledged = onCatalogDetailDeepLinkAcknowledged
     }
 
     var body: some View {
@@ -104,8 +113,12 @@ struct ContentView: View {
                     .presentationContentInteraction(.scrolls)
             }
             .onAppear(perform: applyPendingRootDeepLink)
+            .onAppear(perform: applyPendingCatalogDetailDeepLink)
             .onChange(of: rootDeepLinkDestinationKey) { _, _ in
                 applyPendingRootDeepLink()
+            }
+            .onChange(of: catalogDetailDeepLinkDelivery) { _, _ in
+                applyPendingCatalogDetailDeepLink()
             }
             .onChange(of: isGuestSession) { _, isGuest in
                 if isGuest {
@@ -158,6 +171,16 @@ struct ContentView: View {
         if selectDestinationIfAllowed(destination) {
             onRootDeepLinkConsumed()
         }
+    }
+
+    private func applyPendingCatalogDetailDeepLink() {
+        guard let delivery = catalogDetailDeepLinkDelivery,
+              isCatalogDetailDeepLinkCurrent(delivery) else {
+            return
+        }
+        selectedDestination = .home
+        catalogDetailStore.open(listingID: delivery.listingID)
+        _ = onCatalogDetailDeepLinkAcknowledged(delivery)
     }
 }
 

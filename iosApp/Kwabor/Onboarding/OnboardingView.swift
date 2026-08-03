@@ -39,7 +39,14 @@ struct OnboardingView: View {
                     },
                     onAccountDeleted: coordinator.accountDeletionCompleted,
                     rootDeepLinkDestinationKey: coordinator.pendingRootDeepLinkDestinationKey,
-                    onRootDeepLinkConsumed: coordinator.consumeRootDeepLinkDestination
+                    onRootDeepLinkConsumed: coordinator.consumeRootDeepLinkDestination,
+                    catalogDetailDeepLinkDelivery: coordinator.catalogDetailDeepLinkDeliveryReadyForOpening,
+                    isCatalogDetailDeepLinkCurrent: {
+                        coordinator.isCurrentCatalogDetailDeepLink(delivery: $0)
+                    },
+                    onCatalogDetailDeepLinkAcknowledged: {
+                        coordinator.acknowledgeCatalogDetailDeepLink(delivery: $0)
+                    }
                 )
             }
         }
