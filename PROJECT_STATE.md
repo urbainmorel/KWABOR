@@ -214,10 +214,11 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Le runtime partagé annule et ignore les réponses obsolètes, conserve la source seulement pendant l'ouverture et recalcule chaque minute les statuts Ouvert/Fermé et Événement terminé sans nouvel appel réseau. Les lieux liés des événements sont conservés et la borne de fin est inclusive.
 - Les libellés courts du read model sont désormais bornés de façon identique en SQL et Kotlin : tags `10 × 24`, tableaux typés `20 × 80`, et au plus 20 chambres ou paliers de 80 caractères Unicode, sans contrôles. Les projections dédupliquent les libellés traduits. Le plan détail compte maintenant 211 assertions ; son exécution Supabase attend la CI de la PR empilée.
 - La porte locale complète DETAIL-001B est verte en 9 min 56 s : `spotlessCheck`, `detekt`, `check`, lint, APK Android, compilations iOS, 330 tests shared et 156 tests Android sans échec. Les vérificateurs dépôt, onboarding Store-only et marque sont verts. Trois revues indépendantes ont fait corriger robustesse, temporalité, petite hauteur, TalkBack, Unicode, contraste, clés Compose et couleurs métier ; leurs passes finales ne relèvent aucun P0/P1/P2.
+- La PR brouillon DETAIL-001B `#46` est publiée au-dessus de DETAIL-001A `#45`. Sa CI exact-head, dont la stack isolée doit exécuter les 641 assertions PostgreSQL standard et les 12 assertions concurrentes, est en attente.
 
 ## Tâche en cours
 
-Publier DETAIL-001B en PR brouillon empilée sur DETAIL-001A `#45`, obtenir sa CI exact-head puis sa revue humaine. Les revues humaines de `#41` à `#45` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
+Obtenir la CI exact-head puis la revue humaine de la PR brouillon DETAIL-001B `#46`, empilée sur DETAIL-001A `#45`. Les revues humaines de `#41` à `#46` restent requises dans l'ordre de la pile ; les gates propriétaire/appareils de BRAND-002 restent obligatoires.
 La PR d'authentification `#34` reste séparée : son parcours compact et sa politique de consentement exigent une validation produit ; elle ne doit pas être fusionnée telle quelle sur `#38`.
 
 ## Blocages / limites
@@ -252,7 +253,7 @@ La PR d'authentification `#34` reste séparée : son parcours compact et sa poli
 
 ## Prochaine tâche logique
 
-Publier et valider la PR DETAIL-001B au-dessus de DETAIL-001A `#45`, puis livrer DETAIL-IOS-001 sans
-marquer DETAIL-001 terminé avant la parité SwiftUI et les actions réelles. La pile `#35` → `#45`
+Valider la PR DETAIL-001B `#46` au-dessus de DETAIL-001A `#45`, puis livrer DETAIL-IOS-001 sans
+marquer DETAIL-001 terminé avant la parité SwiftUI et les actions réelles. La pile `#35` → `#46`
 doit toujours être approuvée et fusionnée dans l'ordre. La revue appareils BRAND-002 et
 ENV-001B/OBS-001B restent des gates propriétaire, sans bloquer la vidéo embarquée.

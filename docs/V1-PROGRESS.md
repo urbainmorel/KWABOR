@@ -17,7 +17,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | PR média/BRAND-002 | `#38`, brouillon empilé sur `#37`, sept checks verts sur le commit `94a31d5` |
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
-| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android validé localement et en attente de publication empilée |
+| Détail catalogue | DETAIL-001A dans la PR brouillon `#45` ; DETAIL-001B Android dans la PR brouillon `#46`, CI exact-head en attente |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -91,7 +91,8 @@ SQL/Kotlin des libellés courts et collections imbriquées portent le plan pgTAP
 assertions ; leur exécution attend
 la CI Supabase de la PR empilée, le Docker Kwabor local restant arrêté. Les vérificateurs dépôt,
 onboarding Store-only et marque sont verts. Trois revues indépendantes ont été traitées sans
-P0/P1/P2 résiduel. La publication et la CI exact-head restent à terminer avant revue humaine.
+P0/P1/P2 résiduel. La PR brouillon `#46` est publiée au-dessus de `#45` ; sa CI exact-head reste à
+terminer avant revue humaine.
 
 ### INTRO-STORE-001 — Vidéo distribuée par les Stores
 
@@ -170,7 +171,7 @@ Objectifs :
 
 1. Obtenir la revue humaine puis fusionner la PR `#35`.
 2. Retargeter si nécessaire, relire puis fusionner la PR `#36` vers `main`.
-3. Obtenir la revue humaine de DETAIL-001A `#45`, publier DETAIL-001B au-dessus puis faire relire la pile dans l'ordre.
+3. Obtenir la revue humaine de DETAIL-001A `#45`, valider DETAIL-001B `#46` au-dessus puis faire relire la pile dans l'ordre.
 4. Exécuter la préflight avant tout déploiement sur une base persistante.
 5. Faire valider le parcours compact et la politique de consentement, puis fermer la PR `#34` comme supersédée et reporter manuellement ses portions auth approuvées au-dessus de `#38`.
 6. Faire valider le périmètre V1 minimal et la navigation.

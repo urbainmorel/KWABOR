@@ -146,8 +146,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       les lieux et les états chargement/introuvable/offline/erreur.
     - [x] Rafraîchir localement les statuts temporels, borner les libellés courts SQL/Kotlin et couvrir
       concurrence, Unicode, médias, accessibilité et politique d'actions par tests.
-  - [ ] PR-DETAIL-001B — Publier la branche `codex/detail-001b-android-sheet` au-dessus de `#45`,
-    obtenir la CI exact-head puis la revue humaine.
+  - [ ] PR-DETAIL-001B — PR brouillon `#46` publiée au-dessus de `#45` ; obtenir la CI exact-head
+    puis la revue humaine.
   - [ ] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
 - [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide et claim.
