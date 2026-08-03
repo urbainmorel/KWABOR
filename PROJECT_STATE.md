@@ -254,13 +254,19 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   processus. Aucun crash ni ANR KWABOR n'est observé ; la preuve visuelle de la fiche connectée reste
   hors de portée sans configuration Supabase locale et sur cet AVD dont les processus système
   `Pixel Launcher`/`Interface` déclenchent des ANR.
+- DOC-001 livre un système documentaire vérifié : `README.md` sert de porte d'entrée courte,
+  `docs/index.md` route vers les sources canoniques, et les guides setup, architecture, données,
+  tests, environnements, déploiement et contribution distinguent état actuel, cible et dépendances
+  propriétaire. Les commandes, chemins, liens locaux et règles mobile-only/vidéo Store-only ont été
+  contrôlés contre le dépôt ; aucun code applicatif, workflow, secret ou environnement distant n'a
+  été modifié.
 
 ## Tâche en cours
 
-Clore ACTIONS-001C1 à la frontière locale : conserver le lot sur sa branche sans push, puis obtenir la
-validation Swift/Xcode et le parcours connecté de bout en bout sur appareils configurés avant
-publication. L'installation, la résolution et la livraison d'intent Android froid/chaud sont prouvées.
-Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
+DOC-001 est terminé localement sur `codex/doc-001-documentation-system`, empilé sur
+`codex/actions-001c-detail-deeplink`, sans push. ACTIONS-001C1 reste à valider sous Swift/Xcode et
+sur un parcours connecté avant publication ; l'installation, la résolution et les intents Android
+froid/chaud sont déjà prouvés. Le partage HTTPS public et le signalement restent ouverts.
 - L'audit `docs/audits/2026-08-03-actions-001c-reporting-readiness.md` confirme qu'aucun signalement
   de fiche n'existe encore. Il propose ACTIONS-001C2, fortement typé et transactionnel, mais suspend
   l'implémentation à cinq décisions produit : authentification, cible initiale, détail du motif Autre,
@@ -317,8 +323,8 @@ Le partage HTTPS public et le signalement restent ouverts dans ACTIONS-001C.
 
 ## Prochaine tâche logique
 
-Valider ACTIONS-001C1 sous Swift/Xcode et exécuter le parcours connecté sur appareils configurés,
-sans relancer la CI ni publier la branche sans accord explicite. Faire valider les cinq décisions de
-l'audit ACTIONS-001C2, puis implémenter le signalement d'une fiche. Le domaine HTTPS officiel reste à
-décider pour terminer le partage public, sans CTA factice. La vidéo d'intro reste embarquée : tout
-changement d'octets exige une nouvelle release Android/iOS dans les Stores.
+Faire valider les cinq décisions de l'audit ACTIONS-001C2, puis implémenter le signalement d'une
+fiche. En parallèle, valider ACTIONS-001C1 sous Swift/Xcode et sur appareils configurés, sans relancer
+la CI ni publier une branche sans accord explicite. Le domaine HTTPS officiel reste à décider pour
+terminer le partage public, sans CTA factice. La vidéo d'intro reste embarquée : tout changement
+d'octets exige une nouvelle release Android/iOS dans les Stores.

@@ -10,7 +10,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Avancement fonctionnel estimé | 25 à 30 % du PRD V1 actuel |
 | Préparation production estimée | 15 à 20 % |
 | Décision de release | No-go |
-| Branche active | `codex/detail-ios-001-swiftui`, empilée sur `codex/detail-001b-android-sheet` (`#46`) |
+| Branche active | `codex/doc-001-documentation-system`, empilée localement sur `codex/actions-001c-detail-deeplink`, sans push |
 | PR de stabilisation | `#37`, brouillon empilé sur `#36`, `quality` et `iOS simulator build` verts |
 | PR d’architecture | `#36`, brouillon empilé sur `#35`, `quality` et `iOS simulator build` verts |
 | PR de sécurité | `#35`, brouillon, `quality` et `iOS simulator build` verts |
@@ -18,6 +18,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail historiqu
 | Retrait média distant | INTRO-STORE-001 implémenté dans la PR brouillon `#43`, empilée sur `#42` ; run `30733200076` vert |
 | Explore iOS | EXPLORE-IOS-001 dans la PR brouillon `#44` sur `#43` ; trois revues vertes et run exact-head `30741677132` entièrement vert |
 | Détail catalogue | DETAIL-001A dans `#45`, DETAIL-001B Android dans `#46` et DETAIL-IOS-001 SwiftUI dans `#47` ; run exact-head `30780564021` entièrement vert |
+| Documentation | DOC-001 terminé localement : neuf documents de référence vérifiés ; aucune CI ni publication déclenchée |
 | PR d’authentification parallèle | `#34`, brouillon et non fusionnée |
 | Périmètre V1 recommandé | En attente de validation propriétaire |
 
@@ -50,6 +51,9 @@ Le rapport de référence est [l’audit de préparation V1](audits/2026-07-30-v
 - La porte locale EXPLORE-IOS-001 est verte avec 298 tests shared et 142 tests Android sans échec. Trois revues indépendantes ne relèvent plus aucun P0/P1/P2 après correction des courses, des limites/annulations image, de Dynamic Type, des bandeaux, du formatage XOF partagé et du timeout simulateur. Le run exact-head `30741677132` exécute le smoke test Room/DataStore, construit les XCFrameworks et les trois configurations Xcode simulateur, et passe `quality`, Supabase ainsi que les preuves Android API 30/31/36.
 - Le premier run de matrice `30585538585` a prouvé le blocage effectif de `quality` et le lancement configuré sur les trois APIs. Il a aussi révélé une assertion temporelle trop stricte : le landing onboarding pouvait remplacer l'intro avant la lecture UI à dix secondes. La capture dure désormais quinze secondes et accepte ces deux surfaces configurées tout en refusant toujours l'écran d'indisponibilité.
 - Aucun client Web, PWA, WASM ou Desktop détecté.
+- DOC-001 fournit le `README`, l'index documentaire et les guides setup, architecture, données,
+  tests, environnements, déploiement et contribution. Les liens locaux, chemins et commandes ont été
+  contrôlés contre le dépôt ; le guide qualité KMP reflète désormais la CI Java 21 et la gate `check`.
 
 ## En cours
 
@@ -160,7 +164,7 @@ Objectifs :
 - verrouiller la distribution et les launchers Gradle officiels ;
 - refuser en CI tout écart de template, wrapper, ignore ou artefact sensible suivi.
 
-État : implémentation, validations locales, deux revues indépendantes, commit, push, publication et CI GitHub de la PR brouillon empilée `#37` terminés. La revue humaine et la fusion après `#36` restent ouvertes. La checklist production « clone vierge et setup documenté » reste ouverte jusqu'à DOC-001 et au provisionnement propriétaire.
+État : implémentation, validations locales, deux revues indépendantes, commit, push, publication et CI GitHub de la PR brouillon empilée `#37` terminés. La revue humaine et la fusion après `#36` restent ouvertes. DOC-001 documente désormais le setup ; la checklist « clone vierge » reste ouverte jusqu'à son exécution reproductible et au provisionnement propriétaire.
 
 ### ARCH-004 — Frontière d’exécution du domaine
 
@@ -195,6 +199,7 @@ Objectifs :
 6. Faire valider le périmètre V1 minimal et la navigation.
 7. Livrer ACTIONS-001 sans réintroduire de CTA factice ; conserver DETAIL-001 ouvert jusqu'aux actions réelles.
 8. Reprendre EXPLORE-002B2 après validation des règles de classement et de sponsoring.
+9. Faire valider les cinq décisions produit d'ACTIONS-001C2 avant d'implémenter le signalement.
 
 ## Décisions techniques actées pendant la reprise
 

@@ -224,7 +224,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] SEC-001D — Exécuter la préflight des données historiques, prouver sauvegarde/restauration et approuver toute quarantaine avant déploiement persistant.
   - [ ] SEC-001E — Qualifier Storage, rate limiting, secrets, advisors et tests IDOR restants sur staging.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
-- [ ] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
+- [x] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
 - [ ] BETA-001 — Exécuter la bêta 10 Android/5 iOS sur sept jours avec zéro P0/P1 et ≥ 99,5 % sans crash.
 - [ ] STORE-ANDROID-001 — Produire AAB signé, fiche Play, privacy/data safety et plan de rollout.
