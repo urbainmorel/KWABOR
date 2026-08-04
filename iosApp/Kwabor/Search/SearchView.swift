@@ -151,6 +151,11 @@ struct SearchActiveContent: View {
     let columns: [GridItem]
 
     var body: some View {
+        configurationContent
+    }
+
+    @ViewBuilder
+    private var configurationContent: some View {
         if !store.isConfigured {
             SearchStateMessage(
                 title: commonStrings.errorStateTitle,
@@ -165,14 +170,28 @@ struct SearchActiveContent: View {
                 actionLabel: nil,
                 action: nil
             )
-        } else if !store.state.hasSubmittedQuery {
+        } else {
+            submittedContent
+        }
+    }
+
+    @ViewBuilder
+    private var submittedContent: some View {
+        if !store.state.hasSubmittedQuery {
             SearchInitialHint(text: store.strings.initialHint)
         } else if store.state.isLoading && store.state.listings.isEmpty {
             SearchLoadingGrid(
                 columns: columns,
                 loadingLabel: commonStrings.loading
             )
-        } else if let errorMessage = store.state.errorMessage {
+        } else {
+            loadedContent
+        }
+    }
+
+    @ViewBuilder
+    private var loadedContent: some View {
+        if let errorMessage = store.state.errorMessage {
             SearchStateMessage(
                 title: commonStrings.errorStateTitle,
                 supportingText: errorMessage,
