@@ -2,7 +2,9 @@
 
 Le system prompt dit à l'agent **comment écrire** le code. Ces fichiers **imposent** les règles au niveau du build et de la CI : le code non conforme est refusé automatiquement, sans dépendre de la bonne volonté de l'agent.
 
-Dépose chaque fichier ci-dessous à l'emplacement indiqué, puis lance `./gradlew check`.
+Ce document explique la chaîne versionnée dans KWABOR. Les extraits servent à comprendre sa
+structure ; ils ne doivent pas remplacer mécaniquement les fichiers réels, qui contiennent des gates
+supplémentaires propres au projet. Après toute modification, lance la commande adaptée à ton OS.
 
 ---
 
@@ -54,7 +56,9 @@ indent_size = 2
 trim_trailing_whitespace = false
 ```
 
-> `max_line_length = 120` est le point unique qui pilote la largeur de ligne. Ajuste-le (100 est courant côté Android) — ktlint et detekt s'aligneront dessus.
+> La largeur `120` est déclarée à la fois dans `.editorconfig` pour ktlint et dans
+> `config/detekt/detekt.yml` pour Detekt. Toute évolution doit modifier et vérifier les deux valeurs
+> dans le même changement.
 
 ---
 
@@ -201,38 +205,15 @@ Cette sélection analyse le code commun, les implémentations Android/iOS et les
 
 ## 4. `.github/workflows/ci.yml` — CI bloquante avant merge
 
-```yaml
-name: CI
-
-on:
-  pull_request:
-  push:
-    branches: [ main, develop ]
-
-jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Formatage (Spotless)
-        run: ./gradlew spotlessCheck
-
-      - name: Analyse statique (Detekt)
-        run: ./gradlew detekt
-
-      - name: Tests
-        run: ./gradlew allTests
-```
+La source de vérité exécutable est [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Ne pas la
+remplacer par un exemple minimal : elle orchestre la gate Gradle sous Java 21, l'intégrité du dépôt,
+la marque et le média, l'Edge Function, Supabase/pgTAP, les preuves de lancement Android et le job
+macOS iOS. Les versions d'actions doivent rester cohérentes avec ce workflow versionné.
 
 > **Important — pour *réellement* bloquer un merge** : le workflow seul ne suffit pas. Va dans **Settings → Branches → Branch protection rules**, protège `main`/`develop`, coche **« Require status checks to pass before merging »** et sélectionne le job `quality`. Sans ça, la CI signale mais n'empêche pas le merge.
 >
-> **iOS** : `ubuntu-latest` suffit pour ktlint, detekt et les tests du code commun. Pour compiler/tester la cible iOS complète, ajoute un job séparé sur `macos-latest`.
+> **iOS** : le workflow possède un job macOS séparé. Il exécute les PolicyTests Swift, le test
+> KMP `iosSimulatorArm64`, construit les XCFrameworks et les trois configurations Xcode simulateur.
 >
 > **GitLab CI** : l'équivalent est un `.gitlab-ci.yml` avec un job qui lance les mêmes commandes ; le blocage se fait via *merge request pipelines* + « Pipelines must succeed ».
 
@@ -247,7 +228,8 @@ jobs:
 | `./gradlew detekt` | Analyse statique (échoue si un seuil est dépassé) |
 | `./gradlew check` | Lance `spotlessCheck` + `detekt` (+ tests) sur tous les modules |
 
-> Sur **Windows 11**, utilise `gradlew.bat …` (ou `./gradlew …` sous Git Bash / PowerShell).
+> Sur **Windows 11 PowerShell**, utilise `.\gradlew.bat …`. Utilise `./gradlew …` sous Git Bash,
+> macOS ou Linux.
 >
 > **Optionnel** : un hook git `pre-commit` qui lance `./gradlew spotlessApply` évite de committer du code mal formaté.
 
@@ -255,8 +237,10 @@ jobs:
 
 ## Résultat — les 5 points, imposés automatiquement
 
-1. **KtLint via Spotless** → `spotlessApply` formate, `spotlessCheck` bloque ; largeur de ligne pilotée par `.editorconfig`.
+1. **KtLint via Spotless** → `spotlessApply` formate, `spotlessCheck` bloque ; largeur de ligne
+   coordonnée entre `.editorconfig` et Detekt.
 2. **Detekt avec seuils bloquants** → méthode/classe/complexité/imbrication au-delà des seuils = **build en échec**.
-3. **.editorconfig unique** → indentation et style synchronisés IDE + ktlint + detekt.
+3. **Configuration alignée** → indentation/style via `.editorconfig`, seuils complémentaires via
+   Detekt, sans valeurs contradictoires.
 4. **CI/CD systématique** → `spotlessCheck` et `detekt` à chaque PR ; blocage via protection de branche.
 5. **Application globale** → `subprojects { … }` couvre tous les modules partagés **et** spécifiques.

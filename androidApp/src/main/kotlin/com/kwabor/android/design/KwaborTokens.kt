@@ -23,15 +23,27 @@ object KwaborSizing {
     val Hairline = 1.dp
     val TouchTarget = 44.dp
     val MinimumAccessibleTouchTarget = 48.dp
+    val ExploreTabletBreakpoint = 600.dp
+    const val EXPLORE_MOBILE_GRID_COLUMNS = 2
+    const val EXPLORE_TABLET_GRID_COLUMNS = 3
+    const val EXPLORE_LOAD_MORE_THRESHOLD = 4
+    const val GUIDE_MOBILE_GRID_COLUMNS = 1
+    const val GUIDE_TABLET_GRID_COLUMNS = 2
+    const val GUIDE_LOAD_MORE_THRESHOLD = 2
+    const val GUIDE_CARD_IMAGE_ASPECT_RATIO = 1.6f
     val GoogleLogo = 20.dp
     val BottomNavigationHeight = 76.dp
     val FloatingActionButton = 56.dp
     val FloatingPill = 36.dp
     val BrandMark = 96.dp
+    val DetailSheetMaxWidth = 640.dp
+    val DetailHeroMinimumHeight = 320.dp
+    val DetailGalleryThumbnail = 72.dp
 }
 
 object KwaborAlpha {
     const val SCRIM_LOW = 0.35f
     const val SCRIM_HIGH = 0.72f
+    const val SCRIM_HERO = 0.86f
     const val FROSTED_SURFACE = 0.18f
 }

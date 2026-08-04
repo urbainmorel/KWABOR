@@ -7,54 +7,47 @@ final class RegistrationStore: ObservableObject {
     @Published private(set) var state: RegistrationUiState?
     @Published var otpCode = ""
     @Published var password = ""
-    @Published var passwordConfirmation = ""
     @Published var cityQuery = ""
-    @Published var isLocationPrimerPresented = false
-    @Published private(set) var locationMessage: String?
-    @Published private(set) var isRequestingLocation = false
-    @Published private(set) var isRequestingNotifications = false
     @Published private(set) var nowEpochMilliseconds = RegistrationStore.currentEpochMilliseconds
 
     let strings: OnboardingStrings
     let controller: IosRegistrationController
 
-    private let locationProvider: RegistrationLocationProviding
-    private let notificationPermissionRequester: RegistrationNotificationPermissionRequesting
-    private let notificationPrimingStore: RegistrationNotificationPrimingPersisting
     private let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
-    private let applyObservabilityConsent: (ObservabilityConsent) -> Void
     private let onCompleted: (AuthSession) -> Void
     private let onExistingAccountAuthenticated: (String?) -> Void
     private let onCancel: (Bool) -> Void
+    private let onEmailMethodChosen: () -> Void
+    private let onOtpValidated: () -> Void
+    private let onProfileResult: (Bool) -> Void
     private var completionReported = false
     private var clockTask: Task<Void, Never>?
 
     init(
         controller: IosRegistrationController,
         strings: OnboardingStrings,
-        locationProvider: RegistrationLocationProviding,
-        notificationPermissionRequester: RegistrationNotificationPermissionRequesting,
-        notificationPrimingStore: RegistrationNotificationPrimingPersisting,
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting,
-        applyObservabilityConsent: @escaping (ObservabilityConsent) -> Void,
         onCompleted: @escaping (AuthSession) -> Void,
         onExistingAccountAuthenticated: @escaping (String?) -> Void,
-        onCancel: @escaping (Bool) -> Void
+        onCancel: @escaping (Bool) -> Void,
+        onEmailMethodChosen: @escaping () -> Void,
+        onOtpValidated: @escaping () -> Void,
+        onProfileResult: @escaping (Bool) -> Void
     ) {
         self.controller = controller
         self.strings = strings
-        self.locationProvider = locationProvider
-        self.notificationPermissionRequester = notificationPermissionRequester
-        self.notificationPrimingStore = notificationPrimingStore
         self.interruptedAuthJourneyStore = interruptedAuthJourneyStore
-        self.applyObservabilityConsent = applyObservabilityConsent
         self.onCompleted = onCompleted
         self.onExistingAccountAuthenticated = onExistingAccountAuthenticated
         self.onCancel = onCancel
+        self.onEmailMethodChosen = onEmailMethodChosen
+        self.onOtpValidated = onOtpValidated
+        self.onProfileResult = onProfileResult
 
         controller.observe { [weak self] state in
             self?.receive(state)
         }
+        controller.prepare(suggestedCityId: nil)
         clockTask = Task { [weak self] in
             while !Task.isCancelled {
                 do {
@@ -75,7 +68,7 @@ final class RegistrationStore: ObservableObject {
     var canGoBack: Bool {
         guard let state else { return false }
         return state.step != .email &&
-            !state.isNotificationPriming &&
+            !(state.step == .profile && state.method == .federated) &&
             state.step != .completed
     }
 
@@ -85,19 +78,30 @@ final class RegistrationStore: ObservableObject {
 
     var canCancel: Bool {
         guard let state else { return true }
-        return !state.isNotificationPriming && state.step != .completed
+        return state.step != .completed
     }
 
     var canResendOtp: Bool {
         state?.canResendOtp(nowEpochMilliseconds: nowEpochMilliseconds) ?? false
     }
 
+    var resendLabel: String {
+        guard let availableAt = state?.resendAvailableAtEpochMilliseconds?.int64Value else {
+            return strings.authRequestOtp
+        }
+        let remainingMilliseconds = max(0, availableAt - nowEpochMilliseconds)
+        let remainingSeconds = (remainingMilliseconds + millisecondsPerSecondInt - 1) /
+            millisecondsPerSecondInt
+        guard remainingSeconds > 0 else { return strings.authRequestOtp }
+        return strings.registrationOtpResendCountdown.replacingOccurrences(
+            of: resendSecondsPlaceholder,
+            with: String(remainingSeconds)
+        )
+    }
+
     var requirementsReady: Bool {
         guard let state else { return false }
-        return !state.cities.isEmpty &&
-            state.termsDocument != nil &&
-            state.privacyDocument != nil &&
-            state.ugcDocument != nil
+        return state.requirementsReady
     }
 
     var filteredCities: [City] {
@@ -122,7 +126,6 @@ final class RegistrationStore: ObservableObject {
     }
 
     func selectCity(_ cityId: String) {
-        locationMessage = nil
         controller.dispatch(intent: IosRegistrationSelectCityIntent(cityId: cityId))
     }
 
@@ -142,33 +145,6 @@ final class RegistrationStore: ObservableObject {
         controller.legalAcceptance.updateUgc(accepted: accepted)
     }
 
-    func updateAnalyticsConsent(_ allowed: Bool) {
-        guard let consent = state?.observabilityConsent else { return }
-        updateObservabilityConsent(
-            analytics: allowed,
-            diagnostics: consent.diagnosticsAllowed,
-            remoteConfiguration: consent.remoteConfigurationAllowed
-        )
-    }
-
-    func updateDiagnosticsConsent(_ allowed: Bool) {
-        guard let consent = state?.observabilityConsent else { return }
-        updateObservabilityConsent(
-            analytics: consent.analyticsAllowed,
-            diagnostics: allowed,
-            remoteConfiguration: consent.remoteConfigurationAllowed
-        )
-    }
-
-    func updateRemoteConfigurationConsent(_ allowed: Bool) {
-        guard let consent = state?.observabilityConsent else { return }
-        updateObservabilityConsent(
-            analytics: consent.analyticsAllowed,
-            diagnostics: consent.diagnosticsAllowed,
-            remoteConfiguration: allowed
-        )
-    }
-
     func submitPrimaryAction() {
         guard let state, !state.isLoading else { return }
         if state.step == .email {
@@ -179,31 +155,22 @@ final class RegistrationStore: ObservableObject {
         } else if state.step == .password {
             controller.dispatch(
                 intent: IosRegistrationSetInitialPasswordIntent(
-                    password: password,
-                    confirmation: passwordConfirmation
+                    password: password
                 )
             )
-        } else if state.step == .identity {
-            if requirementsReady {
-                controller.dispatch(intent: IosRegistrationContinueFromIdentityIntent.shared)
-            } else {
-                controller.dispatch(intent: IosRegistrationLoadRequirementsIntent.shared)
-            }
-        } else if state.step == .city {
-            controller.dispatch(intent: IosRegistrationContinueFromCityIntent.shared)
-        } else if state.step == .currency {
-            controller.dispatch(intent: IosRegistrationContinueFromCurrencyIntent.shared)
-        } else if state.step == .legal {
-            controller.dispatch(intent: IosRegistrationContinueFromLegalIntent.shared)
-        } else if state.step == .observability {
-            applyObservabilityConsent(state.observabilityConsent)
-            controller.dispatch(intent: IosRegistrationCompleteOnboardingIntent.shared)
+        } else if state.step == .profile {
+            controller.dispatch(intent: IosRegistrationCompleteProfileIntent.shared)
         }
     }
 
     func resendOtp() {
         guard canResendOtp, state?.isLoading == false else { return }
         controller.dispatch(intent: IosRegistrationRequestOtpIntent.shared)
+    }
+
+    func retryRequirements() {
+        guard state?.requirementsStatus == .failed else { return }
+        controller.dispatch(intent: IosRegistrationLoadRequirementsIntent.shared)
     }
 
     func goBack() {
@@ -215,73 +182,30 @@ final class RegistrationStore: ObservableObject {
         onCancel(state?.currentSession != nil)
     }
 
-    func presentLocationPrimer() {
-        isLocationPrimerPresented = true
-    }
-
-    func requestLocationAfterPrimer() {
-        isLocationPrimerPresented = false
-        guard !isRequestingLocation else { return }
-        isRequestingLocation = true
-        locationMessage = nil
-        let provider = locationProvider
-        Task { [weak self, provider] in
-            let result = await provider.requestCurrentLocation()
-            guard let self else { return }
-            isRequestingLocation = false
-            switch result {
-            case let .coordinate(coordinate):
-                controller.dispatch(
-                    intent: IosRegistrationSelectNearestCityIntent(
-                        latitude: coordinate.latitude,
-                        longitude: coordinate.longitude
-                    )
-                )
-            case .permissionDenied:
-                locationMessage = strings.registrationLocationPermissionDenied
-            case .unavailable:
-                locationMessage = strings.registrationLocationUnavailable
-            }
-        }
-    }
-
-    func enableNotifications() {
-        guard state?.isNotificationPriming == true,
-              !isRequestingNotifications else {
-            return
-        }
-        isRequestingNotifications = true
-        let requester = notificationPermissionRequester
-        Task { [weak self, requester] in
-            let result = await requester.requestPermission()
-            guard let self else { return }
-            switch result {
-            case .granted, .denied, .unavailable:
-                notificationPrimingStore.markResolved()
-                isRequestingNotifications = false
-                controller.dispatch(intent: IosRegistrationFinishNotificationPrimingIntent.shared)
-            }
-        }
-    }
-
-    func skipNotifications() {
-        guard state?.isNotificationPriming == true,
-              !isRequestingNotifications else {
-            return
-        }
-        notificationPrimingStore.markResolved()
-        controller.dispatch(intent: IosRegistrationFinishNotificationPrimingIntent.shared)
-    }
-
     private func receive(_ updatedState: RegistrationUiState) {
-        let previousStep = state?.step
+        let previousState = state
+        let previousStep = previousState?.step
         state = updatedState
+        if previousStep == .email, updatedState.step == .otp {
+            onEmailMethodChosen()
+        }
+        if previousStep == .otp,
+           updatedState.step == .password || updatedState.step == .completed {
+            onOtpValidated()
+        }
+        if previousStep == .profile, updatedState.step == .completed {
+            onProfileResult(true)
+        } else if previousStep == .profile,
+                  previousState?.isLoading == true,
+                  !updatedState.isLoading,
+                  updatedState.errorMessage != nil {
+            onProfileResult(false)
+        }
         if previousStep == .otp, updatedState.step != .otp {
             otpCode = ""
         }
         if previousStep == .password, updatedState.step != .password {
             password = ""
-            passwordConfirmation = ""
         }
         guard !completionReported else { return }
         switch RegistrationSessionGate.outcome(
@@ -305,26 +229,12 @@ final class RegistrationStore: ObservableObject {
         }
     }
 
-    private func updateObservabilityConsent(
-        analytics: Bool,
-        diagnostics: Bool,
-        remoteConfiguration: Bool
-    ) {
-        controller.dispatch(
-            intent: IosRegistrationUpdateObservabilityConsentIntent(
-                consent: ObservabilityConsent(
-                    analyticsAllowed: analytics,
-                    diagnosticsAllowed: diagnostics,
-                    remoteConfigurationAllowed: remoteConfiguration
-                )
-            )
-        )
-    }
-
     private static var currentEpochMilliseconds: Int64 {
         Int64(Date().timeIntervalSince1970 * millisecondsPerSecond)
     }
 }
 
 private let millisecondsPerSecond = 1_000.0
+private let millisecondsPerSecondInt: Int64 = 1_000
 private let oneSecondNanoseconds: UInt64 = 1_000_000_000
+private let resendSecondsPlaceholder = "{seconds}"

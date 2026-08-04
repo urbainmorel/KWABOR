@@ -175,6 +175,7 @@ SELECT is(
         'profiles',
         'user_roles',
         'listings',
+        'event_details',
         'listing_media',
         'social_posts',
         'favorites',
@@ -187,7 +188,7 @@ SELECT is(
       )
       AND relation.relrowsecurity
   ),
-  14,
+  15,
   'all required public tables have RLS enabled'
 );
 

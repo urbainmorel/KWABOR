@@ -13,17 +13,17 @@ $assetCatalog = Join-Path $repositoryRoot 'iosApp\Kwabor\Resources\Assets.xcasse
 $appIconDirectory = Join-Path $assetCatalog 'AppIcon.appiconset'
 $launchMarkDirectory = Join-Path $assetCatalog 'LaunchMark.imageset'
 $launchWordmarkDirectory = Join-Path $assetCatalog 'LaunchWordmark.imageset'
-$androidLaunchWordmarkDirectory =
+$androidNoDensityDirectory =
     Join-Path $repositoryRoot 'androidApp\src\main\res\drawable-nodpi'
-$androidDrawableAssets = @(
-    @{ Density = 'mdpi'; Size = 108 },
-    @{ Density = 'hdpi'; Size = 162 },
-    @{ Density = 'xhdpi'; Size = 216 },
-    @{ Density = 'xxhdpi'; Size = 324 },
-    @{ Density = 'xxxhdpi'; Size = 432 }
+$androidDensityAssets = @(
+    @{ Density = 'mdpi'; BrandSize = 108; LaunchSize = 288 },
+    @{ Density = 'hdpi'; BrandSize = 162; LaunchSize = 432 },
+    @{ Density = 'xhdpi'; BrandSize = 216; LaunchSize = 576 },
+    @{ Density = 'xxhdpi'; BrandSize = 324; LaunchSize = 864 },
+    @{ Density = 'xxxhdpi'; BrandSize = 432; LaunchSize = 1152 }
 )
 $androidDrawableDirectories =
-    $androidDrawableAssets |
+    $androidDensityAssets |
     ForEach-Object {
         Join-Path $repositoryRoot "androidApp\src\main\res\drawable-$($_.Density)"
     }
@@ -31,7 +31,7 @@ $outputDirectories = @(
     $appIconDirectory,
     $launchMarkDirectory,
     $launchWordmarkDirectory,
-    $androidLaunchWordmarkDirectory
+    $androidNoDensityDirectory
 ) + $androidDrawableDirectories
 
 if (-not (Test-Path -LiteralPath $masterAsset -PathType Leaf)) {
@@ -146,17 +146,23 @@ function Export-KwaborPaddedBrandBitmap {
     }
 }
 
-$androidDrawableAssets | ForEach-Object {
+$androidDensityAssets | ForEach-Object {
     $outputDirectory =
         Join-Path $repositoryRoot "androidApp\src\main\res\drawable-$($_.Density)"
     Export-KwaborPaddedBrandBitmap `
-        -Size $_.Size `
+        -Size $_.BrandSize `
         -OutputPath (Join-Path $outputDirectory 'kwabor_brand_mark.png') `
         -ContentScale 0.75
     Export-KwaborPaddedBrandBitmap `
-        -Size $_.Size `
+        -Size $_.LaunchSize `
         -OutputPath (Join-Path $outputDirectory 'kwabor_launch_mark.png') `
         -ContentScale 0.75
+}
+
+$obsoleteNoDensityLaunchMark =
+    Join-Path $androidNoDensityDirectory 'kwabor_launch_mark.png'
+if (Test-Path -LiteralPath $obsoleteNoDensityLaunchMark -PathType Leaf) {
+    Remove-Item -LiteralPath $obsoleteNoDensityLaunchMark -Force
 }
 
 Export-KwaborBrandBitmap `
@@ -175,7 +181,7 @@ Export-KwaborBrandBitmap `
 
 Copy-Item `
     -LiteralPath $launchWordmarkMasterAsset `
-    -Destination (Join-Path $androidLaunchWordmarkDirectory 'kwabor_launch_wordmark.png') `
+    -Destination (Join-Path $androidNoDensityDirectory 'kwabor_launch_wordmark.png') `
     -Force
 Copy-Item `
     -LiteralPath $launchWordmarkMasterAsset `
@@ -183,6 +189,6 @@ Copy-Item `
     -Force
 
 Write-Output (
-    'Generated deterministic Android and iOS assets from ' +
-    'kwabor_icone_app.png and copied the exact kwabor_2.png launch wordmark.'
+    'Generated deterministic Android and iOS assets, including the Android ' +
+    '288 dp launch canvases, and copied the exact kwabor_2.png launch wordmark.'
 )

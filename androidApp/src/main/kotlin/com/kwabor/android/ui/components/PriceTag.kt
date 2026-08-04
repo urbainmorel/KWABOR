@@ -14,13 +14,8 @@ import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.shared.presentation.money.PriceLabelFormatter
 
-private const val COMPACT_AMOUNT_THRESHOLD = 10_000L
-private const val ONE_THOUSAND = 1_000L
-private const val ONE_MILLION = 1_000_000L
-private const val ONE_MILLION_DECIMAL = 1_000_000.0
-private const val ONE_DECIMAL_SCALE = 10.0
-private const val ONE_DECIMAL_DIVISOR = 10L
 private const val TWO_DECIMAL_SCALE = 100.0
 private const val TWO_DECIMAL_DIVISOR = 100L
 private const val DECIMAL_WIDTH = 2
@@ -74,27 +69,9 @@ internal fun formatPriceTag(
 
     val effectiveMode = if (options.transactional) PriceTagMode.Full else options.mode
     return when (effectiveMode) {
-        PriceTagMode.Compact -> formatCompactXof(price.amount)
-        PriceTagMode.Full -> "${price.amount.formatWholeNumber()} ${KwaborCurrency.Xof.symbol}"
+        PriceTagMode.Compact -> PriceLabelFormatter.compactXof(price, strings.free)
+        PriceTagMode.Full -> PriceLabelFormatter.fullXof(price)
     }
-}
-
-private fun formatCompactXof(amount: Long): String {
-    if (amount < COMPACT_AMOUNT_THRESHOLD) {
-        return "${amount.formatWholeNumber()} ${KwaborCurrency.Xof.symbol}"
-    }
-
-    if (amount < ONE_MILLION) {
-        return "${amount / ONE_THOUSAND} k ${KwaborCurrency.Xof.symbol}"
-    }
-
-    val millions = amount.toDouble() / ONE_MILLION_DECIMAL
-    val formatted = if (amount % ONE_MILLION == 0L) {
-        (amount / ONE_MILLION).toString()
-    } else {
-        millions.formatOneDecimal()
-    }
-    return "$formatted M ${KwaborCurrency.Xof.symbol}"
 }
 
 private fun formatConvertedAmount(amount: Double, currency: KwaborCurrency, transactional: Boolean): String = when {
@@ -109,11 +86,6 @@ private fun Long.formatWholeNumber(): String = toString()
     .chunked(size = WHOLE_NUMBER_GROUP_SIZE)
     .joinToString(separator = " ")
     .reversed()
-
-private fun Double.formatOneDecimal(): String {
-    val value = (this * ONE_DECIMAL_SCALE).roundToLong()
-    return "${value / ONE_DECIMAL_DIVISOR},${value % ONE_DECIMAL_DIVISOR}"
-}
 
 private fun Double.formatTwoDecimals(): String {
     val value = (this * TWO_DECIMAL_SCALE).roundToLong()

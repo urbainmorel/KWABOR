@@ -1,14 +1,16 @@
 package com.kwabor.shared.bridge
 
-import com.kwabor.shared.domain.observability.DiagnosticCode
+import com.kwabor.shared.domain.i18n.AppLocale
+import com.kwabor.shared.i18n.stringsFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KwaborSharedBridgeTest {
     @Test
-    fun exposesFrenchFoundationCopyForIosHost() {
+    fun exposesFrenchCoreCopyForIosHost() {
         val bridge = KwaborSharedBridge()
 
         assertEquals("Kwabor", bridge.appName())
@@ -23,6 +25,9 @@ class KwaborSharedBridgeTest {
         assertEquals("Accueil", onboardingStrings.home)
         assertEquals("Réessayer", onboardingStrings.retry)
         assertEquals("Chargement", onboardingStrings.loading)
+        val settingsStrings = onboardingStrings.settings
+        assertEquals("Paramètres", settingsStrings.title)
+        assertEquals("Adresse e-mail indisponible", settingsStrings.emailUnavailable)
         assertEquals("Continuer avec Google", onboardingStrings.authSignInWithGoogle)
         assertEquals("Continuer avec Apple", onboardingStrings.authSignInWithApple)
         assertEquals("ou", onboardingStrings.authOrSeparator)
@@ -41,10 +46,25 @@ class KwaborSharedBridgeTest {
             "La suppression du compte a échoué. Réessayez sans fermer cet écran.",
             onboardingStrings.authAccountDeletionFailed,
         )
+        assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
+        val telemetry = bridge.onboardingTelemetry()
+        assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)
+        assertEquals("intro_video_skipped", telemetry.skippedEvent.name.wireName)
+        assertFalse(bridge.hasCatalogConfiguration())
+    }
+
+    @Test
+    fun exposesFrenchRegistrationAndPrivacyCopyForIosHost() {
+        val onboardingStrings = KwaborSharedBridge().onboardingStrings()
+
         assertEquals("Activer mon espace Promoteur", onboardingStrings.promoterActivationTitle)
-        assertEquals("Commerce invité", onboardingStrings.promoterActivationBusinessName)
+        assertEquals("Votre établissement", onboardingStrings.promoterActivationBusinessName)
         assertEquals("Votre espace Promoteur est prêt.", onboardingStrings.promoterActivationSuccess)
         assertEquals("Ce lien d'activation est invalide.", onboardingStrings.authPromoterInviteInvalid)
+        assertEquals(
+            "Ce lien ne peut plus être utilisé. Demandez une nouvelle invitation.",
+            stringsFor(AppLocale.French).authPromoterInviteUsed,
+        )
         assertEquals(
             "Ce code a expiré. Demandez-en un nouveau.",
             onboardingStrings.registrationOtpExpired,
@@ -53,12 +73,22 @@ class KwaborSharedBridgeTest {
             "Recevez les nouveautés utiles près de votre ville. Vous gardez le contrôle dans les paramètres.",
             onboardingStrings.registrationNotificationSupport,
         )
-        assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
-        val telemetry = bridge.onboardingTelemetry()
-        assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)
-        assertEquals("intro_video_skipped", telemetry.skippedEvent.name.wireName)
-        assertEquals(DiagnosticCode.IntroVideoIntegrityFailed, telemetry.integrityDiagnosticCode)
-        assertFalse(bridge.hasCatalogConfiguration())
+        assertEquals(
+            "Ces choix sont facultatifs, désactivés par défaut et modifiables dans les paramètres.",
+            onboardingStrings.registrationObservabilitySupport,
+        )
+        assertEquals(
+            "Partager des statistiques d'utilisation pour améliorer Kwabor",
+            onboardingStrings.registrationAnalyticsConsent,
+        )
+        assertEquals(
+            "Partager des informations sur les pannes et les lenteurs",
+            onboardingStrings.registrationDiagnosticsConsent,
+        )
+        assertEquals(
+            "Autoriser certains réglages de l'application sans mise à jour",
+            onboardingStrings.registrationRemoteConfigConsent,
+        )
     }
 
     @Test
@@ -66,5 +96,18 @@ class KwaborSharedBridgeTest {
         val bridge = KwaborSharedBridge(hasCatalogConfiguration = true)
 
         assertTrue(bridge.hasCatalogConfiguration())
+    }
+
+    @Test
+    fun exposesOnlyAcceptedCatalogDetailDeepLinksToNativeHosts() {
+        val bridge = KwaborSharedBridge()
+        val listingId = "123e4567-e89b-42d3-a456-426614174000"
+
+        assertEquals(
+            listingId,
+            bridge.catalogDetailListingIdForDeepLink("KWABOR://LISTING/${listingId.uppercase()}"),
+        )
+        assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/$listingId?source=share"))
+        assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/not-a-uuid"))
     }
 }

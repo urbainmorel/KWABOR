@@ -6,7 +6,6 @@ import com.kwabor.shared.domain.auth.PromoterActivationContext
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter

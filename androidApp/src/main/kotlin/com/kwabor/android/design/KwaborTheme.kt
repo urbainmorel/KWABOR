@@ -14,6 +14,7 @@ private val LightColors = lightColorScheme(
     surface = KwaborColors.Surface0,
     onSurface = KwaborColors.Ink900,
     error = KwaborColors.Ticket,
+    onError = KwaborColors.Surface0,
 )
 
 private val DarkColors = darkColorScheme(
@@ -24,7 +25,8 @@ private val DarkColors = darkColorScheme(
     onBackground = KwaborColors.DarkText,
     surface = KwaborColors.DarkSurface,
     onSurface = KwaborColors.DarkText,
-    error = KwaborColors.Ticket,
+    error = KwaborColors.TicketDark,
+    onError = KwaborColors.Ink950,
 )
 
 @Composable

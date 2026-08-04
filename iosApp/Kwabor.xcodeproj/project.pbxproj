@@ -20,8 +20,9 @@
 		1A0000010000000000000049 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000055 /* FirebaseCrashlytics */; };
 		1A0000010000000000000050 /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000056 /* FirebasePerformance */; };
 		1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000057 /* FirebaseRemoteConfig */; };
+		1A00000100000000000000B8 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00000100000000000000B7 /* FirebaseInstallations */; };
 		1A0000010000000000000060 /* OnboardingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000061 /* OnboardingCoordinator.swift */; };
-		1A0000010000000000000062 /* IntroVideoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000063 /* IntroVideoCache.swift */; };
+		1A0000010000000000000062 /* LegacyRemoteIntroCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */; };
 		1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000065 /* IntroVideoPlayer.swift */; };
 		1A0000010000000000000066 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000067 /* OnboardingView.swift */; };
 		1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000069 /* AuthenticationSheet.swift */; };
@@ -40,13 +41,33 @@
 		1A000001000000000000008A /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000089 /* AccountDeletionView.swift */; };
 		1A000001000000000000008C /* PromoterActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008B /* PromoterActivationView.swift */; };
 		1A000001000000000000008E /* PromoterActivationSessionMarker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000008D /* PromoterActivationSessionMarker.swift */; };
+		1A0000010000000000000090 /* IntroVideoPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000091 /* IntroVideoPresentationStore.swift */; };
+		1A0000010000000000000092 /* ExplorePolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000093 /* ExplorePolicies.swift */; };
+		1A0000010000000000000094 /* ExploreStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000095 /* ExploreStore.swift */; };
+		1A0000010000000000000096 /* ApproximateLocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000097 /* ApproximateLocationProvider.swift */; };
+		1A0000010000000000000098 /* ExploreImagePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000099 /* ExploreImagePipeline.swift */; };
+		1A000001000000000000009A /* ExploreCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009B /* ExploreCard.swift */; };
+		1A000001000000000000009C /* ExploreCitySelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009D /* ExploreCitySelector.swift */; };
+		1A000001000000000000009E /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000009F /* ExploreView.swift */; };
+		1A00000100000000000000A3 /* CatalogDetailPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A2 /* CatalogDetailPolicies.swift */; };
+		1A00000100000000000000A5 /* CatalogDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A4 /* CatalogDetailStore.swift */; };
+		1A00000100000000000000A7 /* CatalogDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A6 /* CatalogDetailSheet.swift */; };
+		1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000A8 /* CatalogDetailMedia.swift */; };
+		1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AA /* CatalogDetailSections.swift */; };
+		1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AC /* CatalogDetailTypedContent.swift */; };
+		1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */; };
+		1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B1 /* GuideDiscoveryStore.swift */; };
+		1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B3 /* GuideDiscoveryCard.swift */; };
+		1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B5 /* GuideDiscoveryView.swift */; };
+		1A00000100000000000000C0 /* SearchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000C1 /* SearchStore.swift */; };
+		1A00000100000000000000C2 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000C3 /* SearchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1A0000010000000000000002 /* KwaborApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborApp.swift; sourceTree = "<group>"; };
 		1A0000010000000000000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1A0000010000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = ../shared/build/XCFrameworks/debug/Shared.xcframework; sourceTree = "<group>"; };
+		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = "../shared/build/XCFrameworks/$(KWABOR_SHARED_BUILD_TYPE)/Shared.xcframework"; sourceTree = "<group>"; };
 		1A0000010000000000000009 /* Kwabor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kwabor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000010000000000000029 /* KwaborDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborDesignTokens.swift; sourceTree = "<group>"; };
 		1A0000010000000000000031 /* RootNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootNavigation.swift; sourceTree = "<group>"; };
@@ -60,7 +81,7 @@
 		1A0000010000000000000041 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		1A0000010000000000000045 /* FirebaseObservability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseObservability.swift; sourceTree = "<group>"; };
 		1A0000010000000000000061 /* OnboardingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingCoordinator.swift; sourceTree = "<group>"; };
-		1A0000010000000000000063 /* IntroVideoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoCache.swift; sourceTree = "<group>"; };
+		1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRemoteIntroCleaner.swift; sourceTree = "<group>"; };
 		1A0000010000000000000065 /* IntroVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoPlayer.swift; sourceTree = "<group>"; };
 		1A0000010000000000000067 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		1A0000010000000000000069 /* AuthenticationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationSheet.swift; sourceTree = "<group>"; };
@@ -77,6 +98,26 @@
 		1A0000010000000000000089 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
 		1A000001000000000000008B /* PromoterActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationView.swift; sourceTree = "<group>"; };
 		1A000001000000000000008D /* PromoterActivationSessionMarker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoterActivationSessionMarker.swift; sourceTree = "<group>"; };
+		1A0000010000000000000091 /* IntroVideoPresentationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroVideoPresentationStore.swift; sourceTree = "<group>"; };
+		1A0000010000000000000093 /* ExplorePolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplorePolicies.swift; sourceTree = "<group>"; };
+		1A0000010000000000000095 /* ExploreStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreStore.swift; sourceTree = "<group>"; };
+		1A0000010000000000000097 /* ApproximateLocationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApproximateLocationProvider.swift; sourceTree = "<group>"; };
+		1A0000010000000000000099 /* ExploreImagePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreImagePipeline.swift; sourceTree = "<group>"; };
+		1A000001000000000000009B /* ExploreCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreCard.swift; sourceTree = "<group>"; };
+		1A000001000000000000009D /* ExploreCitySelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreCitySelector.swift; sourceTree = "<group>"; };
+		1A000001000000000000009F /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A2 /* CatalogDetailPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailPolicies.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A4 /* CatalogDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A6 /* CatalogDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSheet.swift; sourceTree = "<group>"; };
+		1A00000100000000000000A8 /* CatalogDetailMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailMedia.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AA /* CatalogDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailSections.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AC /* CatalogDetailTypedContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailTypedContent.swift; sourceTree = "<group>"; };
+		1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDetailExternalURLPolicy.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B1 /* GuideDiscoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B3 /* GuideDiscoveryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryCard.swift; sourceTree = "<group>"; };
+		1A00000100000000000000B5 /* GuideDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryView.swift; sourceTree = "<group>"; };
+		1A00000100000000000000C1 /* SearchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000C3 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +131,7 @@
 				1A0000010000000000000049 /* FirebaseCrashlytics in Frameworks */,
 				1A0000010000000000000050 /* FirebasePerformance in Frameworks */,
 				1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */,
+				1A00000100000000000000B8 /* FirebaseInstallations in Frameworks */,
 				1A0000010000000000000087 /* GoogleSignIn in Frameworks */,
 				1A0000010000000000000088 /* GoogleSignInSwift in Frameworks */,
 			);
@@ -112,10 +154,14 @@
 			children = (
 				1A0000010000000000000015 /* App */,
 				1A0000010000000000000035 /* Config */,
+				1A00000100000000000000A1 /* Detail */,
+				1A00000100000000000000A0 /* Explore */,
+				1A00000100000000000000B6 /* Guide */,
 				1A000001000000000000006C /* Onboarding */,
 				1A0000010000000000000046 /* Observability */,
 				1A0000010000000000000076 /* Registration */,
 				1A0000010000000000000016 /* Resources */,
+				1A00000100000000000000C4 /* Search */,
 			);
 			path = Kwabor;
 			sourceTree = "<group>";
@@ -142,6 +188,7 @@
 				1A0000010000000000000002 /* KwaborApp.swift */,
 				1A0000010000000000000004 /* ContentView.swift */,
 				1A0000010000000000000029 /* KwaborDesignTokens.swift */,
+				1A0000010000000000000097 /* ApproximateLocationProvider.swift */,
 				1A0000010000000000000031 /* RootNavigation.swift */,
 			);
 			path = App;
@@ -184,7 +231,8 @@
 			isa = PBXGroup;
 			children = (
 				1A0000010000000000000061 /* OnboardingCoordinator.swift */,
-				1A0000010000000000000063 /* IntroVideoCache.swift */,
+				1A0000010000000000000091 /* IntroVideoPresentationStore.swift */,
+				1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */,
 				1A0000010000000000000065 /* IntroVideoPlayer.swift */,
 				1A0000010000000000000067 /* OnboardingView.swift */,
 				1A0000010000000000000069 /* AuthenticationSheet.swift */,
@@ -208,6 +256,52 @@
 				1A0000010000000000000075 /* RegistrationFlowView.swift */,
 			);
 			path = Registration;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000A0 /* Explore */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000010000000000000093 /* ExplorePolicies.swift */,
+				1A0000010000000000000095 /* ExploreStore.swift */,
+				1A0000010000000000000099 /* ExploreImagePipeline.swift */,
+				1A000001000000000000009B /* ExploreCard.swift */,
+				1A000001000000000000009D /* ExploreCitySelector.swift */,
+				1A000001000000000000009F /* ExploreView.swift */,
+			);
+			path = Explore;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000A1 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000A2 /* CatalogDetailPolicies.swift */,
+				1A00000100000000000000A4 /* CatalogDetailStore.swift */,
+				1A00000100000000000000A6 /* CatalogDetailSheet.swift */,
+				1A00000100000000000000A8 /* CatalogDetailMedia.swift */,
+				1A00000100000000000000AA /* CatalogDetailSections.swift */,
+				1A00000100000000000000AC /* CatalogDetailTypedContent.swift */,
+				1A00000100000000000000AE /* CatalogDetailExternalURLPolicy.swift */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000B6 /* Guide */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000B1 /* GuideDiscoveryStore.swift */,
+				1A00000100000000000000B3 /* GuideDiscoveryCard.swift */,
+				1A00000100000000000000B5 /* GuideDiscoveryView.swift */,
+			);
+			path = Guide;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000C4 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000C1 /* SearchStore.swift */,
+				1A00000100000000000000C3 /* SearchView.swift */,
+			);
+			path = Search;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -234,6 +328,7 @@
 				1A0000010000000000000055 /* FirebaseCrashlytics */,
 				1A0000010000000000000056 /* FirebasePerformance */,
 				1A0000010000000000000057 /* FirebaseRemoteConfig */,
+				1A00000100000000000000B7 /* FirebaseInstallations */,
 				1A0000010000000000000085 /* GoogleSignIn */,
 				1A0000010000000000000086 /* GoogleSignInSwift */,
 			);
@@ -353,7 +448,8 @@
 				1A0000010000000000000028 /* KwaborDesignTokens.swift in Sources */,
 				1A0000010000000000000030 /* RootNavigation.swift in Sources */,
 				1A0000010000000000000060 /* OnboardingCoordinator.swift in Sources */,
-				1A0000010000000000000062 /* IntroVideoCache.swift in Sources */,
+				1A0000010000000000000090 /* IntroVideoPresentationStore.swift in Sources */,
+				1A0000010000000000000062 /* LegacyRemoteIntroCleaner.swift in Sources */,
 				1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */,
 				1A0000010000000000000066 /* OnboardingView.swift in Sources */,
 				1A0000010000000000000068 /* AuthenticationSheet.swift in Sources */,
@@ -368,6 +464,25 @@
 				1A0000010000000000000070 /* RegistrationPermissionServices.swift in Sources */,
 				1A0000010000000000000072 /* RegistrationStore.swift in Sources */,
 				1A0000010000000000000074 /* RegistrationFlowView.swift in Sources */,
+				1A0000010000000000000092 /* ExplorePolicies.swift in Sources */,
+				1A0000010000000000000094 /* ExploreStore.swift in Sources */,
+				1A0000010000000000000096 /* ApproximateLocationProvider.swift in Sources */,
+				1A0000010000000000000098 /* ExploreImagePipeline.swift in Sources */,
+				1A000001000000000000009A /* ExploreCard.swift in Sources */,
+				1A000001000000000000009C /* ExploreCitySelector.swift in Sources */,
+				1A000001000000000000009E /* ExploreView.swift in Sources */,
+				1A00000100000000000000A3 /* CatalogDetailPolicies.swift in Sources */,
+				1A00000100000000000000A5 /* CatalogDetailStore.swift in Sources */,
+				1A00000100000000000000A7 /* CatalogDetailSheet.swift in Sources */,
+				1A00000100000000000000A9 /* CatalogDetailMedia.swift in Sources */,
+				1A00000100000000000000AB /* CatalogDetailSections.swift in Sources */,
+				1A00000100000000000000AD /* CatalogDetailTypedContent.swift in Sources */,
+				1A00000100000000000000AF /* CatalogDetailExternalURLPolicy.swift in Sources */,
+				1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */,
+				1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */,
+				1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */,
+				1A00000100000000000000C0 /* SearchStore.swift in Sources */,
+				1A00000100000000000000C2 /* SearchView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -417,6 +532,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		1A00000100000000000000B7 /* FirebaseInstallations */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseInstallations;
 		};
 		1A0000010000000000000085 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

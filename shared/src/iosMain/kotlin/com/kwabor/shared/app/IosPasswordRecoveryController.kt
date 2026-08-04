@@ -1,6 +1,5 @@
 package com.kwabor.shared.app
 
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter

@@ -24,11 +24,22 @@ Le build rejette un code invalide ou un nom hors contrat avant compilation.
 
 ## Identité visuelle et lancement
 
-La source canonique du symbole carré est `kwabor_icone_app.png` à la racine du dépôt. Elle est réservée à l'icône de l'application et au splash système Android. Le symbole n'est jamais redessiné, détouré ou recoloré : le script versionné redimensionne le bitmap officiel opaque en conservant sa silhouette, sa courbe intérieure, ses nuances et sa texture.
+La source de build verrouillée du symbole carré est `kwabor_icone_app.png` à la racine du dépôt. Elle est réservée à l'icône de l'application et au splash système Android. Le symbole n'est jamais redessiné, détouré ou recoloré : le script versionné redimensionne ce bitmap opaque en conservant sa silhouette, sa courbe intérieure, ses nuances et sa texture. Le propriétaire de marque doit encore confirmer qu'il s'agit du master haute définition officiel, ou fournir son remplacement avant la validation perceptuelle finale.
 
-Le splash Android 12+ et le foreground de l'icône adaptative utilisent deux assets distincts, chacun contenant le symbole intégral, au ratio inchangé, centré à 75 % sur le même fond ink `#0E0E0D`. Ce padding est nécessaire pour garder toute la silhouette dans le masque circulaire imposé au lancement par Android.
+Le splash système et le foreground de l'icône adaptative utilisent deux familles d'assets distinctes. Le foreground conserve son canevas intrinsèque de 108 dp. Le splash utilise le canevas Android sans fond d'icône de 288 dp, soit des PNG de 288, 432, 576, 864 et 1152 px de `mdpi` à `xxxhdpi`. Chaque splash est produit directement depuis le master 1254 px en un seul downsampling, avec le symbole centré à 75 % sur le fond ink `#0E0E0D`. Cette géométrie maintient la silhouette claire dans le cercle sûr de 192 dp sans agrandir un dérivé basse définition.
 
-Le logo horizontal complet a un autre master canonique : `kwabor_2.png`. Il est embarqué dans `res/drawable-nodpi/kwabor_launch_wordmark.png` comme copie binaire exacte, en 2172 × 724 au ratio 3:1. Dès que le splash système rend la main, Compose l'affiche centré avec `ContentScale.Fit`, sur le fond `#080707` prélevé aux bords du master, jusqu'à la première frame réellement rendue par le lecteur vidéo. Aucun crop, padding raster, recolorisation ou redessin ne sépare donc le fichier officiel du rendu applicatif.
+Le logo horizontal complet a un autre master canonique : `kwabor_2.png`. Il est embarqué dans `res/drawable-nodpi/kwabor_launch_wordmark.png` comme copie binaire exacte, en 2172 × 724 au ratio 3:1. Dès que le splash système rend la main, l'interface Android l'affiche centré avec `FIT_CENTER`, sur le fond `#080707` prélevé aux bords du master, jusqu'à la première frame réellement rendue par le lecteur vidéo. Aucun crop, padding raster, recolorisation ou redessin ne sépare donc le fichier officiel du rendu applicatif.
+
+Au premier `onCreate`, le symbole système reste affiché au moins 1 000 ms ; une recréation d'Activity
+n'ajoute pas cette attente de lancement à froid. Android 13+ reçoit explicitement la préférence
+`icon_preferred`. La fenêtre et ses barres système restent sur le fond sombre pendant la relève.
+La vidéo est attachée derrière le wordmark, préparée en pause à la position zéro, puis autorisée
+uniquement après le retrait effectif du splash, 500 ms de wordmark dans une fenêtre visible sur
+plusieurs frames et un lifecycle au premier plan. Un passage en arrière-plan ou une surface
+détachée interrompt cette autorisation.
+Lors d'un lancement ultérieur, ce même wordmark couvre aussi la décision locale comparant la
+révision embarquée à la dernière révision présentée. Cette vérification locale ne peut donc pas
+intercaler l'écran générique de restauration entre le symbole système et une intro requise.
 
 Les PNG Android/iOS sont régénérables sur Windows avec :
 
@@ -36,11 +47,77 @@ Les PNG Android/iOS sont régénérables sur Windows avec :
 .\tools\generate-brand-assets.ps1
 ```
 
-La CI verrouille les trois masters, chaque dérivé d'icône et les références plateforme. Le contrôle peut aussi être lancé localement, sans dépendance Python tierce :
+La CI verrouille les trois masters, chaque dérivé d'icône, la géométrie visible, le cercle sûr et le câblage XML actif du SplashScreen. Le contrôle peut aussi être lancé localement, sans dépendance Python tierce :
 
 ```powershell
 python -B tools/verify-brand-assets.py
 ```
+
+Quand un asset de lancement ou son pipeline change, la CI appelle aussi
+`.github/workflows/android-launch-evidence.yml`. Elle installe un APK frais sur les API 30, 31 et
+36, puis réinitialise complètement ses données avant chacun des profils `xxxhdpi`, `xhdpi` et
+`mdpi`. La capture brute AOSP de l'écran composé est d'abord armée par une frame HOME. Le même
+shell appareil horodate ensuite
+`/proc/uptime`, publie le marqueur et exécute le cold start. Android 12 ne fournit pas l'option
+shell de forçage du splash à icône : son job API 31 utilise donc l'image AOSP standard rootable,
+exige `adb shell id -u == 0` et vérifie que HOME est au premier plan avant le lancement. Le
+framework Android 12 classe cet UID racine comme surface système et sélectionne ainsi le même
+splash à icône qu'un lancement depuis HOME. Sur API 36, `--splashscreen-show-icon` demande
+explicitement `SPLASH_SCREEN_STYLE_ICON` ; API 30 conserve son mécanisme de splash historique.
+
+La séquence RGBA commence par un burst de trois secondes à cible de 450 ms afin d'observer le
+splash court, passe à une cible de deux secondes jusqu'au retour de `am start -W`, puis reprend une
+cible de 450 ms pendant au moins cinq secondes. Le même shell publie successivement, par
+renommages atomiques, l'horodatage de ce retour, le marqueur `ready` et la demande d'arrêt ; le
+worker n'honore cette dernière qu'après le burst final. Celui-ci doit contenir au moins quatre
+captures postérieures au marqueur et couvrir au moins 2,5 secondes. Chaque commande est bornée à
+trois secondes ; le temps réellement inactif entre la fin d'une capture valide et le début de la
+suivante reste limité à 4,5 secondes. Un dépassement, un timeout de commande ou une capture HOME
+initiale vide rejette toute la séquence et autorise jusqu'à deux recaptures complètes ; aucune frame
+d'un essai rejeté n'est réutilisée. L'en-tête, le format, les
+dimensions et la taille exacte de chaque frame sont vérifiés avant conversion PNG côté hôte. Les
+budgets statiques sont de 608 633 344 octets en `xxxhdpi`, 177 324 544 en `xhdpi` et 69 497 344 en
+`mdpi`, chacun contrôlé avec 128 Mio supplémentaires réservés au système et sous le quota de
+sécurité de 640 Mio. Le profil le plus lourd passe en premier. Les données brutes sont supprimées
+après production d'un manifeste SHA-256, puis l'ensemble validé est publié par un unique renommage
+atomique de répertoire.
+
+Le `screenrecord` long démarre seulement après la validation et la compression de cette séquence
+critique afin de ne pas lui disputer SurfaceFlinger. La CI réinitialise une seconde fois les données
+applicatives avant de l'armer : cette preuve continue observe donc elle aussi un état applicatif
+vierge de premier lancement et peut rendre visible le bref raccord wordmark → intro même lorsqu'un
+`screencap` haute résolution l'a échantillonné autour. Cette preuve de continuité, distincte de la
+preuve launch
+native, est encodée en 360×780 pour rester sous les capacités AVC logicielles des images AOSP.
+Recorder armé sur une surface HOME attestée pour chaque API, la CI fige une baseline MP4 monotone
+juste avant l'action, provoque un cold start depuis cet état vierge puis, au moins quinze secondes
+plus tard, une transition vers HOME suivie d'une reprise. Le même processus `screenrecord` doit rester
+actif et le MP4 doit croître séparément après le cold start, après HOME et après la reprise. Chaque
+baseline est un snapshot de taille validé au plus près de l'action, supérieur ou égal au dernier
+octet déjà prouvé, et encadré par deux contrôles du même PID distant et du processus hôte. La
+croissance strictement supérieure qui suit, les assertions d'activité/UI et la validation finale du
+MP4 prouvent ensemble que le flux traverse chaque transition ; le processus applicatif doit aussi
+rester identique entre HOME et la reprise. Le `LaunchState` doit être `HOT` ou `WARM`. Le retour
+`UNKNOWN (0)` n'est admis que si `am start` émet aussi exactement l'avertissement indiquant que la
+tâche courante a été ramenée au premier plan ; cette paire AOSP reste corroborée par le même PID,
+la croissance du flux, l'activité reprise et l'état UI.
+Les phases
+partagent un deadline global borné sous la limite AOSP de 180 secondes et conservent dix secondes
+pour finaliser le conteneur. La preuve exige enfin un H.264 décodable d'au moins quatre frames VFR,
+au moins quinze secondes PTS, vingt-quatre secondes murales et une assertion UI distincte après le
+cold start puis après la reprise, confirmant l'intro ou le landing configuré. La CI
+publie les vidéos source et de revue, les
+planches-contact, la frame HOME et les métadonnées pendant 7 jours ; en cas d'échec de cadence,
+les PNG déjà validés restent disponibles pour le diagnostic. Une planche montre chaque
+échantillon exactement une fois et un manifeste distingue `startup` de `post-ready`. La vidéo et
+la planche normalisées sont des reconstructions qui maintiennent chaque PNG jusqu'à l'échantillon
+suivant : elles facilitent la lecture, mais ne prouvent pas la persistance intermédiaire. Les
+sources horodatées prouvent les pixels observés ; les tests déterministes imposent séparément
+1 000 ms de splash et 500 ms de wordmark. L'APK de preuve utilise une URL réservée `.invalid` et
+une clé factice non secrète ; la capture échoue si l'activité n'est pas reprise ou si aucune
+surface onboarding configurée n'est exposée. Ces preuves automatisées ne remplacent pas la revue
+perceptuelle finale sur appareils Pixel/Samsung et iOS. Une matrice sans frame wordmark clairement
+identifiable est donc rejetée lors de cette revue, même si ses garde-fous temporels sont verts.
 
 ## Clé d'upload production
 
@@ -69,7 +146,20 @@ Les GitHub Environments `staging` et `production` doivent fournir les variables 
 dans Supabase et doit respecter `*.apps.googleusercontent.com` ; une valeur absente ou mal formée
 arrête le workflow avant le build.
 
-### Secrets production
+### Configuration Firebase staging et production
+
+Chaque GitHub Environment doit contenir le secret `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64`, encodé
+depuis le `google-services.json` de ce même environnement. Le workflow le décode dans le checkout,
+vérifie le project ID et le package `com.kwabor.android`, puis le supprime même après échec.
+
+Avant la première distribution contenant une configuration Firebase réelle, prouver que la population
+ciblée n'a reçu aucune ancienne build ayant activé la collecte automatique Crashlytics ou Performance.
+Sur les appareils staging, partir d'une installation propre. Si une build Firebase antérieure a été
+distribuée, bloquer la release et documenter une migration dédiée : un override persistant déjà actif
+peut commencer son travail lors de l'initialisation et la nouvelle app ne peut pas annuler avec certitude
+un upload déjà engagé.
+
+### Secrets de signature production
 
 Dans le GitHub Environment `production`, créer les secrets suivants :
 
@@ -118,5 +208,13 @@ Le workflow exécute la gate `check` avant de publier. Toute configuration dista
 - signature de l'AAB issue de la clé d'upload attendue ;
 - mapping R8 et SHA-256 archivés ;
 - aucun fichier de configuration ou secret ajouté à Git ;
+- manifest fusionné sans `FirebaseInitProvider`, six valeurs de collecte à `false` et instrumentation
+  Performance automatique désactivée ;
+- manifest fusionné sans `AD_ID`, permissions AdServices, Install Referrer ni
+  `android.ext.adservices`, contrôlé pour debug, staging et release par
+  `:androidApp:verifyFirebaseMergedManifests` ;
+- `verifyFirebaseDependencyBoundary` vert : les dépendances Gradle évaluées ne contiennent le groupe
+  Firebase que dans `:androidApp`, et l'inventaire des scripts audités est intact ;
+- lignée Firebase propre confirmée, ou plan de migration legacy approuvé avant rollout ;
 - CI de la révision `main` verte ;
 - formulaire Data safety, politique de confidentialité et consentements validés par le propriétaire.

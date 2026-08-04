@@ -1,4 +1,3 @@
-import CoreLocation
 import Foundation
 import UserNotifications
 
@@ -19,90 +18,29 @@ protocol RegistrationLocationProviding {
 }
 
 @MainActor
-final class CoreLocationRegistrationService: NSObject, RegistrationLocationProviding {
-    private let manager: CLLocationManager
-    private var continuation: CheckedContinuation<RegistrationLocationResult, Never>?
-    private var timeoutTask: Task<Void, Never>?
+final class CoreLocationRegistrationService: RegistrationLocationProviding {
+    private let provider: ApproximateLocationProviding
 
-    init(manager: CLLocationManager = CLLocationManager()) {
-        self.manager = manager
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+    init(provider: ApproximateLocationProviding? = nil) {
+        self.provider = provider ?? CoreLocationApproximateLocationProvider()
     }
 
     func requestCurrentLocation() async -> RegistrationLocationResult {
-        guard continuation == nil else { return .unavailable }
-
-        return await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            timeoutTask = Task { [weak self] in
-                do {
-                    try await Task.sleep(nanoseconds: locationTimeoutNanoseconds)
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled else { return }
-                self?.finish(with: .unavailable)
-            }
-            switch manager.authorizationStatus {
-            case .authorizedAlways, .authorizedWhenInUse:
-                manager.requestLocation()
-            case .notDetermined:
-                manager.requestWhenInUseAuthorization()
-            case .denied, .restricted:
-                finish(with: .permissionDenied)
-            @unknown default:
-                finish(with: .unavailable)
-            }
-        }
-    }
-
-    private func finish(with result: RegistrationLocationResult) {
-        guard let continuation else { return }
-        timeoutTask?.cancel()
-        timeoutTask = nil
-        self.continuation = nil
-        continuation.resume(returning: result)
-    }
-}
-
-extension CoreLocationRegistrationService: @preconcurrency CLLocationManagerDelegate {
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard continuation != nil else { return }
-        switch manager.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            manager.requestLocation()
-        case .denied, .restricted:
-            finish(with: .permissionDenied)
-        case .notDetermined:
-            break
-        @unknown default:
-            finish(with: .unavailable)
-        }
-    }
-
-    func locationManager(_: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else {
-            finish(with: .unavailable)
-            return
-        }
-        finish(
-            with: .coordinate(
+        switch await provider.requestCurrentLocation() {
+        case let .coordinate(coordinate):
+            return .coordinate(
                 RegistrationCoordinate(
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
                 )
             )
-        )
-    }
-
-    func locationManager(_: CLLocationManager, didFailWithError _: Error) {
-        finish(with: .unavailable)
+        case .permissionDenied:
+            return .permissionDenied
+        case .disabled, .unavailable:
+            return .unavailable
+        }
     }
 }
-
-private let locationTimeoutNanoseconds: UInt64 = 12_000_000_000
 
 @MainActor
 protocol RegistrationNotificationPermissionRequesting {

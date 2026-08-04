@@ -225,6 +225,8 @@ final class FederatedSignInStore: ObservableObject {
     private let presenterProvider: PresentingViewControllerProviding
     private let identityHintStore: FederatedIdentityHintPersisting
     private let reportsSubmissionFailure: Bool
+    private let attemptPreflight: () -> Bool
+    private let attemptPreflightErrorMessage: String?
     private let onCredential: (FederatedAuthCredential, @escaping (Bool) -> Void) -> Void
     private var pendingAppleAttempt: NonceAttempt?
 
@@ -233,12 +235,16 @@ final class FederatedSignInStore: ObservableObject {
         presenterProvider: PresentingViewControllerProviding,
         identityHintStore: FederatedIdentityHintPersisting,
         reportsSubmissionFailure: Bool = true,
+        attemptPreflight: @escaping () -> Bool = { true },
+        attemptPreflightErrorMessage: String? = nil,
         onCredential: @escaping (FederatedAuthCredential, @escaping (Bool) -> Void) -> Void
     ) {
         self.strings = strings
         self.presenterProvider = presenterProvider
         self.identityHintStore = identityHintStore
         self.reportsSubmissionFailure = reportsSubmissionFailure
+        self.attemptPreflight = attemptPreflight
+        self.attemptPreflightErrorMessage = attemptPreflightErrorMessage
         self.onCredential = onCredential
         GoogleSignInBootstrap.configureIfPossible()
     }
@@ -249,6 +255,7 @@ final class FederatedSignInStore: ObservableObject {
 
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         guard !isLoading else { return }
+        guard prepareAttempt() else { return }
         do {
             let attempt = try NonceAttempt.make()
             pendingAppleAttempt = attempt
@@ -325,6 +332,7 @@ final class FederatedSignInStore: ObservableObject {
             errorMessage = strings.authFederatedUnavailable
             return
         }
+        guard prepareAttempt() else { return }
         do {
             let attempt = try NonceAttempt.make()
             errorMessage = nil
@@ -398,6 +406,17 @@ final class FederatedSignInStore: ObservableObject {
                 errorMessage = strings.authReauthenticationFailed
             }
         }
+    }
+
+    private func prepareAttempt() -> Bool {
+        guard attemptPreflight() else {
+            pendingAppleAttempt = nil
+            isLoading = false
+            errorMessage = attemptPreflightErrorMessage ?? strings.authFederatedUnavailable
+            return false
+        }
+        errorMessage = nil
+        return true
     }
 
     private func normalized(_ value: String?) -> String? {

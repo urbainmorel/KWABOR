@@ -4,6 +4,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ## En cours
 
+- [x] AUDIT-V1-001 — Auditer l’état réel Android/iOS/Supabase, reconstruire le chemin critique et publier `docs/audits/2026-07-30-v1-production-readiness.md`.
 - [x] FND-001 — Créer le scaffold KMP minimal compilable.
 - [x] FND-002 — Formaliser les ADR fondateurs.
 - [x] FND-003 — Installer le shell Compose partagé.
@@ -37,6 +38,17 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] V1-GOV-001 — Transformer `PRD.md` §5.1 en feuille de route traçable, accepter les ADR Room/IA/Firebase/FedaPay et protéger `main`.
 - [x] PR-V1-GOV-001 — PR `#18` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 
+### Stabilisation du dépôt
+
+- [ ] STAB-001 — Fusionner ou fermer proprement la PR parallèle `#34`, puis resynchroniser l'état documentaire après décision.
+- [ ] STAB-002 — Retirer les messages techniques et désactiver visuellement toute action sans implémentation réelle après validation des racines V1.
+  - [x] STAB-002A — Remplacer les copies internes d'authentification, d'invitation, de consentement et
+    d'inscription externe ; rendre explicites les choix facultatifs de confidentialité sur Android/iOS.
+  - [ ] STAB-002B — Retirer le placeholder `Socle applicatif en place` et neutraliser les racines sans
+    implémentation réelle après validation de la navigation V1.
+- [x] STAB-003 — Corriger les templates et runbooks locaux, permettre le build sans fichier fournisseur, verrouiller le wrapper Gradle et refuser en CI les secrets ou artefacts mobiles suivis.
+- [ ] PR-STAB-003 — PR brouillon empilée `#37` publiée avec `quality` et `iOS simulator build` verts ; obtenir la revue humaine puis la fusionner après `#36`.
+
 ### Architecture et environnements
 
 - [x] CI-004 — Migrer les actions GitHub vers des versions compatibles Node 24 sans modifier les gates.
@@ -48,56 +60,186 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-ARCH-002 — PR `#22` mergée après tests JVM, `quality`, pgTAP et `iOS simulator build` verts.
 - [x] ARCH-003 — Introduire les ViewModels Auth/Explore, `StateFlow` immuable, intents exhaustifs et effets ponctuels.
 - [x] PR-ARCH-003 — PR `#23` mergée après tests de flux, `quality`, pgTAP et `iOS simulator build` verts.
+- [x] ARCH-004 — Sortir `DispatcherProvider` du domaine, déplacer son binding dans la composition root et verrouiller les imports/emplacements du domaine via `verifyDomainPurity`.
+- [ ] PR-ARCH-004 — PR empilée `#36` publiée avec CI verte ; obtenir la revue humaine puis la fusionner après la PR de sécurité `#35`.
 - [x] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.
 - [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
-  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations.
+  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations ; aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
 - [x] PR-IOS-REL-001 — PR `#27` mergée après `quality`, pgTAP et les trois configurations simulateur vertes.
+- [ ] IOS-PRIVACY-001 — Aligner le Privacy Manifest et les déclarations App Store sur les traitements
+  réellement livrés.
+  - [x] IOS-PRIVACY-001A — Déclarer l'accès direct à `UserDefaults` avec la raison Apple `CA92.1`,
+    verrouiller cette déclaration dans le vérificateur d'intégrité et corriger le runbook iOS.
+  - [ ] IOS-PRIVACY-001B — Inventorier les données de l'hôte et des SDK, valider collecte, finalités,
+    liaison au compte et tracking avec le propriétaire, puis contrôler le Privacy Report Xcode et le
+    questionnaire App Store Connect.
+    - [x] IOS-PRIVACY-001B1 — Inventorier l'hôte et les SDK, corriger et verrouiller les catégories
+      hôte certaines, puis documenter le mapping et les inconnues.
+    - [ ] IOS-PRIVACY-001B2 — Valider rétention/finalités/réglages avec le propriétaire, générer le
+      Privacy Report de l'archive Release sur macOS et publier les réponses App Store Connect.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
-  - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et Remote Config sur appareils avec consentement.
+  - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et la capacité Remote Config générique sur appareils avec consentement, valeurs sûres et révocation ; aucun canal média n'y est autorisé.
 - [x] PR-OBS-001A — PR `#28` livrée après tests ciblés, `quality`, pgTAP et les trois configurations iOS simulateur vertes.
 
 ### Auth et onboarding
 
-- [x] AUTH-002 — Livrer intro vidéo, reduced-motion, cache Remote Config et navigation invité sur Android/iOS.
+- [x] AUTH-002 — Livrer intro vidéo embarquée, reduced-motion et navigation invité sur Android/iOS.
 - [x] PR-AUTH-002 — PR `#29` mergée après vérification média, `quality`, pgTAP et les trois configurations `iOS simulator build` vertes.
+- [x] REMOTE-INTRO-001 — Implémentation historique livrée dans `#38`, désormais remplacée par ADR-0021 et non retenue comme état cible V1.
+- [ ] PR-REMOTE-INTRO-001 — PR brouillon empilée `#38` publiée sur `#37`, run final `30661731938` vert ; ne pas livrer le canal distant sans la tranche de retrait Store-only au-dessus de la pile.
+- [x] INTRO-STORE-001 — Retirer URL/téléchargement/cache/quarantaine/purge distants, conserver Remote Config pour les flags sûrs, versionner l'intro embarquée sur Android/iOS et imposer une release Store pour tout changement vidéo.
+  - [x] Verrouiller la révision initiale `1`, l'égalité Android/iOS et le couplage octets/révision contre la base Git.
+  - [ ] Confirmer provenance, droits de diffusion et approbation éditoriale de chaque média avant build Store.
+  - [ ] Prouver première lecture, non-répétition, upgrade vers une révision supérieure, offline et reduced-motion sur les deux plateformes.
+- [ ] PR-INTRO-STORE-001 — PR brouillon empilée `#43` publiée sur `#42` ; validations locales, deux revues indépendantes et run GitHub Actions `30733200076` verts ; obtenir la revue humaine avant fusion.
 - [x] AUTH-003 — Terminer email OTP, mot de passe, identité, ville/GPS, devise et consentements.
 - [x] AUTH-004 — Ajouter connexion mot de passe, oubli/réinitialisation, déconnexion et écrans SwiftUI équivalents.
 - [x] PR-AUTH-004 — PR `#31` mergée après seconde `quality`/pgTAP verte et compilation SwiftUI Debug/Staging/Release verte.
 - [x] BRAND-001 — Restaurer le wordmark officiel complet au lancement Android/iOS, assurer la continuité jusqu'à la première frame et verrouiller l'intégrité des assets en CI.
-- [ ] BRAND-002 — Remplacer le monogramme Android de lancement rééchantillonné par le master officiel haute définition exact, verrouiller hash/géométrie et fournir les captures multi-API Android ainsi que le contrôle iOS.
+- [ ] BRAND-002 — Remplacer le monogramme Android de lancement rééchantillonné par la source haute définition du dépôt, verrouiller hash/géométrie, faire confirmer le master officiel et fournir les captures multi-API Android ainsi que le contrôle iOS.
+  - [x] Séparer le canevas launcher 108 dp du splash 288 dp et générer les cinq densités directement depuis le master 1254 px.
+  - [x] Verrouiller dimensions, hashes, géométrie, cercle sûr et câblage XML actif ; prouver l'idempotence et les refus négatifs.
+  - [ ] Faire confirmer par le propriétaire de marque que `kwabor_icone_app.png` est le master officiel, ou fournir son remplacement avant validation perceptuelle finale.
+  - [x] Produire et auditer les neuf captures CI API 30/31/36 en `mdpi`/`xhdpi`/`xxxhdpi` — run `30661731938` vert et intégrité technique 9/9.
+  - [x] Produire une matrice perceptuellement recevable : les neuf preuves continues du run `30661731938` montrent HOME → monogramme → wordmark complet → intro.
+  - [ ] Valider perceptuellement le raccord complet sur appareils Android Pixel/Samsung et iOS.
 - [x] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.
   - [x] Validations locales finales, reset Supabase, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
   - [x] Build Xcode macOS, PR et CI validés avant fusion.
+- [x] AUTH-UX-001 — Réduire l'inscription à quatre écrans email/un profil fédéré, rendre l'intro interactive, contextualiser la softwall et différer toute permission avant l'accueil ; portage local validé sur la ligne avancée Store-only.
+- [ ] PR-AUTH-UX-001 — Valider les configurations iOS simulateur sur macOS puis, après autorisation, publier et faire revoir la branche d'intégration avancée ; ne pas fusionner directement l'ancienne branche basée sur `main`.
 
 ### Offline, préférences et médias
 
-- [ ] OFFLINE-001 — Installer Room KMP, schémas exportés et DataStore KMP pour préférences légères.
+- [x] OFFLINE-001 — Installer Room KMP, schémas exportés et DataStore KMP pour préférences légères.
+  - [x] Implémenter le schéma Room v1 Explore, la rétention bornée, l'auto-réparation et les builders Android/iOS.
+  - [x] Implémenter DataStore pour ville Explore, locale et devise, avec erreurs de stockage typées et cycle de vie Koin paresseux.
+  - [x] Valider 218 tests shared, 160 tests Android, les gates globales, les APK debug/staging minifié et KSP sur les trois cibles iOS.
+  - [x] Publier la PR empilée `#40` et obtenir les gates GitHub Actions `quality`/iOS vertes sur le run `30705934250`.
+- [ ] PR-OFFLINE-001 — Obtenir la revue humaine de la PR brouillon empilée `#40`, puis la fusionner après `#39`.
+- [ ] OFFLINE-002 — Rendre la persistance locale sensible liée à l’appareil conformément à ADR-0027.
+  - [x] Android : placer Room dans `noBackupFilesDir`, exclure les neuf domaines cloud/D2D et
+    basculer en mémoire si la politique disque échoue ; invalider le cache v2 historique.
+  - [x] iOS : isoler Room dans un dossier exclu des sauvegardes, protégé et fail-closed avec repli
+    mémoire ; invalider le cache v2 historique.
+  - [x] Verrouiller les politiques sources, les manifestes fusionnés et la compilation Kotlin/Native par tests.
+  - [x] Qualifier l’APK debug sur émulateur Android 11/API 30 : la cible 36 ne porte pas le flag
+    runtime `ALLOW_BACKUP` et `bmgr backupnow` répond `Backup is not allowed`, sans jeu restaurable.
+  - [ ] Qualifier avec `bmgr` les API 31/36.1 puis un transfert sur appareil Android/OEM ; confirmer
+    notamment qu’aucune donnée privée n’entre dans le nouveau transfert Android↔iOS.
+  - [ ] Exécuter le test filesystem sur simulateur macOS puis qualifier exclusion/protection sur appareil iOS.
 - [ ] SYNC-001 — Persister l'outbox, coalescer Like/Favori, appliquer idempotence, backoff et drain réseau/session.
 - [ ] DRAFT-001 — Synchroniser les brouillons avec version optimiste et conservation des deux versions en conflit.
 - [ ] MEDIA-001 — Créer buckets/RLS, uploads temporaires, validation, downsampling, dérivés et Edge Function `media-finalize`.
 
 ### Explore, recherche, détail et devises
 
-- [ ] CATALOG-002 — Ajouter une vue/RPC de résumé catalogue paginé et supprimer le N+1 média.
+- [x] CATALOG-002 — Ajouter un RPC de résumé catalogue paginé par curseur et supprimer le N+1 média.
+- [ ] PR-CATALOG-002 — PR brouillon empilée `#39` publiée avec CI verte ; obtenir la revue humaine avant fusion.
 - [ ] EXPLORE-002 — Finaliser Explore Android : pagination, refresh, filtres, ville/GPS, sponsors et cache.
-- [ ] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles.
-- [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
+  - [x] EXPLORE-002A — Livrer le mur offline-first, la pagination/déduplication, le refresh non destructif,
+    la ville persistée/GPS, les référentiels Room v2 et les catégories serveur réelles.
+  - [ ] EXPLORE-002B — Versionner les tris/filtres prix-date-événement et le plafond sponsorisé côté serveur,
+    puis les brancher sans classement client divergent.
+    - [x] EXPLORE-002B1 — Ajouter `event_details`, ses invariants parent/enfant, ses grants/RLS,
+      un seed canonique et sa couverture pgTAP sans modifier le classement catalogue existant.
+    - [ ] PR-EXPLORE-002B1 — PR brouillon empilée `#42` publiée sur `#41`, run `30729830885`
+      entièrement vert ; obtenir la revue humaine, puis la fusionner en respectant l'ordre de la pile.
+    - [ ] EXPLORE-002B2 — Figer la popularité, les placements sponsorisés et les intervalles de dates,
+      puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
+  - [x] PR-EXPLORE-002A — PR brouillon `#41` publiée sur `#40` ; le run `30723036248` a passé
+    `quality`, le build simulateur iOS et les preuves de lancement Android API 30/31/36.
+- [x] EXPLORE-IOS-001 — Livrer Explore SwiftUI avec les mêmes états et capacités fonctionnelles que le mur Android disponible.
+  - [x] Partager le runtime intents/état/effets, brancher le cache Room, la pagination, le refresh, la ville/GPS et les interactions avec soft wall d'authentification.
+  - [x] Livrer la grille SwiftUI native, ses états chargement/vide/offline/erreur, l'image pipeline borné et les politiques d'accessibilité/adaptation.
+  - [x] Ajouter un smoke test iOS simulateur qui rouvre Room et DataStore sur disque, le brancher à la CI macOS et borner son exécution.
+  - [x] Passer la porte locale complète et trois revues indépendantes sans P0/P1/P2 résiduel.
+- [ ] PR-EXPLORE-IOS-001 — PR brouillon `#44` publiée sur `#43` ; le run exact-head `30741677132` a passé `quality`, le build Xcode simulateur et les preuves Android API 30/31/36. Obtenir la revue humaine.
+- [ ] HISTORY-001 — Conserver l’historique de recherche utile à Search, l’Assistant IA et au fil organique.
+  - [ ] Faire valider avant migration la rétention, les plafonds serveur/local et le défaut du
+    contrôle de personnalisation.
+  - [ ] Créer l’autorité Supabase liée au compte avec RLS propriétaire, effacement et couverture pgTAP.
+  - [ ] Capturer uniquement les requêtes soumises, isoler invité/comptes dans Room, synchroniser le
+    même compte et proposer l’import invité explicitement.
+  - [ ] Ajouter effacement unitaire/global et contrôle distinct de personnalisation, sans texte libre
+    dans analytics ou logs ; purger historique et signaux dérivés à la suppression du compte.
+  - [ ] Dériver des signaux bornés pour IA/fil organique sans exposer l’historique brut au modèle ni
+    modifier le classement ou l’attribution sponsorisés.
+- [ ] SEARCH-001 — Livrer récents durables, autocomplétion, résultats, filtres et fallback texte offline.
+  - [ ] SEARCH-001A — Livrer la recherche lexicale versionnée publiée-only, pagination, résultats
+    Android/iOS et repli Room borné sans persistance de requête.
+    - [x] Implémentation KMP, Compose, SwiftUI, RPC/RLS/grants, tests ciblés et ADR locaux.
+    - [ ] Prouver le commit exact par la CI GitHub parallèle, dont Xcode Debug/Staging/Release.
+  - [ ] SEARCH-001B — Livrer autocomplétion, filtres avancés et raccord aux récents de HISTORY-001.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
+  - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
+    contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.
+  - [ ] PR-DETAIL-001A — PR brouillon `#45` publiée sur `#44` ; le run exact-head `30759824206`
+    valide Gradle, Android API 30/31/36, iOS, les 632 tests SQL standard et les 12 tests concurrents.
+    Obtenir la revue humaine.
+  - [x] DETAIL-001B — Livrer le DetailSheet Android Compose connecté au read model, sans stub ni CTA factice.
+    - [x] Brancher les six variantes, les médias officiels, les champs typés, les horaires, les prix XOF,
+      les lieux et les états chargement/introuvable/offline/erreur.
+    - [x] Rafraîchir localement les statuts temporels, borner les libellés courts SQL/Kotlin et couvrir
+      concurrence, Unicode, médias, accessibilité et politique d'actions par tests.
+  - [ ] PR-DETAIL-001B — PR brouillon `#46` publiée au-dessus de `#45` ; le run exact-head
+    `30775732082` valide Gradle, Android API 30/31/36, iOS, les 641 tests SQL standard et les
+    12 tests concurrents. Obtenir la revue humaine.
+  - [x] DETAIL-IOS-001 — Livrer l'écran détail SwiftUI natif avec parité fonctionnelle et accessibilité.
+  - [ ] PR-DETAIL-IOS-001 — PR brouillon `#47` publiée au-dessus de `#46` ; le run exact-head
+    `30780564021` valide Gradle, Supabase, Android API 30/31/36, les tests Swift, le runtime iOS,
+    les XCFrameworks et les configurations Xcode simulateur Debug/Staging/Release. Obtenir la revue
+    humaine et la preuve VoiceOver sur appareil.
 - [ ] REVIEWS-001 — Ajouter avis paginés, création/édition, photos, likes et réponse Promoteur.
-- [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide, claim et état événement terminé.
+- [ ] ACTIONS-001 — Ajouter partage, itinéraire, contact, signalement, guide et claim.
+  - [x] ACTIONS-001A — Livrer les actions externes réellement disponibles sur Android/iOS : itinéraire,
+    téléphone, WhatsApp, site, email, menu et billetterie, avec désactivation des événements terminés.
+  - [ ] PR-ACTIONS-001A — PR brouillon `#48` publiée au-dessus de DETAIL-IOS-001 ; Android API 30/31
+    et iOS sont verts. La preuve brute API 36 reste à rejouer après accord explicite sur le correctif
+    minimal du harnais, sans relâcher les critères d'acceptation.
+  - [x] GUIDE-001B — Livrer localement la découverte publique « Trouver un guide » : contrat RPC
+    versionné, filtres destination/langue/spécialité, pagination, cartes et ouverture du détail sur
+    Android Compose et iOS SwiftUI, sans nouvel onglet racine ni sponsoring.
+  - [ ] PR-GUIDE-001B — Valider la migration sur une stack Supabase isolée et les sources Swift sous
+    Xcode/macOS, puis publier la branche empilée après décision sur la CI API 36.
+  - [x] ACTIONS-001C1 — Livrer localement la route interne stricte de fiche Android/iOS : validation
+    UUID partagée, dernier lien valide restaurable, attente intro/bootstrap/E3, ouverture Accueil puis
+    détail, acquittement conditionnel et invalidation lors des resets sensibles.
+  - [ ] PR-ACTIONS-001C1 — Installation, résolution et intents froid/chaud validés sur l'AVD Android
+    API 30 ; valider encore les PolicyTests, `onOpenURL` sous Xcode/macOS et le parcours connecté sur
+    appareils configurés avant toute publication de la branche.
+  - [ ] ACTIONS-001C — Livrer partage et signalement réels avec contrats serveur et parcours natifs.
+    - [ ] ACTIONS-001C2 — Après validation des décisions de
+      [`l'audit du 3 août`](docs/audits/2026-08-03-actions-001c-reporting-readiness.md), livrer le
+      signalement fortement typé d'une fiche : RPC idempotent, RLS/ACL, UI Android/iOS et analytics
+      sans PII.
+  - [ ] ACTIONS-001D — Livrer le claim sécurisé relié aux organisations vérifiées et aux droits RLS.
 - [ ] FX-001 — Livrer `exchange-rates-sync` avec Open Exchange Rates, cache sept jours du dernier taux valide puis repli XOF.
 
 ### Profil, paramètres, Social et contribution
 
 - [ ] PROFILE-001 — Livrer profils personnel/public, publications, contenus, favoris, statistiques et édition.
 - [ ] SETTINGS-001 — Livrer sécurité, sessions, préférences, thème, langue/devise/date, légal et Danger Zone.
+  - [x] SETTINGS-001A — Séparer Profil et Paramètres sur Android/iOS, afficher l'identité et la méthode
+    de connexion, puis livrer déconnexion et suppression de compte sans faux réglage.
+  - [x] SETTINGS-001B — Exposer les trois consentements d'observabilité réels dans Paramètres sur
+    Android/iOS, couper immédiatement les portes applicatives lors d'un retrait et persister les
+    maintenances fournisseur asynchrones jusqu'à leur succès.
+    - [x] Android : retirer l'initialisation Firebase automatique, garder Crashlytics manuel et rendre
+      les purges diagnostics/FID crash-safe, réessayables et protégées contre les callbacks obsolètes.
+    - [x] Android : retirer les permissions d'attribution héritées et vérifier les manifestes fusionnés
+      debug/staging/release dans la gate Gradle.
+    - [x] Android : rejeter après évaluation Gradle toute dépendance Firebase hors `androidApp` et
+      verrouiller l'inventaire exact des scripts de build audités.
+    - [x] Android/iOS : verrouiller les sources auditées et interdire tout accès Firebase hors des
+      adaptateurs plateforme approuvés.
 - [ ] SOCIAL-001 — Ajouter schéma/RLS feed, follows, post likes, médias, compteurs et pagination.
 - [ ] SOCIAL-002 — Livrer le feed photo/diaporama Android avec mention ≤ 25 %, Like, suivi et partage.
 - [ ] SOCIAL-IOS-001 — Livrer le feed SwiftUI avec parité fonctionnelle et accessibilité.
@@ -132,9 +274,26 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.
+  - [x] SEC-001A — Fermer les contournements OAuth/onboarding, Social, membres, claims, signalements et classification des fiches ; hotfix ACL séparé de la taxonomie et 316 assertions pgTAP locales vertes.
+  - [x] SEC-001B — Faire deux revues techniques, publier la PR brouillon `#35` et obtenir `quality` + `iOS simulator build` verts.
+  - [ ] SEC-001C — Obtenir la revue humaine puis fusionner la PR `#35`.
+  - [ ] SEC-001D — Exécuter la préflight des données historiques, prouver sauvegarde/restauration et approuver toute quarantaine avant déploiement persistant.
+  - [ ] SEC-001E — Qualifier Storage, rate limiting, secrets, advisors et tests IDOR restants sur staging.
+  - [x] SEC-001F — Retirer mot de passe, ID token et nonce du body `account-delete` grâce à un client
+    Auth éphémère avec `MemorySessionManager` et `LogLevel.NONE` ; limiter le body à
+    `idempotency_key`, puis vérifier côté serveur identité, AMR fraîche et session live par RPC
+    atomique avant toute mutation. La reprise après redémarrage conserve une sentinelle de profil
+    pseudonymisée, privée et non modifiable, puis utilise une nouvelle session éphémère si Auth
+    existe encore ; après suppression Auth, seule la réconciliation serveur termine le tombstone.
+    Tests Kotlin ciblés Android et compilation des tests Kotlin/Native iOS X64 verts, Deno 20/20,
+    reset Supabase et 753 assertions pgTAP ainsi que la porte globale `spotlessCheck detekt check`
+    verts.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
-- [ ] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
+- [x] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
+  - [x] OPS-001A — Livrer le runbook Auth/session/suppression avec diagnostics en lecture seule,
+    seuils cron, reprises autorisées, no-go explicites et revue indépendante.
+  - [ ] OPS-001B — Raccorder les alertes non-PII, prouver cron/fallback et exécuter l'exercice staging.
 - [ ] BETA-001 — Exécuter la bêta 10 Android/5 iOS sur sept jours avec zéro P0/P1 et ≥ 99,5 % sans crash.
 - [ ] STORE-ANDROID-001 — Produire AAB signé, fiche Play, privacy/data safety et plan de rollout.
 - [ ] STORE-IOS-001 — Produire archive/TestFlight, fiche App Store, privacy et validation de signature.

@@ -149,18 +149,20 @@ private fun RecoveryNewPasswordStep(
             value = password,
             onValueChange = { updated -> password = updated },
             label = strings.passwordRecoveryNewPassword,
-            enabled = !state.isLoading,
+            options = AuthPasswordFieldOptions(enabled = !state.isLoading),
         )
         AuthPasswordField(
             value = confirmation,
             onValueChange = { updated -> confirmation = updated },
             label = strings.passwordRecoveryConfirmation,
-            enabled = !state.isLoading,
-            onDone = {
-                if (password.length >= MINIMUM_PASSWORD_LENGTH && password == confirmation) {
-                    actions.onSubmitPassword(password, confirmation)
-                }
-            },
+            options = AuthPasswordFieldOptions(
+                enabled = !state.isLoading,
+                onDone = {
+                    if (password.length >= MINIMUM_PASSWORD_LENGTH && password == confirmation) {
+                        actions.onSubmitPassword(password, confirmation)
+                    }
+                },
+            ),
         )
         AuthPrimaryButton(
             label = stringResource(R.string.auth_recovery_complete),

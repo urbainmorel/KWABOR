@@ -3,8 +3,7 @@ package com.kwabor.shared.domain.observability
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
 
 class ObservabilityModelsTest {
     @Test
@@ -52,41 +51,14 @@ class ObservabilityModelsTest {
     }
 
     @Test
-    fun remoteConfiguration_acceptsOnlyVerifiableHttpsIntroVideo() {
-        val configuration = createRemoteFeatureConfiguration(
-            introVideoEnabled = true,
-            introVideoUrl = "https://cdn.kwabor.example/intro.mp4",
-            introVideoSha256 = VALID_SHA256.uppercase(),
-            introVideoRevision = 2,
-        )
+    fun observabilityConsent_deniesEveryCapabilityByDefault() {
+        val consent = ObservabilityConsent()
 
-        val introVideo = assertNotNull(configuration.introVideo)
-        assertEquals(VALID_SHA256, introVideo.sha256)
-        assertEquals(2, introVideo.revision)
-    }
-
-    @Test
-    fun remoteConfiguration_fallsBackSafelyWhenAnyRemoteValueIsInvalid() {
-        assertNull(
-            createRemoteFeatureConfiguration(
-                introVideoEnabled = true,
-                introVideoUrl = "http://cdn.kwabor.example/intro.mp4",
-                introVideoSha256 = VALID_SHA256,
-                introVideoRevision = 1,
-            ).introVideo,
-        )
-        assertNull(
-            createRemoteFeatureConfiguration(
-                introVideoEnabled = true,
-                introVideoUrl = "https://user@cdn.kwabor.example/intro.mp4",
-                introVideoSha256 = "invalid",
-                introVideoRevision = 0,
-            ).introVideo,
-        )
+        assertFalse(consent.analyticsAllowed)
+        assertFalse(consent.diagnosticsAllowed)
+        assertFalse(consent.remoteConfigurationAllowed)
     }
 }
-
-private const val VALID_SHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 private val EXPECTED_EVENT_NAMES = setOf(
     "view_card",
@@ -111,6 +83,10 @@ private val EXPECTED_EVENT_NAMES = setOf(
     "signup_completed",
     "login_completed",
     "auth_method",
+    "registration_otp_validated",
+    "registration_profile_succeeded",
+    "registration_profile_failed",
+    "protected_action_replayed",
     "social_post_created",
     "entity_tag_selected",
     "mention_preview_opened",

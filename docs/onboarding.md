@@ -2,24 +2,24 @@
 
 ## Fondation livrée par AUTH-002
 
-Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Le bouton **Passer** reste immédiatement disponible. Le logo horizontal officiel reste visible entre le lancement natif et la première frame vidéo. Lorsque la réduction des animations est active, l'application affiche l'image de repli statique embarquée et un bouton **Continuer** sans démarrer la vidéo.
+Au premier lancement, Android Compose et iOS SwiftUI affichent une intro portrait silencieuse. Les CTA **S'inscrire**, **Se connecter** et **Continuer sans compte** sont disponibles immédiatement au-dessus de la vidéo ; celle-ci ne bloque jamais l'interaction. **Passer** arrête seulement la lecture et conserve la même surface sur l'image statique. Le logo horizontal officiel reste visible entre le lancement natif et la première frame. Le mouvement réduit, un échec de lecture et les lancements suivants utilisent directement le fallback statique.
 
 Après l'intro, un utilisateur non connecté peut ouvrir le flux OTP ou demander un accès invité. Avant de confirmer cet accès, l'application précise que les prix restent en FCFA et que les interactions nécessitent un compte. L'accès invité ouvre le mur Explore en lecture seule ; toucher une destination protégée conserve le mur souple d'authentification.
 
-L'intro embarquée n'est affichée qu'une fois par installation. Chaque nouvelle révision distante validée peut ensuite être affichée une seule fois, au lancement suivant son préchargement. L'accès invité n'est pas persisté : au prochain lancement sans session authentifiée, l'écran de connexion est présenté, sauf si une nouvelle révision d'intro est en attente.
+L'intro embarquée est affichée une fois par révision installée. La révision initiale vaut `1` sur Android et iOS ; une version Store qui conserve cette valeur ne rejoue pas l'intro. Une révision strictement supérieure est proposée une seule fois au lancement suivant son installation. L'accès invité n'est pas persisté : au prochain lancement sans session authentifiée et sans nouvelle révision embarquée, l'écran de connexion est présenté.
 
 ## Inscription livrée par AUTH-003
 
 Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
 
-1. email puis OTP de 6 chiffres, avec renvoi après 30 secondes ;
-2. mot de passe d'au moins 8 caractères, jamais conservé dans l'état UI ;
-3. prénom et nom, chacun limité à 80 caractères ;
-4. ville choisie manuellement ou estimée localement depuis une localisation approximative ponctuelle ;
-5. devise d'affichage XOF, NGN, USD ou EUR, XOF restant la devise de stockage et de paiement ;
-6. consultation et acceptation séparée des CGU, de la politique de confidentialité et de la licence UGC actives ;
-7. choix facultatifs et désactivés par défaut pour Analytics, diagnostics et Remote Config ;
-8. finalisation serveur atomique, puis écran d'explication avant la demande système de notifications.
+1. email puis OTP de 6 chiffres, avec collage/autoremplissage natif, soumission automatique, correction de l'email et renvoi après 30 secondes ;
+2. un seul champ de mot de passe d'au moins 8 caractères, compatible gestionnaire de mots de passe et jamais conservé dans l'état UI ;
+3. un écran défilant **Finaliser mon profil** : prénom, nom, ville recherchable, devise XOF par défaut et trois acceptations juridiques séparées avec liens HTTPS et versions visibles ;
+4. finalisation serveur atomique puis fermeture immédiate du tunnel, sans écran succès ni permission.
+
+Le chemin email compte quatre écrans maximum et affiche `2/4`, `3/4`, `4/4` seulement après le choix de méthode. Google et Apple ouvrent directement le profil final avec les noms préremplis et modifiables ; la progression affiche **Dernière étape**. Les villes et documents légaux sont préchargés dès l'ouverture. Une erreur offre un retry ciblé sans perdre les saisies. Une ville n'est suggérée que si la softwall provient d'un lieu dont le `cityId` est valide.
+
+Aucune géolocalisation, permission notification ou demande de consentement d'observabilité n'appartient plus au tunnel. Les nouveaux comptes conservent Analytics, diagnostics et Remote Config à `false` jusqu'à leur future gestion dans Réglages ; l'intro locale reste donc le comportement par défaut.
 
 L'OTP crée une session Supabase avant la fin du profil. Cette session porte le statut `OnboardingRequired` et n'est jamais considérée comme authentifiée par la navigation. La RPC vérifie elle-même que le compte email possède désormais un mot de passe avant toute écriture : un client modifié ne peut donc pas sauter cette étape. Si l'application est interrompue après vérification, elle reprend au minimum à l'étape du mot de passe et ne peut pas ouvrir l'accueil. Quitter le parcours après OTP déclenche d'abord une déconnexion confirmée ; un échec réseau conserve l'écran ouvert et affiche seulement un message utilisateur traduit.
 
@@ -47,7 +47,7 @@ La déconnexion utilisateur est accessible depuis Profil et exige une confirmati
 Elle retire la session de cet appareil, les destinations protégées en attente et revient sur
 l'accueil invité. La révocation des autres appareils reste réservée aux paramètres de sécurité.
 
-## AUTH-005 implémentée sur branche, validations finales en attente
+## Auth fédérée, activation Promoteur et suppression livrées par AUTH-005
 
 Google est acquis nativement sur Android et iOS. Sign in with Apple est acquis par
 `AuthenticationServices` sur iOS uniquement et apparaît au même niveau que Google. Chaque tentative
@@ -55,11 +55,11 @@ utilise un nonce aléatoire à usage unique ; seuls l'ID token, le nonce brut co
 indices de nom éventuellement fournis sont transmis au data layer partagé. Aucun access token ou
 refresh token Google/Apple n'est demandé, persisté ou envoyé à Analytics.
 
-Un compte complet ouvre la destination protégée attendue. Un compte nouveau ou incomplet reprend la
-révision Nom/Prénom, puis Ville/GPS, Devise, consentements et primer notifications. Les indices de
-nom restent modifiables et ne finalisent jamais le profil à eux seuls. Apple pouvant ne fournir le
-nom qu'à la première autorisation, l'écran de révision reste utilisable sans indice. Une annulation
-du fournisseur ne crée pas de session et ne montre aucun message technique.
+Un compte complet ouvre la destination protégée attendue. Un compte nouveau ou incomplet reprend
+directement **Finaliser mon profil** après Google/Apple, ou le mot de passe/profil selon la session
+email. Les indices de nom restent modifiables et ne finalisent jamais le profil à eux seuls. Apple
+pouvant ne fournir le nom qu'à la première autorisation, le profil final reste utilisable sans
+indice. Une annulation du fournisseur ne crée pas de session et ne montre aucun message technique.
 
 ### Activation Promoteur
 
@@ -90,86 +90,131 @@ la suppression gagne toujours, sans réimporter ensuite une session devenue inva
 ### Danger Zone et suppression de compte
 
 La suppression exige la confirmation exacte `SUPPRIMER`, puis une ré-authentification récente par
-mot de passe ou par un nouvel ID token Google/Apple avec nonce. La fonction serveur compare
-l'identité ré-authentifiée au bearer courant, vérifie les blocages de propriété d'organisation et
-d'objets Storage, puis prépare l'effacement avec une clé d'idempotence. Les politiques Storage
-restrictives partagent le verrou de suppression : un upload déjà engagé finit avant la vérification,
-et tout nouvel upload attend puis échoue dès que le tombstone existe.
+mot de passe ou par un nouvel ID token Google/Apple avec nonce. Le data layer crée pour chaque
+tentative un client Supabase Auth/Functions dédié avec `MemorySessionManager`, sans persistance,
+auto-refresh ni callbacks de cycle de vie, et avec `LogLevel.NONE`. Le secret primaire est envoyé
+exclusivement à Supabase Auth. L'identifiant obtenu doit être strictement égal à celui de la session
+principale ; une identité différente échoue sans remplacer ni effacer cette session.
 
-La préparation supprime le profil, les rôles, acceptations juridiques et données utilisateur
-rattachées, et neutralise les attributions résiduelles de fiches. La fonction révoque ensuite toutes
-les sessions, revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Un retry
-réutilise la même opération serveur, y compris si l'application redémarre avec une nouvelle clé
-client.
+Le client éphémère appelle ensuite `account-delete` avec un body JSON contenant exactement
+`idempotency_key`. L'Edge Function exige que `userClaims.id`, `jwtClaims.sub` et l'utilisateur live
+retourné par `getUser()` désignent le même UUID. Le claim `session_id` doit être un UUID et l'entrée
+AMR la plus récente doit être `password` ou `oauth`, dater d'au plus 300 secondes et ne pas dépasser
+l'horloge serveur de plus de 30 secondes. Toute AMR absente, malformée, OTP, magic link, Recovery,
+token refresh, trop ancienne ou trop future est refusée.
+
+La première mutation utilise le RPC privilégié `prepare_account_deletion_with_session` : il vérifie
+et verrouille atomiquement la ligne `auth.sessions` du même utilisateur avant de préparer
+l'effacement. La fonction vérifie ensuite les blocages de propriété d'organisation et d'objets
+Storage. Les politiques Storage restrictives partagent le verrou de suppression : un upload déjà
+engagé finit avant la vérification, et tout nouvel upload attend puis échoue dès que le tombstone
+existe.
+
+La préparation anonymise les invitations, supprime les données applicatives rejouables, les rôles et
+les acceptations juridiques, puis neutralise les attributions résiduelles de fiches. Elle remplace
+provisoirement le profil par une sentinelle pseudonymisée comme ancre de routage, la masque aux
+lecteurs publics et interdit toute mutation grâce au tombstone. La fonction révoque ensuite toutes
+les sessions,
+revalide propriété et Storage, puis supprime l'utilisateur Supabase Auth. Si une tentative s'arrête
+avec un tombstone `prepared` et un utilisateur Auth encore présent, l'utilisateur se reconnecte au
+même compte, rouvre la Danger Zone et crée une nouvelle session éphémère ; la clé effective serveur
+est reprise, y compris après redémarrage ou expiration de l'ancien token. La sentinelle retenue est
+supprimée seulement après la disparition de l'utilisateur Auth. À partir de ce point, aucune preuve
+utilisateur ne peut être recréée : seule la réconciliation serveur termine l'opération.
+
+Le body ne transporte plus aucun mot de passe, ID token, nonce, email ou fournisseur. L'ouverture aux
+utilisateurs staging et production reste néanmoins interdite tant que les AMR réellement émises pour
+email/mot de passe, Google et Apple ne sont pas prouvées, et tant que la politique d'accès, de
+rétention et d'expurgation des en-têtes d'invocation et des éventuels Log Drains n'est pas validée.
+Seuls des comptes synthétiques servent à ces preuves staging. L'en-tête `Authorization` reste un
+secret ; voir le
+[runbook Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md) et
+[l'ADR-0025](adr/0025-ephemeral-account-deletion-step-up-session.md).
 
 Le tombstone privé `account_deletion_requests` conserve seulement un identifiant utilisateur
 pseudonyme, une clé d'idempotence, un statut et des horodatages. Il ne contient aucun email, nom,
 contenu ou credential. Une ligne `prepared` interdit les écritures produit jusqu'à reprise. Si le
-compte Auth existe encore, l'utilisateur reprend avec une preuve fraîche ; s'il a déjà disparu, la
-réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le tombstone. Les
-tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa mention dans la
+compte Auth existe encore, l'utilisateur reprend avec une session éphémère fraîche ; s'il a déjà
+disparu, la réconciliation privilégiée quotidienne refait le nettoyage idempotent puis clôt le
+tombstone. Aucun opérateur ne supprime manuellement un utilisateur Auth encore présent. Les
+tombstones complétés sont techniquement purgés après 30 jours. Cette durée et sa
+mention dans la
 politique de confidentialité restent une gate juridique avant release candidate.
 
-Le GPS reste facultatif. Android ne demande que `ACCESS_COARSE_LOCATION` et iOS utilise une précision kilométrique ; les coordonnées ne sont ni envoyées au backend ni persistées. Elles servent uniquement à choisir localement la ville béninoise la plus proche. Un refus, une position indisponible ou hors du Bénin ramène toujours vers la sélection manuelle.
+La ville est une préférence de profil obligatoire mais ne déclenche aucun accès GPS pendant
+l'inscription. Les trois consentements d'observabilité déjà enregistrés sont préservés ; aucun
+nouveau choix n'est collecté dans ce parcours. Une session complète restaurée ouvre directement
+l'accueil, sans primer notifications.
 
-Les trois consentements observabilité sont appliqués et persistés par les adaptateurs Firebase natifs lorsque l'utilisateur confirme cette étape, juste avant `complete_user_onboarding`. Ainsi, une réponse réseau perdue après le commit serveur ne peut pas effacer son choix explicite ; chaque nouvelle confirmation réapplique la dernière valeur sélectionnée. Autoriser Remote Config rend alors opérationnel le préchargement de l'intro distante décrit ci-dessous.
+La softwall conserve un contexte minimal : type d'action et `suggestedCityId` facultatif. Elle
+propose directement les fournisseurs, l'email, la connexion existante et **Plus tard**. Après
+authentification, Like ou Favori est rejoué une seule fois puis le contexte est effacé. Une
+annulation explicite ou **Plus tard** l'efface ; une erreur réseau ou fournisseur récupérable le
+conserve.
 
-La permission notifications n'arrive qu'après le succès serveur et reste non bloquante, qu'elle soit acceptée, refusée ou remise à plus tard ; l'enregistrement du token est réservé à la tranche Notifications. La résolution de cet écran est persistée localement par installation avant d'ouvrir l'accueil. Si l'application est arrêtée après la finalisation serveur mais avant ce choix, une session complète restaurée reprend donc le primer au lieu de le perdre ou de le contourner. Une écriture locale Android en échec conserve l'écran avec une action de retry ; les doubles appuis ne peuvent jamais ouvrir deux demandes système.
-
-## Média embarqué et distant
+## Média embarqué et révision Store
 
 Les actifs de repli sont versionnés avec chaque client :
 
 - Android : `res/raw/kwabor_intro.mp4` et `res/drawable-nodpi/kwabor_intro_fallback.png` ;
 - iOS : `KwaborIntro.mp4` et l'image set `IntroFallback`.
 
+`tools/verify-onboarding-media.py` impose en CI des MP4 byte-identical sur les deux plateformes et
+verrouille aussi la présence, les octets et les dimensions de l'image statique commune. Il exige
+une révision embarquée strictement positive et identique dans les deux clients. Avec `--base-ref`,
+il refuse un changement vidéo sans incrément de révision et un incrément sans changement vidéo.
+
 Le raccord de lancement utilise séparément le master `kwabor_2.png`, copié bit pour bit dans les ressources Android et iOS. Le format officiel 2172 × 724, son ratio 3:1, son mode RGBA opaque et son SHA-256 sont contrôlés en CI par `tools/verify-brand-assets.py`. Android conserve le symbole carré pendant le splash système masqué, puis affiche immédiatement le wordmark en `Fit`. iOS l'affiche dès `LaunchScreen.storyboard` en `scaleAspectFit`. Sur les deux plateformes, il reste au-dessus du lecteur jusqu'au signal natif de première frame ; le démarrage hors ligne ne dépend donc jamais du réseau ni d'un décodage déjà prêt.
 
-Le remplacement distant dépend du consentement Remote Config et des clés documentées dans [Observabilité](observability.md). La configuration n'est acceptée que si l'URL est HTTPS, le SHA-256 comporte 64 caractères hexadécimaux et la révision est positive. Après consentement, un listener temps réel permet de précharger une publication du super-admin sans attendre le prochain fetch périodique.
+La vidéo ne possède aucun canal Firebase/CDN. La révision `1` est la baseline de migration : une
+installation ayant déjà terminé l'ancienne intro est considérée comme l'ayant présentée. Les
+anciens fichiers et métadonnées distants sont supprimés sans pouvoir bloquer le lancement. Une
+révision plus récente est affichée une seule fois ; sa fin, son passage manuel ou son fallback
+marquent cette révision comme présentée avant de poursuivre.
 
-Après téléchargement, chaque client exige :
+Les événements `intro_video_shown` et `intro_video_skipped` restent soumis au consentement
+Analytics. Le tout premier lancement précède ce consentement : ses événements sont donc ignorés
+et ne sont jamais mis en attente. Le taux de skip ne couvre que les révisions ultérieures vues par
+des installations ayant déjà accordé Analytics ; il ne doit pas être interprété comme une mesure
+exhaustive de tous les nouveaux utilisateurs.
 
-- réponse `video/mp4` et URL finale HTTPS ;
-- taille maximale de 3 Mio ;
-- SHA-256 identique à la configuration ;
-- vidéo portrait H.264 de 15 à 25 secondes, sans piste audio.
+## Publication d'une nouvelle vidéo
 
-Le fichier n'est rendu actif qu'après validation et remplacement atomique. La source est figée pendant toute lecture : une publication reçue en cours de session ne redémarre jamais la vidéo et ne surgit pas au-dessus d'un autre écran. La révision est proposée une seule fois au lancement suivant. En cas d'échec de lecture distante, le client revient à l'actif embarqué. Révoquer le consentement ferme le listener temps réel, annule le téléchargement, supprime le cache et la révision en attente, puis restaure les valeurs sûres.
+Le pas-à-pas complet et le registre des révisions sont définis dans le
+[runbook de release Store](runbooks/onboarding-video-store-release.md). Une publication exige :
 
-## Publication par le super-admin
+1. encoder le MP4 candidat selon le contrat H.264 commun et enregistrer son SHA-256 ;
+2. remplacer les deux MP4 par exactement les mêmes octets ;
+3. incrémenter ensemble les constantes Android/iOS, sans modifier la baseline de migration ;
+4. exécuter `tools/verify-onboarding-media.py` avec la branche de base, les gates Kotlin/Swift et les preuves sur
+   appareils staging ;
+5. versionner les builds, archiver hash/droits/approbations, puis publier Android et iOS dans les
+   Stores avec rollout contrôlé.
 
-La console Firebase est l'interface opérationnelle V1 ; aucun nouveau client web n'est introduit. Pour publier une intro :
-
-> **Dépendance avant activation réelle** : le consentement client est raccordé par AUTH-003. La mécanique ne devient néanmoins opérable qu'après provisionnement Firebase staging/production dans ENV-001B/OBS-001B et vérification sur appareils. Elle ne doit pas être annoncée comme active en bêta avant ces preuves.
-
-1. encoder et contrôler le MP4 avec les mêmes invariants que l'actif embarqué ;
-2. déposer le fichier sur le CDN HTTPS approuvé, sans redirection ;
-3. calculer son SHA-256 ;
-4. publier ensemble `intro_video_enabled=true`, l'URL, le SHA-256 et une révision strictement supérieure à toutes les révisions précédentes ;
-5. vérifier sur staging le préchargement, la lecture au lancement suivant, le mode hors ligne et la non-répétition avant publication production.
-
-Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à un ancien contenu, republier son fichier et son hash avec une **nouvelle** révision supérieure : réutiliser un ancien numéro serait ignoré par les clients qui l'ont déjà présenté. Une publication est détectée rapidement par les applications consenties et au premier plan ; un appareil hors ligne la récupère lors d'une exécution ultérieure et conserve toujours l'actif embarqué comme repli.
+Un retrait ou un retour arrière exige lui aussi une nouvelle révision strictement supérieure et
+une release corrective. Remote Config peut continuer à piloter des flags sûrs selon l'ADR-0013,
+mais ne peut ni choisir, ni télécharger, ni désactiver la vidéo d'intro.
 
 ## Vérification avant livraison
 
-1. Nouvelle installation sans réseau : logo officiel complet sans flash vide, intro locale, bouton Passer et landing visibles.
-2. Réduction des animations active : image de repli statique et bouton Continuer visibles, aucune lecture vidéo.
+1. Nouvelle installation sans réseau : logo officiel complet sans flash vide, intro locale et CTA d'accès immédiatement utilisables.
+2. Réduction des animations active : image de repli statique et mêmes CTA visibles, aucune lecture vidéo.
 3. Confirmation invité : navigation racine disponible ; interaction protégée renvoie vers l'authentification.
-4. Nouveau lancement sans session et sans nouvelle révision : landing affichée sans rejouer l'intro.
-5. Remote Config refusé ou absent : aucun téléchargement média.
-6. Remote Config consenti et média valide : variante préchargée puis utilisée une seule fois au lancement suivant.
-7. Hash, MIME, codec, durée ou taille invalides : fallback local et aucun message technique à l'écran.
-8. Révocation : cache distant supprimé et fallback local restauré.
-9. Publication d'une révision supérieure pendant une session : aucun écran interrompu ; la variante apparaît une fois au prochain lancement.
-10. Relance suivante sans nouvelle révision : la variante ne rejoue pas.
+4. Nouveau lancement sans session et sans nouvelle révision embarquée : landing affichée sans rejouer l'intro.
+5. Mise à jour Store avec le même MP4 et la même révision : aucune intro supplémentaire.
+6. MP4 changé sans incrément, révision changée sans MP4 ou constantes Android/iOS divergentes : vérification refusée.
+7. Version Store avec révision supérieure : intro embarquée utilisée une seule fois au lancement suivant, même hors ligne.
+8. Échec de décodage après ouverture : image statique, poursuite sans message technique et révision marquée présentée pour éviter une boucle.
+9. Mise à jour installée pendant une session : aucun écran interrompu ; la nouvelle révision apparaît une fois au prochain lancement.
+10. Relance suivante avec la même révision : l'intro ne rejoue pas.
 11. OTP vérifié puis application arrêtée : reprise au mot de passe, jamais à l'accueil.
 12. Annulation après OTP avec déconnexion en échec : parcours maintenu ouvert et session incomplète inutilisable comme compte finalisé.
-13. GPS refusé, indisponible ou hors Bénin : sélection manuelle utilisable sans coordonnée transmise.
-14. Documents juridiques absents, dupliqués, inactifs ou non effectifs : finalisation bloquée sans créer de profil partiel.
-15. Consentements observabilité refusés : aucune collecte ni récupération Remote Config ; inscription toujours finalisable.
-16. Permission notifications refusée ou différée : compte finalisé et navigation débloquée sans token enregistré.
-17. Application arrêtée après la RPC mais avant le choix notifications : session restaurée sur le primer, puis résolution persistée avant l'accueil.
-18. Double appui sur « Autoriser » : une seule demande système ; échec de persistance locale Android : primer maintenu avec retry.
+13. Inscription générique : aucune ville présélectionnée ; softwall liée à un lieu valide : sa ville est proposée.
+14. Documents juridiques absents, dupliqués, inactifs ou non effectifs : finalisation bloquée avec retry ciblé sans perdre les saisies.
+15. Nouveau compte sans consentement antérieur : aucune collecte ni récupération Remote Config ; inscription toujours finalisable et intro embarquée inchangée.
+16. Finalisation réussie : zéro permission, fermeture immédiate et accueil direct.
+17. Réponse réseau tardive du préchargement : nom, ville, devise et acceptations déjà saisis restent inchangés.
+18. Collage OTP ou double événement UI : une seule vérification envoyée.
 19. « Se connecter » exige le mot de passe et ne déclenche jamais l'OTP d'inscription.
 20. Adresse de récupération inconnue : même confirmation visible qu'une adresse connue, sans fuite d'existence du compte.
 21. OTP Recovery invalide, expiré ou renvoyé trop tôt : état conservé et message utilisateur sûr, sans session authentifiée.
@@ -180,15 +225,17 @@ Pour retirer une campagne, publier `intro_video_enabled=false`. Pour revenir à 
 26. Google annulé sur Android/iOS : aucun compte créé, aucune erreur technique et destination en attente conservée.
 27. Apple annulé sur iOS : même comportement que Google ; aucun bouton Apple visible sur Android.
 28. ID token absent, nonce absent/réutilisé ou audience d'un autre environnement : authentification refusée sans secret dans les logs.
-29. Nouveau compte Google/Apple : révision du nom puis onboarding complet ; compte existant complet : connexion directe.
+29. Nouveau compte Google/Apple : un seul profil final ; compte existant complet : connexion directe.
 30. Apple sans nom lors d'une reconnexion : révision manuelle toujours disponible et aucun nom précédent attribué à une autre identité.
 31. Invitation Promoteur invalide, expirée, utilisée ou destinée à un autre email : activation refusée sans révéler l'email attendu.
 32. Lien Promoteur reçu avec une session existante : session jamais remplacée ni déconnectée, y compris si le lien est invalide.
 33. Lien Promoteur sans session : session temporaire conservée jusqu'à activation, puis supprimée en cas d'annulation ou de prévisualisation invalide.
 34. Activation réussie : rôle Promoteur vérifié et rôle Éditeur seulement ; aucun rôle critique ni transfert de `owner_id`.
-35. Suppression sans la phrase exacte, avec mot de passe faux ou identité sociale différente : aucune préparation ni révocation.
+35. Suppression sans la phrase exacte, avec mot de passe faux ou identité sociale différente : aucune préparation ni révocation, et session principale inchangée.
 36. Propriété d'organisation ou objets Storage restants : suppression bloquée avec message utilisateur sûr et données intactes avant résolution.
-37. Double appui, retry réseau ou redémarrage avec une autre clé client : une seule préparation effective et aucune double suppression.
-38. Échec après état `prepared` avec compte Auth encore présent : reprise utilisateur fraîche ; écritures produit bloquées entre-temps.
+37. Double appui, retry réseau ou redémarrage avec une nouvelle session/clé client : une seule préparation effective et aucune double suppression.
+38. Échec après état `prepared` avec compte Auth encore présent : reprise par une ré-authentification éphémère fraîche ; écritures produit bloquées entre-temps.
 39. Compte Auth déjà absent mais tombstone encore `prepared` : réconciliation serveur vers `completed`, sans suppression manuelle d'un compte présent.
 40. Suppression réussie : toutes les sessions révoquées, session locale et destinations privées effacées, retour à l'accueil invité.
+41. Body Edge avec email, mot de passe, ID token, nonce, fournisseur ou tout champ supplémentaire : requête refusée avant mutation.
+42. `session_id` absent/invalide, AMR absente/malformée/non forte/ancienne/trop future, session Auth absente ou `getUser()` différent : requête refusée avant mutation.

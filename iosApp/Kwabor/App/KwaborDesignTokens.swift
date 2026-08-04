@@ -5,6 +5,8 @@ enum KwaborDesignTokens {
         static let ink950 = Color(red: 0.055, green: 0.055, blue: 0.063)
         static let ink900 = Color(red: 0.102, green: 0.102, blue: 0.110)
         static let ink700 = Color(red: 0.235, green: 0.235, blue: 0.255)
+        static let ink300 = Color(red: 0.714, green: 0.714, blue: 0.741)
+        static let ink200 = Color(red: 0.863, green: 0.863, blue: 0.882)
         static let ink100 = Color(red: 0.945, green: 0.945, blue: 0.953)
         static let paper50 = Color(red: 0.980, green: 0.980, blue: 0.973)
         static let surface0 = Color.white
@@ -31,9 +33,22 @@ enum KwaborDesignTokens {
 
     enum Sizing {
         static let touchTarget: CGFloat = 44
+        static let minimumAccessibleTouchTarget: CGFloat = 48
+        static let exploreTabletBreakpoint: CGFloat = 600
+        static let detailGalleryThumbnail: CGFloat = 72
+        static let detailStateMinimumHeight: CGFloat = 240
+        static let detailAccessibilityHeroMinimumHeight: CGFloat = 420
+        static let hairline: CGFloat = 2
+        static let outline: CGFloat = 1
+        static let guideTabletBreakpoint: CGFloat = 700
+        static let guideCardHeroHeight: CGFloat = 220
+        static let guideStateMinimumHeight: CGFloat = 220
+        static let guideSkeletonLineHeight: CGFloat = 14
+        static let guideSkeletonLastLineWidth: CGFloat = 180
     }
 
     enum Alpha {
+        static let scrimLow = 0.35
         static let scrimHigh = 0.72
     }
 }

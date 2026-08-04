@@ -8,7 +8,6 @@ final class OnboardingCoordinator: ObservableObject {
         case intro
         case restoringSession
         case authentication
-        case notificationPriming
         case home
     }
 
@@ -17,9 +16,11 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var introVideoURL: URL?
     @Published private(set) var registrationCancellationErrorMessage: String?
     @Published private(set) var accountSignOutErrorMessage: String?
+    @Published private(set) var observabilityConsent: ObservabilityConsent
+    @Published private(set) var observabilityConsentErrorMessage: String?
     @Published private(set) var promoterActivationContext: PromoterActivationContext?
     @Published private(set) var promoterActivationErrorMessage: String?
-    @Published private(set) var pendingRootDeepLinkDestinationKey: String?
+    @Published private var pendingInternalDeepLink = PendingInternalDeepLink()
     @Published private(set) var interruptedRegistrationEmail: String?
     @Published var isAuthenticationPresented = false
     @Published var isRegistrationPresented = false
@@ -29,7 +30,8 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var isSigningOutAccount = false
     @Published private(set) var sessionRestoreFailed = false
     @Published private(set) var isDeletingAccount = false
-    @Published private(set) var isRequestingNotificationsAfterSessionRestore = false
+    @Published private(set) var contextualAuthenticationCancellationRevision = 0
+    @Published private(set) var pendingProtectedDestinationKey: String?
 
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
@@ -38,19 +40,47 @@ final class OnboardingCoordinator: ObservableObject {
     let registrationController: IosRegistrationController
     let federatedIdentityHintStore: FederatedIdentityHintPersisting
     let promoterActivationDestinationStore: PromoterActivationDestinationPersisting
-    let registrationLocationProvider: RegistrationLocationProviding
-    let registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting
-    let registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting
     let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
 
     var isGuestSession: Bool {
         guestAccessGranted && !hasCompleteAccount
     }
 
+    var pendingRootDeepLinkDelivery: RootDeepLinkDelivery? {
+        pendingInternalDeepLink.rootDelivery
+    }
+
+    var catalogDetailDeepLinkDeliveryReadyForOpening: CatalogDetailDeepLinkDelivery? {
+        let action = CatalogDetailDeepLinkPostBootstrapPolicy.action(
+            hasPendingListing: pendingInternalDeepLink.catalogDetailDelivery != nil,
+            isIntroComplete: !shouldPresentLaunchIntro,
+            isSessionRestoreComplete: sessionRestoreCompleted,
+            isBlockingFlowActive: isCatalogDetailDeepLinkOpeningBlocked,
+            hasAuthenticatedAccount: hasCompleteAccount,
+            hasExplicitGuestAccess: guestAccessGranted
+        )
+        guard action == .openWhenHome else { return nil }
+        return pendingInternalDeepLink.catalogDetailDelivery
+    }
+
+    var exploreViewerID: String? {
+        guard hasCompleteAccount else { return nil }
+        return authState?.currentSession?.userId ?? completedRegistrationSession?.userId
+    }
+
+    var accountSettingsSession: AuthSession? {
+        guard hasCompleteAccount else { return nil }
+        if authState?.isAuthenticated == true {
+            return authState?.currentSession
+        }
+        return completedRegistrationSession
+    }
+
     private var canExposeSessionDuringPromoterActivation: Bool {
         PromoterActivationSessionPolicy.canExposeSession(
             cleanupRequired: temporaryPromoterActivationSessionCleanupRequired,
-            activationCallbackInProgress: isHandlingPromoterActivationCallback
+            activationCallbackInProgress: isHandlingPromoterActivationCallback,
+            activationPresented: isPromoterActivationPresented
         )
     }
 
@@ -68,24 +98,30 @@ final class OnboardingCoordinator: ObservableObject {
         ) || requiresInterruptedRegistrationPasswordSignIn
     }
 
+    private var isCatalogDetailDeepLinkOpeningBlocked: Bool {
+        route != .home ||
+        requiresProtectedAuthentication ||
+        isSigningOutAccount ||
+        isAuthenticationPresented ||
+        isRegistrationPresented ||
+        isPromoterActivationPresented ||
+        shouldPresentRegistrationAfterAuthenticationDismissal ||
+        authState?.hasPasswordRecoverySession == true ||
+        (authState?.hasSession == true && !hasCompleteAccount)
+    }
+
     private let observability: FirebaseObservability
-    private let cache: IntroVideoCache
     private let telemetry: OnboardingTelemetry
     private let introStore: IntroVideoPresentationStore
-    private let bundledIntroVideoURL: URL?
     private var firstLaunchCompleted: Bool
     private var sessionRestoreCompleted = false
     private var guestAccessGranted = false
     private var introDisplayTracked = false
-    private var launchIntroDecisionCompleted: Bool
     private var launchIntroCompleted = false
-    private var launchIntroRevision: Int64?
-    private var bundledFallbackAttempted = false
-    private var deferredRemoteMedia: DeferredRemoteMedia?
-    private var remoteMediaTask: Task<Void, Never>?
-    private var remoteMediaRevisionInFlight: Int64?
+    private let launchBundledIntroRevision: Int64?
     private var completedRegistrationSession: AuthSession?
     private var shouldPresentRegistrationAfterAuthenticationDismissal = false
+    private var registrationJourneyResolved = false
     private var isRevokingInterruptedRegistrationSession = false
     private var isReplacingInterruptedRegistrationSession = false
     private var isHandlingPromoterActivationCallback = false
@@ -97,6 +133,7 @@ final class OnboardingCoordinator: ObservableObject {
     private var isClearingTemporaryPromoterActivationSessionAtBootstrap = false
     private var freshInstallSessionCleanupCompleted: Bool
     private let promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting
+    private var contextualAuthJourney: ContextualAuthJourney?
 
     init(
         bridge: KwaborSharedBridge,
@@ -107,10 +144,6 @@ final class OnboardingCoordinator: ObservableObject {
         federatedIdentityHintStore: FederatedIdentityHintPersisting = KeychainFederatedIdentityHintStore(),
         promoterActivationDestinationStore: PromoterActivationDestinationPersisting =
             KeychainPromoterActivationDestinationStore(),
-        registrationLocationProvider: RegistrationLocationProviding? = nil,
-        registrationNotificationPermissionRequester: RegistrationNotificationPermissionRequesting? = nil,
-        registrationNotificationPrimingStore: RegistrationNotificationPrimingPersisting? = nil,
-        cache: IntroVideoCache = IntroVideoCache(),
         userDefaults: UserDefaults = .standard,
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting? = nil,
         promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting =
@@ -125,27 +158,23 @@ final class OnboardingCoordinator: ObservableObject {
         self.federatedIdentityHintStore = federatedIdentityHintStore
         self.promoterActivationDestinationStore = promoterActivationDestinationStore
         self.observability = observability
-        self.registrationLocationProvider = registrationLocationProvider ?? CoreLocationRegistrationService()
-        self.registrationNotificationPermissionRequester = registrationNotificationPermissionRequester ??
-            UserNotificationRegistrationService()
-        self.registrationNotificationPrimingStore = registrationNotificationPrimingStore ??
-            UserDefaultsRegistrationNotificationPrimingStore(userDefaults: userDefaults)
+        observabilityConsent = observability.consent
         self.interruptedAuthJourneyStore = interruptedAuthJourneyStore ??
             UserDefaultsInterruptedAuthJourneyStore(userDefaults: userDefaults)
         self.promoterActivationSessionMarkerStore = promoterActivationSessionMarkerStore
-        self.cache = cache
         telemetry = bridge.onboardingTelemetry()
-        let bundledIntroVideoURL = bundle.url(
-            forResource: bundledIntroName,
-            withExtension: mp4Extension
-        )
-        self.bundledIntroVideoURL = bundledIntroVideoURL
 
         let introStore = IntroVideoPresentationStore(userDefaults: userDefaults)
         self.introStore = introStore
         let storedFirstLaunchCompleted = introStore.firstLaunchCompleted
         firstLaunchCompleted = storedFirstLaunchCompleted
         freshInstallSessionCleanupCompleted = storedFirstLaunchCompleted
+        let pendingBundledIntroRevision = introStore.pendingBundledRevision()
+        launchBundledIntroRevision = pendingBundledIntroRevision
+        introVideoURL = pendingBundledIntroRevision == nil ? nil : bundle.url(
+            forResource: bundledIntroName,
+            withExtension: mp4Extension
+        )
         switch PromoterActivationSessionPolicy.bootstrapAction(
             markerState: promoterActivationSessionMarkerStore.state
         ) {
@@ -155,34 +184,12 @@ final class OnboardingCoordinator: ObservableObject {
             temporaryPromoterActivationSessionCleanupRequired = true
         }
 
-        let hadPendingVideo = introStore.hasPendingVideo
-        let storedPendingVideo = introStore.pendingVideoNewerThanLastPresented()
-        let activeRemoteVideo = observability.remoteConfiguration.introVideo
-        let pendingAtLaunch: PendingIntroVideo?
-        if observability.consent.remoteConfigurationAllowed,
-           storedFirstLaunchCompleted,
-           let storedPendingVideo,
-           let activeRemoteVideo,
-           storedPendingVideo.matches(activeRemoteVideo) {
-            pendingAtLaunch = storedPendingVideo
-        } else {
-            pendingAtLaunch = nil
-            introStore.clearPendingVideo()
-        }
-        let purgeRejectedPendingBeforeObservation = hadPendingVideo && pendingAtLaunch == nil
-
         if temporaryPromoterActivationSessionCleanupRequired {
             route = .restoringSession
-            introVideoURL = nil
-            launchIntroDecisionCompleted = pendingAtLaunch == nil
-        } else if storedFirstLaunchCompleted {
+        } else if pendingBundledIntroRevision == nil {
             route = .restoringSession
-            introVideoURL = nil
-            launchIntroDecisionCompleted = pendingAtLaunch == nil
         } else {
             route = .intro
-            introVideoURL = bundledIntroVideoURL
-            launchIntroDecisionCompleted = true
         }
 
         authController.observe { [weak self] state in
@@ -195,26 +202,6 @@ final class OnboardingCoordinator: ObservableObject {
             processPendingPromoterActivationCallbackIfPossible()
         }
         startSessionBootstrap()
-
-        if let pendingAtLaunch {
-            Task { [weak self, cache] in
-                let resolvedURL = await cache.resolveCached(
-                    revision: pendingAtLaunch.revision,
-                    sha256: pendingAtLaunch.sha256
-                )
-                guard let self else { return }
-                finishLaunchIntroDecision(pending: pendingAtLaunch, resolvedURL: resolvedURL)
-            }
-        }
-
-        if purgeRejectedPendingBeforeObservation {
-            Task { [weak self, cache] in
-                await cache.clear()
-                self?.startObservingRemoteConfiguration()
-            }
-        } else {
-            startObservingRemoteConfiguration()
-        }
     }
 
     func introDisplayed() {
@@ -223,47 +210,124 @@ final class OnboardingCoordinator: ObservableObject {
         observability.track(telemetry.shownEvent)
     }
 
+    func applicationBecameActive() {
+        guard freshInstallSessionCleanupCompleted else { return }
+        observability.retryPendingMaintenance()
+        observabilityConsent = observability.consent
+    }
+
     func completeIntro(skipped: Bool) {
+        completeIntro(reason: skipped ? .skipped : .playbackCompleted)
+    }
+
+    private func completeIntro(reason: IntroCompletionReason) {
         guard !launchIntroCompleted else { return }
         launchIntroCompleted = true
+        introStore.markCompletion(reason: reason.rawValue)
         markFirstLaunchCompletedIfEligible()
-        if let launchIntroRevision {
-            introStore.markRemoteVideoPresented(revision: launchIntroRevision)
-        }
-        if skipped {
+        if reason == .skipped {
             observability.track(telemetry.skippedEvent)
         }
         resolveRoute()
         presentInterruptedRegistrationSignInIfPossible()
         presentPasswordRecoveryIfPossible()
         presentIncompleteRegistrationIfPossible()
-        processDeferredRemoteMediaIfPossible()
     }
 
     func introPlaybackFailed() {
         guard !launchIntroCompleted else { return }
-        if launchIntroRevision != nil,
-           !bundledFallbackAttempted,
-           let bundledIntroVideoURL {
-            bundledFallbackAttempted = true
-            introVideoURL = bundledIntroVideoURL
-        } else {
-            introVideoURL = nil
-        }
+        introVideoURL = nil
     }
 
     func presentAuthentication() {
         guard !requiresProtectedAuthentication else { return }
+        completeLaunchIntroForSelectedAction()
         isAuthenticationPresented = true
     }
 
+    func presentAuthentication(forProtectedDestinationKey destinationKey: String) {
+        guard isGuestSession,
+              !requiresProtectedAuthentication,
+              let destination = RootDestination(rawValue: destinationKey),
+              destination != .home else {
+            return
+        }
+        pendingProtectedDestinationKey = destination.rawValue
+        presentAuthentication()
+    }
+
+    @discardableResult
+    func consumePendingProtectedDestination(_ destinationKey: String) -> Bool {
+        guard pendingProtectedDestinationKey == destinationKey else { return false }
+        pendingProtectedDestinationKey = nil
+        return true
+    }
+
+    @discardableResult
+    func transferRootDeepLinkToProtectedAuthentication(
+        _ delivery: RootDeepLinkDelivery
+    ) -> Bool {
+        guard pendingInternalDeepLink.isCurrentRoot(delivery: delivery),
+              isGuestSession,
+              !requiresProtectedAuthentication,
+              !isRegistrationPresented,
+              let destination = RootDestination(rawValue: delivery.destinationKey),
+              destination != .home else {
+            return false
+        }
+        completeLaunchIntroForSelectedAction()
+        guard pendingInternalDeepLink.isCurrentRoot(delivery: delivery),
+              isGuestSession,
+              !requiresProtectedAuthentication,
+              !isRegistrationPresented,
+              pendingInternalDeepLink.acknowledgeRoot(delivery: delivery) else {
+            return false
+        }
+        pendingProtectedDestinationKey = destination.rawValue
+        isAuthenticationPresented = true
+        return true
+    }
+
+    @discardableResult
+    func presentContextualAuthentication(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        presentAuthentication()
+        return isAuthenticationPresented
+    }
+
     func presentRegistration() {
+        presentRegistration(suggestedCityId: nil)
+    }
+
+    func presentRegistration(suggestedCityId: String?) {
         guard !requiresProtectedAuthentication else { return }
+        registrationJourneyResolved = false
+        completeLaunchIntroForSelectedAction()
         registrationCancellationErrorMessage = nil
         if authState?.hasSession != true {
             registrationController.reset()
+            registrationController.prepare(suggestedCityId: suggestedCityId)
         }
         isRegistrationPresented = true
+    }
+
+    @discardableResult
+    func presentContextualRegistration(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        presentRegistration(suggestedCityId: suggestedCityId)
+        return isRegistrationPresented
+    }
+
+    func prepareContextualFederatedAuthentication(suggestedCityId: String?) -> Bool {
+        guard isGuestSession, !requiresProtectedAuthentication else { return false }
+        contextualAuthJourney = ContextualAuthJourney(suggestedCityId: suggestedCityId)
+        return true
+    }
+
+    func cancelContextualSoftWall() {
+        cancelContextualAuthJourney()
     }
 
     func presentRegistrationFromAuthentication() {
@@ -284,21 +348,79 @@ final class OnboardingCoordinator: ObservableObject {
             isAuthenticationPresented = true
             return
         }
-        guard shouldPresentRegistrationAfterAuthenticationDismissal else { return }
-        shouldPresentRegistrationAfterAuthenticationDismissal = false
-        presentRegistration()
+        switch ContextualAuthenticationDismissalPolicy.action(
+            hasCompleteAccount: hasCompleteAccount,
+            isRegistrationPresented: isRegistrationPresented,
+            registrationWasRequested: shouldPresentRegistrationAfterAuthenticationDismissal
+        ) {
+        case .cancel:
+            cancelPendingProtectedDestination()
+            cancelContextualAuthJourney()
+        case .keepForAuthenticatedReplay:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+        case .keepForPresentedRegistration:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+        case .presentRequestedRegistration:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+            presentRegistration(suggestedCityId: contextualAuthJourney?.suggestedCityId)
+        }
     }
 
-    func applyRegistrationObservabilityConsent(_ consent: ObservabilityConsent) {
-        observability.updateConsent(consent)
+    func updateObservabilityConsent(_ category: ObservabilityConsentCategory, allowed: Bool) {
+        guard !isSigningOutAccount, !isDeletingAccount else {
+            _ = revokeObservabilityConsent()
+            return
+        }
+        guard let userId = normalizedSessionUserId(accountSettingsSession?.userId) else {
+            failClosedObservabilitySession()
+            return
+        }
+        observabilityConsentErrorMessage = nil
+        let updatedConsent: ObservabilityConsent
+        switch category {
+        case .analytics:
+            updatedConsent = ObservabilityConsent(
+                analyticsAllowed: allowed,
+                diagnosticsAllowed: observabilityConsent.diagnosticsAllowed,
+                remoteConfigurationAllowed: observabilityConsent.remoteConfigurationAllowed
+            )
+        case .diagnostics:
+            updatedConsent = ObservabilityConsent(
+                analyticsAllowed: observabilityConsent.analyticsAllowed,
+                diagnosticsAllowed: allowed,
+                remoteConfigurationAllowed: observabilityConsent.remoteConfigurationAllowed
+            )
+        case .remoteConfiguration:
+            updatedConsent = ObservabilityConsent(
+                analyticsAllowed: observabilityConsent.analyticsAllowed,
+                diagnosticsAllowed: observabilityConsent.diagnosticsAllowed,
+                remoteConfigurationAllowed: allowed
+            )
+        }
+        let persisted = observability.updateConsent(updatedConsent, ownerUserId: userId)
+        observabilityConsent = observability.consent
+        if !persisted {
+            observabilityConsentErrorMessage = strings.settings.privacyPersistenceError
+        }
     }
-
     func completeRegistration(_ session: AuthSession) {
+        guard let userId = normalizedSessionUserId(session.userId) else {
+            registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
+            failClosedObservabilitySession()
+            return
+        }
+        guard bindObservability(to: userId) else {
+            registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
+            failClosedObservabilitySession()
+            return
+        }
         federatedIdentityHintStore.clearPendingHints()
         interruptedAuthJourneyStore.clearRegistration()
         registrationCancellationErrorMessage = nil
+        registrationJourneyResolved = true
         completedRegistrationSession = session
         guestAccessGranted = false
+        completeContextualAuthJourney()
         isAuthenticationPresented = false
         isRegistrationPresented = false
         registrationController.reset()
@@ -306,7 +428,25 @@ final class OnboardingCoordinator: ObservableObject {
         refreshSessionState()
     }
 
+    func trackRegistrationEmailMethod() {
+        observability.track(telemetry.registrationEmailMethodEvent)
+    }
+
+    func trackRegistrationOtpValidated() {
+        observability.track(telemetry.registrationOtpValidatedEvent)
+    }
+
+    func trackRegistrationProfileResult(_ succeeded: Bool) {
+        observability.track(
+            succeeded
+                ? telemetry.registrationProfileSucceededEvent
+                : telemetry.registrationProfileFailedEvent
+        )
+    }
+
     func handleExistingRegistrationAccount(email: String?) {
+        bindObservability(to: nil)
+        registrationJourneyResolved = true
         interruptedAuthJourneyStore.mark(.registration)
         interruptedRegistrationEmail = normalizedEmail(email)
         completedRegistrationSession = nil
@@ -343,6 +483,12 @@ final class OnboardingCoordinator: ObservableObject {
         _ credential: FederatedAuthCredential,
         onCompleted: @escaping (Bool) -> Void
     ) {
+        if isRegistrationPresented {
+            let methodEvent = credential.provider == .apple
+                ? telemetry.registrationAppleMethodEvent
+                : telemetry.registrationGoogleMethodEvent
+            observability.track(methodEvent)
+        }
         let replacesInterruptedRegistration = interruptedAuthJourneyStore.current == .registration
         if replacesInterruptedRegistration {
             isReplacingInterruptedRegistrationSession = true
@@ -397,23 +543,68 @@ final class OnboardingCoordinator: ObservableObject {
                 return true
             }
         }
-        guard !requiresProtectedAuthentication else {
+        let catalogDetailListingID = bridge.catalogDetailListingIdForDeepLink(
+            rawUrl: url.absoluteString
+        )
+        if let catalogDetailListingID {
+            guard InternalDeepLinkIngressPolicy.shouldRetain(
+                validatedDestinationExists: true,
+                isSigningOut: isSigningOutAccount,
+                isDeletingAccount: isDeletingAccount
+            ) else { return true }
+            pendingInternalDeepLink.enqueueCatalogDetail(
+                validatedListingID: catalogDetailListingID
+            )
             return true
         }
-        guard let routeKey = bridge.rootDestinationKeyForDeepLink(rawUrl: url.absoluteString) else {
-            return false
+        let rootDestinationKey = bridge.rootDestinationKeyForDeepLink(
+            rawUrl: url.absoluteString
+        )
+        if let rootDestinationKey {
+            guard InternalDeepLinkIngressPolicy.shouldRetain(
+                validatedDestinationExists: true,
+                isSigningOut: isSigningOutAccount,
+                isDeletingAccount: isDeletingAccount
+            ) else { return true }
+            pendingInternalDeepLink.enqueueRoot(destinationKey: rootDestinationKey)
+            return true
         }
-        pendingRootDeepLinkDestinationKey = routeKey
-        return true
+        return requiresProtectedAuthentication
     }
 
-    func consumeRootDeepLinkDestination() {
-        pendingRootDeepLinkDestinationKey = nil
+    @discardableResult
+    func acknowledgeRootDeepLink(delivery: RootDeepLinkDelivery) -> Bool {
+        pendingInternalDeepLink.acknowledgeRoot(delivery: delivery)
+    }
+
+    func isCurrentCatalogDetailDeepLink(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        catalogDetailDeepLinkDeliveryReadyForOpening != nil &&
+        pendingInternalDeepLink.isCurrentCatalogDetail(delivery: delivery)
+    }
+
+    @discardableResult
+    func acknowledgeCatalogDetailDeepLink(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
+        pendingInternalDeepLink.acknowledgeCatalogDetail(delivery: delivery)
     }
 
     func completePromoterActivation(_ result: PromoterActivationResult) {
         guard let promoterActivationContext else {
             promoterActivationErrorMessage = strings.authPromoterInviteInvalid
+            return
+        }
+        guard let userId = normalizedSessionUserId(result.session.userId) else {
+            rejectUntrustedPromoterActivationCompletion()
+            return
+        }
+        guard PromoterActivationSessionPolicy.canCompleteActivation(
+            resultUserID: userId,
+            authenticatedUserID: normalizedSessionUserId(authState?.currentSession?.userId),
+            isAuthenticated: authState?.isAuthenticated == true,
+            isAuthenticationLoading: authState?.isLoading != false,
+            cleanupInProgress: isClearingTemporaryPromoterActivationSessionAtBootstrap,
+            callbackInProgress: isHandlingPromoterActivationCallback
+        ) else {
+            rejectUntrustedPromoterActivationCompletion()
             return
         }
         let destination = PromoterActivationDestination(
@@ -432,16 +623,18 @@ final class OnboardingCoordinator: ObservableObject {
             }
             temporaryPromoterActivationSessionCleanupRequired = false
         }
+        guard bindObservability(to: userId) else {
+            promoterActivationErrorMessage = strings.settings.privacyPersistenceError
+            return
+        }
         federatedIdentityHintStore.clearPendingHints()
         completedRegistrationSession = result.session
         guestAccessGranted = false
-        self.promoterActivationContext = nil
-        promoterActivationSessionImported = false
+        invalidatePromoterActivationPresentation()
         promoterActivationErrorMessage = nil
-        isPromoterActivationPresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
         resolveRoute()
         processPendingPromoterActivationCallbackIfPossible()
     }
@@ -450,6 +643,10 @@ final class OnboardingCoordinator: ObservableObject {
         guard !isHandlingPromoterActivationCallback else { return }
         guard promoterActivationSessionImported else {
             closePromoterActivation()
+            return
+        }
+        guard revokeObservabilityConsent() else {
+            promoterActivationErrorMessage = strings.settings.privacyPersistenceError
             return
         }
         isHandlingPromoterActivationCallback = true
@@ -462,13 +659,14 @@ final class OnboardingCoordinator: ObservableObject {
             }
             GoogleSignInBootstrap.clearLocalSession()
             completedRegistrationSession = nil
+            invalidatePromoterActivationPresentation()
             guard promoterActivationSessionMarkerStore.clear() else {
                 promoterActivationErrorMessage = strings.authUnavailable
                 resolveRoute()
                 return
             }
             temporaryPromoterActivationSessionCleanupRequired = false
-            closePromoterActivation()
+            closePromoterActivation(restoresStandardSession: false)
         }
     }
 
@@ -479,10 +677,17 @@ final class OnboardingCoordinator: ObservableObject {
             return
         }
         processPendingPromoterActivationCallbackIfPossible()
+        resumeProtectedAuthenticationIfPossible()
     }
 
     func signOutCurrentAccount() {
         guard !isSigningOutAccount else { return }
+        guard revokeObservabilityConsent() else {
+            accountSignOutErrorMessage = strings.settings.privacyPersistenceError
+            return
+        }
+        pendingInternalDeepLink.clear()
+        cancelPendingProtectedDestination()
         accountSignOutErrorMessage = nil
         isSigningOutAccount = true
         guestAccessGranted = true
@@ -491,13 +696,15 @@ final class OnboardingCoordinator: ObservableObject {
             guard let self else { return }
             isSigningOutAccount = false
             if completed.boolValue {
+                _ = revokeObservabilityConsent()
                 federatedIdentityHintStore.clearPendingHints()
                 promoterActivationDestinationStore.clear()
                 GoogleSignInBootstrap.clearLocalSession()
                 completedRegistrationSession = nil
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
-                pendingRootDeepLinkDestinationKey = nil
+                pendingInternalDeepLink.clear()
+                cancelPendingProtectedDestination()
                 registrationController.reset()
             } else {
                 guestAccessGranted = false
@@ -511,10 +718,18 @@ final class OnboardingCoordinator: ObservableObject {
         accountSignOutErrorMessage = nil
     }
 
+    func prepareForAccountDeletion() -> Bool {
+        guard !isDeletingAccount, !isSigningOutAccount else { return false }
+        return revokeObservabilityConsent()
+    }
+
     func accountDeletionStateChanged(isInProgress: Bool) {
         guard isDeletingAccount != isInProgress else { return }
         isDeletingAccount = isInProgress
         if isInProgress {
+            _ = revokeObservabilityConsent()
+            pendingInternalDeepLink.clear()
+            cancelPendingProtectedDestination()
             invalidatePromoterActivationCallbacksForAccountDeletion()
         } else if temporaryPromoterActivationSessionCleanupRequired {
             clearTemporaryPromoterActivationSessionBeforeBootstrap()
@@ -524,6 +739,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func accountDeletionCompleted() {
+        _ = revokeObservabilityConsent()
         promoterActivationCallbackGeneration += 1
         promoterActivationCallbackQueue.clear()
         isHandlingPromoterActivationCallback = false
@@ -545,15 +761,21 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
+        cancelPendingProtectedDestination()
         resolveRoute()
     }
 
     func cancelRegistration(requiresSignOut: Bool) {
         guard !isCancellingRegistration else { return }
         registrationCancellationErrorMessage = nil
+        guard revokeObservabilityConsent() else {
+            registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
+            return
+        }
         guard requiresSignOut else {
             registrationController.reset()
+            recordRegistrationCancellation()
             isRegistrationPresented = false
             resolveRoute()
             return
@@ -563,10 +785,12 @@ final class OnboardingCoordinator: ObservableObject {
             guard let self else { return }
             isCancellingRegistration = false
             if completed.boolValue {
+                _ = revokeObservabilityConsent()
                 federatedIdentityHintStore.clearPendingHints()
                 GoogleSignInBootstrap.clearLocalSession()
                 completedRegistrationSession = nil
                 registrationController.reset()
+                recordRegistrationCancellation()
                 isRegistrationPresented = false
                 resolveRoute()
             } else {
@@ -578,6 +802,57 @@ final class OnboardingCoordinator: ObservableObject {
     func registrationPresentationDismissed() {
         guard !isRegistrationPresented, authState?.hasSession != true else { return }
         registrationController.reset()
+        recordRegistrationCancellation()
+    }
+
+    @discardableResult
+    private func revokeObservabilityConsent() -> Bool {
+        let persisted = observability.revokeAllConsent()
+        observabilityConsent = observability.consent
+        return persisted
+    }
+
+    @discardableResult
+    private func bindObservability(to userId: String?) -> Bool {
+        let restored = observability.bindToAuthenticatedUser(userId)
+        observabilityConsent = observability.consent
+        return restored
+    }
+
+    @discardableResult
+    private func restoreObservabilityForCurrentStandardSession() -> Bool {
+        guard sessionRestoreCompleted,
+              !sessionRestoreFailed,
+              !isDeletingAccount,
+              canExposeSessionDuringPromoterActivation,
+              AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
+                  freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
+              ),
+              authState?.hasPasswordRecoverySession != true,
+              interruptedAuthJourneyStore.current != .registration,
+              let session = accountSettingsSession,
+              let userId = normalizedSessionUserId(session.userId) else {
+            bindObservability(to: nil)
+            return true
+        }
+        guard bindObservability(to: userId) else {
+            failClosedObservabilitySession()
+            return false
+        }
+        observabilityConsentErrorMessage = nil
+        return true
+    }
+
+    private func failClosedObservabilitySession() {
+        bindObservability(to: nil)
+        observabilityConsentErrorMessage = strings.settings.privacyPersistenceError
+        completedRegistrationSession = nil
+        guestAccessGranted = false
+        isAuthenticationPresented = false
+        isRegistrationPresented = false
+        sessionRestoreCompleted = false
+        sessionRestoreFailed = true
+        resolveRoute()
     }
 
     func requestGuestAccess() {
@@ -594,6 +869,7 @@ final class OnboardingCoordinator: ObservableObject {
             resolveRoute()
             return
         }
+        completeLaunchIntroForSelectedAction()
         isGuestDisclosurePresented = true
     }
 
@@ -632,33 +908,17 @@ final class OnboardingCoordinator: ObservableObject {
         }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
         isAuthenticationPresented = false
-    }
-
-    func enableNotificationsAfterSessionRestore() {
-        guard route == .notificationPriming,
-              !isRequestingNotificationsAfterSessionRestore else {
-            return
-        }
-        isRequestingNotificationsAfterSessionRestore = true
-        let requester = registrationNotificationPermissionRequester
-        Task { [weak self, requester] in
-            _ = await requester.requestPermission()
-            guard let self else { return }
-            completeNotificationsAfterSessionRestore()
-        }
-    }
-
-    func skipNotificationsAfterSessionRestore() {
-        guard route == .notificationPriming,
-              !isRequestingNotificationsAfterSessionRestore else {
-            return
-        }
-        completeNotificationsAfterSessionRestore()
+        cancelPendingProtectedDestination()
+        cancelContextualAuthJourney()
     }
 
     private var shouldPresentLaunchIntro: Bool {
-        guard launchIntroDecisionCompleted, !launchIntroCompleted else { return false }
-        return !firstLaunchCompleted || launchIntroRevision != nil
+        !launchIntroCompleted && launchBundledIntroRevision != nil
+    }
+
+    private func completeLaunchIntroForSelectedAction() {
+        guard shouldPresentLaunchIntro else { return }
+        completeIntro(reason: .ctaSelected)
     }
 
     private var hasCompleteAccount: Bool {
@@ -667,11 +927,22 @@ final class OnboardingCoordinator: ObservableObject {
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) else { return false }
         guard interruptedAuthJourneyStore.current != .registration else { return false }
-        return (authState?.isAuthenticated ?? false) || completedRegistrationSession != nil
+        if authState?.isAuthenticated == true {
+            return normalizedSessionUserId(authState?.currentSession?.userId) != nil
+        }
+        return normalizedSessionUserId(completedRegistrationSession?.userId) != nil
     }
 
     private func handleAuthState(_ state: AuthUiState) {
+        guard freshInstallSessionCleanupCompleted else {
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isAuthenticationPresented = false
+            isRegistrationPresented = false
+            return
+        }
         guard canExposeSessionDuringPromoterActivation else {
+            bindObservability(to: nil)
             completedRegistrationSession = nil
             guestAccessGranted = false
             isAuthenticationPresented = false
@@ -681,12 +952,14 @@ final class OnboardingCoordinator: ObservableObject {
         guard AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
         ) else {
+            bindObservability(to: nil)
             completedRegistrationSession = nil
             guestAccessGranted = false
             isRegistrationPresented = false
             return
         }
         if state.hasPasswordRecoverySession {
+            bindObservability(to: nil)
             completedRegistrationSession = nil
             guestAccessGranted = false
             isRegistrationPresented = false
@@ -702,6 +975,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func handleInterruptedRegistrationAuthState(_ state: AuthUiState) {
+        bindObservability(to: nil)
         completedRegistrationSession = nil
         guestAccessGranted = false
         isRegistrationPresented = false
@@ -725,16 +999,31 @@ final class OnboardingCoordinator: ObservableObject {
 
     private func applyStandardAuthState(_ state: AuthUiState) {
         if state.isAuthenticated {
+            guard let session = state.currentSession,
+                  let userId = normalizedSessionUserId(session.userId) else {
+                failClosedObservabilitySession()
+                return
+            }
+            observabilityConsentErrorMessage = nil
+            guard bindObservability(to: userId) else {
+                failClosedObservabilitySession()
+                return
+            }
             federatedIdentityHintStore.clearPendingHints()
             interruptedAuthJourneyStore.clearRegistration()
-            completedRegistrationSession = state.currentSession
+            completedRegistrationSession = session
+            completeContextualAuthJourney()
             isAuthenticationPresented = false
             isRegistrationPresented = false
         } else if state.hasSession, let session = state.currentSession {
+            observabilityConsentErrorMessage = nil
+            bindObservability(to: nil)
             completedRegistrationSession = nil
             guestAccessGranted = false
             resumeIncompleteRegistration(session)
         } else {
+            observabilityConsentErrorMessage = nil
+            bindObservability(to: nil)
             completedRegistrationSession = nil
         }
     }
@@ -742,8 +1031,9 @@ final class OnboardingCoordinator: ObservableObject {
     private func resumeIncompleteRegistration(_ session: AuthSession) {
         guestAccessGranted = false
         isAuthenticationPresented = false
+        registrationJourneyResolved = false
         resumeRegistrationController(session)
-        if launchIntroDecisionCompleted, !shouldPresentLaunchIntro {
+        if !shouldPresentLaunchIntro {
             isRegistrationPresented = true
         }
     }
@@ -756,21 +1046,10 @@ final class OnboardingCoordinator: ObservableObject {
             route = .restoringSession
             return
         }
-        guard launchIntroDecisionCompleted else {
-            route = .restoringSession
-            return
-        }
         if shouldPresentLaunchIntro {
             route = .intro
             return
         }
-        if sessionRestoreCompleted,
-           hasCompleteAccount,
-           !registrationNotificationPrimingStore.isResolved {
-            route = .notificationPriming
-            return
-        }
-
         let routeKey = bridge.onboardingEntryKey(
             firstLaunchCompleted: firstLaunchCompleted,
             sessionRestoreCompleted: sessionRestoreCompleted,
@@ -789,110 +1068,8 @@ final class OnboardingCoordinator: ObservableObject {
         }
     }
 
-    private func completeNotificationsAfterSessionRestore() {
-        registrationNotificationPrimingStore.markResolved()
-        isRequestingNotificationsAfterSessionRestore = false
-        resolveRoute()
-    }
-
-    private func finishLaunchIntroDecision(
-        pending: PendingIntroVideo,
-        resolvedURL: URL?
-    ) {
-        guard !launchIntroDecisionCompleted else { return }
-        if observability.consent.remoteConfigurationAllowed,
-           let activeRemoteVideo = observability.remoteConfiguration.introVideo,
-           pending.matches(activeRemoteVideo),
-           let resolvedURL {
-            introVideoURL = resolvedURL
-            launchIntroRevision = pending.revision
-        } else {
-            introStore.clearPendingVideo(ifRevision: pending.revision)
-        }
-        launchIntroDecisionCompleted = true
-        resolveRoute()
-        presentInterruptedRegistrationSignInIfPossible()
-        presentPasswordRecoveryIfPossible()
-        presentIncompleteRegistrationIfPossible()
-        processDeferredRemoteMediaIfPossible()
-    }
-
-    private func updateRemoteMedia(
-        configuration: FirebaseRemoteFeatureConfiguration,
-        consent: ObservabilityConsent
-    ) {
-        guard consent.remoteConfigurationAllowed else {
-            deferredRemoteMedia = nil
-            purgePendingRemoteMedia()
-            return
-        }
-        deferredRemoteMedia = DeferredRemoteMedia(configuration: configuration, consent: consent)
-        processDeferredRemoteMediaIfPossible()
-    }
-
-    private func startObservingRemoteConfiguration() {
-        observability.observeRemoteConfiguration { [weak self] configuration, consent in
-            self?.updateRemoteMedia(configuration: configuration, consent: consent)
-        }
-    }
-
-    private func processDeferredRemoteMediaIfPossible() {
-        guard launchIntroDecisionCompleted, !shouldPresentLaunchIntro,
-              let deferredRemoteMedia else {
-            return
-        }
-        self.deferredRemoteMedia = nil
-
-        guard deferredRemoteMedia.consent.remoteConfigurationAllowed else {
-            purgePendingRemoteMedia()
-            return
-        }
-        guard let source = deferredRemoteMedia.configuration.introVideo else {
-            purgePendingRemoteMedia()
-            return
-        }
-
-        let latestKnownRevision = max(
-            introStore.latestKnownRemoteRevision,
-            remoteMediaRevisionInFlight ?? noRemoteRevision
-        )
-        guard source.revision > latestKnownRevision else { return }
-
-        remoteMediaTask?.cancel()
-        remoteMediaRevisionInFlight = source.revision
-        introStore.clearPendingVideo()
-        let telemetry = self.telemetry
-        remoteMediaTask = Task { [weak self, cache, observability] in
-            let resolvedURL = await cache.resolve(source: source)
-            guard let self, !Task.isCancelled,
-                  remoteMediaRevisionInFlight == source.revision else {
-                return
-            }
-            remoteMediaRevisionInFlight = nil
-            guard observability.consent.remoteConfigurationAllowed,
-                  source.revision > introStore.latestKnownRemoteRevision else {
-                return
-            }
-            guard resolvedURL != nil else {
-                observability.recordDiagnostic(telemetry.integrityDiagnosticCode)
-                return
-            }
-            introStore.savePendingVideoIfNewer(source)
-        }
-    }
-
-    private func purgePendingRemoteMedia() {
-        remoteMediaTask?.cancel()
-        remoteMediaRevisionInFlight = nil
-        introStore.clearPendingVideo()
-        remoteMediaTask = Task { [cache] in
-            await cache.clear()
-        }
-    }
-
     private func presentIncompleteRegistrationIfPossible() {
         guard canExposeSessionDuringPromoterActivation,
-              launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
               authState?.isLoading == false,
               authState?.isAuthenticated == false,
@@ -902,6 +1079,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         guestAccessGranted = false
         isAuthenticationPresented = false
+        registrationJourneyResolved = false
         resumeRegistrationController(session)
         isRegistrationPresented = true
     }
@@ -964,6 +1142,7 @@ final class OnboardingCoordinator: ObservableObject {
             guestAccessGranted = false
             isAuthenticationPresented = false
             isRegistrationPresented = false
+            invalidatePromoterActivationPresentation()
             guard promoterActivationSessionMarkerStore.clear() else {
                 promoterActivationErrorMessage = strings.authUnavailable
                 resolveRoute()
@@ -994,6 +1173,7 @@ final class OnboardingCoordinator: ObservableObject {
     private func beginPromoterActivationCallback(_ callbackURL: URL) {
         guard !isDeletingAccount else { return }
         let callbackGeneration = promoterActivationCallbackGeneration
+        bindObservability(to: nil)
         isHandlingPromoterActivationCallback = true
         promoterActivationSessionImported = false
         promoterActivationCallbackMarkerArmed = false
@@ -1123,7 +1303,11 @@ final class OnboardingCoordinator: ObservableObject {
             promoterActivationCallbackMarkerArmed = false
             promoterActivationContext = nil
             isPromoterActivationPresented = false
-            promoterActivationErrorMessage = authState?.errorMessage ?? strings.authPromoterInviteInvalid
+            if restoreObservabilityForCurrentStandardSession() {
+                promoterActivationErrorMessage = authState?.errorMessage ?? strings.authPromoterInviteInvalid
+            } else {
+                promoterActivationErrorMessage = strings.settings.privacyPersistenceError
+            }
             resolveRoute()
         case .clearTemporarySessionBeforeExposingError:
             failClosedPromoterActivationCallback()
@@ -1152,7 +1336,7 @@ final class OnboardingCoordinator: ObservableObject {
         isGuestDisclosurePresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
         resolveRoute()
         authController.signOut { [weak self] completed in
             guard let self else { return }
@@ -1179,6 +1363,19 @@ final class OnboardingCoordinator: ObservableObject {
     private func clearFreshInstallSessionBeforeRestore() {
         sessionRestoreCompleted = false
         sessionRestoreFailed = false
+        guard observability.resetConsentForFreshInstallation() else {
+            observabilityConsent = observability.consent
+            observabilityConsentErrorMessage = strings.settings.privacyPersistenceError
+            completedRegistrationSession = nil
+            guestAccessGranted = false
+            isAuthenticationPresented = false
+            isRegistrationPresented = false
+            sessionRestoreFailed = true
+            resolveRoute()
+            return
+        }
+        observabilityConsent = observability.consent
+        observabilityConsentErrorMessage = nil
         federatedIdentityHintStore.clearPendingHints()
         promoterActivationDestinationStore.clear()
         GoogleSignInBootstrap.clearLocalSession()
@@ -1201,16 +1398,25 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func restoreSessionAfterBootstrap() {
+        bindObservability(to: nil)
+        observabilityConsentErrorMessage = nil
         sessionRestoreCompleted = false
         sessionRestoreFailed = false
         resolveRoute()
         authController.restoreSession { [weak self] result in
             guard let self else { return }
             guard result.isReady else {
+                bindObservability(to: nil)
                 completedRegistrationSession = nil
                 guestAccessGranted = false
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
+                sessionRestoreCompleted = false
+                sessionRestoreFailed = true
+                resolveRoute()
+                return
+            }
+            guard observabilityConsentErrorMessage == nil else {
                 sessionRestoreCompleted = false
                 sessionRestoreFailed = true
                 resolveRoute()
@@ -1258,15 +1464,18 @@ final class OnboardingCoordinator: ObservableObject {
         isGuestDisclosurePresented = false
         isAuthenticationPresented = false
         isRegistrationPresented = false
-        pendingRootDeepLinkDestinationKey = nil
+        pendingInternalDeepLink.clear()
     }
 
     private func markFirstLaunchCompletedIfEligible() {
         guard launchIntroCompleted,
-              freshInstallSessionCleanupCompleted,
-              !firstLaunchCompleted else {
+              freshInstallSessionCleanupCompleted else {
             return
         }
+        if let launchBundledIntroRevision {
+            introStore.markBundledVideoPresented(revision: launchBundledIntroRevision)
+        }
+        guard !firstLaunchCompleted else { return }
         firstLaunchCompleted = true
         introStore.firstLaunchCompleted = true
     }
@@ -1305,7 +1514,6 @@ final class OnboardingCoordinator: ObservableObject {
         guard canExposeSessionDuringPromoterActivation,
               interruptedAuthJourneyStore.current == .registration,
               sessionRestoreCompleted,
-              launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
               authState?.hasPasswordRecoverySession != true,
               !isRevokingInterruptedRegistrationSession else {
@@ -1319,7 +1527,6 @@ final class OnboardingCoordinator: ObservableObject {
 
     private func presentPasswordRecoveryIfPossible() {
         guard canExposeSessionDuringPromoterActivation,
-              launchIntroDecisionCompleted,
               !shouldPresentLaunchIntro,
               authState?.isLoading == false,
               authState?.hasPasswordRecoverySession == true else {
@@ -1335,13 +1542,55 @@ final class OnboardingCoordinator: ObservableObject {
         return candidate.isEmpty ? nil : candidate
     }
 
-    private func closePromoterActivation() {
-        promoterActivationContext = nil
-        promoterActivationSessionImported = false
+    private func normalizedSessionUserId(_ userId: String?) -> String? {
+        let candidate = userId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return candidate.isEmpty ? nil : candidate
+    }
+
+    private func closePromoterActivation(restoresStandardSession: Bool = true) {
+        invalidatePromoterActivationPresentation()
         promoterActivationErrorMessage = nil
-        isPromoterActivationPresented = false
+        if restoresStandardSession {
+            guard restoreObservabilityForCurrentStandardSession() else {
+                promoterActivationErrorMessage = strings.settings.privacyPersistenceError
+                resolveRoute()
+                return
+            }
+        } else {
+            bindObservability(to: nil)
+        }
         resolveRoute()
         processPendingPromoterActivationCallbackIfPossible()
+        resumeProtectedAuthenticationIfPossible()
+    }
+
+    private func invalidatePromoterActivationPresentation() {
+        promoterActivationContext = nil
+        promoterActivationSessionImported = false
+        promoterActivationCallbackMarkerArmed = false
+        isPromoterActivationPresented = false
+    }
+
+    private func rejectUntrustedPromoterActivationCompletion() {
+        let requiresTemporarySessionCleanup =
+            temporaryPromoterActivationSessionCleanupRequired || promoterActivationSessionImported
+        invalidatePromoterActivationPresentation()
+        promoterActivationErrorMessage = strings.authUnavailable
+        if requiresTemporarySessionCleanup {
+            temporaryPromoterActivationSessionCleanupRequired = true
+            resolveRoute()
+            clearTemporaryPromoterActivationSessionBeforeBootstrap()
+            return
+        }
+        if !restoreObservabilityForCurrentStandardSession() {
+            promoterActivationErrorMessage = strings.settings.privacyPersistenceError
+        }
+        resolveRoute()
+    }
+
+    private func resumeProtectedAuthenticationIfPossible() {
+        presentInterruptedRegistrationSignInIfPossible()
+        presentPasswordRecoveryIfPossible()
     }
 
     private func resumeRegistrationController(_ session: AuthSession) {
@@ -1351,93 +1600,45 @@ final class OnboardingCoordinator: ObservableObject {
             registrationController.resumeIncompleteSocialSession(
                 session: session,
                 suggestedFirstName: hints?.firstName,
-                suggestedLastName: hints?.lastName
+                suggestedLastName: hints?.lastName,
+                suggestedCityId: contextualAuthJourney?.suggestedCityId
             )
         } else {
             registrationController.resumeIncompleteSession(session: session)
         }
     }
-}
 
-private struct DeferredRemoteMedia {
-    let configuration: FirebaseRemoteFeatureConfiguration
-    let consent: ObservabilityConsent
-}
-
-struct PendingIntroVideo {
-    let revision: Int64
-    let sha256: String
-
-    func matches(_ source: FirebaseRemoteIntroVideo) -> Bool {
-        revision == source.revision && sha256 == source.sha256
-    }
-}
-
-struct IntroVideoPresentationStore {
-    let userDefaults: UserDefaults
-
-    var firstLaunchCompleted: Bool {
-        get { userDefaults.bool(forKey: introSeenKey) }
-        nonmutating set { userDefaults.set(newValue, forKey: introSeenKey) }
+    private func completeContextualAuthJourney() {
+        contextualAuthJourney = nil
     }
 
-    var lastPresentedRemoteRevision: Int64 {
-        Int64(userDefaults.integer(forKey: lastPresentedRemoteRevisionKey))
+    private func cancelContextualAuthJourney() {
+        guard contextualAuthJourney != nil else { return }
+        contextualAuthJourney = nil
+        contextualAuthenticationCancellationRevision += 1
     }
 
-    var validPendingRemoteRevision: Int64? {
-        pendingVideoNewerThanLastPresented()?.revision
+    private func cancelPendingProtectedDestination() {
+        pendingProtectedDestinationKey = nil
     }
 
-    var latestKnownRemoteRevision: Int64 {
-        max(lastPresentedRemoteRevision, validPendingRemoteRevision ?? noRemoteRevision)
-    }
-
-    var hasPendingVideo: Bool {
-        userDefaults.object(forKey: pendingRemoteRevisionKey) != nil ||
-            userDefaults.object(forKey: pendingRemoteSHA256Key) != nil
-    }
-
-    func pendingVideoNewerThanLastPresented() -> PendingIntroVideo? {
-        let revision = Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey))
-        guard revision > lastPresentedRemoteRevision,
-              let sha256 = userDefaults.string(forKey: pendingRemoteSHA256Key),
-              sha256.range(of: sha256Pattern, options: .regularExpression) != nil else {
-            clearPendingVideo()
-            return nil
-        }
-        return PendingIntroVideo(revision: revision, sha256: sha256)
-    }
-
-    func savePendingVideoIfNewer(_ source: FirebaseRemoteIntroVideo) {
-        guard source.revision > latestKnownRemoteRevision else { return }
-        userDefaults.set(source.revision, forKey: pendingRemoteRevisionKey)
-        userDefaults.set(source.sha256, forKey: pendingRemoteSHA256Key)
-    }
-
-    func markRemoteVideoPresented(revision: Int64) {
-        let presentedRevision = max(lastPresentedRemoteRevision, revision)
-        userDefaults.set(presentedRevision, forKey: lastPresentedRemoteRevisionKey)
-        if Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey)) <= presentedRevision {
-            clearPendingVideo()
-        }
-    }
-
-    func clearPendingVideo(ifRevision revision: Int64? = nil) {
-        if let revision,
-           Int64(userDefaults.integer(forKey: pendingRemoteRevisionKey)) != revision {
-            return
-        }
-        userDefaults.removeObject(forKey: pendingRemoteRevisionKey)
-        userDefaults.removeObject(forKey: pendingRemoteSHA256Key)
+    private func recordRegistrationCancellation() {
+        guard !registrationJourneyResolved else { return }
+        registrationJourneyResolved = true
+        cancelPendingProtectedDestination()
+        cancelContextualAuthJourney()
     }
 }
 
 private let bundledIntroName = "KwaborIntro"
 private let mp4Extension = "mp4"
-private let introSeenKey = "kwabor.first_launch.intro_seen_v1"
-private let pendingRemoteRevisionKey = "kwabor.intro.pending_remote_revision"
-private let pendingRemoteSHA256Key = "kwabor.intro.pending_remote_sha256"
-private let lastPresentedRemoteRevisionKey = "kwabor.intro.last_presented_remote_revision"
-private let noRemoteRevision: Int64 = 0
-private let sha256Pattern = "^[a-f0-9]{64}$"
+
+private enum IntroCompletionReason: String {
+    case playbackCompleted = "playback_completed"
+    case skipped
+    case ctaSelected = "cta_selected"
+}
+
+private struct ContextualAuthJourney {
+    let suggestedCityId: String?
+}

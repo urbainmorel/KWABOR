@@ -77,26 +77,26 @@ struct AuthenticationSheet: View {
         if store.canGoBack {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(coordinator.strings.registrationBack, action: store.goBack)
-                    .disabled(store.isLoading)
+                    .disabled(store.isLoading || federatedStore.isLoading)
             }
         }
         if !coordinator.requiresProtectedAuthentication {
             ToolbarItem(placement: .cancellationAction) {
                 Button(coordinator.strings.guestCancel, action: dismiss)
-                    .disabled(store.isLoading)
+                    .disabled(store.isLoading || federatedStore.isLoading)
             }
         }
     }
 
     private func dismiss() {
-        guard !coordinator.requiresProtectedAuthentication else { return }
+        guard !coordinator.requiresProtectedAuthentication, !federatedStore.isLoading else { return }
         store.prepareForDismissal {
             coordinator.dismissAuthentication()
         }
     }
 
     private func continueAsGuest() {
-        guard !coordinator.requiresProtectedAuthentication else { return }
+        guard !coordinator.requiresProtectedAuthentication, !federatedStore.isLoading else { return }
         store.prepareForDismissal {
             coordinator.dismissAuthentication()
             coordinator.requestGuestAccess()

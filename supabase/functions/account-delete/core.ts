@@ -1,52 +1,33 @@
-const MAX_REQUEST_BODY_BYTES = 20_000;
-const MAX_PASSWORD_LENGTH = 512;
-const MAX_ID_TOKEN_LENGTH = 16_384;
-const MIN_ID_TOKEN_LENGTH = 20;
-const MIN_NONCE_LENGTH = 32;
-const MAX_NONCE_LENGTH = 128;
+const MAX_REQUEST_BODY_BYTES = 256;
+const STEP_UP_MAX_AGE_SECONDS = 300;
+const STEP_UP_MAX_FUTURE_SKEW_SECONDS = 30;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ID_TOKEN_PATTERN = /^[A-Za-z0-9._-]+$/;
-const NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export type AccountDeletionStatus =
     | "prepared"
     | "completed"
     | "ownership_conflict"
     | "storage_conflict"
-    | null;
+    | "session_not_live";
 
 export interface AccountDeletionPreparation {
-    status: Exclude<AccountDeletionStatus, null>;
+    status: AccountDeletionStatus;
     effectiveIdempotencyKey: string;
 }
 
-export type AccountDeletionState = AccountDeletionPreparation | null;
-
 export type AccountDeletionUserResult = "deleted" | "not_found" | "failed";
-
-export type ReauthenticationCredential =
-    | {
-        type: "password";
-        password: string;
-    }
-    | {
-        type: "social";
-        provider: "google" | "apple";
-        idToken: string;
-        nonce: string;
-    };
 
 export interface AccountDeleteDependencies {
     verifiedUserId: string;
+    jwtClaims: unknown;
+    nowEpochSeconds: number;
     getCurrentUser: () => Promise<{ id: string } | null>;
-    getDeletionState: (
+    prepareDeletionWithSession: (
         userId: string,
+        sessionId: string,
         idempotencyKey: string,
-    ) => Promise<AccountDeletionState>;
-    reauthenticate: (
-        credential: ReauthenticationCredential,
-    ) => Promise<{ id: string } | null>;
+    ) => Promise<AccountDeletionPreparation>;
     prepareDeletion: (
         userId: string,
         idempotencyKey: string,
@@ -58,7 +39,10 @@ export interface AccountDeleteDependencies {
 
 interface AccountDeletePayload {
     idempotencyKey: string;
-    credential: ReauthenticationCredential;
+}
+
+interface StepUpSession {
+    sessionId: string;
 }
 
 export async function handleAccountDelete(
@@ -78,47 +62,27 @@ export async function handleAccountDelete(
         return errorResponse(400, "invalid_request");
     }
 
-    try {
-        let existingState = await dependencies.getDeletionState(
-            dependencies.verifiedUserId,
-            payload.idempotencyKey,
-        );
-        const currentUser = await dependencies.getCurrentUser();
+    const stepUpSession = readRecentStepUpSession(
+        dependencies.jwtClaims,
+        dependencies.verifiedUserId,
+        dependencies.nowEpochSeconds,
+    );
+    if (stepUpSession === null) {
+        return errorResponse(401, "reauthentication_failed");
+    }
 
+    try {
+        const currentUser = await dependencies.getCurrentUser();
         if (currentUser === null) {
-            // Close the crash window between Auth deletion and tombstone completion.
-            // Refresh once because another concurrent request may have prepared the
-            // deletion after the initial state lookup.
-            existingState = existingState ??
-                await dependencies.getDeletionState(
-                    dependencies.verifiedUserId,
-                    payload.idempotencyKey,
-                );
-            if (existingState?.status === "completed") {
-                return new Response(null, { status: 204 });
-            }
-            if (existingState?.status === "prepared") {
-                const completed = await dependencies.markCompleted(
-                    dependencies.verifiedUserId,
-                    existingState.effectiveIdempotencyKey,
-                );
-                return completed
-                    ? new Response(null, { status: 204 })
-                    : errorResponse(503, "deletion_completion_pending");
-            }
-            return errorResponse(401, "unauthorized");
+            return errorResponse(401, "reauthentication_failed");
         }
         if (currentUser.id !== dependencies.verifiedUserId) {
             return errorResponse(401, "unauthorized");
         }
 
-        const reauthenticatedUser = await dependencies.reauthenticate(payload.credential);
-        if (reauthenticatedUser?.id !== dependencies.verifiedUserId) {
-            return errorResponse(401, "reauthentication_failed");
-        }
-
-        const preparation = await dependencies.prepareDeletion(
+        const preparation = await dependencies.prepareDeletionWithSession(
             dependencies.verifiedUserId,
+            stepUpSession.sessionId,
             payload.idempotencyKey,
         );
         if (!UUID_PATTERN.test(preparation.effectiveIdempotencyKey)) {
@@ -164,6 +128,54 @@ export async function handleAccountDelete(
     }
 }
 
+export function readRecentStepUpSession(
+    claims: unknown,
+    verifiedUserId: string,
+    nowEpochSeconds: number,
+): StepUpSession | null {
+    if (
+        !isRecord(claims) ||
+        claims.sub !== verifiedUserId ||
+        typeof claims.session_id !== "string" ||
+        !UUID_PATTERN.test(claims.session_id) ||
+        !Number.isSafeInteger(nowEpochSeconds) ||
+        nowEpochSeconds < 0 ||
+        !Array.isArray(claims.amr) ||
+        claims.amr.length === 0
+    ) {
+        return null;
+    }
+
+    let latestMethod: string | null = null;
+    let latestTimestamp = Number.NEGATIVE_INFINITY;
+    for (const entry of claims.amr) {
+        if (
+            !isRecord(entry) ||
+            typeof entry.method !== "string" ||
+            entry.method.length === 0 ||
+            typeof entry.timestamp !== "number" ||
+            !Number.isSafeInteger(entry.timestamp) ||
+            entry.timestamp < 0
+        ) {
+            return null;
+        }
+        if (entry.timestamp >= latestTimestamp) {
+            latestMethod = entry.method;
+            latestTimestamp = entry.timestamp;
+        }
+    }
+
+    if (
+        (latestMethod !== "password" && latestMethod !== "oauth") ||
+        latestTimestamp < nowEpochSeconds - STEP_UP_MAX_AGE_SECONDS ||
+        latestTimestamp > nowEpochSeconds + STEP_UP_MAX_FUTURE_SKEW_SECONDS
+    ) {
+        return null;
+    }
+
+    return { sessionId: claims.session_id };
+}
+
 async function parsePayload(request: Request): Promise<AccountDeletePayload | null> {
     const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
     if (contentType !== "application/json") return null;
@@ -193,61 +205,15 @@ async function parsePayload(request: Request): Promise<AccountDeletePayload | nu
     } catch {
         return null;
     }
-    if (!isRecord(body) || !hasExactKeys(body, ["idempotency_key", "credential"])) {
+    if (!isRecord(body) || !hasExactKeys(body, ["idempotency_key"])) {
         return null;
     }
 
     const idempotencyKey = body.idempotency_key;
-    if (typeof idempotencyKey !== "string" || !UUID_PATTERN.test(idempotencyKey)) {
-        return null;
-    }
-    const credential = parseCredential(body.credential);
-    return credential === null ? null : { idempotencyKey, credential };
+    return typeof idempotencyKey === "string" && UUID_PATTERN.test(idempotencyKey) ? { idempotencyKey } : null;
 }
 
-function parseCredential(value: unknown): ReauthenticationCredential | null {
-    if (!isRecord(value) || typeof value.type !== "string") return null;
-    if (value.type === "password") {
-        if (!hasExactKeys(value, ["type", "password"])) return null;
-        if (
-            typeof value.password !== "string" ||
-            value.password.length === 0 ||
-            value.password.length > MAX_PASSWORD_LENGTH
-        ) {
-            return null;
-        }
-        return { type: "password", password: value.password };
-    }
-    if (value.type === "social") {
-        if (!hasExactKeys(value, ["type", "provider", "id_token", "nonce"])) return null;
-        if (value.provider !== "google" && value.provider !== "apple") return null;
-        if (
-            typeof value.id_token !== "string" ||
-            value.id_token.length < MIN_ID_TOKEN_LENGTH ||
-            value.id_token.length > MAX_ID_TOKEN_LENGTH ||
-            !ID_TOKEN_PATTERN.test(value.id_token)
-        ) {
-            return null;
-        }
-        if (
-            typeof value.nonce !== "string" ||
-            value.nonce.length < MIN_NONCE_LENGTH ||
-            value.nonce.length > MAX_NONCE_LENGTH ||
-            !NONCE_PATTERN.test(value.nonce)
-        ) {
-            return null;
-        }
-        return {
-            type: "social",
-            provider: value.provider,
-            idToken: value.id_token,
-            nonce: value.nonce,
-        };
-    }
-    return null;
-}
-
-function preparationStatusError(status: Exclude<AccountDeletionStatus, null>): Response | null {
+function preparationStatusError(status: AccountDeletionStatus): Response | null {
     switch (status) {
         case "prepared":
         case "completed":
@@ -256,6 +222,8 @@ function preparationStatusError(status: Exclude<AccountDeletionStatus, null>): R
             return errorResponse(409, "organization_ownership_conflict");
         case "storage_conflict":
             return errorResponse(409, "storage_objects_conflict");
+        case "session_not_live":
+            return errorResponse(401, "reauthentication_failed");
     }
 }
 

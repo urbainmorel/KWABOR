@@ -2,38 +2,61 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.data.auth.authDataModule
 import com.kwabor.shared.data.catalog.catalogDataModule
+import com.kwabor.shared.data.config.KwaborEnvironment
 import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
+import com.kwabor.shared.data.explore.exploreDataModule
+import com.kwabor.shared.data.guide.guideDiscoveryDataModule
+import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.organization.organizationDataModule
+import com.kwabor.shared.data.search.searchDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
-import com.kwabor.shared.domain.core.DispatcherProvider
+import com.kwabor.shared.domain.guide.GuideDiscoveryRepository
 import com.kwabor.shared.domain.organization.OrganizationRepository
+import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.authPresentationModule
+import com.kwabor.shared.presentation.detail.CatalogDetailPresenter
+import com.kwabor.shared.presentation.detail.catalogDetailPresentationModule
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.explorePresentationModule
+import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
+import com.kwabor.shared.presentation.guide.guideDiscoveryPresentationModule
+import com.kwabor.shared.presentation.search.SearchPresenter
+import com.kwabor.shared.presentation.search.searchPresentationModule
 import io.github.jan.supabase.auth.SessionManager
 import org.koin.core.KoinApplication
+import org.koin.core.module.Module
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 
 class KwaborCompositionRoot internal constructor(
     private val application: KoinApplication,
     hasAuthentication: Boolean,
+    private val hasPersistence: Boolean,
 ) {
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
     val dispatcherProvider: DispatcherProvider = application.koin.get()
+    val guideDiscoveryRepository: GuideDiscoveryRepository = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
-    val explorePresenter: ExplorePresenter = application.koin.get()
+    val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
+    val searchPresenter: SearchPresenter by lazy { application.koin.get() }
+    val catalogDetailPresenter: CatalogDetailPresenter by lazy { application.koin.get() }
+    val guideDiscoveryPresenter: GuideDiscoveryPresenter by lazy { application.koin.get() }
     val authRepository: AuthRepository? = if (hasAuthentication) application.koin.get() else null
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
     val registrationPresenter: RegistrationPresenter? = if (hasAuthentication) application.koin.get() else null
+    val appPreferencesRepository: AppPreferencesRepository?
+        get() = if (hasPersistence) application.koin.get() else null
+
+    internal val exploreCacheStore: ExploreCacheStore?
+        get() = if (hasPersistence) application.koin.get() else null
 
     fun close() {
         application.close()
@@ -45,35 +68,59 @@ internal fun createKwaborCompositionRootOrNull(
     supabasePublishableKey: String?,
     environmentName: String? = DEFAULT_ENVIRONMENT_NAME,
     authSessionManager: SessionManager? = null,
+    persistenceConfigurationProvider: (() -> KwaborPersistenceConfiguration)? = null,
 ): KwaborCompositionRoot? {
     val environment = createKwaborEnvironmentOrNull(
         environmentName = environmentName,
         supabaseUrl = supabaseUrl,
         supabasePublishableKey = supabasePublishableKey,
     ) ?: return null
-    val rootModule = module {
-        includes(
-            coreDataModule(
-                environment = environment,
-                authSessionManager = authSessionManager,
-            ),
-            catalogDataModule,
-            explorePresentationModule,
-            organizationDataModule,
-        )
-        if (authSessionManager != null) {
-            includes(authDataModule, authPresentationModule)
-        }
-    }
+    val persistenceConfiguration = persistenceConfigurationProvider?.invoke()
     val application = koinApplication {
         allowOverride(false)
-        modules(rootModule)
+        modules(
+            createRootModule(
+                environment = environment,
+                authSessionManager = authSessionManager,
+                persistenceConfiguration = persistenceConfiguration,
+            ),
+        )
     }
 
     return KwaborCompositionRoot(
         application = application,
         hasAuthentication = authSessionManager != null,
+        hasPersistence = persistenceConfiguration != null,
     )
+}
+
+private fun createRootModule(
+    environment: KwaborEnvironment,
+    authSessionManager: SessionManager?,
+    persistenceConfiguration: KwaborPersistenceConfiguration?,
+): Module = module {
+    single<DispatcherProvider> { DefaultDispatcherProvider() }
+    includes(
+        coreDataModule(
+            environment = environment,
+            authSessionManager = authSessionManager,
+        ),
+        catalogDataModule(hasAuthentication = authSessionManager != null),
+        exploreDataModule(hasPersistence = persistenceConfiguration != null),
+        searchDataModule(hasPersistence = persistenceConfiguration != null),
+        guideDiscoveryDataModule,
+        explorePresentationModule(hasPersistence = persistenceConfiguration != null),
+        searchPresentationModule,
+        catalogDetailPresentationModule,
+        guideDiscoveryPresentationModule,
+        organizationDataModule,
+    )
+    if (authSessionManager != null) {
+        includes(authDataModule, authPresentationModule)
+    }
+    if (persistenceConfiguration != null) {
+        includes(persistenceModule(persistenceConfiguration))
+    }
 }
 
 private const val DEFAULT_ENVIRONMENT_NAME = "development"

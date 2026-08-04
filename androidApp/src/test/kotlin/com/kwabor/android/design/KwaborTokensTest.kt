@@ -16,6 +16,8 @@ class KwaborTokensTest {
     @Test
     fun sizing_respectsMinimumTouchTarget() {
         assertTrue(KwaborSizing.TouchTarget.value >= 44f)
+        assertTrue(KwaborSizing.MinimumAccessibleTouchTarget.value >= 44f)
+        assertTrue(KwaborSizing.MinimumAccessibleTouchTarget.value >= KwaborSizing.FloatingPill.value)
         assertEquals(76f, KwaborSizing.BottomNavigationHeight.value)
     }
 

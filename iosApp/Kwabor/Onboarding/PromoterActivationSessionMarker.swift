@@ -102,9 +102,29 @@ enum PromoterActivationSessionPolicy {
 
     static func canExposeSession(
         cleanupRequired: Bool,
-        activationCallbackInProgress: Bool
+        activationCallbackInProgress: Bool,
+        activationPresented: Bool
     ) -> Bool {
-        !cleanupRequired && !activationCallbackInProgress
+        !cleanupRequired && !activationCallbackInProgress && !activationPresented
+    }
+
+    static func canCompleteActivation(
+        resultUserID: String?,
+        authenticatedUserID: String?,
+        isAuthenticated: Bool,
+        isAuthenticationLoading: Bool,
+        cleanupInProgress: Bool,
+        callbackInProgress: Bool
+    ) -> Bool {
+        guard isAuthenticated,
+              !isAuthenticationLoading,
+              !cleanupInProgress,
+              !callbackInProgress,
+              let resultUserID,
+              let authenticatedUserID else {
+            return false
+        }
+        return resultUserID == authenticatedUserID
     }
 
     static func failClosedCleanupAction(
@@ -222,7 +242,8 @@ final class FilePromoterActivationSessionMarkerStore: PromoterActivationSessionM
     var state: PromoterActivationSessionMarkerState {
         guard let markerURL else { return .unavailable }
         do {
-            _ = try fileManager.attributesOfItem(atPath: markerURL.path)
+            let markerFile = try FileHandle(forReadingFrom: markerURL)
+            try markerFile.close()
             return .marked
         } catch {
             return isMissingFileError(error) ? .absent : .unavailable

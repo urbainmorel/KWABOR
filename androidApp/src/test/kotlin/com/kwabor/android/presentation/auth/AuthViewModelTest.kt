@@ -5,11 +5,7 @@ import com.kwabor.android.auth.GoogleIdentityProvider
 import com.kwabor.android.auth.GoogleIdentityResult
 import com.kwabor.android.auth.IdempotencyKeyProvider
 import com.kwabor.android.auth.InterruptedAuthJourney
-import com.kwabor.android.auth.NotificationPermissionPolicy
-import com.kwabor.android.auth.NotificationPrimingStore
 import com.kwabor.android.auth.PromoterActivationSessionStore
-import com.kwabor.android.auth.RegistrationLocationResult
-import com.kwabor.android.auth.RegistrationLocationService
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -23,22 +19,20 @@ import com.kwabor.shared.domain.auth.PromoterActivationContext
 import com.kwabor.shared.domain.auth.PromoterActivationRequest
 import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
-import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
-import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
@@ -63,43 +57,26 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthViewModelOnboardingTest {
     @Test
-    fun incompleteRestoredSessionResumesRegistrationAndNeverAuthenticates() = runTest {
-        val repository = RegistrationAuthRepository(currentSession = onboardingSession())
-        val viewModel = createViewModel(repository = repository, scope = this)
+    fun incompleteRestoredSessionResumesAtPasswordWithRequirementsReady() = runTest {
+        val viewModel = createViewModel(
+            repository = RegistrationAuthRepository(currentSession = onboardingSession()),
+            scope = this,
+        )
 
         advanceUntilIdle()
 
         assertEquals(AuthSurface.Registration, viewModel.platformState.value.surface)
         assertEquals(RegistrationStep.Password, viewModel.registrationState.value.step)
+        assertTrue(viewModel.registrationState.value.requirementsReady)
         assertTrue(viewModel.state.value.hasSession)
         assertFalse(viewModel.state.value.isAuthenticated)
     }
 
     @Test
-    fun completedRestoredSessionResumesUnresolvedNotificationPrimingInsteadOfHome() = runTest {
+    fun completedRestoredSessionGoesDirectlyHomeWithoutPrimer() = runTest {
         val viewModel = createViewModel(
             repository = RegistrationAuthRepository(currentSession = completeSession()),
             scope = this,
-            overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = false),
-            ),
-        )
-
-        advanceUntilIdle()
-
-        assertTrue(viewModel.state.value.isAuthenticated)
-        assertEquals(AuthSurface.Registration, viewModel.platformState.value.surface)
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun completedRestoredSessionSkipsNotificationPrimingOnceInstallationResolvedIt() = runTest {
-        val viewModel = createViewModel(
-            repository = RegistrationAuthRepository(currentSession = completeSession()),
-            scope = this,
-            overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
-            ),
         )
 
         advanceUntilIdle()
@@ -110,315 +87,124 @@ class AuthViewModelOnboardingTest {
     }
 
     @Test
-    fun locationPermissionIsRequestedOnlyAfterIntentAndDenialKeepsManualFlowAvailable() = runTest {
-        var locationReads = 0
-        val viewModel = createViewModel(
-            repository = RegistrationAuthRepository(),
-            scope = this,
-            overrides = AuthTestOverrides(
-                locationService = RegistrationLocationService {
-                    locationReads += 1
-                    RegistrationLocationResult.Available(latitude = 6.37, longitude = 2.39)
-                },
-            ),
-        )
-        advanceUntilIdle()
-
-        viewModel.onIntent(AuthIntent.RequestLocation)
-
-        assertEquals(AuthPlatformEffect.RequestLocationPermission, viewModel.platformEffects.first())
-        viewModel.onIntent(AuthIntent.LocationPermissionResult(granted = false))
-
-        assertEquals(RegistrationLocationStatus.PermissionDenied, viewModel.platformState.value.locationStatus)
-        assertEquals(0, locationReads)
-        assertEquals(null, viewModel.registrationState.value.selectedCityId)
-    }
-
-    @Test
-    fun completeRegistrationAppliesOptionalConsentThenPrimesNotificationsWithoutBlockingDenial() = runTest {
-        val appliedConsents = mutableListOf<ObservabilityConsent>()
-        val notificationPrimingStore = FakeNotificationPrimingStore(resolved = false)
+    fun compactProfileCompletionClosesJourneyImmediately() = runTest {
         val repository = RegistrationAuthRepository()
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(
-                notificationPermissionPolicy = NotificationPermissionPolicy { true },
-                notificationPrimingStore = notificationPrimingStore,
-                applyConsent = appliedConsents::add,
-            ),
-        )
+        val viewModel = createViewModel(repository = repository, scope = this)
+        val effects = viewModel.effects.produceIn(backgroundScope)
+        advanceUntilIdle()
+        completeRegistrationProfile(viewModel)
+
+        viewModel.onIntent(AuthIntent.CompleteProfile)
         advanceUntilIdle()
 
-        completeRegistrationUntilObservability(viewModel)
-        viewModel.onIntent(AuthIntent.ChangeAnalyticsConsent(accepted = true))
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
-        assertEquals(listOf(ObservabilityConsent(analyticsAllowed = true)), appliedConsents)
-        assertTrue(viewModel.state.value.isAuthenticated)
-
-        viewModel.onIntent(AuthIntent.EnableNotifications)
-        assertTrue(viewModel.platformState.value.notificationPermissionRequestInFlight)
-        assertEquals(AuthPlatformEffect.RequestNotificationPermission, viewModel.platformEffects.first())
-
-        viewModel.onIntent(AuthIntent.NotificationPermissionResult(granted = false))
-        advanceUntilIdle()
-
-        assertFalse(viewModel.platformState.value.notificationPermissionRequestInFlight)
-        assertTrue(notificationPrimingStore.resolved)
-        assertEquals(1, notificationPrimingStore.markResolvedCalls)
-        assertEquals(AuthEffect.AuthenticationCompleted, viewModel.effects.first())
-        assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
+        assertEquals(null, viewModel.registrationState.value.errorMessage, viewModel.registrationState.value.toString())
+        assertEquals(1, repository.completeOnboardingCallCount)
         assertEquals(RegistrationStep.Completed, viewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun observabilityConsentIsPersistedBeforeOnboardingRpcStarts() = runTest {
-        var consentPersisted = false
-        val repository = RegistrationAuthRepository(
-            hooks = RegistrationAuthHooks(
-                onCompleteOnboarding = { assertTrue(consentPersisted) },
-            ),
-        )
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(
-                applyConsent = {
-                    consentPersisted = true
-                    true
-                },
-            ),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        assertTrue(consentPersisted)
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun onboardingRpcIsNotStartedWhenObservabilityConsentCannotBePersisted() = runTest {
-        val repository = RegistrationAuthRepository()
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(applyConsent = { false }),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        assertEquals(0, repository.completeOnboardingCallCount)
-        assertEquals(RegistrationStep.Observability, viewModel.registrationState.value.step)
-        assertTrue(viewModel.platformState.value.observabilityConsentPersistenceFailed)
+        assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
+        assertEquals(AuthEffect.AuthenticationCompleted, effects.receive())
+        assertTrue(effects.tryReceive().isFailure)
     }
 
     @Test
     fun onboardingSubmissionIgnoresDoubleTapBeforeCoroutineStarts() = runTest {
-        val appliedConsents = mutableListOf<ObservabilityConsent>()
         val repository = RegistrationAuthRepository()
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(applyConsent = appliedConsents::add),
-        )
+        val viewModel = createViewModel(repository = repository, scope = this)
         advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
+        completeRegistrationProfile(viewModel)
 
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
+        viewModel.onIntent(AuthIntent.CompleteProfile)
+        viewModel.onIntent(AuthIntent.CompleteProfile)
         advanceUntilIdle()
 
+        assertEquals(null, viewModel.registrationState.value.errorMessage, viewModel.registrationState.value.toString())
         assertEquals(1, repository.completeOnboardingCallCount)
-        assertEquals(1, appliedConsents.size)
-    }
-
-    @Test
-    fun notificationPermissionRequestIgnoresDoubleTapUntilPlatformCallback() = runTest {
-        val viewModel = createViewModel(
-            repository = RegistrationAuthRepository(),
-            scope = this,
-            overrides = AuthTestOverrides(
-                notificationPermissionPolicy = NotificationPermissionPolicy { true },
-            ),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-        val platformEffects = viewModel.platformEffects.produceIn(backgroundScope)
-
-        viewModel.onIntent(AuthIntent.EnableNotifications)
-        viewModel.onIntent(AuthIntent.EnableNotifications)
-        runCurrent()
-
-        assertTrue(viewModel.platformState.value.notificationPermissionRequestInFlight)
-        assertEquals(AuthPlatformEffect.RequestNotificationPermission, platformEffects.receive())
-        assertTrue(platformEffects.tryReceive().isFailure)
-
-        viewModel.onIntent(AuthIntent.NotificationPermissionResult(granted = true))
-        advanceUntilIdle()
-
-        assertFalse(viewModel.platformState.value.notificationPermissionRequestInFlight)
-        assertEquals(RegistrationStep.Completed, viewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun processRestartAfterSuccessfulRpcResumesUnresolvedNotificationPriming() = runTest {
-        val repository = RegistrationAuthRepository()
-        val store = FakeNotificationPrimingStore(resolved = false)
-        val initialViewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(initialViewModel)
-        initialViewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-        assertEquals(RegistrationStep.NotificationPriming, initialViewModel.registrationState.value.step)
-
-        val restoredViewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
-        )
-        advanceUntilIdle()
-
-        assertEquals(AuthSurface.Registration, restoredViewModel.platformState.value.surface)
-        assertEquals(RegistrationStep.NotificationPriming, restoredViewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun notificationChoiceIsPersistedBeforeJourneyCompletesAndIsNeverProposedAgain() = runTest {
-        val store = FakeNotificationPrimingStore(resolved = false)
-        val repository = RegistrationAuthRepository()
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        viewModel.onIntent(AuthIntent.SkipNotifications)
-        advanceUntilIdle()
-
-        assertTrue(store.resolved)
-        assertEquals(1, store.markResolvedCalls)
-        assertEquals(AuthSurface.Hidden, viewModel.platformState.value.surface)
-        assertEquals(RegistrationStep.Completed, viewModel.registrationState.value.step)
-
-        val restoredViewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
-        )
-        advanceUntilIdle()
-        assertEquals(AuthSurface.Hidden, restoredViewModel.platformState.value.surface)
-    }
-
-    @Test
-    fun failedNotificationChoicePersistenceKeepsPrimerVisibleAndAllowsRetry() = runTest {
-        val store = FakeNotificationPrimingStore(resolved = false, writesSucceed = false)
-        val viewModel = createViewModel(
-            repository = RegistrationAuthRepository(),
-            scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        viewModel.onIntent(AuthIntent.SkipNotifications)
-
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
-        assertEquals(AuthSurface.Registration, viewModel.platformState.value.surface)
-        assertTrue(viewModel.platformState.value.notificationPrimingPersistenceFailed)
-
-        store.writesSucceed = true
-        viewModel.onIntent(AuthIntent.SkipNotifications)
-        advanceUntilIdle()
-
-        assertTrue(store.resolved)
-        assertEquals(RegistrationStep.Completed, viewModel.registrationState.value.step)
-    }
-
-    @Test
-    fun latestObservabilityConsentIsAppliedBeforeEveryOnboardingSubmissionIncludingFailure() = runTest {
-        val appliedConsents = mutableListOf<ObservabilityConsent>()
-        val repository = RegistrationAuthRepository(
-            failurePlan = RegistrationAuthFailurePlan(onboardingCompletionFailures = 1),
-        )
-        val viewModel = createViewModel(
-            repository = repository,
-            scope = this,
-            overrides = AuthTestOverrides(applyConsent = appliedConsents::add),
-        )
-        advanceUntilIdle()
-        completeRegistrationUntilObservability(viewModel)
-        viewModel.onIntent(AuthIntent.ChangeAnalyticsConsent(accepted = true))
-
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        assertEquals(listOf(ObservabilityConsent(analyticsAllowed = true)), appliedConsents)
-        assertEquals(RegistrationStep.Observability, viewModel.registrationState.value.step)
-
-        viewModel.onIntent(AuthIntent.ChangeAnalyticsConsent(accepted = false))
-        viewModel.onIntent(AuthIntent.ChangeDiagnosticsConsent(accepted = true))
-        viewModel.onIntent(AuthIntent.CompleteOnboarding)
-        advanceUntilIdle()
-
-        assertEquals(
-            listOf(
-                ObservabilityConsent(analyticsAllowed = true),
-                ObservabilityConsent(diagnosticsAllowed = true),
-            ),
-            appliedConsents,
-        )
-        assertEquals(RegistrationStep.NotificationPriming, viewModel.registrationState.value.step)
     }
 
     @Test
     fun credentialIntentsNeverExposeOtpOrPasswordInLogs() {
         val otpIntent = AuthIntent.SubmitOtp(TEST_OTP)
-        val passwordIntent = AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD)
+        val passwordIntent = AuthIntent.SubmitPassword(TEST_PASSWORD)
 
         assertFalse(otpIntent.toString().contains(TEST_OTP))
         assertFalse(passwordIntent.toString().contains(TEST_PASSWORD))
     }
 
     @Test
-    fun continuingAsGuestSignsOutPartialOtpSessionBeforeEmittingGuestEffect() = runTest {
+    fun otpSubmissionIsSingleFlightAcrossAutofillAndExplicitSubmit() = runTest {
         val repository = RegistrationAuthRepository()
         val viewModel = createViewModel(repository = repository, scope = this)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.RequestOtp)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        advanceUntilIdle()
+
+        assertEquals(1, repository.otpVerificationCount)
+        assertEquals(RegistrationStep.Password, viewModel.registrationState.value.step)
+    }
+
+    @Test
+    fun continuingAsGuestSignsOutPartialOtpSessionBeforeEmittingGuestEffect() = runTest {
+        var consentRevocationCount = 0
+        val repository = RegistrationAuthRepository()
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                revokeConsent = {
+                    consentRevocationCount += 1
+                    true
+                },
+            ),
+        )
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.OpenRegistration(AuthEntryPoint.SoftWall))
         viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
         viewModel.onIntent(AuthIntent.RequestOtp)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
-        assertFalse(viewModel.state.value.isAuthenticated)
         advanceUntilIdle()
 
         viewModel.onIntent(AuthIntent.ContinueAsGuest)
         advanceUntilIdle()
 
         assertTrue(repository.signOutCalled)
+        assertEquals(1, consentRevocationCount)
         assertFalse(viewModel.state.value.hasSession)
         assertEquals(AuthEffect.GuestContinuationSelected, viewModel.effects.first())
+    }
+
+    @Test
+    fun continuingAsGuestStopsBeforeSignOutWhenConsentRevocationCannotBePersisted() = runTest {
+        val repository = RegistrationAuthRepository()
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(revokeConsent = { false }),
+        )
+        val effects = viewModel.effects.produceIn(backgroundScope)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.OpenRegistration(AuthEntryPoint.SoftWall))
+        viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
+        viewModel.onIntent(AuthIntent.RequestOtp)
+        advanceUntilIdle()
+        viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.ContinueAsGuest)
+        advanceUntilIdle()
+
+        assertEquals(0, repository.signOutCallCount)
+        assertTrue(viewModel.state.value.hasSession)
+        assertEquals(
+            stringsFor(AppLocale.French).settings.privacyPersistenceError,
+            viewModel.registrationState.value.errorMessage,
+        )
+        assertTrue(effects.tryReceive().isFailure)
     }
 
     @Test
@@ -433,19 +219,17 @@ class AuthViewModelOnboardingTest {
         viewModel.onIntent(AuthIntent.RequestOtp)
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
-        assertFalse(viewModel.state.value.isAuthenticated)
         advanceUntilIdle()
-        viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD))
+        viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD))
         advanceUntilIdle()
 
-        assertTrue(viewModel.registrationState.value.cities.isNotEmpty())
-        assertEquals(null, viewModel.registrationState.value.termsDocument)
+        assertEquals(RegistrationStep.Profile, viewModel.registrationState.value.step)
         assertEquals(1, repository.passwordUpdateCount)
 
         viewModel.onIntent(AuthIntent.RetryRequirements)
         advanceUntilIdle()
 
-        assertTrue(viewModel.registrationState.value.termsDocument != null)
+        assertTrue(viewModel.registrationState.value.requirementsReady)
         assertEquals(1, repository.passwordUpdateCount)
     }
 }
@@ -488,10 +272,45 @@ class AuthViewModelFederatedSecurityTest {
 
         assertEquals(TEST_GOOGLE_ID_TOKEN, repository.lastSocialSignInRequest?.idToken)
         assertEquals(TEST_GOOGLE_RAW_NONCE, repository.lastSocialSignInRequest?.rawNonce)
-        assertEquals(RegistrationStep.Identity, viewModel.registrationState.value.step)
+        assertEquals(RegistrationStep.Profile, viewModel.registrationState.value.step)
         assertEquals("Afi", viewModel.registrationState.value.firstName)
         assertEquals("Soglo", viewModel.registrationState.value.lastName)
         assertEquals(InterruptedAuthJourney.SocialRegistration, journeyStore.read())
+    }
+
+    @Test
+    fun failedSocialJourneyWriteDoesNotSignOutUntilConsentRevocationPersists() = runTest {
+        val journeyStore = FakeAuthJourneyStore(writesSucceed = false)
+        val googleProvider = FakeGoogleIdentityProvider(
+            GoogleIdentityResult.Success(
+                idToken = TEST_GOOGLE_ID_TOKEN,
+                nonce = TEST_GOOGLE_RAW_NONCE,
+                profileHint = com.kwabor.android.auth.GoogleProfileHint("Afi", "Soglo"),
+            ),
+        )
+        val repository = RegistrationAuthRepository(
+            authBehavior = RegistrationAuthBehavior(
+                signInSession = onboardingSession().copy(authenticationMethod = AuthenticationMethod.Google),
+            ),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                authJourneyStore = journeyStore,
+                googleIdentityProvider = googleProvider,
+                revokeConsent = { false },
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.OpenRegistration())
+        viewModel.onIntent(AuthIntent.ContinueWithGoogle)
+        advanceUntilIdle()
+
+        assertEquals(0, repository.signOutCallCount)
+        assertTrue(viewModel.state.value.hasSession)
+        assertEquals(strings.settings.privacyPersistenceError, viewModel.registrationState.value.errorMessage)
     }
 
     @Test
@@ -531,7 +350,7 @@ class AuthViewModelFederatedSecurityTest {
 
         advanceUntilIdle()
 
-        assertEquals(RegistrationStep.Identity, viewModel.registrationState.value.step)
+        assertEquals(RegistrationStep.Profile, viewModel.registrationState.value.step)
         assertEquals("Afi", viewModel.registrationState.value.firstName)
         assertEquals("Soglo", viewModel.registrationState.value.lastName)
         assertEquals(InterruptedAuthJourney.SocialRegistration, journeyStore.read())
@@ -580,6 +399,25 @@ class AuthViewModelFederatedSecurityTest {
                 value = "supprimer",
                 expected = strings.authDeleteAccountConfirmationPhrase,
             ),
+        )
+    }
+
+    @Test
+    fun accountDeletionStopsBeforeServerWhenConsentRevocationCannotBePersisted() = runTest {
+        val probe = AccountDeletionProbe()
+        val viewModel = createAccountDeletionViewModel(probe, revokeConsent = { false })
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.RequestAccountDeletion)
+        submitPasswordAccountDeletion(viewModel, strings.authDeleteAccountConfirmationPhrase)
+
+        assertTrue(probe.requests.isEmpty())
+        assertEquals(0, probe.generatedKeyCount)
+        assertTrue(viewModel.state.value.isAuthenticated)
+        assertFalse(viewModel.accessState.value.accountDeletionInProgress)
+        assertEquals(
+            strings.settings.privacyPersistenceError,
+            viewModel.accessState.value.accountDeletionErrorMessage,
         )
     }
 }
@@ -639,6 +477,36 @@ class AuthViewModelPromoterSessionSafetyTest {
         assertFalse(store.pending)
         assertTrue(viewModel.isSessionRestoreComplete.value)
         assertFalse(viewModel.state.value.hasSession)
+    }
+
+    @Test
+    fun coldStartStopsBeforeImportedSessionSignOutWhenConsentRevocationFails() = runTest {
+        val events = mutableListOf<String>()
+        val store = FakePromoterActivationSessionStore(pending = true, operationEvents = events)
+        val repository = RegistrationAuthRepository(
+            currentSession = completeSession(),
+            hooks = RegistrationAuthHooks(operationEvents = events),
+        )
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                promoterActivationSessionStore = store,
+                revokeConsent = { false },
+            ),
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(listOf("marker-read"), events)
+        assertEquals(0, repository.signOutCallCount)
+        assertEquals(0, repository.getCurrentSessionCallCount)
+        assertTrue(store.pending)
+        assertSessionRestoreIsBlocked(viewModel)
+        assertEquals(
+            stringsFor(AppLocale.French).settings.privacyPersistenceError,
+            viewModel.state.value.errorMessage,
+        )
     }
 
     @Test
@@ -933,7 +801,6 @@ class AuthViewModelPromoterActivationTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 promoterActivationSessionStore = store,
             ),
         )
@@ -999,7 +866,6 @@ class AuthViewModelPromoterActivationTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 promoterActivationSessionStore = store,
             ),
         )
@@ -1096,9 +962,6 @@ class AuthViewModelPromoterActivationTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(
-                    resolved = !sessionImportedForActivation,
-                ),
                 promoterActivationSessionStore = store,
             ),
         )
@@ -1279,7 +1142,6 @@ class AuthViewModelPromoterConcurrencyTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 promoterActivationSessionStore = promoterStore,
             ),
         )
@@ -1364,9 +1226,6 @@ class AuthViewModelPromoterConcurrencyTest {
         val viewModel = createViewModel(
             repository = repository,
             scope = this,
-            overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
-            ),
         )
         val effects = viewModel.effects.produceIn(backgroundScope)
         advanceUntilIdle()
@@ -1411,9 +1270,6 @@ class AuthViewModelPromoterConcurrencyTest {
         val viewModel = createViewModel(
             repository = repository,
             scope = this,
-            overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
-            ),
         )
         advanceUntilIdle()
         viewModel.onIntent(AuthIntent.OpenSignIn())
@@ -1450,7 +1306,6 @@ class AuthViewModelPromoterConcurrencyTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 promoterActivationSessionStore = store,
             ),
         )
@@ -1469,7 +1324,6 @@ class AuthViewModelPromoterConcurrencyTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 promoterActivationSessionStore = store,
             ),
         )
@@ -1541,13 +1395,36 @@ class AuthViewModelPostAuthenticationTest {
     private val strings = stringsFor(AppLocale.French)
 
     @Test
+    fun signOutStopsBeforeServerWhenConsentRevocationCannotBePersisted() = runTest {
+        val repository = RegistrationAuthRepository(currentSession = completeSession())
+        val viewModel = createViewModel(
+            repository = repository,
+            scope = this,
+            overrides = AuthTestOverrides(
+                revokeConsent = { false },
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.confirmSignOut()
+        advanceUntilIdle()
+
+        assertEquals(0, repository.signOutCallCount)
+        assertTrue(viewModel.state.value.isAuthenticated)
+        assertFalse(viewModel.accessState.value.signOutConfirmationVisible)
+        assertFalse(viewModel.accessState.value.signOutInProgress)
+        assertEquals(
+            strings.settings.privacyPersistenceError,
+            viewModel.accessState.value.signOutErrorMessage,
+        )
+    }
+
+    @Test
     fun completedAccountOtpFromRegistrationSignsOutAndRequiresPassword() = runTest {
-        val store = FakeNotificationPrimingStore(resolved = false)
         val repository = RegistrationAuthRepository(verifiedSession = completeSession())
         val viewModel = createViewModel(
             repository = repository,
             scope = this,
-            overrides = AuthTestOverrides(notificationPrimingStore = store),
         )
         val effects = viewModel.effects.produceIn(backgroundScope)
         advanceUntilIdle()
@@ -1604,7 +1481,6 @@ class AuthViewModelPostAuthenticationTest {
     @Test
     fun passwordSignInAfterRedirectFailureClearsMarkerBeforeRestart() = runTest {
         val journeyStore = FakeAuthJourneyStore()
-        val notificationStore = FakeNotificationPrimingStore(resolved = true)
         val repository = RegistrationAuthRepository(
             verifiedSession = completeSession(),
             authBehavior = RegistrationAuthBehavior(
@@ -1612,7 +1488,6 @@ class AuthViewModelPostAuthenticationTest {
             ),
         )
         val overrides = AuthTestOverrides(
-            notificationPrimingStore = notificationStore,
             authJourneyStore = journeyStore,
         )
         val viewModel = createViewModel(repository = repository, scope = this, overrides = overrides)
@@ -1653,7 +1528,6 @@ class AuthViewModelPostAuthenticationTest {
             repository = repository,
             scope = this,
             overrides = AuthTestOverrides(
-                notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
                 authJourneyStore = journeyStore,
             ),
         )
@@ -1700,37 +1574,6 @@ class AuthViewModelPostAuthenticationTest {
         assertEquals(strings.registrationOtpWait, viewModel.passwordRecoveryState.value.errorMessage)
         assertTrue(viewModel.accessState.value.recoveryResendSecondsRemaining > 0)
     }
-
-    @Test
-    fun locationPermissionRequestIsSingleFlightAndResetsAfterEveryResult() = runTest {
-        val viewModel = createViewModel(repository = RegistrationAuthRepository(), scope = this)
-        val platformEffects = viewModel.platformEffects.produceIn(backgroundScope)
-        advanceUntilIdle()
-
-        viewModel.onIntent(AuthIntent.RequestLocation)
-        viewModel.onIntent(AuthIntent.RequestLocation)
-        runCurrent()
-
-        assertTrue(viewModel.platformState.value.locationPermissionRequestInFlight)
-        assertEquals(AuthPlatformEffect.RequestLocationPermission, platformEffects.receive())
-        assertTrue(platformEffects.tryReceive().isFailure)
-
-        viewModel.onIntent(AuthIntent.LocationPermissionResult(granted = false))
-
-        assertFalse(viewModel.platformState.value.locationPermissionRequestInFlight)
-        assertEquals(RegistrationLocationStatus.PermissionDenied, viewModel.platformState.value.locationStatus)
-
-        viewModel.onIntent(AuthIntent.RequestLocation)
-        runCurrent()
-        assertTrue(viewModel.platformState.value.locationPermissionRequestInFlight)
-        assertEquals(AuthPlatformEffect.RequestLocationPermission, platformEffects.receive())
-
-        viewModel.onIntent(AuthIntent.LocationPermissionResult(granted = true))
-        advanceUntilIdle()
-
-        assertFalse(viewModel.platformState.value.locationPermissionRequestInFlight)
-        assertEquals(RegistrationLocationStatus.Unavailable, viewModel.platformState.value.locationStatus)
-    }
 }
 
 private class AccountDeletionProbe(
@@ -1755,15 +1598,18 @@ private class AccountDeletionProbe(
     }
 }
 
-private fun TestScope.createAccountDeletionViewModel(probe: AccountDeletionProbe): AuthViewModel = createViewModel(
+private fun TestScope.createAccountDeletionViewModel(
+    probe: AccountDeletionProbe,
+    revokeConsent: () -> Boolean = { true },
+): AuthViewModel = createViewModel(
     repository = RegistrationAuthRepository(
         currentSession = completeSession(),
         hooks = RegistrationAuthHooks(onAccountDeletion = probe::delete),
     ),
     scope = this,
     overrides = AuthTestOverrides(
-        notificationPrimingStore = FakeNotificationPrimingStore(resolved = true),
         idempotencyKeyProvider = probe.idempotencyKeyProvider,
+        revokeConsent = revokeConsent,
     ),
 )
 
@@ -1855,16 +1701,14 @@ private fun TestScope.createViewModel(
                 RegistrationReducer(),
             ),
             passwordRecoveryPresenter = PasswordRecoveryPresenter(repository, clock),
-            locationService = overrides.locationService,
-            notificationPermissionPolicy = overrides.notificationPermissionPolicy,
-            notificationPrimingStore = overrides.notificationPrimingStore,
             authJourneyStore = overrides.authJourneyStore,
             promoterActivationSessionStore = overrides.promoterActivationSessionStore,
             googleIdentityProvider = overrides.googleIdentityProvider,
             googleIdentityUnavailableMessage = TEST_GOOGLE_UNAVAILABLE_MESSAGE,
             idempotencyKeyProvider = overrides.idempotencyKeyProvider,
             clockProvider = clock,
-            applyObservabilityConsent = overrides.applyConsent,
+            track = overrides.track,
+            revokeObservabilityConsent = overrides.revokeConsent,
         ),
         strings = stringsFor(AppLocale.French),
         coroutineScope = this,
@@ -1872,41 +1716,34 @@ private fun TestScope.createViewModel(
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-private suspend fun TestScope.completeRegistrationUntilObservability(viewModel: AuthViewModel) {
+private suspend fun TestScope.completeRegistrationProfile(viewModel: AuthViewModel) {
     viewModel.onIntent(AuthIntent.OpenRegistration())
     viewModel.onIntent(AuthIntent.ChangeEmail(TEST_EMAIL))
     viewModel.onIntent(AuthIntent.RequestOtp)
     advanceUntilIdle()
     viewModel.onIntent(AuthIntent.SubmitOtp(TEST_OTP))
     advanceUntilIdle()
-    viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD, TEST_PASSWORD))
+    viewModel.onIntent(AuthIntent.SubmitPassword(TEST_PASSWORD))
     advanceUntilIdle()
     viewModel.onIntent(AuthIntent.ChangeFirstName("Afi"))
     viewModel.onIntent(AuthIntent.ChangeLastName("Soglo"))
-    viewModel.onIntent(AuthIntent.ContinueFromIdentity)
     viewModel.onIntent(AuthIntent.SelectCity(TEST_CITY_ID))
-    viewModel.onIntent(AuthIntent.ContinueFromCity)
     viewModel.onIntent(AuthIntent.SelectCurrency(KwaborCurrency.Eur))
-    viewModel.onIntent(AuthIntent.ContinueFromCurrency)
     LegalDocumentType.entries.forEach { type ->
         viewModel.onIntent(AuthIntent.ChangeLegalAcceptance(type, accepted = true))
     }
-    viewModel.onIntent(AuthIntent.ContinueFromLegal)
-    assertEquals(RegistrationStep.Observability, viewModel.registrationState.value.step)
+    assertEquals(RegistrationStep.Profile, viewModel.registrationState.value.step)
+    assertEquals(null, viewModel.registrationState.value.errorMessage, viewModel.registrationState.value.toString())
 }
 
 private data class AuthTestOverrides(
-    val locationService: RegistrationLocationService = RegistrationLocationService {
-        RegistrationLocationResult.Unavailable
-    },
-    val notificationPermissionPolicy: NotificationPermissionPolicy = NotificationPermissionPolicy { false },
-    val notificationPrimingStore: NotificationPrimingStore = FakeNotificationPrimingStore(resolved = false),
     val authJourneyStore: AuthJourneyStore = FakeAuthJourneyStore(),
     val promoterActivationSessionStore: PromoterActivationSessionStore =
         FakePromoterActivationSessionStore(),
     val googleIdentityProvider: GoogleIdentityProvider = FakeGoogleIdentityProvider(),
     val idempotencyKeyProvider: IdempotencyKeyProvider = IdempotencyKeyProvider { TEST_IDEMPOTENCY_KEY },
-    val applyConsent: (ObservabilityConsent) -> Boolean = { true },
+    val revokeConsent: () -> Boolean = { true },
+    val track: (com.kwabor.shared.domain.observability.AnalyticsEvent) -> Unit = {},
 )
 
 private class FakePromoterActivationSessionStore(
@@ -2009,6 +1846,8 @@ private class RegistrationAuthRepository(
         private set
     var passwordUpdateCount = 0
         private set
+    var otpVerificationCount = 0
+        private set
     var completeOnboardingCallCount = 0
         private set
     var signInCallCount = 0
@@ -2042,6 +1881,7 @@ private class RegistrationAuthRepository(
     override suspend fun requestEmailOtp(email: String): DomainResult<Unit> = DomainResult.Success(Unit)
 
     override suspend fun verifyEmailOtp(email: String, otpCode: String): DomainResult<AuthSession> {
+        otpVerificationCount += 1
         val verified = verifiedSession
         session = verified
         return DomainResult.Success(verified)
@@ -2138,10 +1978,12 @@ private class RegistrationAuthRepository(
 private class FakeAuthJourneyStore(
     private var journey: InterruptedAuthJourney = InterruptedAuthJourney.None,
     private val clearsSucceed: Boolean = true,
+    private val writesSucceed: Boolean = true,
 ) : AuthJourneyStore {
     override fun read(): InterruptedAuthJourney = journey
 
     override fun write(journey: InterruptedAuthJourney): Boolean {
+        if (!writesSucceed) return false
         this.journey = journey
         return true
     }
@@ -2150,22 +1992,6 @@ private class FakeAuthJourneyStore(
         if (!clearsSucceed) return false
         journey = InterruptedAuthJourney.None
         return true
-    }
-}
-
-private class FakeNotificationPrimingStore(
-    var resolved: Boolean,
-    var writesSucceed: Boolean = true,
-) : NotificationPrimingStore {
-    var markResolvedCalls: Int = 0
-        private set
-
-    override fun isResolved(): Boolean = resolved
-
-    override fun markResolved(): Boolean {
-        markResolvedCalls += 1
-        if (writesSucceed) resolved = true
-        return writesSucceed
     }
 }
 
@@ -2178,15 +2004,15 @@ private class RegistrationCatalogRepository : CatalogRepository {
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = unexpected()
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = unexpected()
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = unexpected()
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = unexpected()
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = unexpected()
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> = unexpected()
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         unexpected()

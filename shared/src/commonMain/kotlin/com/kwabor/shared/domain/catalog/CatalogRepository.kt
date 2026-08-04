@@ -1,8 +1,6 @@
 package com.kwabor.shared.domain.catalog
 
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 
 interface CatalogRepository : CatalogQueryRepository, CatalogInteractionRepository
 
@@ -13,15 +11,15 @@ interface CatalogQueryRepository {
 
     suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest = PageRequest(),
-    ): DomainResult<PageResult<ListingSummary>>
+        page: ListingPageRequest = ListingPageRequest(),
+    ): DomainResult<ListingSummaryPage>
 
     suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest = PageRequest(),
-    ): DomainResult<PageResult<ListingSummary>>
+        page: ListingPageRequest = ListingPageRequest(),
+    ): DomainResult<ListingSummaryPage>
 
-    suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail>
+    suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail>
 }
 
 interface CatalogInteractionRepository {

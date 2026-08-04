@@ -56,6 +56,35 @@ class AndroidDeepLinkClassifierTest {
     }
 
     @Test
+    fun catalogDetailAcceptsCanonicalManifestContractAndRejectsAmbiguousPayloads() {
+        assertEquals(
+            AndroidDeepLinkDestination.CatalogDetail,
+            AndroidDeepLinkClassifier.classify("kwabor://listing/$VALID_LISTING_ID"),
+        )
+        listOf(
+            "kwabor://listing/not-a-uuid",
+            "kwabor://listing/$VALID_LISTING_ID?source=share",
+            "kwabor://listing/$VALID_LISTING_ID#section",
+            "kwabor://user@listing/$VALID_LISTING_ID",
+            "kwabor://listing:443/$VALID_LISTING_ID",
+            "kwabor://listing/$VALID_LISTING_ID/extra",
+        ).forEach { rawUrl ->
+            assertEquals(
+                AndroidDeepLinkDestination.Rejected,
+                AndroidDeepLinkClassifier.classify(rawUrl),
+            )
+        }
+    }
+
+    @Test
+    fun catalogDetailClassifierNormalizesCaseAfterSystemDelivery() {
+        assertEquals(
+            AndroidDeepLinkDestination.CatalogDetail,
+            AndroidDeepLinkClassifier.classify("KWABOR://LISTING/${VALID_LISTING_ID.uppercase()}"),
+        )
+    }
+
+    @Test
     fun promoterCallbackRejectsUserInfoAndOversizedPayload() {
         assertEquals(
             AndroidDeepLinkDestination.Rejected,
@@ -80,3 +109,4 @@ class AndroidDeepLinkClassifierTest {
 
 private val VALID_PROMOTER_TOKEN = "a".repeat(64)
 private val VALID_PKCE_CODE = "b".repeat(32)
+private const val VALID_LISTING_ID = "123e4567-e89b-42d3-a456-426614174000"

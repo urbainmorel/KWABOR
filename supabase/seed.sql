@@ -17,21 +17,28 @@ insert into public.categories (
   subtype,
   name_key,
   default_listing_class,
+  detail_variant,
   sort_order
 ) values
-  ('heritage-historique', 'lieu', 'historique', 'category.heritage.historique', 'patrimonial', 10),
-  ('heritage-nature', 'lieu', 'nature', 'category.heritage.nature', 'patrimonial', 20),
-  ('commercial-marche', 'lieu', 'marche', 'category.commercial.marche', 'commercial', 30),
-  ('commercial-restaurant', 'etablissement', 'restaurant', 'category.commercial.restaurant', 'commercial', 40),
-  ('commercial-hotel', 'etablissement', 'hotel', 'category.commercial.hotel', 'commercial', 50),
-  ('guide-touristique', 'etablissement', 'guide', 'category.commercial.guide', 'commercial', 60),
-  ('event-culture', 'evenement', 'culture', 'category.event.culture', 'evenementiel', 70)
+  ('heritage-historique', 'lieu', 'historique', 'category.heritage.historique', 'patrimonial', 'place', 10),
+  ('heritage-nature', 'lieu', 'nature', 'category.heritage.nature', 'patrimonial', 'place', 20),
+  ('commercial-marche', 'lieu', 'marche', 'category.commercial.marche', 'commercial', 'place', 30),
+  ('commercial-restaurant', 'etablissement', 'restaurant', 'category.commercial.restaurant', 'commercial', 'food', 40),
+  ('commercial-hotel', 'etablissement', 'hotel', 'category.commercial.hotel', 'commercial', 'lodging', 50),
+  ('guide-touristique', 'etablissement', 'guide', 'category.commercial.guide', 'commercial', 'guide', 60),
+  ('event-culture', 'evenement', 'culture', 'category.event.culture', 'evenementiel', 'event', 70)
 on conflict (id) do update set
   listing_type = excluded.listing_type,
   subtype = excluded.subtype,
   name_key = excluded.name_key,
   default_listing_class = excluded.default_listing_class,
+  detail_variant = excluded.detail_variant,
   sort_order = excluded.sort_order;
+
+update public.listings
+set status = 'brouillon',
+    published_at = null
+where id = '00000000-0000-4000-8000-000000000104';
 
 insert into public.listings (
   id,
@@ -65,7 +72,7 @@ insert into public.listings (
     'historique',
     'patrimonial',
     'heritage-historique',
-    'publie',
+    'brouillon',
     'Porte du Non-Retour',
     'porte-du-non-retour-ouidah',
     'Monument patrimonial majeur de Ouidah, point de memoire ouvert aux visiteurs et parcours de decouverte historique.',
@@ -83,7 +90,7 @@ insert into public.listings (
     42,
     320,
     86,
-    now()
+    null
   ),
   (
     '00000000-0000-4000-8000-000000000102',
@@ -91,7 +98,7 @@ insert into public.listings (
     'marche',
     'commercial',
     'commercial-marche',
-    'publie',
+    'brouillon',
     'Marche Dantokpa',
     'marche-dantokpa-cotonou',
     'Grand marche populaire de Cotonou, connu pour ses allees denses, ses produits locaux et son energie commerciale.',
@@ -109,7 +116,7 @@ insert into public.listings (
     31,
     280,
     63,
-    now()
+    null
   ),
   (
     '00000000-0000-4000-8000-000000000103',
@@ -117,7 +124,7 @@ insert into public.listings (
     'restaurant',
     'commercial',
     'commercial-restaurant',
-    'publie',
+    'brouillon',
     'Table Locale Cotonou',
     'table-locale-cotonou',
     'Restaurant de test dedie a la validation catalogue Kwabor, avec cuisine beninoise, prix indicatif et contact fictif.',
@@ -128,14 +135,14 @@ insert into public.listings (
     6.3586,
     2.4041,
     5000,
-    'consommation',
+    'par_personne',
     array['restaurant', 'beninois', 'test'],
     false,
     4.2,
     12,
     110,
     24,
-    now()
+    null
   ),
   (
     '00000000-0000-4000-8000-000000000104',
@@ -143,7 +150,7 @@ insert into public.listings (
     'culture',
     'evenementiel',
     'event-culture',
-    'publie',
+    'brouillon',
     'Festival culturel de Ouidah',
     'festival-culturel-ouidah-test',
     'Evenement culturel de test pour valider les fiches evenementielles, la recherche par ville et les campagnes futures.',
@@ -161,9 +168,13 @@ insert into public.listings (
     8,
     75,
     15,
-    now()
+    null
   )
 on conflict (id) do update set
+  type = excluded.type,
+  subtype = excluded.subtype,
+  listing_class = excluded.listing_class,
+  category_id = excluded.category_id,
   status = excluded.status,
   name = excluded.name,
   slug = excluded.slug,
@@ -182,6 +193,160 @@ on conflict (id) do update set
   views_count = excluded.views_count,
   likes_count = excluded.likes_count,
   published_at = excluded.published_at;
+
+update public.listings
+set opening_hours = $$
+  {
+    "monday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1320,"closes_next_day":false}]},
+    "tuesday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1320,"closes_next_day":false}]},
+    "wednesday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1320,"closes_next_day":false}]},
+    "thursday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1320,"closes_next_day":false}]},
+    "friday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1380,"closes_next_day":false}]},
+    "saturday":{"status":"periods","periods":[{"opens_minute":660,"closes_minute":1380,"closes_next_day":false}]},
+    "sunday":{"status":"closed","periods":[]}
+  }
+$$::jsonb,
+    contact_phone = '+2290100000000',
+    socials = '{"instagram":"https://instagram.com/kwabor.test"}'::jsonb
+where id = '00000000-0000-4000-8000-000000000103';
+
+insert into public.amenities (id, name_key, allowed_variants, sort_order) values
+  (
+    'parking',
+    'amenity.parking',
+    array['place', 'lodging', 'food', 'nightlife']::public.catalog_detail_variant[],
+    10
+  ),
+  (
+    'wifi',
+    'amenity.wifi',
+    array['lodging', 'food']::public.catalog_detail_variant[],
+    20
+  ),
+  (
+    'accessible-pmr',
+    'amenity.accessible_pmr',
+    array['place', 'lodging', 'food', 'nightlife']::public.catalog_detail_variant[],
+    30
+  )
+on conflict (id) do update set
+  name_key = excluded.name_key,
+  allowed_variants = excluded.allowed_variants,
+  sort_order = excluded.sort_order;
+
+insert into public.place_details (
+  listing_id,
+  place_category,
+  is_free,
+  entry_fee_xof,
+  fee_note
+) values
+  (
+    '00000000-0000-4000-8000-000000000101',
+    'historique',
+    true,
+    null,
+    'Acces libre au monument.'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000102',
+    'marche',
+    true,
+    null,
+    'Acces libre au marche.'
+  )
+on conflict (listing_id) do update set
+  place_category = excluded.place_category,
+  is_free = excluded.is_free,
+  entry_fee_xof = excluded.entry_fee_xof,
+  fee_note = excluded.fee_note;
+
+insert into public.food_details (
+  listing_id,
+  cuisines,
+  meals,
+  reservation,
+  menu_url
+) values (
+  '00000000-0000-4000-8000-000000000103',
+  array['beninoise'],
+  array['dejeuner', 'diner'],
+  true,
+  'https://example.invalid/kwabor/menus/table-locale'
+)
+on conflict (listing_id) do update set
+  cuisines = excluded.cuisines,
+  meals = excluded.meals,
+  reservation = excluded.reservation,
+  menu_url = excluded.menu_url;
+
+insert into public.event_details (
+  listing_id,
+  category,
+  start_at,
+  end_at,
+  venue_listing_id,
+  organizer_name,
+  organizer_contact,
+  ticket_type,
+  ticket_url,
+  capacity
+) values (
+  '00000000-0000-4000-8000-000000000104',
+  'culture',
+  '2030-01-10 18:00:00+01',
+  '2030-01-10 22:00:00+01',
+  '00000000-0000-4000-8000-000000000101',
+  'Kwabor Démonstration',
+  'events@kwabor.test',
+  'payant',
+  'https://example.invalid/kwabor/tickets/festival-ouidah',
+  500
+)
+on conflict (listing_id) do update set
+  category = excluded.category,
+  start_at = excluded.start_at,
+  end_at = excluded.end_at,
+  venue_listing_id = excluded.venue_listing_id,
+  organizer_name = excluded.organizer_name,
+  organizer_contact = excluded.organizer_contact,
+  ticket_type = excluded.ticket_type,
+  ticket_url = excluded.ticket_url,
+  capacity = excluded.capacity;
+
+insert into public.ticket_tiers (
+  listing_id,
+  label,
+  price_xof,
+  display_order
+) values
+  (
+    '00000000-0000-4000-8000-000000000104',
+    'Standard',
+    2000,
+    0
+  ),
+  (
+    '00000000-0000-4000-8000-000000000104',
+    'VIP',
+    5000,
+    1
+  )
+on conflict (listing_id, label) do update set
+  price_xof = excluded.price_xof,
+  display_order = excluded.display_order;
+
+insert into public.listing_amenities (
+  listing_id,
+  amenity_id,
+  display_order
+) values
+  ('00000000-0000-4000-8000-000000000101', 'accessible-pmr', 0),
+  ('00000000-0000-4000-8000-000000000102', 'parking', 0),
+  ('00000000-0000-4000-8000-000000000103', 'wifi', 0),
+  ('00000000-0000-4000-8000-000000000103', 'accessible-pmr', 1)
+on conflict (listing_id, amenity_id) do update set
+  display_order = excluded.display_order;
 
 insert into public.listing_media (
   listing_id,
@@ -219,3 +384,17 @@ insert into public.listing_media (
     true
   )
 on conflict do nothing;
+
+update public.listings
+set status = 'publie',
+    published_at = '2026-07-01 00:00:00+00'
+where id in (
+  '00000000-0000-4000-8000-000000000101',
+  '00000000-0000-4000-8000-000000000102',
+  '00000000-0000-4000-8000-000000000103'
+);
+
+update public.listings
+set status = 'publie',
+    published_at = '2026-07-01 00:00:00+00'
+where id = '00000000-0000-4000-8000-000000000104';

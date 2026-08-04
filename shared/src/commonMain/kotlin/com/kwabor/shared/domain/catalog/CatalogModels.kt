@@ -1,6 +1,5 @@
 package com.kwabor.shared.domain.catalog
 
-import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import kotlin.math.abs
 
@@ -64,7 +63,12 @@ fun nearestCity(cities: List<City>, location: GeoPoint): City? {
     }
     return cities
         .asSequence()
-        .filter { city -> city.countryCode == "BJ" && city.latitude != null && city.longitude != null }
+        .filter { city ->
+            city.countryCode == "BJ" &&
+                city.latitude != null &&
+                city.longitude != null &&
+                GeoPoint(latitude = city.latitude, longitude = city.longitude).isWithinBeninBounds
+        }
         .minByOrNull { city ->
             val latitudeDelta = requireNotNull(city.latitude) - location.latitude
             val longitudeDelta = requireNotNull(city.longitude) - location.longitude
@@ -191,22 +195,7 @@ data class ListingSummary(
     val likesCount: Int,
     val verified: Boolean,
     val sponsoredUntilEpochMilliseconds: Long?,
-)
-
-data class ListingDetail(
-    val summary: ListingSummary,
-    val slug: String,
-    val description: String,
-    val contentLocale: AppLocale,
-    val district: String?,
-    val address: String?,
-    val geoPoint: GeoPoint?,
-    val contact: ListingContact,
-    val media: List<ListingMedia>,
-    val tags: List<String>,
-    val ownerId: String?,
-    val stewardId: String?,
-    val publishedAtEpochMilliseconds: Long?,
+    val isSponsoredPlacement: Boolean? = null,
 )
 
 data class ListingViewerInteraction(
@@ -223,13 +212,6 @@ data class ListingContact(
     val email: String?,
 )
 
-data class ListingMedia(
-    val url: String,
-    val alt: String,
-    val order: Int,
-    val isCover: Boolean,
-)
-
 data class ListingFilters(
     val cityId: String? = null,
     val categoryId: String? = null,
@@ -241,4 +223,21 @@ data class ListingFilters(
 data class ListingSearchQuery(
     val text: String,
     val filters: ListingFilters = ListingFilters(),
-)
+) {
+    init {
+        require(text == text.trim()) { "Listing search query must be canonical." }
+        require(text.length in 1..MAX_LISTING_SEARCH_QUERY_LENGTH) {
+            "Listing search query must contain between 1 and $MAX_LISTING_SEARCH_QUERY_LENGTH characters."
+        }
+        require(text.none(Char::isISOControl)) { "Listing search query contains control characters." }
+        require(filters.onlyPublished) { "Listing search only supports published listings." }
+        require(filters.cityId.isValidListingSearchFilterId()) { "Listing search city id is invalid." }
+        require(filters.categoryId.isValidListingSearchFilterId()) { "Listing search category id is invalid." }
+    }
+}
+
+private fun String?.isValidListingSearchFilterId(): Boolean =
+    this == null || (isNotBlank() && length <= MAX_LISTING_SEARCH_FILTER_ID_LENGTH && none(Char::isISOControl))
+
+private const val MAX_LISTING_SEARCH_QUERY_LENGTH = 120
+private const val MAX_LISTING_SEARCH_FILTER_ID_LENGTH = 100

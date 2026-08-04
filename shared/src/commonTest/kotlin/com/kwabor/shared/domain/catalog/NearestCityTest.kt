@@ -27,6 +27,24 @@ class NearestCityTest {
     }
 
     @Test
+    fun nearestCity_ignoresBeninTaggedCandidateOutsideBoundary() {
+        val result = nearestCity(
+            cities = listOf(
+                City(
+                    id = "invalid-city",
+                    name = "Ville hors frontière",
+                    countryCode = "BJ",
+                    latitude = 48.8566,
+                    longitude = 2.3522,
+                ),
+            ),
+            location = GeoPoint(latitude = 6.3703, longitude = 2.3912),
+        )
+
+        assertNull(result)
+    }
+
+    @Test
     fun beninBoundary_acceptsCitiesAndKnownBorderVertices() {
         val locations = listOf(
             GeoPoint(latitude = 6.3703, longitude = 2.3912),

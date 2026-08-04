@@ -23,18 +23,22 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcuserstate
+*.xcarchive
+*.xcresult
+*.ipa
 iosApp/Kwabor/Config/Local.xcconfig
-androidApp/google-services.json
-iosApp/Kwabor/Resources/GoogleService-Info.plist
+google-services.json
+GoogleService-Info.plist
 
 # Secrets and local environment
 .env
 .env.*
-!.env.example
+!/.env.example
 firebase-debug.log
 *.keystore
 *.jks
 *.p12
+*.p8
 *.mobileprovision
 
 # OS files

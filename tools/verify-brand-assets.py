@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import struct
 import sys
+import xml.etree.ElementTree as ElementTree
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +22,9 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ANDROID_XML_NAMESPACE = "http://schemas.android.com/apk/res/android"
+ANDROID_LAUNCH_BACKGROUND = (14, 14, 13)
+VISIBLE_LUMINANCE_THRESHOLD = 32
 
 
 class BrandVerificationError(RuntimeError):
@@ -110,7 +115,7 @@ DERIVED_ICON_SPECS = (
     ),
 )
 
-ANDROID_ICON_OUTPUTS = {
+ANDROID_BRAND_MARK_OUTPUTS = {
     "mdpi": (
         108,
         "fccdad11d4e44ed5b968a5fdcdc82b137803812436d3a90631ef9708652a6ae3",
@@ -130,6 +135,34 @@ ANDROID_ICON_OUTPUTS = {
     "xxxhdpi": (
         432,
         "77a424a66525055c14a8de9300eb89fd205605b4de5e097e4501b2b1aab877e0",
+    ),
+}
+
+ANDROID_LAUNCH_MARK_OUTPUTS = {
+    "mdpi": (
+        288,
+        "a754994e4dd87ecacdde67a08540554f1ab12689e920ec8c44bc011d3f2f3fae",
+        (92, 78, 215, 205),
+    ),
+    "hdpi": (
+        432,
+        "77a424a66525055c14a8de9300eb89fd205605b4de5e097e4501b2b1aab877e0",
+        (138, 118, 323, 308),
+    ),
+    "xhdpi": (
+        576,
+        "41870075bb16070535645acc2276a13a202384a40313377ca1805c174f0ba5fe",
+        (185, 157, 430, 410),
+    ),
+    "xxhdpi": (
+        864,
+        "834b8ade73bbe3b0566cd5c5da77bbc6d1e546abea1a2cc3bd96d8f0280ed349",
+        (277, 236, 645, 615),
+    ),
+    "xxxhdpi": (
+        1152,
+        "adeb414a67d97cab1f15dfeac3fad815b548b6ce0bb3a2eb4d5cb021ccecfb01",
+        (370, 315, 860, 820),
     ),
 }
 
@@ -201,6 +234,140 @@ def read_png_metadata(path: Path) -> tuple[bytes, int, int, str]:
     return payload, width, height, modes[color_type]
 
 
+def paeth_predictor(left: int, above: int, upper_left: int) -> int:
+    estimate = left + above - upper_left
+    left_distance = abs(estimate - left)
+    above_distance = abs(estimate - above)
+    upper_left_distance = abs(estimate - upper_left)
+    if left_distance <= above_distance and left_distance <= upper_left_distance:
+        return left
+    if above_distance <= upper_left_distance:
+        return above
+    return upper_left
+
+
+def decode_rgb_pixels(path: Path) -> tuple[int, int, bytes]:
+    payload, width, height, mode = read_png_metadata(path)
+    require(mode == "RGB", f"Geometry verification requires an RGB PNG: {path}")
+
+    idat_chunks: list[bytes] = []
+    offset = len(PNG_SIGNATURE)
+    while offset < len(payload):
+        length = int.from_bytes(payload[offset : offset + 4], "big")
+        chunk_type = payload[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        if chunk_type == b"IDAT":
+            idat_chunks.append(payload[data_start:data_end])
+        offset = data_end + 4
+
+    require(idat_chunks, f"Missing PNG image data: {path}")
+    try:
+        filtered = zlib.decompress(b"".join(idat_chunks))
+    except zlib.error as error:
+        raise BrandVerificationError(f"Invalid PNG image data: {path}: {error}") from error
+
+    bytes_per_pixel = 3
+    stride = width * bytes_per_pixel
+    require(
+        len(filtered) == height * (stride + 1),
+        f"Unexpected decompressed PNG size: {path}",
+    )
+
+    decoded = bytearray()
+    previous = bytearray(stride)
+    offset = 0
+    for _ in range(height):
+        filter_type = filtered[offset]
+        offset += 1
+        current = bytearray(filtered[offset : offset + stride])
+        offset += stride
+        require(filter_type in range(5), f"Unsupported PNG row filter: {path}")
+
+        for index in range(stride):
+            left = current[index - bytes_per_pixel] if index >= bytes_per_pixel else 0
+            above = previous[index]
+            upper_left = (
+                previous[index - bytes_per_pixel]
+                if index >= bytes_per_pixel
+                else 0
+            )
+            if filter_type == 1:
+                current[index] = (current[index] + left) & 0xFF
+            elif filter_type == 2:
+                current[index] = (current[index] + above) & 0xFF
+            elif filter_type == 3:
+                current[index] = (current[index] + ((left + above) // 2)) & 0xFF
+            elif filter_type == 4:
+                current[index] = (
+                    current[index] + paeth_predictor(left, above, upper_left)
+                ) & 0xFF
+
+        decoded.extend(current)
+        previous = current
+
+    return width, height, bytes(decoded)
+
+
+def verify_launch_geometry(
+    relative_path: str,
+    expected_bounds: tuple[int, int, int, int],
+) -> None:
+    path = repository_path(relative_path)
+    width, height, pixels = decode_rgb_pixels(path)
+    require(width == height, f"Android launch canvas must be square: {path}")
+    require(width % 8 == 0, f"Android launch canvas must support exact 75% padding: {path}")
+
+    visible_x: list[int] = []
+    visible_y: list[int] = []
+    maximum_radius_squared = 0.0
+    center = width / 2.0
+    padding = width // 8
+    for y in range(height):
+        row_offset = y * width * 3
+        for x in range(width):
+            pixel_offset = row_offset + x * 3
+            red, green, blue = pixels[pixel_offset : pixel_offset + 3]
+            if (
+                x < padding
+                or x >= width - padding
+                or y < padding
+                or y >= height - padding
+            ):
+                require(
+                    (red, green, blue) == ANDROID_LAUNCH_BACKGROUND,
+                    f"Unexpected Android launch padding pixel in {relative_path}",
+                )
+            luminance_numerator = 2126 * red + 7152 * green + 722 * blue
+            if luminance_numerator < VISIBLE_LUMINANCE_THRESHOLD * 10_000:
+                continue
+            visible_x.append(x)
+            visible_y.append(y)
+            x_distance = (x + 0.5) - center
+            y_distance = (y + 0.5) - center
+            maximum_radius_squared = max(
+                maximum_radius_squared,
+                x_distance * x_distance + y_distance * y_distance,
+            )
+
+    require(visible_x, f"Android launch mark has no visible light pixels: {path}")
+    actual_bounds = (
+        min(visible_x),
+        min(visible_y),
+        max(visible_x) + 1,
+        max(visible_y) + 1,
+    )
+    require(
+        actual_bounds == expected_bounds,
+        f"Unexpected visible launch geometry for {relative_path}: {actual_bounds}",
+    )
+    safe_radius = width / 3.0
+    require(
+        maximum_radius_squared <= safe_radius * safe_radius,
+        f"Android launch mark exceeds the 192 dp safe circle: {relative_path}",
+    )
+
+
 def verify_png(spec: PngSpec) -> bytes:
     path = repository_path(spec.path)
     payload, width, height, mode = read_png_metadata(path)
@@ -230,22 +397,53 @@ def verify_icon_derivatives() -> None:
         require(spec.source == ICON_MASTER, f"Invalid icon provenance: {spec.path}")
         verify_png(spec)
 
-    for density, (size, expected_hash) in ANDROID_ICON_OUTPUTS.items():
-        paths = (
-            f"androidApp/src/main/res/drawable-{density}/kwabor_brand_mark.png",
-            f"androidApp/src/main/res/drawable-{density}/kwabor_launch_mark.png",
-        )
-        for path in paths:
-            verify_png(
-                PngSpec(
-                    path=path,
-                    width=size,
-                    height=size,
-                    mode="RGB",
-                    sha256=expected_hash,
-                    source=ICON_MASTER,
-                )
+    for density, (size, expected_hash) in ANDROID_BRAND_MARK_OUTPUTS.items():
+        brand_payload = verify_png(
+            PngSpec(
+                path=(
+                    f"androidApp/src/main/res/drawable-{density}/"
+                    "kwabor_brand_mark.png"
+                ),
+                width=size,
+                height=size,
+                mode="RGB",
+                sha256=expected_hash,
+                source=ICON_MASTER,
             )
+        )
+
+        launch_size, launch_hash, launch_bounds = ANDROID_LAUNCH_MARK_OUTPUTS[density]
+        launch_path = (
+            f"androidApp/src/main/res/drawable-{density}/kwabor_launch_mark.png"
+        )
+        launch_payload = verify_png(
+            PngSpec(
+                path=launch_path,
+                width=launch_size,
+                height=launch_size,
+                mode="RGB",
+                sha256=launch_hash,
+                source=ICON_MASTER,
+            )
+        )
+        require(
+            launch_size > size,
+            f"Android launch canvas must exceed the launcher canvas: {density}",
+        )
+        require(
+            launch_payload != brand_payload,
+            f"Android launch and launcher assets must remain distinct: {density}",
+        )
+        verify_launch_geometry(launch_path, launch_bounds)
+
+    obsolete_no_density_launch_mark = repository_path(
+        "androidApp/src/main/res/drawable-nodpi/kwabor_launch_mark.png"
+    )
+    require(
+        not obsolete_no_density_launch_mark.exists(),
+        "Android launch mark must use explicit 288 dp density assets: "
+        + str(obsolete_no_density_launch_mark),
+    )
 
 
 def verify_wordmarks(master_payload: bytes) -> None:
@@ -270,6 +468,270 @@ def load_json(relative_path: str) -> dict[str, Any]:
         raise BrandVerificationError(f"Invalid JSON metadata: {path}: {error}") from error
     require(isinstance(document, dict), f"JSON root must be an object: {path}")
     return document
+
+
+def load_xml(relative_path: str) -> ElementTree.Element:
+    path = repository_path(relative_path)
+    require(path.is_file(), f"Missing Android resource XML: {path}")
+    try:
+        return ElementTree.fromstring(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ElementTree.ParseError) as error:
+        raise BrandVerificationError(f"Invalid Android resource XML: {path}: {error}") from error
+
+
+def verify_android_splash_xml() -> None:
+    drawable_path = "androidApp/src/main/res/drawable/ic_kwabor_launch_mark.xml"
+    drawable = load_xml(drawable_path)
+    android_attribute = f"{{{ANDROID_XML_NAMESPACE}}}"
+    require(drawable.tag == "bitmap", f"Unexpected root element: {drawable_path}")
+    require(not list(drawable), f"Launch bitmap wrapper must not have children: {drawable_path}")
+    require(
+        drawable.attrib
+        == {
+            f"{android_attribute}antialias": "true",
+            f"{android_attribute}dither": "true",
+            f"{android_attribute}filter": "true",
+            f"{android_attribute}gravity": "fill",
+            f"{android_attribute}src": "@drawable/kwabor_launch_mark",
+        },
+        f"Unexpected launch bitmap policy in {drawable_path}: {drawable.attrib}",
+    )
+
+    styles_path = "androidApp/src/main/res/values/styles.xml"
+    resources = load_xml(styles_path)
+    require(resources.tag == "resources", f"Unexpected root element: {styles_path}")
+    application_styles = [
+        style
+        for style in resources.findall("style")
+        if style.attrib.get("name") == "KwaborTheme"
+    ]
+    require(
+        len(application_styles) == 1,
+        f"Expected one KwaborTheme definition in {styles_path}",
+    )
+    application_items = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in application_styles[0].findall("item")
+    }
+    require(
+        application_items.get("android:windowBackground")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:statusBarColor")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:navigationBarColor")
+        == "@color/kwabor_wordmark_background"
+        and application_items.get("android:windowLightStatusBar") == "false",
+        f"KwaborTheme must bridge every launch surface in {styles_path}",
+    )
+    starting_styles = [
+        style
+        for style in resources.findall("style")
+        if style.attrib.get("name") == "KwaborTheme.Starting"
+    ]
+    require(
+        len(starting_styles) == 1,
+        f"Expected one KwaborTheme.Starting definition in {styles_path}",
+    )
+    starting_style = starting_styles[0]
+    require(
+        starting_style.attrib
+        == {"name": "KwaborTheme.Starting", "parent": "Theme.SplashScreen"},
+        f"Unexpected starting theme attributes in {styles_path}: {starting_style.attrib}",
+    )
+
+    items: dict[str, str] = {}
+    for item in starting_style.findall("item"):
+        require(
+            set(item.attrib) == {"name"} and not list(item),
+            f"Invalid starting theme item in {styles_path}",
+        )
+        name = item.attrib["name"]
+        require(name not in items, f"Duplicate starting theme item {name}: {styles_path}")
+        items[name] = (item.text or "").strip()
+    require(
+        items
+        == {
+            "windowSplashScreenBackground": "@color/kwabor_icon_background",
+            "windowSplashScreenAnimatedIcon": "@drawable/ic_kwabor_launch_mark",
+            "windowSplashScreenAnimationDuration": "300",
+            "postSplashScreenTheme": "@style/KwaborTheme",
+            "android:statusBarColor": "@color/kwabor_icon_background",
+            "android:navigationBarColor": "@color/kwabor_icon_background",
+            "android:windowLightStatusBar": "false",
+        },
+        f"Unexpected active SplashScreen wiring in {styles_path}: {items}",
+    )
+
+    styles_v27_path = "androidApp/src/main/res/values-v27/styles.xml"
+    resources_v27 = load_xml(styles_v27_path)
+    application_styles_v27 = [
+        style
+        for style in resources_v27.findall("style")
+        if style.attrib.get("name") == "KwaborTheme"
+    ]
+    require(
+        len(application_styles_v27) == 1,
+        f"Expected one KwaborTheme definition in {styles_v27_path}",
+    )
+    application_items_v27 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in application_styles_v27[0].findall("item")
+    }
+    require(
+        application_styles_v27[0].attrib == application_styles[0].attrib
+        and application_items_v27
+        == {
+            **application_items,
+            "android:windowLightNavigationBar": "false",
+        },
+        f"KwaborTheme must keep API 27+ system bars dark in {styles_v27_path}",
+    )
+    starting_styles_v27 = [
+        style
+        for style in resources_v27.findall("style")
+        if style.attrib.get("name") == "KwaborTheme.Starting"
+    ]
+    require(
+        len(starting_styles_v27) == 1
+        and starting_styles_v27[0].attrib == starting_style.attrib,
+        f"Expected one matching KwaborTheme.Starting in {styles_v27_path}",
+    )
+    starting_items_v27 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in starting_styles_v27[0].findall("item")
+    }
+    require(
+        starting_items_v27
+        == {
+            **items,
+            "android:windowLightNavigationBar": "false",
+        },
+        f"Starting theme must keep API 27+ system bars dark in {styles_v27_path}",
+    )
+
+    styles_v33_path = "androidApp/src/main/res/values-v33/styles.xml"
+    resources_v33 = load_xml(styles_v33_path)
+    starting_styles_v33 = [
+        style
+        for style in resources_v33.findall("style")
+        if style.attrib.get("name") == "KwaborTheme.Starting"
+    ]
+    require(
+        len(starting_styles_v33) == 1,
+        f"Expected one KwaborTheme.Starting definition in {styles_v33_path}",
+    )
+    starting_items_v33 = {
+        item.attrib.get("name"): (item.text or "").strip()
+        for item in starting_styles_v33[0].findall("item")
+    }
+    require(
+        starting_styles_v33[0].attrib == starting_style.attrib
+        and starting_items_v33
+        == {
+            **starting_items_v27,
+            "android:windowSplashScreenBehavior": "icon_preferred",
+        },
+        f"API 33+ must prefer the launch icon in {styles_v33_path}",
+    )
+
+    colors_path = "androidApp/src/main/res/values/colors.xml"
+    color_resources = load_xml(colors_path)
+    require(color_resources.tag == "resources", f"Unexpected root element: {colors_path}")
+    launch_backgrounds = [
+        color
+        for color in color_resources.findall("color")
+        if color.attrib.get("name") == "kwabor_icon_background"
+    ]
+    require(
+        len(launch_backgrounds) == 1,
+        f"Expected one kwabor_icon_background definition in {colors_path}",
+    )
+    launch_background = launch_backgrounds[0]
+    require(
+        launch_background.attrib == {"name": "kwabor_icon_background"}
+        and not list(launch_background)
+        and (launch_background.text or "").strip().upper() == "#0E0E0D",
+        f"Unexpected Android launch background in {colors_path}",
+    )
+
+    manifest_path = "androidApp/src/main/AndroidManifest.xml"
+    manifest = load_xml(manifest_path)
+    require(manifest.tag == "manifest", f"Unexpected root element: {manifest_path}")
+    applications = manifest.findall("application")
+    require(len(applications) == 1, f"Expected one application in {manifest_path}")
+    main_activities = [
+        activity
+        for activity in applications[0].findall("activity")
+        if activity.attrib.get(f"{android_attribute}name") == ".MainActivity"
+    ]
+    require(len(main_activities) == 1, f"Expected one .MainActivity in {manifest_path}")
+    require(
+        main_activities[0].attrib.get(f"{android_attribute}theme")
+        == "@style/KwaborTheme.Starting",
+        f"MainActivity must use KwaborTheme.Starting in {manifest_path}",
+    )
+
+    activity_source_path = "androidApp/src/main/kotlin/com/kwabor/android/MainActivity.kt"
+    activity_source_file = repository_path(activity_source_path)
+    require(activity_source_file.is_file(), f"Missing Android source: {activity_source_file}")
+    activity_source = activity_source_file.read_text(encoding="utf-8")
+    activity_source = re.sub(r"/\*.*?\*/", "", activity_source, flags=re.DOTALL)
+    activity_source = re.sub(r"//[^\r\n]*", "", activity_source)
+    on_create_position = activity_source.find("override fun onCreate(")
+    splash_position = activity_source.find("installSplashScreen()", on_create_position)
+    super_position = activity_source.find(
+        "super.onCreate(savedInstanceState)",
+        on_create_position,
+    )
+    keep_condition_position = activity_source.find(
+        "setKeepOnScreenCondition(",
+        on_create_position,
+    )
+    exit_listener_position = activity_source.find(
+        "setOnExitAnimationListener",
+        on_create_position,
+    )
+    require(
+        on_create_position >= 0
+        and splash_position > on_create_position
+        and super_position > splash_position
+        and keep_condition_position > super_position
+        and exit_listener_position > keep_condition_position
+        and activity_source.count("installSplashScreen()") == 1,
+        "MainActivity must install and retain SplashScreen before its first application frame",
+    )
+    require(
+        activity_source.count("setKeepOnScreenCondition(") == 1,
+        "MainActivity must register exactly one SplashScreen keep condition",
+    )
+    require(
+        activity_source.count("launchProcessState.consumeIsFirstActivityInProcess()") == 1,
+        "MainActivity must apply the brand hold to the first Activity in each process",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/LaunchSplashGuard.kt",
+        "COLD_START_MINIMUM_SPLASH_MILLIS = 1_000L",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "INTRO_WORDMARK_MINIMUM_VISIBLE_MILLIS = 500L",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroPlayerLifecycleBinding.kt",
+        "player.setMediaItem(MediaItem.fromUri(mediaUri), true)",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "setImageResource(R.drawable.kwabor_launch_wordmark)",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "scaleType = ImageView.ScaleType.FIT_CENTER",
+    )
+    require_text(
+        "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/onboarding/IntroScreen.kt",
+        "setBackgroundColor(context.getColor(R.color.kwabor_wordmark_background))",
+    )
 
 
 def verify_imageset(relative_path: str, expected: dict[str, str]) -> None:
@@ -336,6 +798,28 @@ def verify_references() -> None:
         "tools/generate-brand-assets.ps1",
         "$launchWordmarkMasterAsset = Join-Path $repositoryRoot 'kwabor_2.png'",
     )
+    for density, brand_size, launch_size in (
+        ("mdpi", 108, 288),
+        ("hdpi", 162, 432),
+        ("xhdpi", 216, 576),
+        ("xxhdpi", 324, 864),
+        ("xxxhdpi", 432, 1152),
+    ):
+        require_text(
+            "tools/generate-brand-assets.ps1",
+            (
+                f"@{{ Density = '{density}'; BrandSize = {brand_size}; "
+                f"LaunchSize = {launch_size} }}"
+            ),
+        )
+    require_text(
+        "tools/generate-brand-assets.ps1",
+        "-Size $_.LaunchSize",
+    )
+    require_text(
+        "tools/generate-brand-assets.ps1",
+        "-ContentScale 0.75",
+    )
     require_text(
         "tools/generate-brand-assets.ps1",
         "'kwabor_launch_wordmark.png'",
@@ -349,14 +833,7 @@ def verify_references() -> None:
         "androidApp/src/main/AndroidManifest.xml",
         'android:icon="@mipmap/ic_launcher"',
     )
-    require_text(
-        "androidApp/src/main/res/drawable/ic_kwabor_launch_mark.xml",
-        'android:src="@drawable/kwabor_launch_mark"',
-    )
-    require_text(
-        "androidApp/src/main/res/values/styles.xml",
-        "@drawable/ic_kwabor_launch_mark",
-    )
+    verify_android_splash_xml()
     require_source_reference(
         "androidApp/src",
         "R.drawable.kwabor_launch_wordmark",
@@ -415,8 +892,9 @@ def main() -> int:
         return 1
 
     print(
-        "OK brand assets: 3 canonical masters, icon derivatives locked, "
-        "launch wordmarks byte-exact and Android/iOS references valid"
+        "OK brand assets: 3 canonical masters, Android 288 dp launch geometry "
+        "and hashes locked, icon derivatives locked, launch wordmarks byte-exact "
+        "and Android/iOS references valid"
     )
     return 0
 

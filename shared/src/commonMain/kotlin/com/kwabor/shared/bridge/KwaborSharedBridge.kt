@@ -4,6 +4,8 @@ import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.OnboardingStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.i18n.toOnboardingStrings
+import com.kwabor.shared.presentation.detail.CatalogDetailDeepLinkParser
+import com.kwabor.shared.presentation.detail.CatalogDetailDeepLinkResult
 import com.kwabor.shared.presentation.navigation.RootDeepLinkParser
 import com.kwabor.shared.presentation.navigation.RootDeepLinkResult
 import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
@@ -37,6 +39,12 @@ class KwaborSharedBridge internal constructor(
         is RootDeepLinkResult.Accepted -> result.destination.routeKey
         is RootDeepLinkResult.Rejected -> null
     }
+
+    fun catalogDetailListingIdForDeepLink(rawUrl: String): String? =
+        when (val result = CatalogDetailDeepLinkParser.parse(rawUrl)) {
+            is CatalogDetailDeepLinkResult.Accepted -> result.listingId
+            is CatalogDetailDeepLinkResult.Rejected -> null
+        }
 
     fun hasCatalogConfiguration(): Boolean = hasCatalogConfiguration
 

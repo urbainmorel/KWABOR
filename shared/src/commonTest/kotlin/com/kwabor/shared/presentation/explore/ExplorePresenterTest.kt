@@ -1,23 +1,25 @@
 package com.kwabor.shared.presentation.explore
 
+import com.kwabor.shared.domain.catalog.CatalogDetail
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingClass
-import com.kwabor.shared.domain.catalog.ListingContact
-import com.kwabor.shared.domain.catalog.ListingDetail
 import com.kwabor.shared.domain.catalog.ListingFilters
-import com.kwabor.shared.domain.catalog.ListingMedia
+import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
+import com.kwabor.shared.domain.explore.ExploreFeedQuery
+import com.kwabor.shared.domain.explore.ExploreFeedRepository
+import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
+import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.stringsFor
@@ -44,15 +46,19 @@ class ExplorePresenterTest {
                             coverImageUrl = "https://example.invalid/cover.jpg",
                             ratingAverage = 4.74,
                             sponsoredUntilEpochMilliseconds = 2_000L,
+                            isSponsoredPlacement = true,
                         ),
                     ),
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(
-            request = ExploreLoadRequest(selectedTab = ExploreTab.Places, selectedChipId = "history"),
+            request = ExploreLoadRequest(
+                selectedTab = ExploreTab.Places,
+                selectedChipId = "heritage-historique",
+            ),
             strings = strings,
         )
 
@@ -60,7 +66,7 @@ class ExplorePresenterTest {
         assertFalse(state.hasError)
         assertEquals(strings.currentCity, state.cityLabel)
         assertEquals(ExploreTab.Places, state.selectedTab)
-        assertEquals("history", state.selectedChipId)
+        assertEquals("heritage-historique", state.selectedChipId)
         assertEquals(ListingType.Place, repository.lastFilters?.listingType)
         assertEquals("heritage-historique", repository.lastFilters?.categoryId)
 
@@ -76,7 +82,7 @@ class ExplorePresenterTest {
     @Test
     fun load_keepsUnknownChipAsTabFilterOnly() = runSuspendTest {
         val repository = FakeCatalogRepository()
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         presenter.load(
             request = ExploreLoadRequest(selectedTab = ExploreTab.Events, selectedChipId = "concerts"),
@@ -92,7 +98,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(listingsError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -103,15 +109,20 @@ class ExplorePresenterTest {
     }
 
     @Test
-    fun load_marksExpiredCampaignAsNotSponsored() = runSuspendTest {
+    fun load_usesServerSponsorSnapshotDespiteDeviceClockSkew() = runSuspendTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(
                 listings = listOf(
-                    listingSummary(ListingSummaryFixture(sponsoredUntilEpochMilliseconds = 500L)),
+                    listingSummary(
+                        ListingSummaryFixture(
+                            sponsoredUntilEpochMilliseconds = 500L,
+                            isSponsoredPlacement = false,
+                        ),
+                    ),
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, FixedClockProvider(nowEpochMilliseconds = 0L))
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -133,7 +144,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -149,7 +160,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
@@ -171,12 +182,13 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
                 title = "Listing test",
                 cityLabel = "Cotonou",
+                cityId = "cotonou",
                 coverImageUrl = null,
                 price = null,
                 likesCount = 12,
@@ -203,7 +215,7 @@ class ExplorePresenterTest {
                 ),
             ),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -230,7 +242,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -238,6 +250,7 @@ class ExplorePresenterTest {
                 cityLabel = "Cotonou",
                 coverImageUrl = null,
                 price = null,
+                cityId = "cotonou",
             ),
         )
 
@@ -249,6 +262,7 @@ class ExplorePresenterTest {
             PendingExploreAuthInteraction(
                 listingId = "listing-1",
                 kind = ExploreInteractionKind.Favorite,
+                suggestedCityId = "cotonou",
             ),
             updatedState.pendingAuthInteraction,
         )
@@ -261,7 +275,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -295,7 +309,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -319,7 +333,7 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = ExplorePresenter(repository, clockProvider)
+        val presenter = testPresenter(repository, clockProvider)
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -394,39 +408,22 @@ private class FakeCatalogRepository(
 
     override suspend fun listListings(
         filters: ListingFilters,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> {
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> {
         lastFilters = filters
         return scenario.listingsError?.let { error -> DomainResult.Failure(error) }
-            ?: DomainResult.Success(PageResult(items = scenario.listings, nextOffset = null))
+            ?: DomainResult.Success(ListingSummaryPage(items = scenario.listings, nextCursor = null))
     }
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
-        page: PageRequest,
-    ): DomainResult<PageResult<ListingSummary>> = DomainResult.Success(
-        PageResult(items = emptyList(), nextOffset = null),
+        page: ListingPageRequest,
+    ): DomainResult<ListingSummaryPage> = DomainResult.Success(
+        ListingSummaryPage(items = emptyList(), nextCursor = null),
     )
 
-    override suspend fun getListingDetail(listingId: String): DomainResult<ListingDetail> = DomainResult.Success(
-        ListingDetail(
-            summary = listingSummary(ListingSummaryFixture(id = listingId)),
-            slug = listingId,
-            description = "Description",
-            contentLocale = AppLocale.French,
-            district = null,
-            address = null,
-            geoPoint = null,
-            contact = ListingContact(phone = null, whatsapp = null, externalUrl = null, email = null),
-            media = listOf(
-                ListingMedia(url = "https://example.invalid/image.jpg", alt = "Image", order = 0, isCover = true),
-            ),
-            tags = emptyList(),
-            ownerId = null,
-            stewardId = null,
-            publishedAtEpochMilliseconds = null,
-        ),
-    )
+    override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> =
+        DomainResult.Failure(DomainError.NotFound("error.catalog.not_found"))
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         scenario.interactionError?.let { error -> DomainResult.Failure(error) }
@@ -461,6 +458,86 @@ private class FakeCatalogRepository(
     }
 }
 
+private fun testPresenter(repository: CatalogRepository, clockProvider: ClockProvider): ExplorePresenter =
+    ExplorePresenter(
+        exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
+        catalogInteractionRepository = repository,
+        appPreferencesRepository = null,
+        clockProvider = clockProvider,
+    )
+
+private class TestExploreFeedRepository(
+    private val catalogRepository: CatalogRepository,
+    private val clockProvider: ClockProvider,
+) : ExploreFeedRepository {
+    override suspend fun readCached(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot?> =
+        DomainResult.Success(null)
+
+    override suspend fun refresh(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot> =
+        when (val result = catalogRepository.listCities()) {
+            is DomainResult.Success -> loadCategories(query, result.value)
+            is DomainResult.Failure -> result
+        }
+
+    private suspend fun loadCategories(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+    ): DomainResult<ExploreFeedSnapshot> = when (val result = catalogRepository.listCategories()) {
+        is DomainResult.Success -> loadPage(query, cities, result.value)
+        is DomainResult.Failure -> result
+    }
+
+    private suspend fun loadPage(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+        categories: List<Category>,
+    ): DomainResult<ExploreFeedSnapshot> {
+        val validationError = query.invalidReferenceError(cities, categories)
+        return if (validationError != null) {
+            DomainResult.Failure(validationError)
+        } else {
+            loadValidPage(query, cities, categories)
+        }
+    }
+
+    private suspend fun loadValidPage(
+        query: ExploreFeedQuery,
+        cities: List<City>,
+        categories: List<Category>,
+    ): DomainResult<ExploreFeedSnapshot> = when (
+        val result = catalogRepository.listListings(
+            filters = query.filters,
+            page = ListingPageRequest(limit = query.pageSize),
+        )
+    ) {
+        is DomainResult.Success -> DomainResult.Success(
+            ExploreFeedSnapshot(
+                cities = cities,
+                categories = categories,
+                items = result.value.items,
+                nextCursor = result.value.nextCursor,
+                cachedAtEpochMilliseconds = clockProvider.nowEpochMilliseconds(),
+                source = ExploreFeedSource.Network,
+            ),
+        )
+        is DomainResult.Failure -> result
+    }
+
+    override suspend fun append(
+        query: ExploreFeedQuery,
+        currentSnapshot: ExploreFeedSnapshot,
+    ): DomainResult<ExploreFeedSnapshot> = DomainResult.Failure(DomainError.Unexpected())
+}
+
+private fun ExploreFeedQuery.invalidReferenceError(cities: List<City>, categories: List<Category>): DomainError? =
+    when {
+        filters.cityId != null && cities.none { city -> city.id == filters.cityId } ->
+            DomainError.Validation("error.explore.city_unavailable")
+        filters.categoryId != null && categories.none { category -> category.id == filters.categoryId } ->
+            DomainError.Validation("error.explore.category_unavailable")
+        else -> null
+    }
+
 private class FixedClockProvider(private val nowEpochMilliseconds: Long) : ClockProvider {
     override fun nowEpochMilliseconds(): Long = nowEpochMilliseconds
 }
@@ -473,6 +550,7 @@ private data class ListingSummaryFixture(
     val ratingAverage: Double? = null,
     val likesCount: Int = 12,
     val sponsoredUntilEpochMilliseconds: Long? = null,
+    val isSponsoredPlacement: Boolean? = null,
 )
 
 private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixture()): ListingSummary {
@@ -491,6 +569,7 @@ private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixtur
         likesCount = fixture.likesCount,
         verified = true,
         sponsoredUntilEpochMilliseconds = fixture.sponsoredUntilEpochMilliseconds,
+        isSponsoredPlacement = fixture.isSponsoredPlacement,
     )
 }
 

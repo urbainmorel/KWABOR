@@ -14,6 +14,7 @@ final class AccountDeletionStore: ObservableObject {
 
     private let controller: IosAuthController
     private let latestAuthError: () -> String?
+    private let onDeletionWillStart: () -> Bool
     private let onDeletionStateChanged: (Bool) -> Void
     private let onDeleted: () -> Void
     private var idempotencyKey = UUID().uuidString
@@ -22,12 +23,14 @@ final class AccountDeletionStore: ObservableObject {
         controller: IosAuthController,
         strings: OnboardingStrings,
         latestAuthError: @escaping () -> String?,
+        onDeletionWillStart: @escaping () -> Bool,
         onDeletionStateChanged: @escaping (Bool) -> Void,
         onDeleted: @escaping () -> Void
     ) {
         self.controller = controller
         self.strings = strings
         self.latestAuthError = latestAuthError
+        self.onDeletionWillStart = onDeletionWillStart
         self.onDeletionStateChanged = onDeletionStateChanged
         self.onDeleted = onDeleted
     }
@@ -43,6 +46,10 @@ final class AccountDeletionStore: ObservableObject {
 
     func deleteWithPassword() {
         guard hasConfirmedDeletion, !password.isEmpty, !isLoading else { return }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            return
+        }
         isLoading = true
         errorMessage = nil
         let submittedPassword = password
@@ -64,6 +71,11 @@ final class AccountDeletionStore: ObservableObject {
             onCompleted(false)
             return
         }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            onCompleted(false)
+            return
+        }
         isLoading = true
         errorMessage = nil
         onDeletionStateChanged(true)
@@ -75,6 +87,16 @@ final class AccountDeletionStore: ObservableObject {
             self?.finish(completed: didComplete)
             onCompleted(didComplete)
         }
+    }
+
+    func prepareFederatedDeletion() -> Bool {
+        guard hasConfirmedDeletion, !isLoading else { return false }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            return false
+        }
+        errorMessage = nil
+        return true
     }
 
     func reset() {
@@ -100,43 +122,86 @@ final class AccountDeletionStore: ObservableObject {
     }
 }
 
-struct AccountDeletionSection: View {
-    let controller: IosAuthController
+struct AccountDangerZoneSection: View {
+    let controller: IosAuthController?
     let strings: OnboardingStrings
-    let identityHintStore: FederatedIdentityHintPersisting
+    let identityHintStore: FederatedIdentityHintPersisting?
     let latestAuthError: () -> String?
+    let isSigningOut: Bool
+    let signOutErrorMessage: String?
+    let onSignOut: () -> Void
+    let onDismissSignOutError: () -> Void
+    let onDeletionWillStart: () -> Bool
     let onDeletionStateChanged: (Bool) -> Void
     let onDeleted: () -> Void
-    @State private var isPresented = false
+    @State private var isDeletionPresented = false
+    @State private var isSignOutConfirmationPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
             Text(strings.dangerZoneTitle)
                 .font(.headline)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
-            Text(strings.authDeleteAccountWarning)
-                .font(.callout)
-                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
-            Button(strings.authDeleteAccount, role: .destructive) {
-                isPresented = true
+
+            Button(role: .destructive) {
+                isSignOutConfirmationPresented = true
+            } label: {
+                HStack {
+                    Text(strings.authSignOut)
+                    Spacer()
+                    if isSigningOut {
+                        ProgressView()
+                            .accessibilityLabel(strings.authSignOut)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
             }
-            .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            .disabled(isSigningOut)
+
+            if let signOutErrorMessage {
+                Text(signOutErrorMessage)
+                    .font(.callout)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                    .accessibilityLabel(signOutErrorMessage)
+                    .onDisappear(perform: onDismissSignOutError)
+            }
+
+            if controller != nil, identityHintStore != nil {
+                Divider()
+                Text(strings.authDeleteAccountWarning)
+                    .font(.callout)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                Button(strings.authDeleteAccount, role: .destructive) {
+                    isDeletionPresented = true
+                }
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .disabled(isSigningOut)
+            }
         }
         .padding(KwaborDesignTokens.Spacing.lg)
         .background(KwaborDesignTokens.ColorToken.surface0)
         .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
-        .sheet(isPresented: $isPresented) {
-            AccountDeletionConfirmationView(
-                controller: controller,
-                strings: strings,
-                identityHintStore: identityHintStore,
-                latestAuthError: latestAuthError,
-                onDeletionStateChanged: onDeletionStateChanged,
-                onDeleted: {
-                    isPresented = false
-                    onDeleted()
-                }
-            )
+        .alert(strings.authSignOutTitle, isPresented: $isSignOutConfirmationPresented) {
+            Button(strings.authCancel, role: .cancel) {}
+            Button(strings.authConfirm, role: .destructive, action: onSignOut)
+        } message: {
+            Text(strings.authSignOutConfirmation)
+        }
+        .sheet(isPresented: $isDeletionPresented) {
+            if let controller, let identityHintStore {
+                AccountDeletionConfirmationView(
+                    controller: controller,
+                    strings: strings,
+                    identityHintStore: identityHintStore,
+                    latestAuthError: latestAuthError,
+                    onDeletionWillStart: onDeletionWillStart,
+                    onDeletionStateChanged: onDeletionStateChanged,
+                    onDeleted: {
+                        isDeletionPresented = false
+                        onDeleted()
+                    }
+                )
+            }
         }
     }
 }
@@ -151,6 +216,7 @@ private struct AccountDeletionConfirmationView: View {
         strings: OnboardingStrings,
         identityHintStore: FederatedIdentityHintPersisting,
         latestAuthError: @escaping () -> String?,
+        onDeletionWillStart: @escaping () -> Bool,
         onDeletionStateChanged: @escaping (Bool) -> Void,
         onDeleted: @escaping () -> Void
     ) {
@@ -158,6 +224,7 @@ private struct AccountDeletionConfirmationView: View {
             controller: controller,
             strings: strings,
             latestAuthError: latestAuthError,
+            onDeletionWillStart: onDeletionWillStart,
             onDeletionStateChanged: onDeletionStateChanged,
             onDeleted: onDeleted
         )
@@ -168,6 +235,8 @@ private struct AccountDeletionConfirmationView: View {
                 presenterProvider: WindowScenePresentingViewControllerProvider(),
                 identityHintStore: identityHintStore,
                 reportsSubmissionFailure: false,
+                attemptPreflight: deletionStore.prepareFederatedDeletion,
+                attemptPreflightErrorMessage: strings.settings.privacyPersistenceError,
                 onCredential: deletionStore.deleteWithFederatedCredential
             )
         )

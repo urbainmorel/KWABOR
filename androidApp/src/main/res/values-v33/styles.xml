@@ -1,0 +1,13 @@
+<resources>
+    <style name="KwaborTheme.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/kwabor_icon_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_kwabor_launch_mark</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/KwaborTheme</item>
+        <item name="android:statusBarColor">@color/kwabor_icon_background</item>
+        <item name="android:navigationBarColor">@color/kwabor_icon_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenBehavior">icon_preferred</item>
+    </style>
+</resources>

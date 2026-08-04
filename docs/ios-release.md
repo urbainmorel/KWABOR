@@ -24,7 +24,7 @@ Le workflow reçoit ces valeurs comme entrées et les valide avant d'importer le
 
 ## Icône et lancement
 
-Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source canonique du symbole carré. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG officiel, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
+Le catalogue utilise `kwabor_icone_app.png`, à la racine du dépôt, comme source de build verrouillée du symbole carré. L'icône iOS 1024 × 1024 est un redimensionnement opaque de ce PNG, sur fond ink `#0E0E0D`, sans redessin de la silhouette ni de la courbe intérieure. Le propriétaire de marque doit encore confirmer qu'il s'agit du master haute définition officiel, ou fournir son remplacement avant la validation perceptuelle finale. Xcode génère les tailles iOS à partir de cette source, conformément à la [documentation App Icon Apple](https://developer.apple.com/documentation/xcode/configuring-your-app-icon/).
 
 Le logo horizontal complet utilise séparément `kwabor_2.png`. `LaunchWordmark.imageset/LaunchWordmark.png` en est une copie binaire exacte de 2172 × 724, au ratio 3:1. `LaunchScreen.storyboard` l'affiche centré en `scaleAspectFit`, avec un inset horizontal de 24 points et le fond ink du catalogue. La vue SwiftUI conserve le même wordmark au-dessus du lecteur jusqu'à ce que `AVPlayerLayer.isReadyForDisplay` confirme la première frame. Ce raccord évite tout flash vide sans recadrer, recolorer ou réencoder le logo officiel.
 
@@ -42,11 +42,45 @@ python -B tools/verify-brand-assets.py
 
 ## Privacy Manifest
 
-`PrivacyInfo.xcprivacy` est une ressource de la cible. Il déclare l'état réel de la fondation : aucun tracking ni Required Reason API utilisée directement ; les événements produit restent non liés, tandis que la ville de profil est déclarée comme localisation approximative liée au compte pour la fonctionnalité et, après consentement, Analytics. La coordonnée ponctuelle utilisée pour proposer cette ville n'est ni transmise ni conservée.
+`PrivacyInfo.xcprivacy` est une ressource de la cible. L'hôte ne déclare aucun tracking. Il déclare son
+accès direct à `UserDefaults` avec la raison approuvée `CA92.1`, car les préférences concernées restent
+accessibles uniquement à Kwabor : état de présentation de l'intro, reprise d'authentification,
+amorçage des notifications et marqueurs de migration. Les consentements d'observabilité liés au
+compte résident dans le Keychain. L'inventaire hôte déclare aussi
+le nom, l'adresse e-mail, l'identifiant utilisateur, la ville de profil et les interactions produit
+comme données liées au compte. Les likes/favoris relèvent de la fonctionnalité ; les événements
+d'usage ne partent qu'après opt-in Analytics. La coordonnée ponctuelle utilisée pour proposer la ville
+n'est ni transmise ni conservée. Apple documente les catégories et raisons autorisées dans
+[Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
-Ce fichier doit être réaudité dès qu'une feature collecte une donnée ou qu'un SDK est mis à jour. Firebase et chaque SDK tiers gardent leur propre manifest pour leurs collectes internes ; le manifest applicatif ne recopie que les données définies par l'hôte. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les ressources et rejette les clés invalides : [Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files), [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk). Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
+`IOS-PRIVACY-001B1` a inventorié les traitements de l'hôte et des SDK et corrigé les catégories
+factuellement prouvées. Le rapport complet est dans
+[l'inventaire de confidentialité iOS](audits/2026-08-03-ios-privacy-inventory.md). Cette étape locale
+ne constitue pas encore une preuve Store complète : `IOS-PRIVACY-001B2` doit rapprocher l'archive
+Release et ses réglages production du Privacy Report Xcode, des décisions de rétention du propriétaire
+et du questionnaire App Store Connect. Les manifests fournis par les SDK tiers ne dispensent pas
+Kwabor de ce contrôle global. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les
+ressources et rejette les clés invalides :
+[Privacy manifest files](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files),
+[Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk).
+Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
 
-Avant chaque release candidate : générer le Privacy Report Xcode, rapprocher le résultat du code et des SDK présents, puis mettre à jour les formulaires App Store Connect.
+Le premier build iOS distribué avec une configuration Firebase réelle doit partir d'une installation
+propre. Avant TestFlight, effacer les installations internes ayant déjà exécuté une ancienne build
+Firebase et confirmer qu'aucune build Firebase antérieure n'a été distribuée à des utilisateurs. Si
+une telle distribution est découverte, la release est bloquée jusqu'à un plan de migration dédié :
+l'API publique Crashlytics ne peut pas annuler un envoi déjà démarré sous un ancien override
+automatique. L'archive doit contenir les valeurs Analytics/Crashlytics/Performance désactivées par
+défaut, puis les parcours refus → accord → révocation doivent être vérifiés sur appareils staging.
+Le test staging doit aussi tuer l'app entre les écritures sensibles, vérifier qu'une purge contenant
+un rapport survit jusqu'au lancement suivant et confirmer qu'une seconde purge demandée après le check
+unique du processus garde les diagnostics désactivés jusqu'au redémarrage, sans couper un consentement
+Analytics ou Remote Config indépendant.
+
+Avant chaque release candidate : résoudre les packages, générer le Privacy Report Xcode depuis
+l'archive exacte, rapprocher le résultat du code, des SDK et des traitements backend présents, puis
+mettre à jour les formulaires App Store Connect. La politique de confidentialité publique approuvée
+doit aussi être accessible depuis l'app ; son URL propriétaire reste à fournir.
 
 ## Capacités et profils
 
@@ -90,10 +124,12 @@ Le workflow `iOS archive artifact` s'exécute uniquement depuis `main`, dans le 
 |---|---|---|
 | `KWABOR_SUPABASE_URL` | Variable | URL publique du projet ciblé |
 | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable | clé publishable du projet ciblé |
+| `KWABOR_FIREBASE_PROJECT_ID` | Variable | project ID Firebase exact du tier |
 | `KWABOR_GOOGLE_IOS_CLIENT_ID` | Variable | client OAuth iOS `*.apps.googleusercontent.com` |
 | `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Variable | client OAuth Web/serveur distinct, configuré dans Supabase |
 | `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Variable | schéma callback exact dérivé du client iOS |
 | `KWABOR_IOS_DEVELOPMENT_TEAM` | Variable | Team ID Apple sur 10 caractères |
+| `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Secret | `GoogleService-Info.plist` du tier encodé en Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Secret | certificat + clé privée exportés en `.p12`, encodés Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Secret | mot de passe du `.p12` |
 | `KWABOR_IOS_PROVISIONING_PROFILE_BASE64` | Secret | profil App Store encodé Base64 |

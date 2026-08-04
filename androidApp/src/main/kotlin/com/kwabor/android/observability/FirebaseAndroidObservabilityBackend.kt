@@ -5,6 +5,7 @@ import android.os.Bundle
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.perf.FirebasePerformance
 import com.google.firebase.remoteconfig.ConfigUpdate
 import com.google.firebase.remoteconfig.ConfigUpdateListener
@@ -16,29 +17,93 @@ import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.domain.observability.PerformanceTraceName
-import com.kwabor.shared.domain.observability.RemoteFeatureConfiguration
-import com.kwabor.shared.domain.observability.createRemoteFeatureConfiguration
 
-internal class FirebaseAndroidObservabilityBackend private constructor(
-    private val analytics: FirebaseAnalytics?,
-    private val crashlytics: FirebaseCrashlytics?,
-    private val performance: FirebasePerformance?,
-    private val remoteConfig: FirebaseRemoteConfig?,
+internal fun createAndroidObservabilityController(context: Context): AndroidObservabilityController =
+    AndroidObservabilityController(
+        backend = FirebaseAndroidObservabilityBackend(context.applicationContext),
+        consentStore = SharedPreferencesObservabilityConsentStore(context.applicationContext),
+    )
+
+private class FirebaseAndroidObservabilityBackend(
+    private val context: Context,
 ) : AndroidObservabilityBackend {
+    private var firebaseApp: FirebaseApp? = null
+    private var analytics: FirebaseAnalytics? = null
+    private var crashlytics: FirebaseCrashlytics? = null
+    private var performance: FirebasePerformance? = null
+    private var remoteConfig: FirebaseRemoteConfig? = null
+    private var installations: FirebaseInstallations? = null
     private var configUpdateRegistration: ConfigUpdateListenerRegistration? = null
 
-    override val isConfigured: Boolean = analytics != null
+    override val isConfigured: Boolean
+        get() = firebaseApp != null
+
+    override fun ensureConfigured(): Boolean {
+        if (isConfigured) return true
+        val app = FirebaseApp.initializeApp(context) ?: return false
+        val initializedAnalytics = FirebaseAnalytics.getInstance(context)
+        val initializedCrashlytics = FirebaseCrashlytics.getInstance()
+        val initializedPerformance = FirebasePerformance.getInstance()
+        initializedAnalytics.setAnalyticsCollectionEnabled(false)
+        initializedCrashlytics.setCrashlyticsCollectionEnabled(false)
+        initializedPerformance.isPerformanceCollectionEnabled = false
+        val initializedRemoteConfig = FirebaseRemoteConfig.getInstance(app).apply {
+            setConfigSettingsAsync(
+                FirebaseRemoteConfigSettings.Builder()
+                    .setMinimumFetchIntervalInSeconds(REMOTE_CONFIG_FETCH_INTERVAL_SECONDS)
+                    .build(),
+            )
+        }
+        firebaseApp = app
+        analytics = initializedAnalytics
+        crashlytics = initializedCrashlytics
+        performance = initializedPerformance
+        remoteConfig = initializedRemoteConfig
+        installations = FirebaseInstallations.getInstance(app)
+        return true
+    }
 
     override fun applyConsent(consent: ObservabilityConsent) {
         analytics?.setUserProperty(FirebaseAnalytics.UserProperty.ALLOW_AD_PERSONALIZATION_SIGNALS, "false")
         analytics?.setAnalyticsCollectionEnabled(consent.analyticsAllowed)
-        crashlytics?.setCrashlyticsCollectionEnabled(consent.diagnosticsAllowed)
+        crashlytics?.setCrashlyticsCollectionEnabled(false)
         performance?.isPerformanceCollectionEnabled = consent.diagnosticsAllowed
-        if (!consent.analyticsAllowed) {
-            analytics?.resetAnalyticsData()
+    }
+
+    override fun resetAnalyticsData() {
+        analytics?.setAnalyticsCollectionEnabled(false)
+        analytics?.resetAnalyticsData()
+    }
+
+    override fun checkForUnsentReports(onResult: (DiagnosticsReportCheckResult) -> Unit) {
+        val crashReporter = crashlytics ?: run {
+            onResult(DiagnosticsReportCheckResult.Failure)
+            return
         }
-        if (!consent.diagnosticsAllowed) {
-            crashlytics?.deleteUnsentReports()
+        crashReporter.checkForUnsentReports().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                onResult(DiagnosticsReportCheckResult.Success(hasUnsentReports = task.result == true))
+            } else {
+                onResult(DiagnosticsReportCheckResult.Failure)
+            }
+        }
+    }
+
+    override fun deleteUnsentReports() {
+        crashlytics?.deleteUnsentReports()
+    }
+
+    override fun sendUnsentReports() {
+        crashlytics?.sendUnsentReports()
+    }
+
+    override fun deleteInstallation(onResult: (Boolean) -> Unit) {
+        val firebaseInstallations = installations ?: run {
+            onResult(false)
+            return
+        }
+        firebaseInstallations.delete().addOnCompleteListener { task ->
+            onResult(task.isSuccessful)
         }
     }
 
@@ -56,36 +121,30 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
         return PerformanceTrace(trace::stop)
     }
 
-    override fun fetchRemoteConfiguration(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
         val config = remoteConfig ?: run {
-            onResult(null)
+            onResult(false)
             return
         }
         config.fetchAndActivate().addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                onResult(null)
-                return@addOnCompleteListener
-            }
-            onResult(config.toDomainConfiguration())
+            onResult(task.isSuccessful)
         }
     }
 
-    override fun readCachedRemoteConfiguration(): RemoteFeatureConfiguration? = remoteConfig?.toDomainConfiguration()
-
-    override fun startRemoteConfigurationUpdates(onResult: (RemoteFeatureConfiguration?) -> Unit) {
+    override fun startRemoteConfigurationUpdates(onResult: (Boolean) -> Unit) {
         val config = remoteConfig ?: return
         if (configUpdateRegistration != null) return
         configUpdateRegistration = config.addOnConfigUpdateListener(
             object : ConfigUpdateListener {
                 override fun onUpdate(configUpdate: ConfigUpdate) {
-                    if (!configUpdate.updatedKeys.containsIntroVideoRemoteKey()) return
+                    if (configUpdate.updatedKeys.isEmpty()) return
                     config.activate().addOnCompleteListener { task ->
-                        onResult(config.toDomainConfiguration().takeIf { task.isSuccessful })
+                        onResult(task.isSuccessful)
                     }
                 }
 
                 override fun onError(error: FirebaseRemoteConfigException) {
-                    onResult(null)
+                    onResult(false)
                 }
             },
         )
@@ -94,33 +153,6 @@ internal class FirebaseAndroidObservabilityBackend private constructor(
     override fun stopRemoteConfigurationUpdates() {
         configUpdateRegistration?.remove()
         configUpdateRegistration = null
-    }
-
-    companion object {
-        fun create(context: Context): FirebaseAndroidObservabilityBackend {
-            val firebaseApp = FirebaseApp.initializeApp(context) ?: return unconfigured()
-            val remoteConfig = FirebaseRemoteConfig.getInstance(firebaseApp).apply {
-                setConfigSettingsAsync(
-                    FirebaseRemoteConfigSettings.Builder()
-                        .setMinimumFetchIntervalInSeconds(REMOTE_CONFIG_FETCH_INTERVAL_SECONDS)
-                        .build(),
-                )
-                setDefaultsAsync(REMOTE_CONFIG_DEFAULTS)
-            }
-            return FirebaseAndroidObservabilityBackend(
-                analytics = FirebaseAnalytics.getInstance(context),
-                crashlytics = FirebaseCrashlytics.getInstance(),
-                performance = FirebasePerformance.getInstance(),
-                remoteConfig = remoteConfig,
-            )
-        }
-
-        private fun unconfigured() = FirebaseAndroidObservabilityBackend(
-            analytics = null,
-            crashlytics = null,
-            performance = null,
-            remoteConfig = null,
-        )
     }
 }
 
@@ -137,30 +169,5 @@ private fun AnalyticsEvent.toBundle(): Bundle = Bundle().apply {
     socialPostType?.let { postType -> putString("post_type", postType.wireName) }
 }
 
-private fun FirebaseRemoteConfig.toDomainConfiguration(): RemoteFeatureConfiguration = createRemoteFeatureConfiguration(
-    introVideoEnabled = getBoolean(INTRO_VIDEO_ENABLED_KEY),
-    introVideoUrl = getString(INTRO_VIDEO_URL_KEY),
-    introVideoSha256 = getString(INTRO_VIDEO_SHA256_KEY),
-    introVideoRevision = getLong(INTRO_VIDEO_REVISION_KEY),
-)
-
 private const val REMOTE_CONFIG_FETCH_INTERVAL_SECONDS = 43_200L
-private const val INTRO_VIDEO_ENABLED_KEY = "intro_video_enabled"
-private const val INTRO_VIDEO_URL_KEY = "intro_video_url"
-private const val INTRO_VIDEO_SHA256_KEY = "intro_video_sha256"
-private const val INTRO_VIDEO_REVISION_KEY = "intro_video_revision"
 private const val NOT_APPLICABLE = "not_applicable"
-private val INTRO_VIDEO_REMOTE_KEYS = setOf(
-    INTRO_VIDEO_ENABLED_KEY,
-    INTRO_VIDEO_URL_KEY,
-    INTRO_VIDEO_SHA256_KEY,
-    INTRO_VIDEO_REVISION_KEY,
-)
-internal fun Set<String>.containsIntroVideoRemoteKey(): Boolean = any(INTRO_VIDEO_REMOTE_KEYS::contains)
-
-private val REMOTE_CONFIG_DEFAULTS: Map<String, Any> = mapOf(
-    INTRO_VIDEO_ENABLED_KEY to false,
-    INTRO_VIDEO_URL_KEY to "",
-    INTRO_VIDEO_SHA256_KEY to "",
-    INTRO_VIDEO_REVISION_KEY to 0L,
-)

@@ -2,51 +2,46 @@ package com.kwabor.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import com.kwabor.android.app.AndroidDeepLinkSlotViewModel
+import com.kwabor.android.app.AndroidSensitiveAuthDeepLinkPolicy
 import com.kwabor.android.app.KwaborApp
-import com.kwabor.android.app.KwaborAppDependencies
 import com.kwabor.android.app.KwaborAppRuntimeState
 import com.kwabor.android.app.KwaborUnavailableApp
 import com.kwabor.android.auth.AndroidDeepLinkClassifier
 import com.kwabor.android.auth.AndroidDeepLinkDestination
-import com.kwabor.android.auth.AndroidGoogleIdentityProvider
-import com.kwabor.android.auth.AndroidLegalDocumentLauncher
-import com.kwabor.android.auth.AndroidNotificationPermissionPolicy
-import com.kwabor.android.auth.AndroidRegistrationLocationService
-import com.kwabor.android.auth.SharedPreferencesAuthJourneyStore
-import com.kwabor.android.auth.SharedPreferencesNotificationPrimingStore
-import com.kwabor.android.auth.SharedPreferencesPromoterActivationSessionStore
-import com.kwabor.android.auth.UuidIdempotencyKeyProvider
 import com.kwabor.android.presentation.auth.AuthIntent
 import com.kwabor.android.presentation.auth.AuthViewModel
-import com.kwabor.android.presentation.auth.AuthViewModelDependencies
-import com.kwabor.android.presentation.explore.ExploreViewModel
-import com.kwabor.android.presentation.onboarding.OnboardingViewModel
-import com.kwabor.shared.app.KwaborCompositionRoot
-import com.kwabor.shared.domain.core.DispatcherProvider
 import com.kwabor.shared.domain.i18n.AppLocale
-import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
-import com.kwabor.shared.presentation.auth.AuthPresenter
-import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
-import com.kwabor.shared.presentation.auth.RegistrationPresenter
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
-    private val pendingDeepLink = MutableStateFlow<String?>(null)
+    private val deepLinkSlotViewModel by viewModels<AndroidDeepLinkSlotViewModel>()
+    private val launchSplashExited = MutableStateFlow(false)
     private var pendingAuthCallback: String? = null
     private var authViewModel: AuthViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
+        val isFirstActivityInProcess =
+            (application as KwaborApplication).launchProcessState.consumeIsFirstActivityInProcess()
+        val splashGuard = LaunchSplashGuard(
+            nowMillis = SystemClock::uptimeMillis,
+            minimumVisibleDurationMillis = launchSplashMinimumVisibleDurationMillis(
+                isFirstActivityInProcess = isFirstActivityInProcess,
+            ),
+        )
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition(splashGuard::shouldKeepOnScreen)
+        splashScreen.setOnExitAnimationListener { provider ->
+            provider.remove()
+            launchSplashExited.value = true
+        }
         acceptDeepLink(intent)
         val configuredApp = configuredAppOrNull()
         if (configuredApp == null) {
@@ -56,6 +51,11 @@ class MainActivity : ComponentActivity() {
         }
 
         showConfiguredApp(configuredApp)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        (application as KwaborApplication).observability.retryPendingMaintenance()
     }
 
     private fun configuredAppOrNull(): ConfiguredApp? {
@@ -69,107 +69,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showConfiguredApp(configuredApp: ConfiguredApp) {
-        val strings = stringsFor(AppLocale.French)
         val applicationState = application as KwaborApplication
-        val configuredAuthViewModel = createAuthViewModel(
-            configuredApp = configuredApp,
-            strings = strings,
+        val appFactory = MainActivityAppFactory(
+            activity = this,
             applicationState = applicationState,
+            configuredApp = configuredApp,
+            strings = stringsFor(AppLocale.French),
         )
+        val configuredAuthViewModel = appFactory.createAuthViewModel()
         authViewModel = configuredAuthViewModel
         configuredAuthViewModel.attachGoogleIdentityActivity(this)
         dispatchPendingAuthCallback(configuredAuthViewModel)
-        val dependencies = KwaborAppDependencies(
-            exploreViewModel = createExploreViewModel(configuredApp.compositionRoot, strings),
-            authViewModel = configuredAuthViewModel,
-            onboardingViewModel = createOnboardingViewModel(
-                applicationState,
-                configuredApp.compositionRoot.dispatcherProvider,
-            ),
-            legalDocumentLauncher = AndroidLegalDocumentLauncher(applicationContext),
+        val dependencies = appFactory.createDependencies(configuredAuthViewModel)
+        val runtimeState = KwaborAppRuntimeState(
+            pendingDeepLink = deepLinkSlotViewModel.delivery,
+            launchSplashExited = launchSplashExited,
+            onDeepLinkAcknowledged = deepLinkSlotViewModel::acknowledge,
+            onDeepLinksReset = deepLinkSlotViewModel::resetForSensitiveAuthTransition,
         )
 
         setContent {
-            KwaborApp(
-                dependencies = dependencies,
-                runtimeState = KwaborAppRuntimeState(
-                    pendingDeepLink = pendingDeepLink,
-                    onDeepLinkConsumed = { pendingDeepLink.value = null },
-                ),
-            )
+            KwaborApp(dependencies = dependencies, runtimeState = runtimeState)
         }
     }
-
-    private fun createExploreViewModel(
-        compositionRoot: KwaborCompositionRoot,
-        strings: KwaborStrings,
-    ): ExploreViewModel = ViewModelProvider(
-        owner = this,
-        factory = viewModelFactory {
-            initializer {
-                ExploreViewModel(
-                    presenter = compositionRoot.explorePresenter,
-                    strings = strings,
-                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
-                )
-            }
-        },
-    )[ExploreViewModel::class.java]
-
-    private fun createAuthViewModel(
-        configuredApp: ConfiguredApp,
-        strings: KwaborStrings,
-        applicationState: KwaborApplication,
-    ): AuthViewModel = ViewModelProvider(
-        owner = this,
-        factory = viewModelFactory {
-            initializer {
-                AuthViewModel(
-                    dependencies = AuthViewModelDependencies(
-                        authPresenter = configuredApp.authPresenters.auth,
-                        passwordRecoveryPresenter = configuredApp.authPresenters.passwordRecovery,
-                        registrationPresenter = configuredApp.authPresenters.registration,
-                        locationService = AndroidRegistrationLocationService(applicationContext),
-                        notificationPermissionPolicy = AndroidNotificationPermissionPolicy(applicationContext),
-                        notificationPrimingStore = SharedPreferencesNotificationPrimingStore(applicationContext),
-                        authJourneyStore = SharedPreferencesAuthJourneyStore(applicationContext),
-                        promoterActivationSessionStore =
-                        SharedPreferencesPromoterActivationSessionStore(applicationContext),
-                        googleIdentityProvider = AndroidGoogleIdentityProvider(
-                            context = applicationContext,
-                            serverClientId = BuildConfig.KWABOR_GOOGLE_WEB_CLIENT_ID,
-                        ),
-                        googleIdentityUnavailableMessage = getString(R.string.auth_google_unavailable),
-                        idempotencyKeyProvider = UuidIdempotencyKeyProvider,
-                        clockProvider = configuredApp.compositionRoot.clockProvider,
-                        applyObservabilityConsent = applicationState.observability::updateConsent,
-                    ),
-                    strings = strings,
-                    coroutineScope = newViewModelScope(configuredApp.compositionRoot.dispatcherProvider),
-                )
-            }
-        },
-    )[AuthViewModel::class.java]
-
-    private fun createOnboardingViewModel(
-        applicationState: KwaborApplication,
-        dispatcherProvider: DispatcherProvider,
-    ): OnboardingViewModel = ViewModelProvider(
-        owner = this,
-        factory = viewModelFactory {
-            initializer {
-                OnboardingViewModel(
-                    firstLaunchStore = applicationState.firstLaunchStore,
-                    launchDecision = applicationState.introMediaManager.launchDecision,
-                    track = applicationState.observability::track,
-                    coroutineScope = newViewModelScope(dispatcherProvider),
-                )
-            }
-        },
-    )[OnboardingViewModel::class.java]
-
-    private fun newViewModelScope(dispatcherProvider: DispatcherProvider): CoroutineScope =
-        CoroutineScope(SupervisorJob() + dispatcherProvider.main)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -187,9 +109,23 @@ class MainActivity : ComponentActivity() {
         val data = sourceIntent.data ?: return
         sourceIntent.data = null
         val rawUrl = data.toString()
-        when (AndroidDeepLinkClassifier.classify(rawUrl)) {
+        val destination = AndroidDeepLinkClassifier.classify(rawUrl)
+        when (destination) {
             AndroidDeepLinkDestination.PromoterActivation -> acceptPromoterAuthCallback(rawUrl)
-            AndroidDeepLinkDestination.RootNavigation -> pendingDeepLink.value = rawUrl
+            AndroidDeepLinkDestination.RootNavigation,
+            AndroidDeepLinkDestination.CatalogDetail,
+            -> {
+                val authAccess = authViewModel?.accessState?.value
+                if (
+                    AndroidSensitiveAuthDeepLinkPolicy.shouldRetainNavigation(
+                        destination = destination,
+                        signOutInProgress = authAccess?.signOutInProgress == true,
+                        accountDeletionInProgress = authAccess?.accountDeletionInProgress == true,
+                    )
+                ) {
+                    deepLinkSlotViewModel.offer(rawUrl)
+                }
+            }
             AndroidDeepLinkDestination.Rejected -> Unit
         }
     }
@@ -209,14 +145,3 @@ class MainActivity : ComponentActivity() {
         viewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
     }
 }
-
-private data class ConfiguredApp(
-    val compositionRoot: KwaborCompositionRoot,
-    val authPresenters: AuthPresenters,
-)
-
-private data class AuthPresenters(
-    val auth: AuthPresenter,
-    val passwordRecovery: PasswordRecoveryPresenter,
-    val registration: RegistrationPresenter,
-)

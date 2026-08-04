@@ -3,6 +3,7 @@ package com.kwabor.android.ui.screens.auth
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -88,6 +91,13 @@ internal fun OtpStep(
     modifier: Modifier,
 ) {
     var code by remember(state.email) { mutableStateOf("") }
+    var lastAutoSubmittedCode by remember(state.email) { mutableStateOf<String?>(null) }
+    LaunchedEffect(code, state.isLoading) {
+        if (code.length == OTP_LENGTH && !state.isLoading && lastAutoSubmittedCode != code) {
+            lastAutoSubmittedCode = code
+            actions.onSubmitOtp(code)
+        }
+    }
     RegistrationScrollableColumn(modifier) {
         StepHeading(
             title = stringResource(R.string.registration_otp_title),
@@ -100,19 +110,35 @@ internal fun OtpStep(
             enabled = code.length == OTP_LENGTH,
             onClick = { actions.onSubmitOtp(code) },
         )
-        TextButton(
-            onClick = actions.onResendOtp,
-            enabled = resendSeconds == 0 && !state.isLoading,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) {
-            Text(
-                if (resendSeconds == 0) {
-                    stringResource(R.string.registration_resend)
-                } else {
-                    stringResource(R.string.registration_resend_countdown, resendSeconds)
-                },
-            )
-        }
+        OtpSecondaryActions(
+            resendSeconds = resendSeconds,
+            loading = state.isLoading,
+            actions = actions,
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.OtpSecondaryActions(resendSeconds: Int, loading: Boolean, actions: RegistrationScreenActions) {
+    TextButton(
+        onClick = actions.onResendOtp,
+        enabled = resendSeconds == 0 && !loading,
+        modifier = Modifier.align(Alignment.CenterHorizontally),
+    ) {
+        Text(
+            if (resendSeconds == 0) {
+                stringResource(R.string.registration_resend)
+            } else {
+                stringResource(R.string.registration_resend_countdown, resendSeconds)
+            },
+        )
+    }
+    TextButton(
+        onClick = actions.onBack,
+        enabled = !loading,
+        modifier = Modifier.align(Alignment.CenterHorizontally),
+    ) {
+        Text(stringResource(R.string.registration_edit_email))
     }
 }
 
@@ -128,6 +154,7 @@ internal fun AuthOtpInput(code: String, onCodeChange: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
+            .contentType(ContentType.SmsOtpCode)
             .semantics {
                 contentDescription = accessibilityLabel
                 stateDescription = accessibilityState
@@ -173,65 +200,36 @@ internal fun PasswordStep(
     modifier: Modifier,
 ) {
     var password by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
     RegistrationScrollableColumn(modifier) {
         StepHeading(strings.registrationPassword, stringResource(R.string.registration_password_support))
         AuthPasswordField(
             value = password,
             onValueChange = { updated -> password = updated },
             label = strings.registrationPassword,
-            enabled = !state.isLoading,
+            options = AuthPasswordFieldOptions(
+                enabled = !state.isLoading,
+                autofillContentType = ContentType.NewPassword,
+                onDone = {
+                    if (password.length >= MINIMUM_PASSWORD_LENGTH) {
+                        actions.onSubmitPassword(password)
+                    }
+                },
+            ),
         )
-        AuthPasswordField(
-            value = confirmation,
-            onValueChange = { updated -> confirmation = updated },
-            label = strings.registrationPasswordConfirmation,
-            enabled = !state.isLoading,
-            onDone = {
-                if (password.length >= MINIMUM_PASSWORD_LENGTH && password == confirmation) {
-                    actions.onSubmitPassword(password, confirmation)
-                }
+        Text(
+            text = stringResource(R.string.registration_password_requirement),
+            color = if (password.length >= MINIMUM_PASSWORD_LENGTH) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.secondary
             },
+            style = MaterialTheme.typography.bodySmall,
         )
         ContinueButton(
             label = strings.registrationContinue,
             loading = state.isLoading,
-            enabled = password.length >= MINIMUM_PASSWORD_LENGTH && password == confirmation,
-            onClick = { actions.onSubmitPassword(password, confirmation) },
-        )
-    }
-}
-
-@Composable
-internal fun IdentityStep(
-    state: RegistrationUiState,
-    strings: KwaborStrings,
-    actions: RegistrationScreenActions,
-    modifier: Modifier,
-) {
-    RegistrationScrollableColumn(modifier) {
-        StepHeading(strings.registrationIdentityTitle, stringResource(R.string.registration_identity_support))
-        OutlinedTextField(
-            value = state.firstName,
-            onValueChange = actions.onFirstNameChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isLoading,
-            singleLine = true,
-            label = { Text(strings.authFirstName) },
-        )
-        OutlinedTextField(
-            value = state.lastName,
-            onValueChange = actions.onLastNameChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isLoading,
-            singleLine = true,
-            label = { Text(strings.authLastName) },
-        )
-        ContinueButton(
-            label = strings.registrationContinue,
-            loading = state.isLoading,
-            enabled = state.firstName.isNotBlank() && state.lastName.isNotBlank(),
-            onClick = actions.onContinueFromIdentity,
+            enabled = password.length >= MINIMUM_PASSWORD_LENGTH,
+            onClick = { actions.onSubmitPassword(password) },
         )
     }
 }

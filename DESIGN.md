@@ -54,7 +54,7 @@ Kwabor n'a pas une « charte décorative » : l'identité visuelle est un **levi
 | **Logotype (wordmark)** | Symbole + `KWABOR` en capitales espacées (tracking large), même famille display que l'UI. Versions horizontale et icône seule. |
 | **App icon** | Carré ink `#0E0E10` plein, mark blanc centré, sans dégradé. Variante adaptative Android (foreground = mark, background = ink). |
 | **Watermark communautaire** | Mark Kwabor 24 px + `@username` 14/600, blanc 60 % d'opacité, **non maskable**, posé en bas-droite sur tout export du réseau social — **photos/diaporamas (MVP) et vidéos (V1.1)**. |
-| **Intro vidéo / first run** | Vidéo verticale muette embarquée + remplaçable à distance, **bouton « Passer »**, fallback statique `reduced-motion` → écran « Se connecter ou s'inscrire » (E1/E3). |
+| **Intro vidéo / first run** | Vidéo verticale muette embarquée et révisionnée avec l'app, **bouton « Passer »**, fallback statique `reduced-motion` → écran « Se connecter ou s'inscrire » (E1/E3). Son remplacement exige une release Store Android/iOS. |
 
 > Le mark fonctionnant en positif comme en négatif sert l'inversion dark mode (§3.3) : pas de re-dessin, juste un swap de couleur de remplissage.
 
@@ -254,12 +254,12 @@ Deux actions **distinctes**, jamais confondues :
 | **Banner Offline** | Pleine largeur, **persistante**, fond `ink/900` texte blanc « Vous êtes hors ligne ». | Global (au-dessus navbar) |
 | **Dialog** | Surface élevée, titre + corps + 2 actions ; **action destructive en rouge**. | Confirmations (suppression, archivage, déconnexion) |
 | **Segmented control** | 2–3 segments, actif = `ink/950` ; ex. **Personnel / Promoteur**, tri avis. | Profil, listes |
-| **Intro Video Layer** | Vidéo verticale aspectFill, muette, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué + remote. | Écran E1 |
+| **Intro Video Layer** | Vidéo verticale aspectFill, muette, **bouton « Passer »** frosted, fallback statique `reduced-motion`, asset embarqué et distribué exclusivement via les Stores. | Écran E1 |
 | **Auth Landing** | Fond image plein écran + « Découvrez le Bénin » + **pastille de langue** haut-droite + CTA S'inscrire/Se connecter + **« Ne pas s'inscrire »**. | Écran E3 |
 | **Pastille de langue** | Frosted (§3.5) `🌐 FR ▾` ; lisible sur photo, discrète ; ouvre la liste des langues livrées. | E3, E5, E6 |
 | **Bouton fournisseur d'auth** | Google (toujours) · **Apple (iOS uniquement)** ; style outline, logo + label. | E5, E6 |
 | **Soft-Wall Sheet** | Bottom sheet contextuelle (bénéfice + S'inscrire/Se connecter/Plus tard) ; **reprend l'action** après auth. | Déclenchée en invité (E4) |
-| **Stepper d'inscription** | Barre de progression multi-étapes courte ; retour par étape ; OTP 6 cases ; écran révision Nom/Prénom (Google/Apple). | E6 |
+| **Progression d'inscription** | Aucun total avant la méthode ; email `2/4` à `4/4`, fédéré « Dernière étape » ; OTP 6 cases auto-submit. | E6 |
 | **Carte sociale (feed)** | Contenu plein écran (photo/diaporama/vidéo) + overlay actions + **puce de mention d'entité**. | Feed Social (J1) |
 | **Aperçu de fiche (mention)** | Overlay **≤ 25 % de hauteur** au-dessus du contenu (mini-hero + titre + note + prix) ; tap contenu = ferme, tap aperçu = fiche complète. | Feed Social (J1) |
 | **Sélecteur d'entité (rattachement)** | Recherche catalogue → sélection unique **obligatoire** ; pré-rempli si ouvert depuis une fiche. **Publier désactivé sans entité.** | Composeur social (H2) |
@@ -408,7 +408,11 @@ Onglet Événements actif. Cartes avec pastille date + ruban « Terminé ». Fil
 Onglet actif. Première rangée Sponsorisée (badge ambre, ≤ 2/écran). Chip gamme de prix. Filter Drawer : ville, type (Hôtel, Auberge, Résidence, Restaurant, Bar, Café, Club, **Maquis**…), gamme de prix (double slider XOF), popularité.
 
 **A4. Recherche — état actif**
-Au focus du champ : champ en haut, **recherches récentes** (effaçables), **suggestions/autocomplétion** (nom · ville · catégorie), bascule de portée **Onglet actif / Tout**. Clavier ouvert, bouton effacer.
+Au focus du champ : champ en haut, **recherches récentes** (effaçables une par une ou en totalité),
+**suggestions/autocomplétion** (nom · ville · catégorie), bascule de portée **Onglet actif / Tout**.
+Clavier ouvert, bouton effacer. Seule une requête soumise est enregistrée. Les récents d'un compte
+sont synchronisés ; ceux d'un invité restent sur l'appareil et ne rejoignent un compte qu'après une
+confirmation explicite.
 
 **A5. Recherche — résultats**
 Grille de cartes (§8) filtrée par la requête, chips et filtres conservés. Empty state « Aucun résultat » + suggestions + « Essayer l'assistant IA » (§10).
@@ -420,6 +424,10 @@ Grille de cartes (§8) filtrée par la requête, chips et filtres conservés. Em
 
 **B1. Assistant IA** *(tap FAB)*
 Bottom sheet 90 %. Bulle d'intro + 2–3 prompts rapides en chips (« Restaurant chic et calme à Cotonou », « Que faire ce week-end ? »). Conversation messagerie : bulles user (droite, `ink/100`) / assistant (gauche, surface). **Réponse structurée** : texte court + **3–5 mini-cartes horizontales** (carte §8 réduite) → tap = `DetailSheet`. Indicateur de frappe. **Micro-label « Source : fiche {nom} »** sur chaque reco (anti-hallucination). Champ bas + micro (vocal V1.1). États : **« Aucun résultat dans le catalogue »**, erreur réseau (retry). Réponses dans la langue de l'utilisateur.
+
+Si la personnalisation est activée, la requête courante peut être accompagnée d'un **résumé
+structuré et borné des intérêts** dérivés de l'historique ; l'historique brut complet n'est jamais
+injecté dans le modèle.
 
 **B2. Surprenez-moi** *(appui long FAB)*
 Plein écran immersif (pas une sheet) : carte hero ~70 %, image plein cadre, titre superposé, **CTA noir « Voir la fiche »** + bouton rond « Relancer » (`casino`). Crossfade + léger scale (250 ms) entre tirages. Tirage pondéré popularité + proximité, exclusion des favoris/vus récents.
@@ -464,8 +472,8 @@ Interactions : **tap → `DetailSheet`** (deep link selon le type) ; **swipe →
 
 ### Groupe E — Intro, compte & mur souple
 
-**E1. Écran d'intro vidéo** *(premier lancement, puis une fois par nouvelle révision distante)*
-Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0. Auto-play **muet**, durée 15–25 s. **Bouton « Passer »** discret (pastille frosted) visible **immédiatement** en haut-droite. Léger overlay bas + mark Kwabor. Fin de vidéo **ou** « Passer » → **transition automatique vers E3**. La **langue est détectée** pendant l'intro (§E2). **Fallback image statique** si `reduced-motion` système. Asset **embarqué + remplaçable à distance** (spec : H.264, muet, ~2–3 Mo — §PRD 6.9.3). Une révision distante est validée et précachée après consentement, reste figée pendant la lecture et n'est présentée qu'une fois au lancement suivant ; elle ne surgit jamais en cours de session. **Analytics : taux de skip.** *(Lancements sans nouvelle révision : E3 si déconnecté, Accueil si connecté.)*
+**E1. Écran d'intro vidéo interactif** *(premier lancement, puis une fois par nouvelle révision embarquée installée)*
+Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel/festif du Bénin) en **aspectFill**, safe-area 0, auto-play **muet** 15–25 s. E3 est superposé dès l'ouverture : les trois CTA restent interactifs pendant la lecture. **« Passer »** arrête seulement la vidéo ; fin, échec ou mouvement réduit conservent E3 sur le fallback statique. Un scrim `ink/950` garantit AA. Choisir un CTA consomme l'intro avec le motif `cta_selected`. L'asset H.264 muet (~2–3 Mo) est **embarqué**, byte-identical sur Android/iOS et remplacé exclusivement par une release Store dont les deux constantes de révision sont incrémentées ensemble. La révision installée reste figée pendant la lecture, n'est présentée qu'une fois et ne surgit jamais en cours de session. Analytics seulement lorsqu'un consentement existe déjà. *(Lancements sans révision plus récente : E3 si déconnecté, Accueil si connecté.)*
 
 **E2. Langue — détection automatique** *(pas d'écran dans le cas courant)*
 **Principe : respecter la langue système, sans intervention.** Aucun sélecteur imposé — un écran de choix bloquant serait une friction inutile (au MVP, mono-langue FR).
@@ -473,20 +481,22 @@ Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel
 - **Écran de choix — conditionnel uniquement :** affiché seulement si la locale n'est pas couverte **et** qu'au moins deux langues sont livrées (moot au MVP ; « s'active » avec l'EN).
 - **Bascule non bloquante :** **pastille de langue** en haut-droite de l'écran E3 + Paramètres → G5. Le **choix explicite prime et persiste**.
 
-**E3. « Se connecter ou s'inscrire »** *(landing après l'intro)*
-**Image plein écran** (fond ; au MVP asset embarqué, fond dynamique catalogue reporté). Titre **« Découvrez le Bénin »** (H1, langue détectée), sous-titre court. **Sélecteur de langue moderne et discret en haut à droite** — **pastille frosted** (§3.5) `🌐 FR ▾`, lisible sur photo, s'intègre avec harmonie sans se fondre. En bas : **CTA « S'inscrire »** (noir, plein) → E6 ; **« Se connecter »** (secondaire, contour) → E5 ; et une option **texte claire « Ne pas s'inscrire »** → entre en **mur souple** (Accueil en invité). Au tap sur « Ne pas s'inscrire », **petit message** (toast/sheet) : « En continuant sans compte, les prix s'affichent en **FCFA**. Inscrivez-vous pour voir les tarifs en **€, \\$ ou ₦** et interagir. »
+**E3. « Se connecter ou s'inscrire »** *(surface permanente sur l'intro/fallback)*
+Titre **« Découvrez le Bénin »**, sous-titre court et pastille de langue en haut à droite. En bas : CTA **« S'inscrire »** → E6, **« Se connecter »** → E5, puis **« Continuer sans compte »** avec disclosure FCFA. La surface ne change pas entre la vidéo et l'image statique et tolère grande police, clavier, TalkBack/VoiceOver et petits écrans.
 
 **E4. Invite d'inscription (mur souple)** *(déclenchée en session invité)*
-Bottom sheet déclenché quand un invité tente une **action engageante** (Like, Favori, avis, publier, suivre, **changer de devise**). Contenu : titre contextuel selon l'action (« Créez un compte pour enregistrer ce lieu » / « …pour voir les prix en € »), bénéfice, **CTA « S'inscrire »** (→ E6) + **« Se connecter »** (→ E5) + « Plus tard ». **L'action visée reprend automatiquement** après création/connexion. *(Le mur souple laisse parcourir le mur et ouvrir les fiches en lecture seule, prix FCFA — l'ouverture d'une fiche n'est pas une action engageante.)*
+Bottom sheet contextuelle selon l'action (« aimer » / « enregistrer ce lieu »). Elle propose directement Apple puis Google sur iOS, Google sur Android, inscription email, **« J'ai déjà un compte »** et **« Plus tard »**. Le `cityId` du lieu est transmis comme suggestion au profil final s'il est valide. L'action protégée est rejouée exactement une fois après auth ; annulation ou « Plus tard » l'efface, erreur récupérable la conserve.
 
 **E5. Connexion**
 Layout centré, **mark Kwabor**, **pastille de langue** en coin haut. Champ **email** + bouton **Continuer** → **écran mot de passe** (avec « Mot de passe oublié » → E7). Boutons **« Se connecter avec Google »** et **« Se connecter avec Apple » (iOS uniquement)**. Lien vers Inscription. Validation inline, CTA désactivé tant qu'invalide, spinner inline (pas de layout shift). Erreurs : identifiants invalides, compte non vérifié.
 
 **E6. Inscription** *(formulaire multi-étapes rapide, progress linéaire)*
 Deux chemins ; **ni téléphone ni âge** ; **CGU + confidentialité + licence UGC** acceptées avant validation ; **langue** héritée de la détection (§E2).
-- **Par email :** `Email` + **Continuer** → **Code OTP** (6 chiffres, envoyé automatiquement, saisi à l'écran suivant, renvoi 30 s) → **Création du mot de passe** (règles + confirmation) → **Nom / Prénom** (champs vides) → **Ville / Localisation** (sélecteur ville C5 **ou** « Autoriser la détection GPS » — c'est ici qu'est demandée la permission localisation) → **Devise** (4 options, **XOF par défaut**, aperçu `PriceTag`) → **Validation**.
-- **Par Google / Apple (iOS) :** **Auth** → **Écran de révision** (Nom / Prénom **pré-remplis** depuis le fournisseur, **modifiables en 1 tap**, bouton unique **Continuer**) → **Ville / Localisation** → **Devise** → **Validation**.
-- Retour possible à chaque étape sauf confirmation. Après validation → **priming notifications** (E différé, cf. règle ci-dessous) puis Accueil.
+- **Par email — 4 écrans maximum :** `Email` → **OTP** (6 cases, collage/autoremplissage natif, auto-submit au sixième chiffre, renvoi 30 s, correction email) → **Mot de passe** (un seul champ, afficher/masquer, règles live, password manager) → **Finaliser mon profil**.
+- **Par Google / Apple (iOS) — 1 écran après fournisseur :** **Finaliser mon profil**, nom/prénom préremplis et modifiables.
+- **Profil final compact et défilant :** prénom, nom, ville recherchable, devise compacte XOF par défaut, trois acceptations légales séparées avec lien HTTPS et version visible. Les exigences sont préchargées dès E6 ; un retry ciblé ne réinitialise aucune saisie.
+- **Progression :** aucun total avant le choix ; email affiche `2/4`, `3/4`, `4/4` ; fournisseur affiche **« Dernière étape »**.
+- **Sortie :** aucun écran succès. `Completed` est technique, ferme immédiatement E6 et reprend l'intention protégée. Aucun GPS, consentement observabilité ou prompt notification avant l'accueil.
 
 **E7. Mot de passe oublié**
 Cohérent avec E6 : identifiant (email) → **OTP 6 chiffres** (renvoi 30 s) → **nouveau mot de passe** (règles + confirmation) → toast succès → retour E5.
@@ -494,7 +504,7 @@ Cohérent avec E6 : identifiant (email) → **OTP 6 chiffres** (renvoi 30 s) →
 **E8. Activation d'un compte Promoteur pré-inscrit**
 Ouvert via **lien d'invitation** (email/WhatsApp). Écran **« Activez votre compte {Nom du commerce} »** : rappel de l'établissement pré-rempli, choix **définir un mot de passe** *(email déjà connu)* **ou** **lier Google/Apple** → vérification → **accès direct au tableau de bord Promoteur** (I4) avec la **fiche déjà pré-remplie**. Pas d'inscription à froid.
 
-> **Priming notifications** — placé **après la validation du compte** (ou au premier moment pertinent, ex. première mise en favori) : sheet bénéfice + **Activer** / Plus tard, avant le prompt OS. Le priming **localisation** vit dans l'étape Ville de E6. Refus non bloquant (dégradation gracieuse).
+> **Permissions contextuelles différées** — aucun priming notification, aucune géolocalisation et aucun consentement observabilité dans E6. Les réglages restent refusés par défaut pour un nouveau compte et seront gérés dans Réglages ou au premier besoin réellement contextuel.
 
 ### Groupe F — Profil
 
@@ -536,6 +546,9 @@ Identité, email/téléphone (avec « Modifier »), **chip de statut de vérific
 **G4. Préférences**
 - **Notifications** : **toggles par famille** (Suggestions / Sponsorisé / Nouveautés / Alertes événementielles) + **plafond de fréquence** (curseur ou choix). Opt-out granulaire.
 - **Dark Mode** : toggle (application instantanée, sans reload).
+- **Recherches récentes** : consulter, effacer une entrée ou tout effacer.
+- **Personnalisation par activité** : toggle distinct pour autoriser les signaux dérivés de
+  l'historique dans l'Assistant IA et le feed organique ; aucun effet sur le sponsorisé.
 
 **G5. Internationalisation**
 - **Langue** : liste des 6 (nom natif), application instantanée.
@@ -549,7 +562,9 @@ Identité, email/téléphone (avec « Modifier »), **chip de statut de vérific
 TikTok : état (chip `@username` si connecté), **Connecter** (→ K1) / **Déconnecter** (rouge clair + dialog).
 
 **G8. Danger Zone**
-**Supprimer le compte** (rouge, **dialog irréversible** + ré-authentification), **Se déconnecter** (dialog de confirmation).
+**Supprimer le compte** (rouge, **dialog irréversible** + ré-authentification ; purge de l'historique
+et de ses signaux dérivés), **Se déconnecter** (dialog de confirmation, sans suppression de
+l'historique du compte).
 
 ### Groupe H — Ajout de contenu
 
@@ -645,7 +660,12 @@ Portrait verrouillé, contenu plein écran (aspectFill), safe-area top 0, swipe 
 - **Interactions** : **double-tap = Like** (Heart Burst 200 ms) ; overlay droit **Suivre / Like / Commentaires (J2, V1.1) / Partager** ; long-press = pause + **télécharger/signaler**. **Watermark Kwabor non maskable** (§2) sur photos **et** vidéos.
 - **Mention d'entité** (rattachement obligatoire de tout contenu) : puce **`place`/`event` + nom** posée en bas-gauche, au-dessus de la légende — à l'image des « événements à venir » affichés sur les contenus d'un créateur.
 - **Aperçu de fiche par la mention** : au **tap sur la mention**, un **aperçu de la fiche s'ouvre au-dessus du contenu**, **hauteur ≤ 25 %** (mini-hero + titre + note + chip prix), **laissant le contenu visible** dessous. **Taper le contenu** → l'aperçu **se referme** et on **continue de scroller** ; **taper l'aperçu** → ouverture de la **fiche détail complète** (`DetailSheet` §9). Animation d'ouverture/fermeture 200 ms.
-- **Provenance** : le feed mêle les publications suivies et une découverte pondérée ; chaque contenu renvoie au **profil de l'auteur** (F6). États : chargement (skeleton vidéo/vignette), erreur (retry), offline, empty. **Invité** : le feed est visible en mur souple ; Like/Suivre/publier déclenchent l'invite (E4).
+- **Provenance** : le feed mêle les publications suivies et une découverte pondérée ; si la
+  personnalisation est activée, cette découverte organique peut utiliser des signaux bornés dérivés
+  des recherches soumises. Ils n'influencent jamais le sponsorisé. Chaque contenu renvoie au
+  **profil de l'auteur** (F6). États : chargement (skeleton vidéo/vignette), erreur (retry), offline,
+  empty. **Invité** : le feed est visible en mur souple ; Like/Suivre/publier déclenchent l'invite
+  (E4).
 
 **J2. Panel commentaires** *(V1.1)*
 Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commentaire**, **répondre**, **signaler**), champ de saisie en bas, indicateur d'envoi. Empty « Soyez le premier à commenter ».
@@ -858,9 +878,9 @@ Bottom Nav (plate, 5 items égaux — aucun central)
     └── Paramètres ──► sous-écrans ──► Comptes liés ──► Connexion TikTok
 
 Hors Bottom Nav :
-1er lancement : Intro vidéo (sautable) ──► « Se connecter ou s'inscrire »
-   ├── S'inscrire ──► [Email : OTP → mot de passe → Nom/Prénom → Ville/GPS → Devise]
-   │                  [Google/Apple(iOS) : révision Nom/Prénom → Ville/GPS → Devise]
+1er lancement : Intro vidéo interactive + « Se connecter ou s'inscrire » superposé
+   ├── S'inscrire ──► [Email : email → OTP → mot de passe → profil final compact]
+   │                  [Google/Apple(iOS) : profil final compact unique]
    ├── Se connecter ──► [email → mot de passe] / Google / Apple(iOS) ──► Mot de passe oublié
    └── « Ne pas s'inscrire » ──► MUR SOUPLE (Accueil invité, prix FCFA)
 Lien d'invitation Promoteur ──► Activation « Activez votre compte {Nom} » ──► Tableau de bord

@@ -2,7 +2,8 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
-import com.kwabor.shared.domain.core.DefaultDispatcherProvider
+import com.kwabor.shared.data.local.createIosKwaborDatabaseBuilder
+import com.kwabor.shared.data.preferences.createIosAppPreferencesStorage
 
 class IosKwaborCompositionRoot(
     environmentName: String?,
@@ -14,10 +15,32 @@ class IosKwaborCompositionRoot(
         supabasePublishableKey = supabasePublishableKey,
         environmentName = environmentName,
         authSessionManager = createIosSecureAuthSessionManager(),
+        persistenceConfigurationProvider = {
+            KwaborPersistenceConfiguration(
+                databaseBuilderFactory = ::createIosKwaborDatabaseBuilder,
+                preferencesStorageFactory = ::createIosAppPreferencesStorage,
+            )
+        },
     )
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
 
     val bridge = KwaborSharedBridge(hasCatalogConfiguration = sharedRoot != null)
+    val exploreController = IosExploreController(
+        presenter = sharedRoot?.explorePresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
+    val searchController = IosSearchController(
+        presenter = sharedRoot?.searchPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
+    val guideDiscoveryController = IosGuideDiscoveryController(
+        presenter = sharedRoot?.guideDiscoveryPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
+    val catalogDetailController = IosCatalogDetailController(
+        presenter = sharedRoot?.catalogDetailPresenter,
+        dispatcherProvider = dispatcherProvider,
+    )
     val authController = IosAuthController(
         presenter = sharedRoot?.authPresenter,
         dispatcherProvider = dispatcherProvider,
@@ -32,6 +55,10 @@ class IosKwaborCompositionRoot(
     )
 
     fun close() {
+        exploreController.close()
+        searchController.close()
+        guideDiscoveryController.close()
+        catalogDetailController.close()
         authController.close()
         registrationController.close()
         passwordRecoveryController.close()

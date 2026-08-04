@@ -1,0 +1,24 @@
+<resources>
+    <style name="KwaborTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/kwabor_icon_background</item>
+        <item name="android:windowBackground">@color/kwabor_wordmark_background</item>
+        <item name="android:statusBarColor">@color/kwabor_wordmark_background</item>
+        <item name="android:navigationBarColor">@color/kwabor_wordmark_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="KwaborTheme.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/kwabor_icon_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_kwabor_launch_mark</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/KwaborTheme</item>
+        <item name="android:statusBarColor">@color/kwabor_icon_background</item>
+        <item name="android:navigationBarColor">@color/kwabor_icon_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

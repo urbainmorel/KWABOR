@@ -3,6 +3,7 @@ package com.kwabor.android.design
 import androidx.compose.ui.graphics.Color
 
 object KwaborColors {
+    val Transparent = Color.Transparent
     val Ink950 = Color(color = 0xFF0E0E10)
     val Ink900 = Color(color = 0xFF1A1A1C)
     val Ink700 = Color(color = 0xFF3C3C41)
@@ -14,6 +15,7 @@ object KwaborColors {
     val Surface0 = Color(color = 0xFFFFFFFF)
     val Sponsored = Color(color = 0xFFF4B400)
     val Ticket = Color(color = 0xFFC5283D)
+    val TicketDark = Color(color = 0xFFFF6B74)
     val DarkBackground = Color(color = 0xFF0B0B0C)
     val DarkSurface = Color(color = 0xFF161619)
     val DarkText = Color(color = 0xFFF2F2F4)

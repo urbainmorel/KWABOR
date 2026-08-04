@@ -3,34 +3,69 @@ package com.kwabor.shared.data.auth
 import com.kwabor.shared.domain.auth.AUTH_ACCOUNT_DELETION_OWNERSHIP_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_ACCOUNT_DELETION_REAUTHENTICATION_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_ACCOUNT_DELETION_STORAGE_ERROR_KEY
-import com.kwabor.shared.domain.auth.AccountDeletionCredential
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.exceptions.RestException
-import io.github.jan.supabase.functions.Functions
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 internal class SupabaseAccountSecurityAuthDataSource(
     private val auth: Auth,
-    private val functions: Functions,
+    private val stepUpSessionFactory: AccountDeletionStepUpSessionFactory,
     private val passwordRecoverySessionStore: PasswordRecoverySessionStore,
 ) : AccountSecurityAuthDataSource {
     override suspend fun deleteAccount(request: AccountDeletionRequest): Unit = runAuthRequest {
-        try {
-            functions.invoke(
-                function = ACCOUNT_DELETE_FUNCTION,
-                body = request.toEdgeFunctionBody(),
+        auth.awaitInitialization()
+        val currentUser = auth.currentSessionOrNull()?.user
+            ?: throw AuthDataException.AuthenticationRequired()
+        val stepUpSession = stepUpSessionFactory.create()
+        val executionFailure = runCatching {
+            val reauthenticatedUserId = stepUpSession.reauthenticate(
+                email = currentUser.email,
+                credential = request.credential,
             )
-        } catch (exception: RestException) {
-            throw exception.toAccountDeletionDataException()
+            if (reauthenticatedUserId != currentUser.id) {
+                throw AuthDataException.Validation(AUTH_ACCOUNT_DELETION_REAUTHENTICATION_ERROR_KEY)
+            }
+            try {
+                stepUpSession.invokeDeletion(request.idempotencyKey)
+            } catch (exception: RestException) {
+                throw exception.toAccountDeletionDataException()
+            }
+        }.exceptionOrNull()
+
+        var finalFailure = executionFailure
+        withContext(NonCancellable) {
+            runCatching {
+                stepUpSession.close()
+            }.exceptionOrNull()?.let { cleanupFailure ->
+                if (executionFailure != null) {
+                    finalFailure = finalFailure.mergeWith(cleanupFailure)
+                }
+            }
+            if (executionFailure == null) {
+                runCatching {
+                    clearDeletedAccountLocalState()
+                }
+            }
         }
-        passwordRecoverySessionStore.clearPasswordRecovery()
-        auth.clearSession()
+        finalFailure?.let { failure -> throw failure }
+    }
+
+    private suspend fun clearDeletedAccountLocalState() {
+        var failure: Throwable? = runCatching {
+            passwordRecoverySessionStore.clearPasswordRecovery()
+        }.exceptionOrNull()
+        runCatching {
+            auth.clearSession()
+        }.exceptionOrNull()?.let { cleanupFailure ->
+            failure = failure.mergeWith(cleanupFailure)
+        }
+        failure?.let { cleanupFailure -> throw cleanupFailure }
     }
 }
 
@@ -51,25 +86,5 @@ internal fun mapAccountDeletionError(errorCode: String?, cause: Throwable): Auth
     else -> AuthDataException.Unexpected(cause)
 }
 
-private fun AccountDeletionRequest.toEdgeFunctionBody() = buildJsonObject {
-    put("idempotency_key", idempotencyKey)
-    put(
-        "credential",
-        buildJsonObject {
-            when (val accountCredential = credential) {
-                is AccountDeletionCredential.Password -> {
-                    put("type", "password")
-                    put("password", accountCredential.password)
-                }
-                is AccountDeletionCredential.Social -> {
-                    put("type", "social")
-                    put("provider", accountCredential.request.provider.name.lowercase())
-                    put("id_token", accountCredential.request.idToken)
-                    put("nonce", accountCredential.request.rawNonce)
-                }
-            }
-        },
-    )
-}
-
-private const val ACCOUNT_DELETE_FUNCTION = "account-delete"
+private fun Throwable?.mergeWith(additionalFailure: Throwable): Throwable =
+    this?.also { failure -> failure.addSuppressed(additionalFailure) } ?: additionalFailure

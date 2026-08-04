@@ -7,6 +7,7 @@ import com.kwabor.shared.domain.auth.CompleteOnboardingValues
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.CatalogRepository
+import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
@@ -30,6 +31,7 @@ class RegistrationPresenter(
         return when (val result = authRepository.requestEmailOtp(state.email)) {
             is DomainResult.Success -> loadingState.copy(
                 step = RegistrationStep.Otp,
+                method = RegistrationMethod.Email,
                 resendAvailableAtEpochMilliseconds = now + OTP_RESEND_DELAY_MILLISECONDS,
                 isLoading = false,
                 noticeMessage = strings.authOtpSent,
@@ -63,18 +65,14 @@ class RegistrationPresenter(
     suspend fun setInitialPassword(
         state: RegistrationUiState,
         password: String,
-        confirmation: String,
         strings: KwaborStrings,
     ): RegistrationUiState {
         if (password.length < MINIMUM_PASSWORD_LENGTH) {
             return state.copy(errorMessage = strings.registrationPasswordTooShort)
         }
-        if (password != confirmation) {
-            return state.copy(errorMessage = strings.registrationPasswordMismatch)
-        }
         val loadingState = state.copy(isLoading = true, errorMessage = null)
         return when (val result = authRepository.setInitialPassword(password)) {
-            is DomainResult.Success -> loadingState.copy(step = RegistrationStep.Identity, isLoading = false)
+            is DomainResult.Success -> loadingState.copy(step = RegistrationStep.Profile, isLoading = false)
             is DomainResult.Failure -> loadingState.copy(
                 isLoading = false,
                 errorMessage = result.error.toAuthMessage(strings),
@@ -83,38 +81,29 @@ class RegistrationPresenter(
     }
 
     suspend fun loadRequirements(state: RegistrationUiState, strings: KwaborStrings): RegistrationUiState {
-        val loadingState = state.copy(isLoading = true, errorMessage = null)
+        val loadingState = state.copy(
+            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsErrorMessage = null,
+        )
         val cities = when (val result = catalogRepository.listCities()) {
             is DomainResult.Success -> result.value
             is DomainResult.Failure -> return loadingState.copy(
-                isLoading = false,
-                errorMessage = result.error.toAuthMessage(strings),
+                requirementsStatus = RegistrationRequirementsStatus.Failed,
+                requirementsErrorMessage = result.error.toAuthMessage(strings),
             )
         }
         val documents = when (val result = authRepository.listActiveLegalDocuments(AppLocale.French)) {
             is DomainResult.Success -> result.value
             is DomainResult.Failure -> return loadingState.copy(
                 cities = cities,
-                isLoading = false,
-                errorMessage = result.error.toAuthMessage(strings),
+                requirementsStatus = RegistrationRequirementsStatus.Failed,
+                requirementsErrorMessage = result.error.toAuthMessage(strings),
             )
         }
-        val terms = documents.singleRevisionOfType(LegalDocumentType.Terms)
-        val privacy = documents.singleRevisionOfType(LegalDocumentType.PrivacyPolicy)
-        val ugc = documents.singleRevisionOfType(LegalDocumentType.UgcLicense)
-        if (terms == null || privacy == null || ugc == null) {
-            return loadingState.copy(
-                cities = cities,
-                isLoading = false,
-                errorMessage = strings.registrationLegalUnavailable,
-            )
-        }
-        return loadingState.copy(
+        return loadingState.withLoadedRequirements(
             cities = cities,
-            termsDocument = terms,
-            privacyDocument = privacy,
-            ugcDocument = ugc,
-            isLoading = false,
+            documents = documents,
+            strings = strings,
         )
     }
 
@@ -125,7 +114,7 @@ class RegistrationPresenter(
                 val loadingState = state.copy(isLoading = true, errorMessage = null)
                 when (val result = authRepository.completeOnboarding(request.value)) {
                     is DomainResult.Success -> loadingState.copy(
-                        step = RegistrationStep.NotificationPriming,
+                        step = RegistrationStep.Completed,
                         currentSession = result.value,
                         isLoading = false,
                         noticeMessage = strings.registrationComplete,
@@ -138,6 +127,34 @@ class RegistrationPresenter(
             }
         }
     }
+}
+
+private fun RegistrationUiState.withLoadedRequirements(
+    cities: List<City>,
+    documents: List<LegalDocumentRevision>,
+    strings: KwaborStrings,
+): RegistrationUiState {
+    val terms = documents.singleRevisionOfType(LegalDocumentType.Terms)
+    val privacy = documents.singleRevisionOfType(LegalDocumentType.PrivacyPolicy)
+    val ugc = documents.singleRevisionOfType(LegalDocumentType.UgcLicense)
+    if (terms == null || privacy == null || ugc == null) {
+        return copy(
+            cities = cities,
+            requirementsStatus = RegistrationRequirementsStatus.Failed,
+            requirementsErrorMessage = strings.registrationLegalUnavailable,
+        )
+    }
+    val suggestedCityId = startContext.suggestedCityId
+        ?.takeIf { cityId -> cities.any { city -> city.id == cityId } }
+    return copy(
+        cities = cities,
+        selectedCityId = selectedCityId ?: suggestedCityId,
+        termsDocument = terms,
+        privacyDocument = privacy,
+        ugcDocument = ugc,
+        requirementsStatus = RegistrationRequirementsStatus.Ready,
+        requirementsErrorMessage = null,
+    )
 }
 
 private fun List<LegalDocumentRevision>.singleRevisionOfType(type: LegalDocumentType): LegalDocumentRevision? =

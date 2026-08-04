@@ -11,7 +11,6 @@ data class ObservabilityConsent(
 
 enum class DiagnosticCode(val wireName: String) {
     RemoteConfigurationFetchFailed(wireName = "remote_config_fetch_failed"),
-    IntroVideoIntegrityFailed(wireName = "intro_video_integrity_failed"),
     UnexpectedApplicationState(wireName = "unexpected_application_state"),
 }
 
@@ -44,6 +43,10 @@ enum class AnalyticsEventName(val wireName: String) {
     SignupCompleted(wireName = "signup_completed"),
     LoginCompleted(wireName = "login_completed"),
     AuthMethod(wireName = "auth_method"),
+    RegistrationOtpValidated(wireName = "registration_otp_validated"),
+    RegistrationProfileSucceeded(wireName = "registration_profile_succeeded"),
+    RegistrationProfileFailed(wireName = "registration_profile_failed"),
+    ProtectedActionReplayed(wireName = "protected_action_replayed"),
     SocialPostCreated(wireName = "social_post_created"),
     EntityTagSelected(wireName = "entity_tag_selected"),
     MentionPreviewOpened(wireName = "mention_preview_opened"),
@@ -98,8 +101,8 @@ data class AnalyticsContext(
     val displayCurrency: KwaborCurrency = KwaborCurrency.Xof,
 ) {
     init {
-        require(cityId.isSafeIdentifierOrNull()) { "Analytics city IDs must be opaque identifiers." }
-        require(entityId.isSafeIdentifierOrNull()) { "Analytics entity IDs must be opaque identifiers." }
+        require(cityId.isAnalyticsSafeIdentifierOrNull()) { "Analytics city IDs must be opaque identifiers." }
+        require(entityId.isAnalyticsSafeIdentifierOrNull()) { "Analytics entity IDs must be opaque identifiers." }
         require(entityType != AnalyticsEntityType.NotApplicable || entityId == null) {
             "An entity ID requires a concrete analytics entity type."
         }
@@ -122,57 +125,6 @@ data class AnalyticsEvent(
     }
 }
 
-data class RemoteFeatureConfiguration(
-    val introVideo: RemoteIntroVideo? = null,
-) {
-    companion object {
-        val SafeDefaults = RemoteFeatureConfiguration()
-    }
-}
+internal fun String?.isAnalyticsSafeIdentifierOrNull(): Boolean = this == null || SAFE_IDENTIFIER_PATTERN.matches(this)
 
-data class RemoteIntroVideo(
-    val url: String,
-    val sha256: String,
-    val revision: Long,
-)
-
-fun createRemoteFeatureConfiguration(
-    introVideoEnabled: Boolean,
-    introVideoUrl: String?,
-    introVideoSha256: String?,
-    introVideoRevision: Long,
-): RemoteFeatureConfiguration {
-    if (!introVideoEnabled) {
-        return RemoteFeatureConfiguration.SafeDefaults
-    }
-    val url = introVideoUrl?.trim().orEmpty()
-    val sha256 = introVideoSha256?.trim()?.lowercase().orEmpty()
-    if (!url.isSafeHttpsUrl() || !SHA256_PATTERN.matches(sha256) || introVideoRevision <= 0) {
-        return RemoteFeatureConfiguration.SafeDefaults
-    }
-    return RemoteFeatureConfiguration(
-        introVideo = RemoteIntroVideo(
-            url = url,
-            sha256 = sha256,
-            revision = introVideoRevision,
-        ),
-    )
-}
-
-private fun String?.isSafeIdentifierOrNull(): Boolean = this == null || SAFE_IDENTIFIER_PATTERN.matches(this)
-
-private fun String.isSafeHttpsUrl(): Boolean {
-    if (length !in MIN_REMOTE_URL_LENGTH..MAX_REMOTE_URL_LENGTH || any(Char::isWhitespace)) {
-        return false
-    }
-    if (!startsWith(prefix = "https://", ignoreCase = true)) {
-        return false
-    }
-    val authority = substringAfter(delimiter = "://").substringBefore(delimiter = "/")
-    return authority.isNotBlank() && '@' !in authority && '.' in authority
-}
-
-private const val MIN_REMOTE_URL_LENGTH = 9
-private const val MAX_REMOTE_URL_LENGTH = 2_048
 private val SAFE_IDENTIFIER_PATTERN = Regex(pattern = "^[A-Za-z0-9_-]{1,64}$")
-private val SHA256_PATTERN = Regex(pattern = "^[a-f0-9]{64}$")
