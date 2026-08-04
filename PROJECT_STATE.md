@@ -363,12 +363,28 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   `:androidApp:assembleDebug` sont verts. L'APK debug de 44 235 992 octets porte le SHA-256
   `E7B8B3E4F495F625AEBF31668ED59BE8110C961D6834C4580C8FB076C3F777A9`. La compilation SwiftUI/Xcode
   native reste à exécuter sur macOS avant publication de la branche.
+- OFFLINE-002 est implémentée localement : Room Android vit dans `noBackupFilesDir` en plus des
+  exclusions cloud/D2D ; Room iOS utilise un dossier dédié non sauvegardé avec protection
+  `CompleteUntilFirstUserAuthentication`. Les deux plateformes invalident l’ancien cache et passent
+  en mémoire si leur politique disque ne peut pas être appliquée. ADR-0027 trace la séparation entre
+  copie locale et autorité serveur durable sans présenter les règles plateforme comme une preuve
+  cryptographique absolue.
+- Validation locale OFFLINE-002 : 146 tests structurels/adversariaux et 402 tests Android hôte verts,
+  manifestes fusionnés et ressources de sauvegarde empaquetées debug/staging/release conformes,
+  compilations production et tests Kotlin/Native iOS X64 verts. La gate finale de 130 tâches
+  (`spotlessCheck`, `detekt`, `check`, lint et APK debug) est verte en 4 min 56 s ; les tests Android
+  `bmgr`/transfert et le runtime filesystem iOS restent à exécuter sur appareils.
+- La décision produit du 4 août conserve l’historique de recherche d’un compte pour Search, le futur
+  Assistant IA et le fil organique. HISTORY-001 porte désormais l’autorité Supabase/RLS, la
+  synchronisation multi-appareil et les contrôles de personnalisation ; aucun texte libre ne rejoint
+  les analytics ou les logs. PRD et DESIGN reflètent ce contrat ; rétention, plafonds et valeur par
+  défaut du contrôle de personnalisation restent à valider avant toute migration serveur.
 
 ## Tâche en cours
 
 SEC-001F, STAB-002A, IOS-PRIVACY-001A, IOS-PRIVACY-001B1 et SETTINGS-001B sont terminés localement sur
-`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A. AUTH-UX-001 est terminée localement sur
-`codex/auth-onboarding-ux-integration`. Aucun de ces nouveaux travaux n'a été poussé, soumis à une
+`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A. AUTH-UX-001 est terminée localement et
+OFFLINE-002 est en qualification sur `codex/auth-onboarding-ux-integration`. Aucun de ces nouveaux travaux n'a été poussé, soumis à une
 nouvelle CI, déployé ou publié. STAB-002B reste suspendu à la décision sur les cinq racines V1.
 OPS-001B dépend du provisionnement propriétaire et des gates d'observabilité ci-dessous ;
 SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
@@ -387,6 +403,10 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
+- OFFLINE-002 compile pour iOS X64 sous Windows et ouvre Room sous Robolectric dans le chemin Android
+  `noBackup`, mais l’exclusion/protection iOS doit encore être exécutée sur simulateur macOS et
+  appareil réel. Android exige aussi une qualification `bmgr` API 30/31/36.1 et un transfert OEM ;
+  les règles de sauvegarde plateforme ne sont pas une preuve cryptographique de liaison à l’appareil.
 - Le moteur Docker local Kwabor n'est pas actif après l'arrêt code 137 de son conteneur Supabase. Il n'a pas été redémarré pour ne pas perturber les autres projets ; le run exact-head `30759824206` fournit la preuve finale sur une stack isolée avec 632 assertions standard et 12 assertions concurrentes vertes.
 - Les 77 assertions GUIDE-001B ont été vérifiées statiquement mais pas exécutées contre PostgreSQL :
   Docker/Supabase local n'a volontairement pas été redémarré. Une stack isolée est obligatoire avant
@@ -447,7 +467,7 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 
 ## Prochaine tâche logique
 
-Auditer puis livrer SEARCH-001, prochaine tranche V1 non bloquée par un fournisseur. Valider
+Formaliser puis livrer HISTORY-001 et SEARCH-001, prochaines tranches V1 non bloquées par un fournisseur. Valider
 AUTH-UX-001 sous Xcode/macOS avant toute publication de sa branche. Préparer OPS-001B seulement après
 provisionnement staging ; avant d'activer
 `account-delete`, prouver les AMR réelles email, Google et Apple et faire approuver/tester la

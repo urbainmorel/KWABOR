@@ -899,6 +899,231 @@ class IosObservabilityPrivacyValidationTest(unittest.TestCase):
             self.validate(content_view_source=changed)
 
 
+class AndroidLocalBackupValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.manifest_sources = VERIFIER.discover_android_source_manifests(REPOSITORY_ROOT)
+        self.backup_rule_sources = VERIFIER.discover_android_backup_rule_sources(REPOSITORY_ROOT)
+
+    def validate(
+        self,
+        *,
+        manifest_sources: dict[str, str] | None = None,
+        backup_rule_sources: dict[str, str] | None = None,
+    ) -> None:
+        VERIFIER.validate_android_local_backup_contract(
+            manifest_sources=manifest_sources or self.manifest_sources,
+            backup_rule_sources=backup_rule_sources or self.backup_rule_sources,
+        )
+
+    def test_current_android_backup_contract_is_accepted(self) -> None:
+        self.validate()
+
+    def test_allow_backup_true_is_rejected(self) -> None:
+        manifests = dict(self.manifest_sources)
+        manifests[VERIFIER.ANDROID_MANIFEST_PATH] = manifests[
+            VERIFIER.ANDROID_MANIFEST_PATH
+        ].replace('android:allowBackup="false"', 'android:allowBackup="true"', 1)
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "allowBackup"):
+            self.validate(manifest_sources=manifests)
+
+    def test_backup_rule_reference_change_is_rejected(self) -> None:
+        manifests = dict(self.manifest_sources)
+        manifests[VERIFIER.ANDROID_MANIFEST_PATH] = manifests[
+            VERIFIER.ANDROID_MANIFEST_PATH
+        ].replace("@xml/backup_rules", "@xml/permissive_backup_rules", 1)
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "fullBackupContent"):
+            self.validate(manifest_sources=manifests)
+
+    def test_missing_backup_domain_is_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        rules[VERIFIER.ANDROID_BACKUP_RULES_PATH] = rules[
+            VERIFIER.ANDROID_BACKUP_RULES_PATH
+        ].replace('    <exclude domain="database" path="." />\n', "", 1)
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "every audited"):
+            self.validate(backup_rule_sources=rules)
+
+    def test_include_element_is_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        rules[VERIFIER.ANDROID_BACKUP_RULES_PATH] = rules[
+            VERIFIER.ANDROID_BACKUP_RULES_PATH
+        ].replace("<exclude ", "<include ", 1)
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "only exclude"):
+            self.validate(backup_rule_sources=rules)
+
+    def test_missing_device_transfer_section_is_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        source = rules[VERIFIER.ANDROID_DATA_EXTRACTION_RULES_PATH]
+        section_start = source.index("    <device-transfer>")
+        section_end = source.index("    </device-transfer>") + len("    </device-transfer>\n")
+        rules[VERIFIER.ANDROID_DATA_EXTRACTION_RULES_PATH] = (
+            source[:section_start] + source[section_end:]
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "device-transfer"):
+            self.validate(backup_rule_sources=rules)
+
+    def test_variant_cannot_enable_backup(self) -> None:
+        manifests = dict(self.manifest_sources)
+        manifests["androidApp/src/debug/AndroidManifest.xml"] = """\
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:allowBackup="true" />
+</manifest>
+"""
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "allowBackup"):
+            self.validate(manifest_sources=manifests)
+
+    def test_variant_backup_rules_are_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        rules["androidApp/src/debug/res/xml/backup_rules.xml"] = rules[
+            VERIFIER.ANDROID_BACKUP_RULES_PATH
+        ]
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "audited main"):
+            self.validate(backup_rule_sources=rules)
+
+    def test_qualified_backup_rules_are_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        rules["androidApp/src/main/res/xml-v36/data_extraction_rules.xml"] = rules[
+            VERIFIER.ANDROID_DATA_EXTRACTION_RULES_PATH
+        ]
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "audited main"):
+            self.validate(backup_rule_sources=rules)
+
+    def test_cross_module_qualified_backup_rules_are_rejected(self) -> None:
+        rules = dict(self.backup_rule_sources)
+        rules["shared/src/androidMain/res/xml-v36/data_extraction_rules.xml"] = rules[
+            VERIFIER.ANDROID_DATA_EXTRACTION_RULES_PATH
+        ]
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "audited main"):
+            self.validate(backup_rule_sources=rules)
+
+
+class AndroidRoomStorageContractValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.source = (
+            REPOSITORY_ROOT / VERIFIER.ANDROID_ROOM_DATABASE_BUILDER_PATH
+        ).read_text(encoding="utf-8")
+
+    def test_current_android_room_storage_contract_is_accepted(self) -> None:
+        VERIFIER.validate_android_room_storage_contract(self.source)
+
+    def test_no_backup_directory_cannot_be_removed(self) -> None:
+        changed = self.source.replace("context.noBackupFilesDir", "context.filesDir")
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_memory_only_fallback_cannot_be_removed(self) -> None:
+        changed = self.source.replace(
+            "Room.inMemoryDatabaseBuilder<KwaborDatabase>(",
+            "Room.databaseBuilder<KwaborDatabase>(",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_broad_exception_catch_is_rejected(self) -> None:
+        changed = self.source.replace("catch (_: IOException)", "catch (_: Exception)")
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_broad_legacy_deletion_catch_is_rejected(self) -> None:
+        changed = self.source.replace(
+            "catch (_: SecurityException)",
+            "catch (_: Exception)",
+            1,
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "filesystem failures"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_short_circuiting_legacy_cleanup_is_rejected(self) -> None:
+        changed = self.source.replace(
+            "ANDROID_DATABASE_FILE_SUFFIXES.forEach",
+            "ANDROID_DATABASE_FILE_SUFFIXES.all",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_late_legacy_cleanup_is_rejected(self) -> None:
+        early_cleanup = "val legacyFilesRemoved = removeLegacyAndroidDatabaseFiles(context)"
+        no_backup_root = "val noBackupRoot = context.noBackupFilesDir.canonicalFile"
+        changed = self.source.replace(
+            f"    {early_cleanup}\n    {no_backup_root}",
+            f"    {no_backup_root}\n    {early_cleanup}",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "before preparing"):
+            VERIFIER.validate_android_room_storage_contract(changed)
+
+    def test_crlf_is_accepted(self) -> None:
+        VERIFIER.validate_android_room_storage_contract(self.source.replace("\n", "\r\n"))
+
+
+class IosRoomStorageContractValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.source = (
+            REPOSITORY_ROOT / VERIFIER.IOS_ROOM_DATABASE_BUILDER_PATH
+        ).read_text(encoding="utf-8")
+
+    def test_current_ios_room_storage_contract_is_accepted(self) -> None:
+        VERIFIER.validate_ios_room_storage_contract(self.source)
+
+    def test_backup_exclusion_cannot_be_removed(self) -> None:
+        changed = self.source.replace("NSURLIsExcludedFromBackupKey", "NSURLNameKey")
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_file_protection_cannot_be_weakened(self) -> None:
+        changed = self.source.replace(
+            "NSFileProtectionCompleteUntilFirstUserAuthentication",
+            "NSFileProtectionNone",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_database_family_cleanup_cannot_be_narrowed(self) -> None:
+        changed = self.source.replace(
+            'listOf("", "-wal", "-shm", "-journal")',
+            'listOf("")',
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_legacy_cleanup_cannot_move_after_directory_preparation(self) -> None:
+        cleanup = """\
+    removeLegacyIosDatabaseFiles(
+        applicationSupportPath = applicationSupportPath,
+        fileManager = fileManager,
+    )
+"""
+        changed = self.source.replace(cleanup, "", 1).replace(
+            "    val roomDirectoryUrl = resolveIosRoomDirectoryUrl(applicationSupportUrl)\n",
+            "    val roomDirectoryUrl = resolveIosRoomDirectoryUrl(applicationSupportUrl)\n" + cleanup,
+            1,
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "before preparing"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_policy_failures_cannot_be_swallowed(self) -> None:
+        changed = self.source + "\nprivate fun unsafe() = runCatching { Unit }\n"
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "runCatching"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_memory_only_fallback_cannot_be_removed(self) -> None:
+        changed = self.source.replace(
+            "Room.inMemoryDatabaseBuilder<KwaborDatabase>(",
+            "Room.databaseBuilder<KwaborDatabase>(",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_broad_exception_catch_is_rejected(self) -> None:
+        changed = self.source.replace(
+            "catch (_: IosRoomStoragePolicyException)",
+            "catch (_: Exception)",
+        )
+        with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_crlf_is_accepted(self) -> None:
+        VERIFIER.validate_ios_room_storage_contract(self.source.replace("\n", "\r\n"))
+
+
 class AndroidFirebasePrivacyValidationTest(unittest.TestCase):
     def setUp(self) -> None:
         self.manifest_source = (

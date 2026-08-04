@@ -312,12 +312,30 @@ val firebaseForbiddenAttributionPermissions =
         "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
         "com.google.android.gms.permission.AD_ID",
     )
+val expectedAndroidBackupDomains =
+    setOf(
+        "root",
+        "file",
+        "database",
+        "sharedpref",
+        "external",
+        "device_root",
+        "device_file",
+        "device_database",
+        "device_sharedpref",
+    )
+val expectedAndroidBackupResourcePaths =
+    setOf(
+        "xml/backup_rules.xml",
+        "xml/data_extraction_rules.xml",
+    )
 
 val verifyFirebaseMergedManifests by tasks.registering {
     group = "verification"
-    description = "Verifies Firebase privacy defaults in every merged Android manifest."
+    description = "Verifies Firebase and local-backup privacy defaults in every Android variant."
     firebasePrivacyManifestVariants.values.forEach { variantName ->
         dependsOn("process${variantName}MainManifest")
+        dependsOn("package${variantName}Resources")
     }
 
     doLast {
@@ -352,6 +370,26 @@ val verifyFirebaseMergedManifests by tasks.registering {
                 }
             }
 
+            val applications = elements("application")
+            check(applications.size == 1) {
+                "$variantDirectory merged manifest must contain exactly one application"
+            }
+            val application = applications.single()
+            val expectedBackupAttributes =
+                mapOf(
+                    "allowBackup" to "false",
+                    "fullBackupContent" to "@xml/backup_rules",
+                    "dataExtractionRules" to "@xml/data_extraction_rules",
+                )
+            expectedBackupAttributes.forEach { (attributeName, expectedValue) ->
+                check(application.getAttributeNS(androidNamespace, attributeName) == expectedValue) {
+                    "$variantDirectory merged manifest must set android:$attributeName=$expectedValue"
+                }
+            }
+            check(application.getAttributeNS(androidNamespace, "backupAgent").isBlank()) {
+                "$variantDirectory merged manifest must not install a custom BackupAgent"
+            }
+
             val permissionNames =
                 (elements("uses-permission") + elements("uses-permission-sdk-23"))
                     .map { element -> element.getAttributeNS(androidNamespace, "name") }
@@ -383,6 +421,100 @@ val verifyFirebaseMergedManifests by tasks.registering {
                 check(values == listOf("false")) {
                     "$variantDirectory merged manifest must contain exactly one $metadataName=false"
                 }
+            }
+
+            val packagedResourcesDirectory =
+                layout.buildDirectory
+                    .dir(
+                        "intermediates/packaged_res/$variantDirectory/" +
+                            "package${variantName}Resources",
+                    ).get()
+                    .asFile
+            check(packagedResourcesDirectory.isDirectory) {
+                "Missing packaged Android resources for $variantDirectory: " +
+                    packagedResourcesDirectory.absolutePath
+            }
+            val backupResourceFiles =
+                packagedResourcesDirectory
+                    .walkTopDown()
+                    .filter(File::isFile)
+                    .filter { file ->
+                        file.name == "backup_rules.xml" ||
+                            file.name == "data_extraction_rules.xml"
+                    }.toList()
+            val backupResourcePaths =
+                backupResourceFiles
+                    .map { file ->
+                        file.relativeTo(packagedResourcesDirectory).invariantSeparatorsPath
+                    }.toSet()
+            check(backupResourcePaths == expectedAndroidBackupResourcePaths) {
+                "$variantDirectory packaged backup rules must exist only in unqualified xml/: " +
+                    backupResourcePaths.sorted().joinToString()
+            }
+
+            fun parsePackagedXml(resourcePath: String): Element {
+                val resourceFile = packagedResourcesDirectory.resolve(resourcePath)
+                check(resourceFile.isFile) {
+                    "$variantDirectory is missing packaged resource $resourcePath"
+                }
+                return documentBuilderFactory
+                    .newDocumentBuilder()
+                    .parse(resourceFile)
+                    .documentElement
+            }
+
+            fun childElements(parent: Element): List<Element> =
+                buildList {
+                    val nodes = parent.childNodes
+                    for (index in 0 until nodes.length) {
+                        (nodes.item(index) as? Element)?.let(::add)
+                    }
+                }
+
+            fun verifyBackupExclusions(
+                parent: Element,
+                label: String,
+            ) {
+                val exclusions = childElements(parent)
+                check(exclusions.all { it.tagName == "exclude" }) {
+                    "$variantDirectory $label must contain only exclude elements"
+                }
+                check(exclusions.all { it.attributes.length == 2 }) {
+                    "$variantDirectory $label excludes must declare only domain and path"
+                }
+                val values =
+                    exclusions.map { exclusion ->
+                        exclusion.getAttribute("domain") to exclusion.getAttribute("path")
+                    }
+                val expectedValues = expectedAndroidBackupDomains.map { domain -> domain to "." }
+                check(values.size == expectedValues.size && values.toSet() == expectedValues.toSet()) {
+                    "$variantDirectory $label must exclude every audited Android data domain"
+                }
+            }
+
+            val fullBackupRoot = parsePackagedXml("xml/backup_rules.xml")
+            check(fullBackupRoot.tagName == "full-backup-content" && fullBackupRoot.attributes.length == 0) {
+                "$variantDirectory backup_rules.xml must use an attribute-free full-backup-content root"
+            }
+            verifyBackupExclusions(fullBackupRoot, "backup_rules.xml")
+
+            val extractionRoot = parsePackagedXml("xml/data_extraction_rules.xml")
+            check(extractionRoot.tagName == "data-extraction-rules" && extractionRoot.attributes.length == 0) {
+                "$variantDirectory data_extraction_rules.xml must use an attribute-free data-extraction-rules root"
+            }
+            val extractionSections = childElements(extractionRoot)
+            check(
+                extractionSections.map(Element::getTagName).toSet() ==
+                    setOf("cloud-backup", "device-transfer") &&
+                    extractionSections.size == 2,
+            ) {
+                "$variantDirectory data_extraction_rules.xml must contain cloud-backup and device-transfer"
+            }
+            extractionSections.forEach { section ->
+                check(section.attributes.length == 0) {
+                    "$variantDirectory ${section.tagName} must not declare weakening attributes"
+                }
+                verifyBackupExclusions(section, "data_extraction_rules.xml:${section.tagName}")
             }
         }
     }

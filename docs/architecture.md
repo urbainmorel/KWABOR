@@ -90,7 +90,7 @@ session sécurisée plateforme et les règles RLS/RPC du backend.
 | UI | Compose Multiplatform | SwiftUI natif |
 | Navigation | Navigation Compose typée | Navigation SwiftUI et stores natifs |
 | Session sécurisée | AndroidX Security/Keystore | Keychain |
-| Base Room | Builder Android mince | Builder iOS mince dans Application Support |
+| Base Room | `noBackupFilesDir/KwaborRoom`, repli mémoire | `Application Support/KwaborRoom` protégé, non sauvegardé, repli mémoire |
 | Validation native | JVM/Android + appareils | Tests Swift et simulateur sur macOS ; appareils iOS à qualifier |
 
 `expect`/`actual` reste réservé aux différences réelles de plateforme. Aucun troisième client
@@ -116,5 +116,6 @@ La cible détaillée appartient au [plan V1](v1-production-delivery.md), pas à 
 - [ADR-0010 — Mobile-only et SwiftUI](adr/0010-mobile-only-swiftui-team-access.md)
 - [ADR-0011 — Room KMP](adr/0011-room-kmp-local-persistence.md)
 - [ADR-0015 — Navigation mobile native](adr/0015-native-mobile-navigation.md)
+- [ADR-0027 — Persistance locale liée à l’appareil](adr/0027-device-bound-local-persistence.md)
 
 Étape suivante : [lire le modèle de données](data-model.md).

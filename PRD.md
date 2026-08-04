@@ -129,7 +129,7 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 - **Écran d'intro** au tout premier lancement : **vidéo d'arrière-plan immersive** (univers touristique/culturel/festif du Bénin), **embarquée et versionnée avec l'application**, sautable → écran **« Se connecter ou s'inscrire »**. Tout remplacement exige une nouvelle version Android/iOS publiée dans les Stores.
 - Mur d'exploration (Lieux / Événements / Hôtels & Restaurants) : recherche par mots-clés, sous-catégories en chips, filtres avancés.
 - Fiches de détail immersives (Lieu, Établissement, Événement) : hero + sheet + barre d'action, avec avis, notation, carte, contact. **Fiche = catalogue uniquement** (médias officiels ; aucun média communautaire n'y est affiché).
-- **Recherche par mots-clés** : état actif (récents, suggestions, autocomplétion) + écran de résultats.
+- **Recherche par mots-clés** : état actif (récents durables, suggestions, autocomplétion) + écran de résultats.
 - Interactions : **Like** (cœur), **Favori** (marque-page), **Partage**, **Signalement**, **Écriture d'avis**.
 - **Assistant de découverte IA** conversationnel (FAB) + écran **« Surprenez-moi »** (recommandation aléatoire pondérée).
 - **Centre de notifications** proactif (4 familles, dont contenu sponsorisé labellisé).
@@ -256,13 +256,23 @@ La **barre de recherche** (en-tête Explore) traite la requête **par mots-clés
 - **État focus** (champ actif) : **recherches récentes**, **suggestions/autocomplétion** (lieux/établissements/événements), portée = onglet actif par défaut (basculable « Tout »).
 - **Écran de résultats** : grille de cartes (§6.1) filtrée par la requête, conservant chips et filtres.
 - **Empty state** « Aucun résultat » + suggestions (élargir la recherche, essayer l'assistant IA).
-- Effacement de la requête, gestion de l'historique (effacer).
+- Seules les **requêtes effectivement soumises** entrent dans l'historique ; les frappes, suggestions
+  survolées et autocomplétions non validées ne sont jamais enregistrées.
+- Pour un compte connecté, l'historique est une donnée durable liée au compte et synchronisée entre
+  ses appareils. Une déconnexion le masque localement sans le supprimer du compte. L'invité conserve
+  ses récents uniquement sur l'appareil ; leur rattachement ultérieur au compte exige une action
+  explicite, jamais une fusion silencieuse.
+- Effacement de la requête courante, d'un récent ou de tout l'historique. La suppression du compte
+  efface aussi l'historique serveur et les signaux de personnalisation qui en dérivent.
 
 ### 6.4 Assistant de découverte IA
 - **Point d'entrée unique : FAB flottant** (icône `auto_awesome`) sur tous les écrans Explore.
 - Conversation en **langage naturel, dans la langue de l'utilisateur** (ex. *« un restaurant chic et calme à Cotonou avec un bon vin »*).
 - Retourne une **liste structurée de 3 à 5 cartes cliquables** ouvrant directement la fiche détail.
-- S'appuie sur : le **catalogue** (recherche sémantique), la **localisation** utilisateur, l'**historique de favoris** (si autorisé), la météo/saisonnalité (optionnel V1.1).
+- S'appuie sur : le **catalogue** (recherche sémantique), la **localisation** utilisateur,
+  l'**historique de favoris** et un **résumé borné des intérêts dérivés des recherches soumises**
+  (uniquement si la personnalisation est activée), la météo/saisonnalité (optionnel V1.1). Le modèle
+  ne reçoit jamais l'historique brut complet.
 - **Garde-fous (non négociables)** : l'assistant **n'invente jamais** un établissement absent du catalogue ; **ne promet jamais** une réservation ferme (il oriente vers le contact direct) ; **cite la source** (la fiche Kwabor) de chaque recommandation.
 - **États requis** : indicateur de frappe ; **état « Aucun résultat dans le catalogue »** (au lieu d'une réponse fabriquée) ; **état d'erreur réseau / IA indisponible** (retry).
 - **Entrée vocale** : optionnelle (V1.1).
@@ -354,7 +364,9 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 Sections et **sous-écrans** (tous spécifiés dans `DESIGN.md`) :
 - **Compte** : identité, email/téléphone, **statut de vérification** (chip vert/ambre/rouge).
 - **Sécurité** : **changer le mot de passe**, **2FA** (activation, codes de secours), **appareils connectés** (déconnecter une session).
-- **Préférences** : **notifications granulaires par famille** + **plafond de fréquence**, **Dark Mode** (bascule instantanée).
+- **Préférences** : **notifications granulaires par famille** + **plafond de fréquence**, **Dark Mode**
+  (bascule instantanée), gestion des **recherches récentes** (consulter/effacer) et contrôle séparé
+  **« Utiliser mon activité pour personnaliser »** pour l'Assistant IA et le fil organique.
 - **Internationalisation** : **langue** (6, nom natif), **devise d'affichage** (4), **format de date** (localisé).
 - **À propos** : **version**, **licences**, **politique de confidentialité**.
 - **Comptes liés** *(V1.2)* : TikTok (`@username`, connecter/déconnecter).
@@ -475,6 +487,9 @@ Feed vertical plein écran mêlant **photo unique** et **diaporama** dès le MVP
 - **Suivi de créateurs**, Like, partage ; **commentaires** en V1.1 (panel dédié : liste, saisie, like/réponse, signaler).
 - **Watermark obligatoire et non maskable** (logo Kwabor + `@username`) sur tout média téléchargé/partagé hors app (photos **et** vidéos).
 - **Où vit l'UGC** : feed Social + **profil de l'auteur** (onglet Publications). **Jamais sur la fiche** (fiche = catalogue only).
+- **Pertinence organique** : lorsque l'utilisateur l'autorise, la découverte pondérée peut consommer
+  des signaux d'intérêt bornés dérivés de ses recherches soumises. Ces signaux n'altèrent **jamais**
+  le classement, l'éligibilité, la facturation ou l'attribution d'un contenu sponsorisé.
 
 ### 6.16 Publication croisée TikTok *(V1.2)*
 Permettre à un créateur de publier un contenu simultanément dans le réseau social Kwabor **et** sur son compte TikTok.
@@ -535,7 +550,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 | **Offline / résilience** | Cache local du dernier mur (lecture seule) ; **bannière « Vous êtes hors ligne » persistante** ; **file locale** pour les actions (Like/Favori) synchronisée à la reconnexion ; saisie de brouillon de fiche autorisée (upload média et géocodage mis en file). Les fiches Détail ne sont pas garanties hors-ligne au MVP. |
 | **Accessibilité (WCAG AA)** | Contrastes ≥ **4.5:1** sur tous textes/overlays (y compris titre sur hero et sur cartes) ; labels ARIA/VoiceOver sur tout composant interactif ; **focus order documenté par écran** ; **alt text** généré (éditable) par image ; cibles tactiles ≥ 44 px ; états annoncés (« Événement terminé », « Ouvre une app externe »…). |
 | **Internationalisation** | **6 langues** (FR au MVP, EN en V1.1, puis PT/DE/ES/IT) ; **toute** l'UI via i18n dès le MVP ; **4 devises** d'affichage (conversion indicative, formatage ICU/CLDR) ; formats date/heure localisés ; **tolérance à l'expansion de texte** (DE +30–40 %), aucune largeur de label figée, tests pseudo-localisés. Pas de RTL (langues latines). |
-| **Sécurité & confidentialité** | Auth sécurisée : **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS)** ; TLS ; **secrets paiement/OAuth côté serveur uniquement** ; minimisation de données pour le ciblage (§6.8) ; **licence de contenu UGC + procédure de retrait** et politique de confidentialité accessibles depuis Paramètres → À propos. Pas de collecte de numéro de téléphone ni d'âge à l'inscription. |
+| **Sécurité & confidentialité** | Auth sécurisée : **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS)** ; TLS ; **secrets paiement/OAuth côté serveur uniquement** ; historique limité aux recherches soumises, propriétaire via RLS, effaçable et distinct du consentement de personnalisation ; aucun texte de requête dans les analytics ou logs ; minimisation de données pour le ciblage (§6.8) ; **licence de contenu UGC + procédure de retrait** et politique de confidentialité accessibles depuis Paramètres → À propos. Pas de collecte de numéro de téléphone ni d'âge à l'inscription. |
 | **Disponibilité** | Cible **99,5 %** de disponibilité backend en heures d'usage (18h–00h GMT, Bénin). |
 | **Scalabilité** | Architecture capable d'absorber la croissance du catalogue et du trafic au Bénin sans refonte (objectif mono-pays). |
 | **Modération** | Pipeline hybride : règles automatiques (mots-clés, GPS Bénin, doublon, image) + file de revue humaine pour contenu et comptes Promoteur. |

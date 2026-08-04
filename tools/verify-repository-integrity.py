@@ -23,6 +23,13 @@ IOS_ONBOARDING_COORDINATOR_PATH = "iosApp/Kwabor/Onboarding/OnboardingCoordinato
 IOS_CONTENT_VIEW_PATH = "iosApp/Kwabor/App/ContentView.swift"
 IOS_APP_SOURCE_PATH = "iosApp/Kwabor/App/KwaborApp.swift"
 IOS_XCODE_PROJECT_PATH = "iosApp/Kwabor.xcodeproj/project.pbxproj"
+IOS_ROOM_DATABASE_BUILDER_PATH = (
+    "shared/src/iosMain/kotlin/com/kwabor/shared/data/local/"
+    "IosKwaborDatabaseBuilder.kt"
+)
+IOS_ROOM_DATABASE_BUILDER_SHA256 = (
+    "9e02ce3ad1345b4793da940392013e39413d8823776014450d4557bc0fb24f4b"
+)
 IOS_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     IOS_OBSERVABILITY_SOURCE_PATH: "123738c638e69c098955f4683e0e2448b7f4014cfe041f7f42aed930a80cd638",
     IOS_ONBOARDING_COORDINATOR_PATH: "9611046fa70872e87dd41195bc0a6bd9c75f1fbadc63351cb763c41c193670aa",
@@ -30,6 +37,33 @@ IOS_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     IOS_APP_SOURCE_PATH: "4e04f132132389b47586d2ebc34b37a601d511a148af9c2dddf9676def75fba4",
 }
 ANDROID_MANIFEST_PATH = "androidApp/src/main/AndroidManifest.xml"
+ANDROID_ROOM_DATABASE_BUILDER_PATH = (
+    "shared/src/androidMain/kotlin/com/kwabor/shared/data/local/"
+    "AndroidKwaborDatabaseBuilder.kt"
+)
+ANDROID_ROOM_DATABASE_BUILDER_SHA256 = (
+    "76db407c136d5c85e23826d0e6d4f903eba0ffec24cf46892b43d49c441da4ba"
+)
+ANDROID_BACKUP_RULES_PATH = "androidApp/src/main/res/xml/backup_rules.xml"
+ANDROID_DATA_EXTRACTION_RULES_PATH = (
+    "androidApp/src/main/res/xml/data_extraction_rules.xml"
+)
+ANDROID_BACKUP_RULE_FILENAMES = frozenset(
+    {"backup_rules.xml", "data_extraction_rules.xml"}
+)
+ANDROID_BACKUP_DOMAINS = frozenset(
+    {
+        "root",
+        "file",
+        "database",
+        "sharedpref",
+        "external",
+        "device_root",
+        "device_file",
+        "device_database",
+        "device_sharedpref",
+    }
+)
 ANDROID_SOURCE_MANIFEST_ROOT = "androidApp/src"
 ANDROID_FIREBASE_SOURCE_ROOTS = ("androidApp/src", "shared/src/androidMain")
 ANDROID_BUILD_GRADLE_PATH = "androidApp/build.gradle.kts"
@@ -84,7 +118,7 @@ ANDROID_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     ),
 }
 ANDROID_FIREBASE_CONFIGURATION_SHA256 = {
-    ANDROID_BUILD_GRADLE_PATH: "aa61f9ebaceeee4f72996aa18e30672bc737ca83d6b979c426e1a64754ec70d7",
+    ANDROID_BUILD_GRADLE_PATH: "c557c9f3a9fdbe6a4bfc5213f094cb8d14e7f2b6b1c15651998f6cf62f182aa0",
     ROOT_BUILD_GRADLE_PATH: "350ac8bd380ecaafdd3faf5158b068669e23c55019ba13d7572c1368fa5a1162",
     ANDROID_GRADLE_PROPERTIES_PATH: (
         "ad09dcf116ffab62b052e4212833d8090213d6cc7b28c751b7d7c8e519e6c9e1"
@@ -93,7 +127,7 @@ ANDROID_FIREBASE_CONFIGURATION_SHA256 = {
 AUDITED_GRADLE_CONFIGURATION_SHA256 = {
     ROOT_BUILD_GRADLE_PATH: "350ac8bd380ecaafdd3faf5158b068669e23c55019ba13d7572c1368fa5a1162",
     "settings.gradle.kts": "0c009c069bbf448da8050b44e77ffb7da59fa19ba6daa77c362f908f8aaee8d1",
-    ANDROID_BUILD_GRADLE_PATH: "aa61f9ebaceeee4f72996aa18e30672bc737ca83d6b979c426e1a64754ec70d7",
+    ANDROID_BUILD_GRADLE_PATH: "c557c9f3a9fdbe6a4bfc5213f094cb8d14e7f2b6b1c15651998f6cf62f182aa0",
     "shared/build.gradle.kts": "011ab4721733a60fe50a30891b05f9829e1f45f8b4907d012bc95fa746c8098c",
 }
 ANDROID_EXPECTED_FIREBASE_DEPENDENCIES = (
@@ -556,6 +590,210 @@ def validate_android_source_manifests(manifest_sources: dict[str, str]) -> None:
             )
 
 
+def validate_android_backup_exclusions(
+    *,
+    source_path: str,
+    parent: ET.Element,
+) -> None:
+    children = list(parent)
+    require(
+        all(child.tag == "exclude" for child in children),
+        f"{source_path} must contain only exclude elements",
+    )
+    exclusions: list[tuple[str | None, str | None]] = []
+    for child in children:
+        require(
+            set(child.attrib) == {"domain", "path"},
+            f"{source_path} excludes must declare only domain and path",
+        )
+        exclusions.append((child.get("domain"), child.get("path")))
+    expected = Counter((domain, ".") for domain in ANDROID_BACKUP_DOMAINS)
+    require(
+        Counter(exclusions) == expected,
+        f"{source_path} must exclude every audited Android data domain at path '.'",
+    )
+
+
+def validate_android_local_backup_contract(
+    *,
+    manifest_sources: dict[str, str],
+    backup_rule_sources: dict[str, str],
+) -> None:
+    """Lock Android cloud-backup and device-transfer exclusions."""
+
+    normalized_manifests = {
+        PurePosixPath(source_path).as_posix(): source
+        for source_path, source in manifest_sources.items()
+    }
+    require(
+        ANDROID_MANIFEST_PATH in normalized_manifests,
+        f"Missing required file: {ANDROID_MANIFEST_PATH}",
+    )
+    expected_application_attributes = {
+        "allowBackup": "false",
+        "fullBackupContent": "@xml/backup_rules",
+        "dataExtractionRules": "@xml/data_extraction_rules",
+    }
+    for source_path, source in normalized_manifests.items():
+        manifest = parse_android_manifest(source_path, source)
+        application = manifest.find("application")
+        if application is None:
+            continue
+        for attribute_name, expected_value in expected_application_attributes.items():
+            value = application.get(f"{ANDROID_XML_NAMESPACE}{attribute_name}")
+            if source_path == ANDROID_MANIFEST_PATH or value is not None:
+                require(
+                    value == expected_value,
+                    f"{source_path} must set android:{attribute_name}={expected_value}",
+                )
+        require(
+            application.get(f"{ANDROID_XML_NAMESPACE}backupAgent") is None,
+            f"{source_path} must not install a custom Android BackupAgent",
+        )
+
+    normalized_rules = {
+        PurePosixPath(source_path).as_posix(): source
+        for source_path, source in backup_rule_sources.items()
+    }
+    expected_rule_paths = {
+        ANDROID_BACKUP_RULES_PATH,
+        ANDROID_DATA_EXTRACTION_RULES_PATH,
+    }
+    require(
+        set(normalized_rules) == expected_rule_paths,
+        "Android backup rules must exist only in the audited main source set",
+    )
+
+    full_backup_root = parse_android_manifest(
+        ANDROID_BACKUP_RULES_PATH,
+        normalized_rules[ANDROID_BACKUP_RULES_PATH],
+    )
+    require(
+        full_backup_root.tag == "full-backup-content" and not full_backup_root.attrib,
+        f"{ANDROID_BACKUP_RULES_PATH} must use an attribute-free full-backup-content root",
+    )
+    validate_android_backup_exclusions(
+        source_path=ANDROID_BACKUP_RULES_PATH,
+        parent=full_backup_root,
+    )
+
+    extraction_root = parse_android_manifest(
+        ANDROID_DATA_EXTRACTION_RULES_PATH,
+        normalized_rules[ANDROID_DATA_EXTRACTION_RULES_PATH],
+    )
+    require(
+        extraction_root.tag == "data-extraction-rules" and not extraction_root.attrib,
+        f"{ANDROID_DATA_EXTRACTION_RULES_PATH} must use an attribute-free data-extraction-rules root",
+    )
+    sections = list(extraction_root)
+    require(
+        Counter(section.tag for section in sections)
+        == Counter({"cloud-backup": 1, "device-transfer": 1}),
+        f"{ANDROID_DATA_EXTRACTION_RULES_PATH} must contain cloud-backup and device-transfer",
+    )
+    for section in sections:
+        require(
+            not section.attrib,
+            f"{ANDROID_DATA_EXTRACTION_RULES_PATH} sections must not weaken the policy with attributes",
+        )
+        validate_android_backup_exclusions(
+            source_path=f"{ANDROID_DATA_EXTRACTION_RULES_PATH}:{section.tag}",
+            parent=section,
+        )
+
+
+def validate_ios_room_storage_contract(source: str) -> None:
+    """Lock the fail-closed, device-bound iOS Room directory policy."""
+
+    active_source = strip_kotlin_java_comments(decode_java_unicode_escapes(source))
+    required_fragments = (
+        'private const val KWABOR_ROOM_DIRECTORY_NAME = "KwaborRoom"',
+        "prepareIosRoomDirectory(",
+        "NSFileProtectionCompleteUntilFirstUserAuthentication",
+        "fileManager.createDirectoryAtURL(",
+        "fileManager.setAttributes(",
+        "roomDirectoryUrl.setResourceValue(",
+        "NSNumber(bool = true)",
+        "NSURLIsExcludedFromBackupKey",
+        "removeLegacyIosDatabaseFiles(",
+        "var allFilesRemoved = true",
+        "var allFilesProtected = true",
+        'listOf("", "-wal", "-shm", "-journal")',
+        "IosRoomStoragePolicyException",
+        "catch (_: IosRoomStoragePolicyException)",
+        "Room.inMemoryDatabaseBuilder<KwaborDatabase>(",
+        "onPolicyFailure()",
+        "NSLog(",
+    )
+    for fragment in required_fragments:
+        require(
+            fragment in active_source,
+            f"{IOS_ROOM_DATABASE_BUILDER_PATH} is missing required local-storage control: {fragment}",
+        )
+    require("runCatching" not in active_source, f"{IOS_ROOM_DATABASE_BUILDER_PATH} must not use runCatching")
+    require(
+        active_source.count("catch (") == 1
+        and "catch (_: IosRoomStoragePolicyException)" in active_source,
+        f"{IOS_ROOM_DATABASE_BUILDER_PATH} must catch only its typed policy failure",
+    )
+    require(
+        active_source.index("removeLegacyIosDatabaseFiles(")
+        < active_source.index("val roomDirectoryUrl = resolveIosRoomDirectoryUrl"),
+        f"{IOS_ROOM_DATABASE_BUILDER_PATH} must clean legacy files before preparing protected storage",
+    )
+    require(
+        audited_source_sha256(source) == IOS_ROOM_DATABASE_BUILDER_SHA256,
+        f"{IOS_ROOM_DATABASE_BUILDER_PATH} changed outside its audited local-storage snapshot; "
+        "perform a new review before updating the expected SHA-256",
+    )
+
+
+def validate_android_room_storage_contract(source: str) -> None:
+    """Lock Android Room into no-backup storage with a memory-only fallback."""
+
+    active_source = strip_kotlin_java_comments(decode_java_unicode_escapes(source))
+    required_fragments = (
+        'private const val ANDROID_ROOM_DIRECTORY_NAME = "KwaborRoom"',
+        "context.noBackupFilesDir.canonicalFile",
+        'listOf("", "-wal", "-shm", "-journal")',
+        "removeLegacyAndroidDatabaseFiles(",
+        "val legacyFilesRemoved = removeLegacyAndroidDatabaseFiles(context)",
+        "ANDROID_DATABASE_FILE_SUFFIXES.forEach",
+        "Room.inMemoryDatabaseBuilder<KwaborDatabase>(",
+        "Log.e(",
+        "catch (_: IOException)",
+        "catch (_: SecurityException)",
+    )
+    for fragment in required_fragments:
+        require(
+            fragment in active_source,
+            f"{ANDROID_ROOM_DATABASE_BUILDER_PATH} is missing required local-storage control: "
+            f"{fragment}",
+        )
+    require(
+        "runCatching" not in active_source
+        and "ANDROID_DATABASE_FILE_SUFFIXES.all" not in active_source
+        and Counter(
+            re.findall(r"catch\s*\(\s*_:\s*([A-Za-z0-9_.]+)\s*\)", active_source)
+        )
+        == Counter({"IOException": 1, "SecurityException": 2}),
+        f"{ANDROID_ROOM_DATABASE_BUILDER_PATH} must attempt every legacy deletion and catch only "
+        "Android filesystem failures",
+    )
+    require(
+        active_source.index(
+            "val legacyFilesRemoved = removeLegacyAndroidDatabaseFiles(context)"
+        )
+        < active_source.index("val noBackupRoot = context.noBackupFilesDir.canonicalFile"),
+        f"{ANDROID_ROOM_DATABASE_BUILDER_PATH} must clean legacy files before preparing no-backup storage",
+    )
+    require(
+        audited_source_sha256(source) == ANDROID_ROOM_DATABASE_BUILDER_SHA256,
+        f"{ANDROID_ROOM_DATABASE_BUILDER_PATH} changed outside its audited local-storage snapshot; "
+        "perform a new review before updating the expected SHA-256",
+    )
+
+
 def validate_android_firebase_privacy_contract(
     *,
     manifest_source: str,
@@ -1003,6 +1241,21 @@ def discover_android_source_manifests(
     }
 
 
+def discover_android_backup_rule_sources(
+    repository_root: Path = REPOSITORY_ROOT,
+) -> dict[str, str]:
+    return {
+        path.relative_to(repository_root).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(repository_root.rglob("*.xml"))
+        if path.is_file()
+        and len(path.relative_to(repository_root).parts) >= 5
+        and path.relative_to(repository_root).parts[-5] == "src"
+        and path.relative_to(repository_root).parts[-3] == "res"
+        and (path.parent.name == "xml" or path.parent.name.startswith("xml-"))
+        and path.name in ANDROID_BACKUP_RULE_FILENAMES
+    }
+
+
 def discover_gradle_configuration_files(
     repository_root: Path = REPOSITORY_ROOT,
 ) -> dict[str, str]:
@@ -1293,6 +1546,15 @@ def verify_android_firebase_privacy_contract() -> None:
         main_activity_source=read_text(ANDROID_MAIN_ACTIVITY_PATH),
     )
     validate_android_firebase_source_boundary(discover_android_firebase_source_files())
+
+
+def verify_local_storage_privacy_contract() -> None:
+    validate_android_local_backup_contract(
+        manifest_sources=discover_android_source_manifests(),
+        backup_rule_sources=discover_android_backup_rule_sources(),
+    )
+    validate_android_room_storage_contract(read_text(ANDROID_ROOM_DATABASE_BUILDER_PATH))
+    validate_ios_room_storage_contract(read_text(IOS_ROOM_DATABASE_BUILDER_PATH))
 
 
 def verify_ios_observability_privacy_contract() -> None:
@@ -2242,6 +2504,7 @@ def main() -> int:
         verify_gradle_wrapper()
         verify_git_hygiene()
         verify_android_firebase_privacy_contract()
+        verify_local_storage_privacy_contract()
         verify_ios_privacy_manifest()
         verify_ios_observability_privacy_contract()
     except RepositoryIntegrityError as error:
@@ -2251,7 +2514,8 @@ def main() -> int:
     print(
         "OK repository integrity: configuration templates complete, "
         "sensitive artifacts untracked, Gradle 9.4.1 wrapper checksummed, "
-        "Android/iOS audited Firebase privacy sources and iOS host manifest locked"
+        "Android/iOS audited Firebase privacy sources, local backup policy, "
+        "and iOS host manifest locked"
     )
     return 0
 

@@ -28,12 +28,23 @@ domaine et l'historique des schémas Room, en plus des tests configurés.
 | `.\gradlew.bat spotlessCheck --console=plain` | Formatage Kotlin/KTS |
 | `.\gradlew.bat detekt --console=plain` | Analyse statique Kotlin |
 | `.\gradlew.bat :androidApp:lintDebug --console=plain` | Lint Android debug |
+| `python -B -m unittest tools/test_verify_repository_integrity.py` | Contrats privacy, sauvegarde locale et intégrité |
 
 Sur macOS, le runtime KMP iOS se teste avec :
 
 ```bash
 ./gradlew :shared:iosSimulatorArm64Test
 ```
+
+Ce test exécute aussi la politique Room iOS sur le système de fichiers du simulateur : exclusion des
+sauvegardes, protection `CompleteUntilFirstUserAuthentication`, idempotence et repli mémoire
+fail-closed en cas de collision. La compilation `:shared:compileTestKotlinIosX64` sous Windows ne
+prouve que les signatures Kotlin/Native ; le test runtime macOS et une qualification sur appareil
+restent requis.
+
+Sur Android, `:shared:testAndroidHostTest` ouvre réellement Room dans `noBackupFilesDir` et couvre le
+nettoyage du cache historique ainsi que le repli mémoire. Cette preuve hôte ne remplace pas les tests
+`bmgr` sur API 30/31/36.1 ni les transferts sur un appareil OEM représentatif.
 
 Rapports HTML habituels :
 

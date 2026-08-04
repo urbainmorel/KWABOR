@@ -124,6 +124,15 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Valider 218 tests shared, 160 tests Android, les gates globales, les APK debug/staging minifié et KSP sur les trois cibles iOS.
   - [x] Publier la PR empilée `#40` et obtenir les gates GitHub Actions `quality`/iOS vertes sur le run `30705934250`.
 - [ ] PR-OFFLINE-001 — Obtenir la revue humaine de la PR brouillon empilée `#40`, puis la fusionner après `#39`.
+- [ ] OFFLINE-002 — Rendre la persistance locale sensible liée à l’appareil conformément à ADR-0027.
+  - [x] Android : placer Room dans `noBackupFilesDir`, exclure les neuf domaines cloud/D2D et
+    basculer en mémoire si la politique disque échoue ; invalider le cache v2 historique.
+  - [x] iOS : isoler Room dans un dossier exclu des sauvegardes, protégé et fail-closed avec repli
+    mémoire ; invalider le cache v2 historique.
+  - [x] Verrouiller les politiques sources, les manifestes fusionnés et la compilation Kotlin/Native par tests.
+  - [ ] Qualifier avec `bmgr` les API 30/31/36.1 puis un transfert sur appareil Android/OEM ; confirmer
+    notamment qu’aucune donnée privée n’entre dans le nouveau transfert Android↔iOS.
+  - [ ] Exécuter le test filesystem sur simulateur macOS puis qualifier exclusion/protection sur appareil iOS.
 - [ ] SYNC-001 — Persister l'outbox, coalescer Like/Favori, appliquer idempotence, backoff et drain réseau/session.
 - [ ] DRAFT-001 — Synchroniser les brouillons avec version optimiste et conservation des deux versions en conflit.
 - [ ] MEDIA-001 — Créer buckets/RLS, uploads temporaires, validation, downsampling, dérivés et Edge Function `media-finalize`.
@@ -151,7 +160,17 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Ajouter un smoke test iOS simulateur qui rouvre Room et DataStore sur disque, le brancher à la CI macOS et borner son exécution.
   - [x] Passer la porte locale complète et trois revues indépendantes sans P0/P1/P2 résiduel.
 - [ ] PR-EXPLORE-IOS-001 — PR brouillon `#44` publiée sur `#43` ; le run exact-head `30741677132` a passé `quality`, le build Xcode simulateur et les preuves Android API 30/31/36. Obtenir la revue humaine.
-- [ ] SEARCH-001 — Livrer récents, autocomplétion, résultats, filtres et fallback texte offline.
+- [ ] HISTORY-001 — Conserver l’historique de recherche utile à Search, l’Assistant IA et au fil organique.
+  - [ ] Faire valider avant migration la rétention, les plafonds serveur/local et le défaut du
+    contrôle de personnalisation.
+  - [ ] Créer l’autorité Supabase liée au compte avec RLS propriétaire, effacement et couverture pgTAP.
+  - [ ] Capturer uniquement les requêtes soumises, isoler invité/comptes dans Room, synchroniser le
+    même compte et proposer l’import invité explicitement.
+  - [ ] Ajouter effacement unitaire/global et contrôle distinct de personnalisation, sans texte libre
+    dans analytics ou logs ; purger historique et signaux dérivés à la suppression du compte.
+  - [ ] Dériver des signaux bornés pour IA/fil organique sans exposer l’historique brut au modèle ni
+    modifier le classement ou l’attribution sponsorisés.
+- [ ] SEARCH-001 — Livrer récents durables, autocomplétion, résultats, filtres et fallback texte offline.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
   - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
     contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.

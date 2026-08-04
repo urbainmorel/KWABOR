@@ -5,23 +5,210 @@ import androidx.room.RoomDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSFileProtectionCompleteUntilFirstUserAuthentication
+import platform.Foundation.NSFileProtectionKey
+import platform.Foundation.NSLog
+import platform.Foundation.NSNumber
+import platform.Foundation.NSURL
+import platform.Foundation.NSURLIsExcludedFromBackupKey
 import platform.Foundation.NSUserDomainMask
+
+private const val KWABOR_ROOM_DIRECTORY_NAME = "KwaborRoom"
+private val IOS_DATABASE_FILE_SUFFIXES = listOf("", "-wal", "-shm", "-journal")
 
 @OptIn(ExperimentalForeignApi::class)
 internal fun createIosKwaborDatabaseBuilder(): RoomDatabase.Builder<KwaborDatabase> {
-    val applicationSupportUrl = NSFileManager.defaultManager.URLForDirectory(
+    val fileManager = NSFileManager.defaultManager
+    val applicationSupportUrl = fileManager.URLForDirectory(
         directory = NSApplicationSupportDirectory,
         inDomain = NSUserDomainMask,
         appropriateForURL = null,
         create = true,
         error = null,
     )
-    val applicationSupportPath = checkNotNull(applicationSupportUrl?.path) {
-        "The iOS application support directory is unavailable."
-    }
     return createIosKwaborDatabaseBuilder(
-        databasePath = "$applicationSupportPath/$KWABOR_DATABASE_FILENAME",
+        applicationSupportUrl = applicationSupportUrl,
+        fileManager = fileManager,
     )
+}
+
+@OptIn(ExperimentalForeignApi::class)
+internal fun createIosKwaborDatabaseBuilder(
+    applicationSupportUrl: NSURL?,
+    fileManager: NSFileManager,
+    onPolicyFailure: () -> Unit = ::reportIosRoomStoragePolicyFailure,
+): RoomDatabase.Builder<KwaborDatabase> {
+    val databasePath = try {
+        val roomDirectoryUrl = prepareIosRoomDirectory(
+            applicationSupportUrl = requireIosRoomPolicyValue(
+                applicationSupportUrl,
+                "The iOS application support directory is unavailable.",
+            ),
+            fileManager = fileManager,
+        )
+        val roomDirectoryPath = requireIosRoomPolicyValue(
+            roomDirectoryUrl.path,
+            "The protected iOS Room directory path is unavailable.",
+        )
+        "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME"
+    } catch (_: IosRoomStoragePolicyException) {
+        onPolicyFailure()
+        null
+    }
+    return if (databasePath == null) {
+        Room.inMemoryDatabaseBuilder<KwaborDatabase>(
+            factory = KwaborDatabaseConstructor::initialize,
+        )
+    } else {
+        createIosKwaborDatabaseBuilder(databasePath = databasePath)
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+internal fun prepareIosRoomDirectory(
+    applicationSupportUrl: NSURL,
+    fileManager: NSFileManager = NSFileManager.defaultManager,
+): NSURL {
+    val applicationSupportPath = requireIosRoomPolicyValue(
+        applicationSupportUrl.path,
+        "The iOS application support directory path is unavailable.",
+    )
+    removeLegacyIosDatabaseFiles(
+        applicationSupportPath = applicationSupportPath,
+        fileManager = fileManager,
+    )
+    val roomDirectoryUrl = resolveIosRoomDirectoryUrl(applicationSupportUrl)
+    val roomDirectoryPath = requireIosRoomPolicyValue(
+        roomDirectoryUrl.path,
+        "The protected iOS Room directory path is unavailable.",
+    )
+    val roomPolicy = resolveIosRoomPolicy()
+    enforceIosRoomDirectoryPolicy(roomDirectoryUrl, roomDirectoryPath, roomPolicy, fileManager)
+    protectExistingIosDatabaseFiles(
+        roomDirectoryPath = roomDirectoryPath,
+        protectionAttributes = roomPolicy.protectionAttributes,
+        fileManager = fileManager,
+    )
+    return roomDirectoryUrl
+}
+
+private data class IosRoomPolicy(
+    val backupKey: String,
+    val protectionAttributes: Map<Any?, Any?>,
+)
+
+internal class IosRoomStoragePolicyException(message: String) : IllegalStateException(message)
+
+@OptIn(ExperimentalForeignApi::class)
+private fun resolveIosRoomDirectoryUrl(applicationSupportUrl: NSURL): NSURL = requireIosRoomPolicyValue(
+    applicationSupportUrl.URLByAppendingPathComponent(
+        pathComponent = KWABOR_ROOM_DIRECTORY_NAME,
+        isDirectory = true,
+    ),
+    "The protected iOS Room directory URL is unavailable.",
+)
+
+@OptIn(ExperimentalForeignApi::class)
+private fun resolveIosRoomPolicy(): IosRoomPolicy {
+    val protectionKey = requireIosRoomPolicyValue(
+        NSFileProtectionKey,
+        "The iOS file-protection key is unavailable.",
+    )
+    val protectionValue = requireIosRoomPolicyValue(
+        NSFileProtectionCompleteUntilFirstUserAuthentication,
+        "The required iOS file-protection value is unavailable.",
+    )
+    return IosRoomPolicy(
+        backupKey = requireIosRoomPolicyValue(
+            NSURLIsExcludedFromBackupKey,
+            "The iOS backup-exclusion key is unavailable.",
+        ),
+        protectionAttributes = mapOf(protectionKey to protectionValue),
+    )
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun enforceIosRoomDirectoryPolicy(
+    roomDirectoryUrl: NSURL,
+    roomDirectoryPath: String,
+    policy: IosRoomPolicy,
+    fileManager: NSFileManager,
+) {
+    val directoryCreated = fileManager.createDirectoryAtURL(
+        url = roomDirectoryUrl,
+        withIntermediateDirectories = true,
+        attributes = policy.protectionAttributes,
+        error = null,
+    )
+    val directoryProtected = fileManager.setAttributes(
+        attributes = policy.protectionAttributes,
+        ofItemAtPath = roomDirectoryPath,
+        error = null,
+    )
+    val directoryExcludedFromBackup = roomDirectoryUrl.setResourceValue(
+        value = NSNumber(bool = true),
+        forKey = policy.backupKey,
+        error = null,
+    )
+    requireIosRoomPolicy(
+        directoryCreated && directoryProtected && directoryExcludedFromBackup,
+        "The protected, backup-excluded iOS Room directory could not be prepared.",
+    )
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun removeLegacyIosDatabaseFiles(applicationSupportPath: String, fileManager: NSFileManager) {
+    var allFilesRemoved = true
+    IOS_DATABASE_FILE_SUFFIXES.forEach { suffix ->
+        val legacyPath = "$applicationSupportPath/$KWABOR_DATABASE_FILENAME$suffix"
+        if (fileManager.fileExistsAtPath(legacyPath) && !fileManager.removeItemAtPath(legacyPath, error = null)) {
+            allFilesRemoved = false
+        }
+    }
+    requireIosRoomPolicy(
+        allFilesRemoved,
+        "The complete legacy iOS Room cache could not be removed.",
+    )
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun protectExistingIosDatabaseFiles(
+    roomDirectoryPath: String,
+    protectionAttributes: Map<Any?, *>,
+    fileManager: NSFileManager,
+) {
+    var allFilesProtected = true
+    IOS_DATABASE_FILE_SUFFIXES.forEach { suffix ->
+        val databaseFilePath = "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME$suffix"
+        if (
+            fileManager.fileExistsAtPath(databaseFilePath) &&
+            !fileManager.setAttributes(
+                attributes = protectionAttributes,
+                ofItemAtPath = databaseFilePath,
+                error = null,
+            )
+        ) {
+            allFilesProtected = false
+        }
+    }
+    requireIosRoomPolicy(
+        allFilesProtected,
+        "The complete iOS Room database family could not be protected.",
+    )
+}
+
+private fun requireIosRoomPolicy(condition: Boolean, message: String) {
+    if (!condition) {
+        throw IosRoomStoragePolicyException(message)
+    }
+}
+
+private fun <T : Any> requireIosRoomPolicyValue(value: T?, message: String): T =
+    value ?: throw IosRoomStoragePolicyException(message)
+
+@OptIn(ExperimentalForeignApi::class)
+private fun reportIosRoomStoragePolicyFailure() {
+    NSLog("Kwabor local persistence is unavailable; using memory-only storage.")
 }
 
 internal fun createIosKwaborDatabaseBuilder(databasePath: String): RoomDatabase.Builder<KwaborDatabase> {

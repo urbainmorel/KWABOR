@@ -90,8 +90,15 @@ Le contenu canonique est séparé des requêtes/snapshots et de leur ordre. Un s
 maximum 50 fiches et la rétention garde 64 snapshots récents. Les écritures obsolètes sont rejetées
 et une corruption logique évince seulement le snapshot concerné.
 
-Android place la base dans son stockage applicatif ; iOS utilise Application Support. Les schémas
-Room exportés sont versionnés et vérifiés par `check`.
+Android place Room dans `noBackupFilesDir/KwaborRoom`, exclu de chaque mode de sauvegarde par le
+système, et conserve des règles explicites qui excluent les neuf domaines du cloud et des transferts
+appareil-à-appareil. iOS utilise le sous-dossier dédié `Application Support/KwaborRoom`, exclu des
+sauvegardes et protégé avec `CompleteUntilFirstUserAuthentication`. Les anciennes bases v2,
+composées uniquement de cache régénérable, sont supprimées lors du changement de chemin. Si une
+plateforme ne peut pas appliquer sa politique, Room reste en mémoire pour la session au lieu
+d’ouvrir une base disque non conforme. Les schémas exportés sont versionnés et vérifiés par `check`.
+Une donnée de compte durable, comme le futur historique de recherche connecté, garde son autorité
+côté Supabase/RLS ; Room n’en conserve qu’un miroir local régénérable.
 
 ### DataStore et session
 

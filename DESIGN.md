@@ -408,7 +408,11 @@ Onglet Événements actif. Cartes avec pastille date + ruban « Terminé ». Fil
 Onglet actif. Première rangée Sponsorisée (badge ambre, ≤ 2/écran). Chip gamme de prix. Filter Drawer : ville, type (Hôtel, Auberge, Résidence, Restaurant, Bar, Café, Club, **Maquis**…), gamme de prix (double slider XOF), popularité.
 
 **A4. Recherche — état actif**
-Au focus du champ : champ en haut, **recherches récentes** (effaçables), **suggestions/autocomplétion** (nom · ville · catégorie), bascule de portée **Onglet actif / Tout**. Clavier ouvert, bouton effacer.
+Au focus du champ : champ en haut, **recherches récentes** (effaçables une par une ou en totalité),
+**suggestions/autocomplétion** (nom · ville · catégorie), bascule de portée **Onglet actif / Tout**.
+Clavier ouvert, bouton effacer. Seule une requête soumise est enregistrée. Les récents d'un compte
+sont synchronisés ; ceux d'un invité restent sur l'appareil et ne rejoignent un compte qu'après une
+confirmation explicite.
 
 **A5. Recherche — résultats**
 Grille de cartes (§8) filtrée par la requête, chips et filtres conservés. Empty state « Aucun résultat » + suggestions + « Essayer l'assistant IA » (§10).
@@ -420,6 +424,10 @@ Grille de cartes (§8) filtrée par la requête, chips et filtres conservés. Em
 
 **B1. Assistant IA** *(tap FAB)*
 Bottom sheet 90 %. Bulle d'intro + 2–3 prompts rapides en chips (« Restaurant chic et calme à Cotonou », « Que faire ce week-end ? »). Conversation messagerie : bulles user (droite, `ink/100`) / assistant (gauche, surface). **Réponse structurée** : texte court + **3–5 mini-cartes horizontales** (carte §8 réduite) → tap = `DetailSheet`. Indicateur de frappe. **Micro-label « Source : fiche {nom} »** sur chaque reco (anti-hallucination). Champ bas + micro (vocal V1.1). États : **« Aucun résultat dans le catalogue »**, erreur réseau (retry). Réponses dans la langue de l'utilisateur.
+
+Si la personnalisation est activée, la requête courante peut être accompagnée d'un **résumé
+structuré et borné des intérêts** dérivés de l'historique ; l'historique brut complet n'est jamais
+injecté dans le modèle.
 
 **B2. Surprenez-moi** *(appui long FAB)*
 Plein écran immersif (pas une sheet) : carte hero ~70 %, image plein cadre, titre superposé, **CTA noir « Voir la fiche »** + bouton rond « Relancer » (`casino`). Crossfade + léger scale (250 ms) entre tirages. Tirage pondéré popularité + proximité, exclusion des favoris/vus récents.
@@ -538,6 +546,9 @@ Identité, email/téléphone (avec « Modifier »), **chip de statut de vérific
 **G4. Préférences**
 - **Notifications** : **toggles par famille** (Suggestions / Sponsorisé / Nouveautés / Alertes événementielles) + **plafond de fréquence** (curseur ou choix). Opt-out granulaire.
 - **Dark Mode** : toggle (application instantanée, sans reload).
+- **Recherches récentes** : consulter, effacer une entrée ou tout effacer.
+- **Personnalisation par activité** : toggle distinct pour autoriser les signaux dérivés de
+  l'historique dans l'Assistant IA et le feed organique ; aucun effet sur le sponsorisé.
 
 **G5. Internationalisation**
 - **Langue** : liste des 6 (nom natif), application instantanée.
@@ -551,7 +562,9 @@ Identité, email/téléphone (avec « Modifier »), **chip de statut de vérific
 TikTok : état (chip `@username` si connecté), **Connecter** (→ K1) / **Déconnecter** (rouge clair + dialog).
 
 **G8. Danger Zone**
-**Supprimer le compte** (rouge, **dialog irréversible** + ré-authentification), **Se déconnecter** (dialog de confirmation).
+**Supprimer le compte** (rouge, **dialog irréversible** + ré-authentification ; purge de l'historique
+et de ses signaux dérivés), **Se déconnecter** (dialog de confirmation, sans suppression de
+l'historique du compte).
 
 ### Groupe H — Ajout de contenu
 
@@ -647,7 +660,12 @@ Portrait verrouillé, contenu plein écran (aspectFill), safe-area top 0, swipe 
 - **Interactions** : **double-tap = Like** (Heart Burst 200 ms) ; overlay droit **Suivre / Like / Commentaires (J2, V1.1) / Partager** ; long-press = pause + **télécharger/signaler**. **Watermark Kwabor non maskable** (§2) sur photos **et** vidéos.
 - **Mention d'entité** (rattachement obligatoire de tout contenu) : puce **`place`/`event` + nom** posée en bas-gauche, au-dessus de la légende — à l'image des « événements à venir » affichés sur les contenus d'un créateur.
 - **Aperçu de fiche par la mention** : au **tap sur la mention**, un **aperçu de la fiche s'ouvre au-dessus du contenu**, **hauteur ≤ 25 %** (mini-hero + titre + note + chip prix), **laissant le contenu visible** dessous. **Taper le contenu** → l'aperçu **se referme** et on **continue de scroller** ; **taper l'aperçu** → ouverture de la **fiche détail complète** (`DetailSheet` §9). Animation d'ouverture/fermeture 200 ms.
-- **Provenance** : le feed mêle les publications suivies et une découverte pondérée ; chaque contenu renvoie au **profil de l'auteur** (F6). États : chargement (skeleton vidéo/vignette), erreur (retry), offline, empty. **Invité** : le feed est visible en mur souple ; Like/Suivre/publier déclenchent l'invite (E4).
+- **Provenance** : le feed mêle les publications suivies et une découverte pondérée ; si la
+  personnalisation est activée, cette découverte organique peut utiliser des signaux bornés dérivés
+  des recherches soumises. Ils n'influencent jamais le sponsorisé. Chaque contenu renvoie au
+  **profil de l'auteur** (F6). États : chargement (skeleton vidéo/vignette), erreur (retry), offline,
+  empty. **Invité** : le feed est visible en mur souple ; Like/Suivre/publier déclenchent l'invite
+  (E4).
 
 **J2. Panel commentaires** *(V1.1)*
 Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commentaire**, **répondre**, **signaler**), champ de saisie en bas, indicateur d'envoi. Empty « Soyez le premier à commenter ».
