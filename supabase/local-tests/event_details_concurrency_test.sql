@@ -33,7 +33,9 @@ begin
         app_private.catalog_text_has_canonical_edges(text),
         app_private.catalog_timestamp_is_mobile_safe(timestamptz),
         app_private.catalog_tags_are_valid(text[]),
-        app_private.catalog_point_is_within_benin(numeric, numeric)
+        app_private.catalog_point_is_within_benin(numeric, numeric),
+        app_private.catalog_search_normalize(text),
+        app_private.catalog_search_document(text, text[])
       from kwabor_event_concurrency_test
     $revoke_validators$;
     execute 'revoke usage on schema app_private from kwabor_event_concurrency_test';
@@ -66,7 +68,9 @@ grant execute on function
   app_private.catalog_text_has_canonical_edges(text),
   app_private.catalog_timestamp_is_mobile_safe(timestamptz),
   app_private.catalog_tags_are_valid(text[]),
-  app_private.catalog_point_is_within_benin(numeric, numeric)
+  app_private.catalog_point_is_within_benin(numeric, numeric),
+  app_private.catalog_search_normalize(text),
+  app_private.catalog_search_document(text, text[])
 to kwabor_event_concurrency_test;
 grant select on table public.categories to kwabor_event_concurrency_test;
 grant select, insert, update, delete
@@ -764,7 +768,9 @@ revoke execute on function
   app_private.catalog_text_has_canonical_edges(text),
   app_private.catalog_timestamp_is_mobile_safe(timestamptz),
   app_private.catalog_tags_are_valid(text[]),
-  app_private.catalog_point_is_within_benin(numeric, numeric)
+  app_private.catalog_point_is_within_benin(numeric, numeric),
+  app_private.catalog_search_normalize(text),
+  app_private.catalog_search_document(text, text[])
 from kwabor_event_concurrency_test;
 revoke usage on schema app_private from kwabor_event_concurrency_test;
 drop role kwabor_event_concurrency_test;
