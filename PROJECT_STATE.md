@@ -2,22 +2,22 @@
 
 ## Phase actuelle
 
-Post-intégration V1 — les PR `#50`, `#51` et `#52` sont fusionnées dans `main`, l’état documentaire
-est resynchronisé et les prochains lots restent petits et indépendants.
+Post-intégration V1 — les PR `#50`, `#51`, `#52` et `#53` sont fusionnées dans `main`, l’état
+documentaire est resynchronisé et les prochains lots restent petits et indépendants.
 
 ## Snapshot courant — 4 août 2026
 
-- La base `main` validée avant HISTORY-001A pointe sur le commit de fusion
-  `7e279c012372d0d1b0aa2fb3bdd780df19ae5950` de la PR `#52`. Elle inclut la fondation HISTORY-001
-  de la PR `#51` et l’intégration V1 de la PR `#50`.
+- `main` pointe sur le commit de fusion `8571752e6febcd64d4a74d0e3b55125dce70a308` de la PR `#53`.
+  Il inclut l’autorité Supabase HISTORY-001A, la fondation domaine de `#51`, l’optimisation CI de
+  `#52` et l’intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
 - La PR parallèle `#34` est fermée sans fusion avec commentaire de supersession et n'est pas ancêtre
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
-- Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`) et `30935484599` (`#52`) sont
-  verts pour l’intégrité, Gradle, Supabase, l’Edge Function et Xcode simulateur
+- Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`) et
+  `30940684400` (`#53`) sont verts pour l’intégrité, Gradle, Supabase, l’Edge Function et Xcode simulateur
   Debug/Staging/Release. CI-001 force toujours iOS sur `main` et ne l’omet en PR que pour les
   périmètres explicitement sûrs ; tout chemin inconnu reste fail-safe.
 - Sont désormais présents dans `main` : sécurité/architecture de la pile, intro Store-only,
@@ -37,14 +37,17 @@ est resynchronisé et les prochains lots restent petits et indépendants.
   Search, scopes invité/compte, préférences, import confirmé, contrats repository et diagnostics
   expurgés. Le cache Search actuel stocke des résultats bornés mais encore aucune requête utilisateur.
   ADR-0029 fixe les plafonds 200 serveur/50 local, le défaut de personnalisation désactivé et la
-  resoumission sans doublon ; seules la rétention serveur proposée de 180 jours et l'activation de
-  la personnalisation restent bloquées par le Juridique/DPO.
+  resoumission sans doublon. Pour le texte actif V1, la rétention serveur proposée de 180 jours et
+  l'activation de la personnalisation restent bloquées par le Juridique/DPO ; le protocole V2
+  proposé ajoute notamment la durée de conservation de ses métadonnées à arbitrer.
 - HISTORY-001A livre l’autorité Supabase RPC-only, le snapshot propriétaire, la préférence
   désactivée, le cap concurrent de 200 et la purge de compte. Le protocole tombstone/watermark reste
-  explicitement réservé à HISTORY-001B. La tête définit 85 assertions HISTORY et conserve les
-  harness de concurrence existant (12) et HISTORY (11) ; leur validation GitHub exacte reste la gate
-  avant fusion. Aucun job de rétention ni déploiement automatique d’environnement distant n’est
-  activé.
+  explicitement réservé à HISTORY-001B. Le run exact-head `30938251112` passe 85 assertions HISTORY,
+  899 assertions pgTAP au total, les harness de concurrence existant (12) et HISTORY (11), Gradle,
+  Android API 30/31/36 et iOS Debug/Staging/Release. Aucun job de rétention ni déploiement
+  automatique d’environnement distant n’est activé. Le run post-fusion `30940684400` est également
+  entièrement vert sur le SHA `8571752e6febcd64d4a74d0e3b55125dce70a308`, avec validation iOS
+  complète forcée sur `main`.
 
 ## Historique des tâches terminées
 
@@ -433,8 +436,9 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
   de 200 requêtes canoniques distinctes actives côté serveur, 50 par scope et appareil en local, une
   personnalisation désactivée par défaut et la remontée de l'entrée existante lors d'une resoumission
   canonique identique. Aucun texte libre ne rejoint les analytics ou les logs. La rétention serveur
-  glissante proposée de 180 jours et l'activation de la personnalisation restent les deux seuls
-  points de politique HISTORY-001 bloqués par une validation Juridique/DPO.
+  glissante proposée de 180 jours et l'activation de la personnalisation restent les deux points de
+  politique du texte actif bloqués par une validation Juridique/DPO. La conservation des
+  métadonnées du protocole V2 proposé exige en plus les validations listées dans ADR-0031.
 - HISTORY-001-FOUNDATION livre en domaine Kotlin pur la canonicalisation commune à Search, les scopes
   invité/compte, les entrées ordonnées sans doublon canonique, les préférences refusées par défaut,
   l'import invité confirmé et les contrats d'effacement. Supabase, Room, synchronisation et UI restent
@@ -457,18 +461,20 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-HISTORY-001A livre la politique et l’autorité serveur bornée sans UI ni protocole offline. Le lot
-prioritaire suivant est HISTORY-001B : définir d’abord le protocole versionné tombstone/watermark,
-puis raccorder Room et l’outbox sans résurrection d’un historique effacé. FAVORITES-001A et
+HISTORY-001A livre la politique et l’autorité serveur bornée sans UI ni protocole offline. ADR-0031
+propose le protocole versionné de HISTORY-001B, mais tous ses gates Produit, Sécurité,
+Juridique/DPO et Opérations restent à arbitrer avant Room ou l’outbox. FAVORITES-001A et
 EXPLORE-002B2A peuvent avancer séparément sans recréer une pile d’intégration longue. STAB-002B
 reste suspendu à la décision structurante sur les cinq racines V1.
 
 ## Blocages / limites
 
 - Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
-- Pour HISTORY-001, seuls la rétention serveur glissante proposée de 180 jours et les modalités
-  juridiques d'activation de la personnalisation restent bloquées par le Juridique/DPO. Les plafonds,
-  le défaut désactivé et la resoumission sans doublon sont déjà actés par ADR-0029.
+- Pour le texte actif HISTORY V1, la rétention serveur glissante proposée de 180 jours et les
+  modalités juridiques d'activation de la personnalisation restent bloquées par le Juridique/DPO.
+  Les plafonds, le défaut désactivé et la resoumission sans doublon sont déjà actés par ADR-0029.
+  ADR-0031 reste proposé et ajoute des gates V2, dont la durée de conservation des tombstones et
+  clés d’idempotence avec Juridique/DPO et Opérations.
 - La navigation globale complète, les fonctions de détail encore absentes, l'administration
   opérateur, les contenus réels, le pipeline média et les validations natives/appareils bloquent
   encore une V1 commercialement exploitable. Les actions externes intégrées ne couvrent pas encore
@@ -543,9 +549,10 @@ reste suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Concevoir HISTORY-001B autour d’un protocole offline versionné avec révisions, tombstones et
-watermark avant toute outbox ou synchronisation Room. FAVORITES-001A et EXPLORE-002B2A restent les
-deux lots indépendants suivants. OPS-001B ne démarre qu'après
+Faire arbitrer ADR-0031 avant d’implémenter HISTORY-001B, puis construire le protocole offline
+versionné avec révisions, tombstones et watermark avant toute outbox ou synchronisation Room.
+FAVORITES-001A et EXPLORE-002B2A restent les deux lots indépendants suivants. OPS-001B ne démarre
+qu'après
 provisionnement staging ; avant d'activer `account-delete`, les AMR réelles et la politique des
 en-têtes/journaux doivent être qualifiées. Tout changement d'octets de la vidéo embarquée exige
 toujours une nouvelle release Android/iOS dans les Stores.
