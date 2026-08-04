@@ -31,7 +31,7 @@ exception
 end;
 $$;
 
-select plan(75);
+select plan(85);
 
 insert into auth.users (
   id,
@@ -421,6 +421,58 @@ select is(
   'canonicalization trims submitted text without case folding'
 );
 
+select is(
+  app_private.search_history_canonicalize_v1(U&'\00A0Recherche Cotonou\00A0'),
+  'Recherche Cotonou',
+  'canonicalization trims non-breaking Unicode spaces like Kotlin'
+);
+
+select is(
+  app_private.search_history_canonicalize_v1(E'\tRecherche Cotonou\t'),
+  'Recherche Cotonou',
+  'canonicalization trims peripheral control whitespace before validation'
+);
+
+select throws_ok(
+  $sql$
+    select app_private.search_history_canonicalize_v1(U&'\00A0')
+  $sql$,
+  '22023',
+  'Submitted search query is invalid',
+  'canonicalization rejects Unicode whitespace-only text'
+);
+
+select is(
+  pg_catalog.char_length(
+    app_private.search_history_canonicalize_v1(
+      pg_catalog.repeat(U&'\+01F600', 119)
+    )
+  ),
+  119,
+  'canonicalization accepts 119 supplementary Unicode code points'
+);
+
+select is(
+  pg_catalog.char_length(
+    app_private.search_history_canonicalize_v1(
+      pg_catalog.repeat(U&'\+01F600', 120)
+    )
+  ),
+  120,
+  'canonicalization accepts 120 supplementary Unicode code points'
+);
+
+select throws_ok(
+  $sql$
+    select app_private.search_history_canonicalize_v1(
+      pg_catalog.repeat(U&'\+01F600', 121)
+    )
+  $sql$,
+  '22023',
+  'Submitted search query is invalid',
+  'canonicalization rejects 121 supplementary Unicode code points'
+);
+
 select throws_ok(
   $sql$
     select app_private.search_history_canonicalize_v1(E'query\nvalue')
@@ -577,14 +629,15 @@ select lives_ok(
 );
 reset role;
 
-select is(
+select cmp_ok(
   (
     select history_entry.last_submitted_at
     from public.search_history_entries as history_entry
     where history_entry.user_id = 'b8100000-0000-4000-8000-000000000002'
   ),
+  '>',
   (select future_submission.last_submitted_at from future_submission),
-  'resubmission never moves the authoritative submission time backward'
+  'resubmission advances monotonically after a backward server clock adjustment'
 );
 
 create temporary table foreign_entry as
@@ -757,6 +810,82 @@ select ok(
       and history_entry.canonical_query = 'cap-201'
   ),
   'record keeps the newly submitted query at capacity'
+);
+
+delete from public.search_history_entries
+where user_id = 'b8100000-0000-4000-8000-000000000001';
+
+insert into public.search_history_entries (
+  user_id,
+  canonical_query,
+  created_at,
+  last_submitted_at
+)
+select
+  'b8100000-0000-4000-8000-000000000001',
+  'future-cap-' || pg_catalog.lpad(sequence_number::text, 3, '0'),
+  pg_catalog.statement_timestamp() + interval '1 hour' + sequence_number * interval '1 millisecond',
+  pg_catalog.statement_timestamp() + interval '1 hour' + sequence_number * interval '1 millisecond'
+from pg_catalog.generate_series(1, 200) as generated(sequence_number);
+
+create temporary table future_clock_boundary as
+select pg_catalog.max(history_entry.last_submitted_at) as last_submitted_at
+from public.search_history_entries as history_entry
+where history_entry.user_id = 'b8100000-0000-4000-8000-000000000001';
+
+create temporary table clock_rollback_submission (
+  entry_id uuid not null,
+  query_text text not null,
+  created_at timestamptz not null,
+  last_submitted_at timestamptz not null
+);
+grant insert, select on table clock_rollback_submission to authenticated;
+
+select tests.use_auth_context(
+  'authenticated',
+  'b8100000-0000-4000-8000-000000000001'
+);
+insert into clock_rollback_submission
+select *
+from public.record_search_history_v1('new-after-clock-rollback');
+reset role;
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.search_history_entries as history_entry
+    where history_entry.user_id = 'b8100000-0000-4000-8000-000000000001'
+  ),
+  200::bigint,
+  'clock rollback handling preserves the server cap'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.search_history_entries as history_entry
+    join clock_rollback_submission as recorded
+      on recorded.entry_id = history_entry.id
+    where history_entry.user_id = 'b8100000-0000-4000-8000-000000000001'
+  ),
+  'record never returns an entry immediately evicted after clock rollback'
+);
+
+select ok(
+  not exists (
+    select 1
+    from public.search_history_entries as history_entry
+    where history_entry.user_id = 'b8100000-0000-4000-8000-000000000001'
+      and history_entry.canonical_query = 'future-cap-001'
+  ),
+  'clock rollback handling evicts the logically oldest future-dated entry'
+);
+
+select cmp_ok(
+  (select recorded.last_submitted_at from clock_rollback_submission as recorded),
+  '>',
+  (select boundary.last_submitted_at from future_clock_boundary as boundary),
+  'record advances account time monotonically beyond the stored ceiling'
 );
 
 grant select on table public.search_history_entries to authenticated;

@@ -9,7 +9,10 @@ create table public.search_history_entries (
   created_at timestamptz not null,
   last_submitted_at timestamptz not null,
   constraint search_history_entries_query_valid check (
-    canonical_query = pg_catalog.btrim(canonical_query)
+    canonical_query = pg_catalog.btrim(
+      canonical_query,
+      U&'\0009\000A\000B\000C\000D\001C\001D\001E\001F\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000'
+    )
     and pg_catalog.char_length(canonical_query) between 1 and 120
     and canonical_query !~ '[[:cntrl:]]'
   ),
@@ -81,11 +84,14 @@ parallel safe
 set search_path = ''
 as $$
 declare
-  canonical_query text := pg_catalog.btrim(p_query);
+  canonical_query text := pg_catalog.btrim(
+    p_query,
+    U&'\0009\000A\000B\000C\000D\001C\001D\001E\001F\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000'
+  );
 begin
   if pg_catalog.char_length(canonical_query) < 1
     or pg_catalog.char_length(canonical_query) > 120
-    or p_query ~ '[[:cntrl:]]'
+    or canonical_query ~ '[[:cntrl:]]'
   then
     raise invalid_parameter_value
       using message = 'Submitted search query is invalid';
@@ -96,7 +102,7 @@ end;
 $$;
 
 comment on function app_private.search_history_canonicalize_v1(text) is
-  'Validates and trims submitted keyword text without case-folding or logging its value.';
+  'Trims Kotlin-compatible Unicode whitespace and validates 1-120 Unicode code points without case-folding or logging the value.';
 
 revoke all
 on function app_private.search_history_canonicalize_v1(text)
@@ -119,7 +125,7 @@ as $$
 declare
   current_user_id uuid := (select auth.uid());
   canonical_query text;
-  recorded_at timestamptz := pg_catalog.statement_timestamp();
+  recorded_at timestamptz;
   recorded_entry public.search_history_entries%rowtype;
 begin
   if current_user_id is null then
@@ -149,6 +155,24 @@ begin
     raise insufficient_privilege
       using message = 'Account deletion in progress';
   end if;
+
+  -- `statement_timestamp()` can move behind values already stored after a
+  -- clock correction. Under the account lock, advance the logical submission
+  -- time beyond the newest entry so a successful insert can never be selected
+  -- immediately by the bounded eviction below.
+  recorded_at := greatest(
+    pg_catalog.statement_timestamp(),
+    coalesce(
+      (
+        select history_entry.last_submitted_at + interval '1 microsecond'
+        from public.search_history_entries as history_entry
+        where history_entry.user_id = current_user_id
+        order by history_entry.last_submitted_at desc
+        limit 1
+      ),
+      pg_catalog.statement_timestamp()
+    )
+  );
 
   insert into public.search_history_preferences (user_id)
   values (current_user_id)

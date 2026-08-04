@@ -40,8 +40,40 @@ class SearchRepositoryTest {
     }
 
     @Test
+    fun queryPreservesUnicodeTrimBeforeValidation() {
+        assertIs<DomainResult.Failure>(SearchQuery.from("\u00A0\u00A0"))
+
+        val query =
+            assertIs<DomainResult.Success<SearchQuery>>(
+                SearchQuery.from("\tRestaurant à Cotonou\t"),
+            ).value
+
+        assertEquals("Restaurant à Cotonou", query.text)
+    }
+
+    @Test
+    fun queryLengthCountsUnicodeCodePoints() {
+        val emoji = "\uD83D\uDE00"
+
+        listOf(119, 120).forEach { count ->
+            val expected = emoji.repeat(count)
+            val query = assertIs<DomainResult.Success<SearchQuery>>(SearchQuery.from(expected)).value
+            assertEquals(expected, query.text)
+        }
+        assertIs<DomainResult.Failure>(SearchQuery.from(emoji.repeat(121)))
+    }
+
+    @Test
     fun queryRejectsInvalidTextAndUnsupportedFilters() {
-        val invalidInputs = listOf("   ", "a".repeat(121), "restaurant\nkwabor")
+        val invalidInputs =
+            listOf(
+                "   ",
+                "a".repeat(121),
+                "restaurant\nkwabor",
+                "\uD83D",
+                "\uDE00",
+                "\uD83Da",
+            )
 
         invalidInputs.forEach { text ->
             assertEquals(

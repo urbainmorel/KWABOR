@@ -27,13 +27,17 @@ effacer une entrée et vider l’historique. Les tables publiques restent sans p
 rôles clients ; les RPC `SECURITY DEFINER`, à `search_path` vide et avec contrôle explicite de
 `auth.uid()`, sont l’unique frontière mobile.
 
-- Le texte reçu par l’opération d’enregistrement est borné à 1–120 caractères après trim et refuse
-  les caractères de contrôle. Aucune erreur, trace ou métrique ne reprend sa valeur.
+- Le texte reçu par l’opération d’enregistrement applique le même trim Unicode que Kotlin, refuse
+  les caractères de contrôle restants et compte 1–120 points de code Unicode plutôt que les unités
+  UTF-16 de la représentation. Les paires de substitution valides comptent donc pour un caractère ;
+  aucune erreur, trace ou métrique ne reprend la valeur soumise.
 - L’unicité porte sur le compte et le texte canonique sensible à la casse. Une resoumission conserve
   l’identifiant et `created_at`, puis actualise `last_submitted_at` avec l’horloge serveur.
 - Les mutations d’un compte prennent le même verrou transactionnel que sa suppression de compte.
-  L’upsert et l’éviction sont ainsi sérialisés et ne dépassent jamais 200 lignes actives, même entre
-  plusieurs appareils.
+  Sous ce verrou, l’horloge logique avance strictement au-delà de la dernière soumission déjà
+  stockée ; un recul de l’horloge système ne peut donc pas faire évincer l’entrée que la RPC vient de
+  retourner. L’upsert et l’éviction sont sérialisés et ne dépassent jamais 200 lignes actives, même
+  entre plusieurs appareils.
 - La préférence de personnalisation est initialisée à `false`, reste distincte de l’effacement des
   récents et n’a encore aucun RPC d’activation. La rétention glissante de 180 jours, son job et toute
   production de signaux restent absents.
