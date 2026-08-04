@@ -185,6 +185,7 @@ jobs:
           supabase db lint --local --schema public,app_private --level warning --fail-on warning
           supabase test db
           python3 tools/test-event-details-concurrency.py
+          python3 tools/test-search-history-concurrency.py
 
       - name: Enforce security advisors and inspect performance
         run: |

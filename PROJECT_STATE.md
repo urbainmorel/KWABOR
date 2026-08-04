@@ -37,6 +37,11 @@ et les prochains lots doivent rester petits et indépendants.
   ADR-0029 fixe les plafonds 200 serveur/50 local, le défaut de personnalisation désactivé et la
   resoumission sans doublon ; seules la rétention serveur proposée de 180 jours et l'activation de
   la personnalisation restent bloquées par le Juridique/DPO.
+- HISTORY-001A est implémenté localement, non publié et non déployé sur
+  `codex/history-001a-authority` : autorité Supabase RPC-only, snapshot propriétaire, préférence
+  désactivée, cap concurrent de 200 et purge de compte. Le protocole tombstone/watermark reste
+  explicitement réservé à HISTORY-001B ; la migration complète passe 889 assertions pgTAP et les
+  harness de concurrence existant (12) et HISTORY (11).
 
 ## Historique des tâches terminées
 
