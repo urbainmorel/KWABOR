@@ -1,6 +1,7 @@
 package com.kwabor.shared.app
 
 import com.kwabor.shared.domain.i18n.AppLocale
+import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExploreEffect
@@ -17,20 +18,30 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-enum class IosExploreEffect {
+enum class IosExploreEffectKind {
     RequireAuthentication,
     ProtectedActionReplayed,
     RequestLocation,
-    ;
+}
+
+data class IosExploreEffect(
+    val kind: IosExploreEffectKind,
+    val replayAnalyticsEvent: AnalyticsEvent? = null,
+) {
+    init {
+        require(kind == IosExploreEffectKind.ProtectedActionReplayed || replayAnalyticsEvent == null) {
+            "Only protected-action replay effects may carry analytics context."
+        }
+    }
 
     val requiresAuthentication: Boolean
-        get() = this == RequireAuthentication
+        get() = kind == IosExploreEffectKind.RequireAuthentication
 
     val requestsLocation: Boolean
-        get() = this == RequestLocation
+        get() = kind == IosExploreEffectKind.RequestLocation
 
     val replaysProtectedAction: Boolean
-        get() = this == ProtectedActionReplayed
+        get() = kind == IosExploreEffectKind.ProtectedActionReplayed
 }
 
 class IosExploreFeedActions internal constructor(
@@ -265,7 +276,10 @@ private fun unavailableState(strings: KwaborStrings): ExploreUiState = initialEx
 )
 
 private fun ExploreEffect.toIosEffect(): IosExploreEffect = when (this) {
-    is ExploreEffect.AuthenticationRequired -> IosExploreEffect.RequireAuthentication
-    is ExploreEffect.ProtectedActionReplayed -> IosExploreEffect.ProtectedActionReplayed
-    ExploreEffect.RequestLocation -> IosExploreEffect.RequestLocation
+    is ExploreEffect.AuthenticationRequired -> IosExploreEffect(IosExploreEffectKind.RequireAuthentication)
+    is ExploreEffect.ProtectedActionReplayed -> IosExploreEffect(
+        kind = IosExploreEffectKind.ProtectedActionReplayed,
+        replayAnalyticsEvent = analyticsEvent,
+    )
+    ExploreEffect.RequestLocation -> IosExploreEffect(IosExploreEffectKind.RequestLocation)
 }

@@ -81,10 +81,7 @@ internal fun IntroScreen(
 }
 
 @Composable
-private fun BoxScope.IntroPrimaryContent(
-    state: IntroScreenState,
-    actions: IntroScreenActions,
-) {
+private fun BoxScope.IntroPrimaryContent(state: IntroScreenState, actions: IntroScreenActions) {
     when (introPrimaryMode(state.reducedMotion, state.staticFallbackRequired)) {
         IntroPrimaryMode.StaticFallback -> {
             Image(

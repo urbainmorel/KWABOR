@@ -24,6 +24,7 @@ struct OnboardingView: View {
                     guideDiscoveryStore: guideDiscoveryStore,
                     catalogDetailStore: catalogDetailStore,
                     isGuestSession: coordinator.isGuestSession,
+                    pendingProtectedDestinationKey: coordinator.pendingProtectedDestinationKey,
                     strings: coordinator.strings,
                     settingsStrings: coordinator.strings.settings,
                     accountEmail: coordinator.accountSettingsSession?.email,
@@ -36,7 +37,10 @@ struct OnboardingView: View {
                     latestAccountSecurityError: { coordinator.authState?.errorMessage },
                     isSigningOutAccount: coordinator.isSigningOutAccount,
                     accountSignOutErrorMessage: coordinator.accountSignOutErrorMessage,
-                    onProtectedDestinationSelected: coordinator.presentAuthentication,
+                    onProtectedDestinationSelected: {
+                        coordinator.presentAuthentication(forProtectedDestinationKey: $0)
+                    },
+                    onPendingProtectedDestinationConsumed: coordinator.consumePendingProtectedDestination,
                     onExploreAuthenticationRequired: presentContextualSoftWall,
                     onSignOut: coordinator.signOutCurrentAccount,
                     onDismissSignOutError: coordinator.clearAccountSignOutError,
@@ -46,8 +50,13 @@ struct OnboardingView: View {
                     },
                     onAccountDeleted: coordinator.accountDeletionCompleted,
                     onObservabilityConsentChanged: coordinator.updateObservabilityConsent,
-                    rootDeepLinkDestinationKey: coordinator.pendingRootDeepLinkDestinationKey,
-                    onRootDeepLinkConsumed: coordinator.consumeRootDeepLinkDestination,
+                    rootDeepLinkDelivery: coordinator.pendingRootDeepLinkDelivery,
+                    onProtectedRootDeepLinkTransferred: {
+                        coordinator.transferRootDeepLinkToProtectedAuthentication($0)
+                    },
+                    onRootDeepLinkAcknowledged: {
+                        coordinator.acknowledgeRootDeepLink(delivery: $0)
+                    },
                     catalogDetailDeepLinkDelivery: coordinator.catalogDetailDeepLinkDeliveryReadyForOpening,
                     isCatalogDetailDeepLinkCurrent: {
                         coordinator.isCurrentCatalogDetailDeepLink(delivery: $0)
@@ -210,18 +219,21 @@ private struct ContextualSoftWallView: View {
                 Text(exploreStrings.signInRequiredForInteraction)
                     .font(.body)
                     .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
-                FederatedSignInButtons(store: federatedStore, isDisabled: false)
+                FederatedSignInButtons(store: federatedStore, isDisabled: federatedStore.isLoading)
                 Button(coordinator.strings.signUp, action: onRegistrationSelected)
                     .buttonStyle(.borderedProminent)
                     .tint(KwaborDesignTokens.ColorToken.ink950)
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .disabled(federatedStore.isLoading)
                 Button(coordinator.strings.signIn, action: onAuthenticationSelected)
                     .buttonStyle(.bordered)
                     .tint(KwaborDesignTokens.ColorToken.ink950)
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .disabled(federatedStore.isLoading)
                 Button(coordinator.strings.registrationLater, action: onLater)
                     .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .disabled(federatedStore.isLoading)
             }
             .padding(KwaborDesignTokens.Spacing.xxl)
             .background(KwaborDesignTokens.ColorToken.surface0)

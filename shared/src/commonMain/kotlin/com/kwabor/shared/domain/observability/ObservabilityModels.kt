@@ -101,8 +101,8 @@ data class AnalyticsContext(
     val displayCurrency: KwaborCurrency = KwaborCurrency.Xof,
 ) {
     init {
-        require(cityId.isSafeIdentifierOrNull()) { "Analytics city IDs must be opaque identifiers." }
-        require(entityId.isSafeIdentifierOrNull()) { "Analytics entity IDs must be opaque identifiers." }
+        require(cityId.isAnalyticsSafeIdentifierOrNull()) { "Analytics city IDs must be opaque identifiers." }
+        require(entityId.isAnalyticsSafeIdentifierOrNull()) { "Analytics entity IDs must be opaque identifiers." }
         require(entityType != AnalyticsEntityType.NotApplicable || entityId == null) {
             "An entity ID requires a concrete analytics entity type."
         }
@@ -125,5 +125,6 @@ data class AnalyticsEvent(
     }
 }
 
-private fun String?.isSafeIdentifierOrNull(): Boolean = this == null || SAFE_IDENTIFIER_PATTERN.matches(this)
+internal fun String?.isAnalyticsSafeIdentifierOrNull(): Boolean = this == null || SAFE_IDENTIFIER_PATTERN.matches(this)
+
 private val SAFE_IDENTIFIER_PATTERN = Regex(pattern = "^[A-Za-z0-9_-]{1,64}$")

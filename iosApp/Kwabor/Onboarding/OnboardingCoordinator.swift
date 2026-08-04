@@ -31,6 +31,7 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var sessionRestoreFailed = false
     @Published private(set) var isDeletingAccount = false
     @Published private(set) var contextualAuthenticationCancellationRevision = 0
+    @Published private(set) var pendingProtectedDestinationKey: String?
 
     let bridge: KwaborSharedBridge
     let strings: OnboardingStrings
@@ -45,8 +46,8 @@ final class OnboardingCoordinator: ObservableObject {
         guestAccessGranted && !hasCompleteAccount
     }
 
-    var pendingRootDeepLinkDestinationKey: String? {
-        pendingInternalDeepLink.rootDestinationKey
+    var pendingRootDeepLinkDelivery: RootDeepLinkDelivery? {
+        pendingInternalDeepLink.rootDelivery
     }
 
     var catalogDetailDeepLinkDeliveryReadyForOpening: CatalogDetailDeepLinkDelivery? {
@@ -120,6 +121,7 @@ final class OnboardingCoordinator: ObservableObject {
     private let launchBundledIntroRevision: Int64?
     private var completedRegistrationSession: AuthSession?
     private var shouldPresentRegistrationAfterAuthenticationDismissal = false
+    private var registrationJourneyResolved = false
     private var isRevokingInterruptedRegistrationSession = false
     private var isReplacingInterruptedRegistrationSession = false
     private var isHandlingPromoterActivationCallback = false
@@ -243,6 +245,49 @@ final class OnboardingCoordinator: ObservableObject {
         isAuthenticationPresented = true
     }
 
+    func presentAuthentication(forProtectedDestinationKey destinationKey: String) {
+        guard isGuestSession,
+              !requiresProtectedAuthentication,
+              let destination = RootDestination(rawValue: destinationKey),
+              destination != .home else {
+            return
+        }
+        pendingProtectedDestinationKey = destination.rawValue
+        presentAuthentication()
+    }
+
+    @discardableResult
+    func consumePendingProtectedDestination(_ destinationKey: String) -> Bool {
+        guard pendingProtectedDestinationKey == destinationKey else { return false }
+        pendingProtectedDestinationKey = nil
+        return true
+    }
+
+    @discardableResult
+    func transferRootDeepLinkToProtectedAuthentication(
+        _ delivery: RootDeepLinkDelivery
+    ) -> Bool {
+        guard pendingInternalDeepLink.isCurrentRoot(delivery: delivery),
+              isGuestSession,
+              !requiresProtectedAuthentication,
+              !isRegistrationPresented,
+              let destination = RootDestination(rawValue: delivery.destinationKey),
+              destination != .home else {
+            return false
+        }
+        completeLaunchIntroForSelectedAction()
+        guard pendingInternalDeepLink.isCurrentRoot(delivery: delivery),
+              isGuestSession,
+              !requiresProtectedAuthentication,
+              !isRegistrationPresented,
+              pendingInternalDeepLink.acknowledgeRoot(delivery: delivery) else {
+            return false
+        }
+        pendingProtectedDestinationKey = destination.rawValue
+        isAuthenticationPresented = true
+        return true
+    }
+
     @discardableResult
     func presentContextualAuthentication(suggestedCityId: String?) -> Bool {
         guard isGuestSession, !requiresProtectedAuthentication else { return false }
@@ -257,6 +302,7 @@ final class OnboardingCoordinator: ObservableObject {
 
     func presentRegistration(suggestedCityId: String?) {
         guard !requiresProtectedAuthentication else { return }
+        registrationJourneyResolved = false
         completeLaunchIntroForSelectedAction()
         registrationCancellationErrorMessage = nil
         if authState?.hasSession != true {
@@ -302,12 +348,22 @@ final class OnboardingCoordinator: ObservableObject {
             isAuthenticationPresented = true
             return
         }
-        guard shouldPresentRegistrationAfterAuthenticationDismissal else {
+        switch ContextualAuthenticationDismissalPolicy.action(
+            hasCompleteAccount: hasCompleteAccount,
+            isRegistrationPresented: isRegistrationPresented,
+            registrationWasRequested: shouldPresentRegistrationAfterAuthenticationDismissal
+        ) {
+        case .cancel:
+            cancelPendingProtectedDestination()
             cancelContextualAuthJourney()
-            return
+        case .keepForAuthenticatedReplay:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+        case .keepForPresentedRegistration:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+        case .presentRequestedRegistration:
+            shouldPresentRegistrationAfterAuthenticationDismissal = false
+            presentRegistration(suggestedCityId: contextualAuthJourney?.suggestedCityId)
         }
-        shouldPresentRegistrationAfterAuthenticationDismissal = false
-        presentRegistration(suggestedCityId: contextualAuthJourney?.suggestedCityId)
     }
 
     func updateObservabilityConsent(_ category: ObservabilityConsentCategory, allowed: Bool) {
@@ -361,6 +417,7 @@ final class OnboardingCoordinator: ObservableObject {
         federatedIdentityHintStore.clearPendingHints()
         interruptedAuthJourneyStore.clearRegistration()
         registrationCancellationErrorMessage = nil
+        registrationJourneyResolved = true
         completedRegistrationSession = session
         guestAccessGranted = false
         completeContextualAuthJourney()
@@ -389,6 +446,7 @@ final class OnboardingCoordinator: ObservableObject {
 
     func handleExistingRegistrationAccount(email: String?) {
         bindObservability(to: nil)
+        registrationJourneyResolved = true
         interruptedAuthJourneyStore.mark(.registration)
         interruptedRegistrationEmail = normalizedEmail(email)
         completedRegistrationSession = nil
@@ -514,8 +572,9 @@ final class OnboardingCoordinator: ObservableObject {
         return requiresProtectedAuthentication
     }
 
-    func consumeRootDeepLinkDestination() {
-        pendingInternalDeepLink.consumeRoot()
+    @discardableResult
+    func acknowledgeRootDeepLink(delivery: RootDeepLinkDelivery) -> Bool {
+        pendingInternalDeepLink.acknowledgeRoot(delivery: delivery)
     }
 
     func isCurrentCatalogDetailDeepLink(delivery: CatalogDetailDeepLinkDelivery) -> Bool {
@@ -628,6 +687,7 @@ final class OnboardingCoordinator: ObservableObject {
             return
         }
         pendingInternalDeepLink.clear()
+        cancelPendingProtectedDestination()
         accountSignOutErrorMessage = nil
         isSigningOutAccount = true
         guestAccessGranted = true
@@ -644,6 +704,7 @@ final class OnboardingCoordinator: ObservableObject {
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
                 pendingInternalDeepLink.clear()
+                cancelPendingProtectedDestination()
                 registrationController.reset()
             } else {
                 guestAccessGranted = false
@@ -668,6 +729,7 @@ final class OnboardingCoordinator: ObservableObject {
         if isInProgress {
             _ = revokeObservabilityConsent()
             pendingInternalDeepLink.clear()
+            cancelPendingProtectedDestination()
             invalidatePromoterActivationCallbacksForAccountDeletion()
         } else if temporaryPromoterActivationSessionCleanupRequired {
             clearTemporaryPromoterActivationSessionBeforeBootstrap()
@@ -700,6 +762,7 @@ final class OnboardingCoordinator: ObservableObject {
         isAuthenticationPresented = false
         isRegistrationPresented = false
         pendingInternalDeepLink.clear()
+        cancelPendingProtectedDestination()
         resolveRoute()
     }
 
@@ -712,8 +775,8 @@ final class OnboardingCoordinator: ObservableObject {
         }
         guard requiresSignOut else {
             registrationController.reset()
+            recordRegistrationCancellation()
             isRegistrationPresented = false
-            cancelContextualAuthJourney()
             resolveRoute()
             return
         }
@@ -727,8 +790,8 @@ final class OnboardingCoordinator: ObservableObject {
                 GoogleSignInBootstrap.clearLocalSession()
                 completedRegistrationSession = nil
                 registrationController.reset()
+                recordRegistrationCancellation()
                 isRegistrationPresented = false
-                cancelContextualAuthJourney()
                 resolveRoute()
             } else {
                 registrationCancellationErrorMessage = authState?.errorMessage ?? strings.authUnavailable
@@ -739,7 +802,7 @@ final class OnboardingCoordinator: ObservableObject {
     func registrationPresentationDismissed() {
         guard !isRegistrationPresented, authState?.hasSession != true else { return }
         registrationController.reset()
-        cancelContextualAuthJourney()
+        recordRegistrationCancellation()
     }
 
     @discardableResult
@@ -845,6 +908,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         shouldPresentRegistrationAfterAuthenticationDismissal = false
         isAuthenticationPresented = false
+        cancelPendingProtectedDestination()
         cancelContextualAuthJourney()
     }
 
@@ -967,6 +1031,7 @@ final class OnboardingCoordinator: ObservableObject {
     private func resumeIncompleteRegistration(_ session: AuthSession) {
         guestAccessGranted = false
         isAuthenticationPresented = false
+        registrationJourneyResolved = false
         resumeRegistrationController(session)
         if !shouldPresentLaunchIntro {
             isRegistrationPresented = true
@@ -1014,6 +1079,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         guestAccessGranted = false
         isAuthenticationPresented = false
+        registrationJourneyResolved = false
         resumeRegistrationController(session)
         isRegistrationPresented = true
     }
@@ -1550,6 +1616,17 @@ final class OnboardingCoordinator: ObservableObject {
         guard contextualAuthJourney != nil else { return }
         contextualAuthJourney = nil
         contextualAuthenticationCancellationRevision += 1
+    }
+
+    private func cancelPendingProtectedDestination() {
+        pendingProtectedDestinationKey = nil
+    }
+
+    private func recordRegistrationCancellation() {
+        guard !registrationJourneyResolved else { return }
+        registrationJourneyResolved = true
+        cancelPendingProtectedDestination()
+        cancelContextualAuthJourney()
     }
 }
 

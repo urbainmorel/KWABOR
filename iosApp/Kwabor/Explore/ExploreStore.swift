@@ -25,6 +25,7 @@ final class ExploreStore: ObservableObject {
 
     private let controller: IosExploreController
     private let locationProvider: ApproximateLocationProviding
+    private let onProtectedActionReplayed: (AnalyticsEvent) -> Void
     private var paginationGuard = ExplorePaginationGuard()
     private var locationTask: Task<Void, Never>?
     private var lastAnnouncement: String?
@@ -36,10 +37,12 @@ final class ExploreStore: ObservableObject {
 
     init(
         controller: IosExploreController,
-        locationProvider: ApproximateLocationProviding? = nil
+        locationProvider: ApproximateLocationProviding? = nil,
+        onProtectedActionReplayed: @escaping (AnalyticsEvent) -> Void = { _ in }
     ) {
         self.controller = controller
         self.locationProvider = locationProvider ?? CoreLocationApproximateLocationProvider()
+        self.onProtectedActionReplayed = onProtectedActionReplayed
         state = controller.currentState
         strings = controller.strings
         isConfigured = controller.isConfigured
@@ -177,6 +180,11 @@ final class ExploreStore: ObservableObject {
             publishAuthenticationRequestIfNeeded(state.pendingAuthInteraction)
         } else if effect.requestsLocation {
             resolveLocation()
+        } else if effect.replaysProtectedAction {
+            authenticationRequest = nil
+            if let event = effect.replayAnalyticsEvent {
+                onProtectedActionReplayed(event)
+            }
         }
     }
 

@@ -3,10 +3,7 @@ package com.kwabor.android.presentation.explore
 import androidx.lifecycle.ViewModel
 import com.kwabor.android.auth.ApproximateLocationResult
 import com.kwabor.android.auth.ApproximateLocationService
-import com.kwabor.shared.domain.observability.AnalyticsContext
-import com.kwabor.shared.domain.observability.AnalyticsEntityType
 import com.kwabor.shared.domain.observability.AnalyticsEvent
-import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.explore.ExploreChip
 import com.kwabor.shared.presentation.explore.ExploreInteractionKind
@@ -87,15 +84,7 @@ internal class ExploreViewModel(
                 ),
             )
             SharedExploreEffect.RequestLocation -> emit(ExploreEffect.RequestLocationPermission)
-            is SharedExploreEffect.ProtectedActionReplayed -> track(
-                AnalyticsEvent(
-                    name = AnalyticsEventName.ProtectedActionReplayed,
-                    context = AnalyticsContext(
-                        entityType = AnalyticsEntityType.Place,
-                        entityId = effect.listingId,
-                    ),
-                ),
-            )
+            is SharedExploreEffect.ProtectedActionReplayed -> effect.analyticsEvent?.let(track)
         }
     }
 

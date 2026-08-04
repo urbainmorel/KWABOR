@@ -24,6 +24,9 @@ import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
+import com.kwabor.shared.domain.observability.AnalyticsEntityType
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.domain.preferences.AppPreferences
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.stringsFor
@@ -35,7 +38,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -106,11 +112,15 @@ class ExploreViewModelTest {
     @Test
     fun replayPendingInteraction_appliesAuthenticatedResult() = runTest {
         val repository = ViewModelCatalogRepository(requiresAuthentication = true)
-        val viewModel = viewModel(repository)
+        val trackedEvents = mutableListOf<AnalyticsEvent>()
+        val viewModel = viewModel(repository, track = trackedEvents::add)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.effects.collect()
+        }
         advanceUntilIdle()
         viewModel.onIntent(ExploreIntent.ToggleLike(TEST_LISTING_ID))
         advanceUntilIdle()
-        viewModel.effects.first()
+        assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
 
         repository.requiresAuthentication = false
         viewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
@@ -119,6 +129,11 @@ class ExploreViewModelTest {
         assertNull(viewModel.state.value.pendingAuthInteraction)
         assertTrue(viewModel.state.value.listings.single().liked)
         assertEquals(1, viewModel.state.value.listings.single().likesCount)
+        assertEquals(1, trackedEvents.size)
+        assertEquals(AnalyticsEventName.ProtectedActionReplayed, trackedEvents.single().name)
+        assertEquals(AnalyticsEntityType.Place, trackedEvents.single().context.entityType)
+        assertEquals(TEST_LISTING_ID, trackedEvents.single().context.entityId)
+        assertEquals(TEST_CITY_ID, trackedEvents.single().context.cityId)
     }
 
     @Test
@@ -374,6 +389,7 @@ class ExploreViewModelTest {
         locationService: ApproximateLocationService = ApproximateLocationService {
             ApproximateLocationResult.Unavailable
         },
+        track: (AnalyticsEvent) -> Unit = {},
     ): ExploreViewModel {
         val viewModelScope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
         requireNotNull(coroutineContext[Job]).invokeOnCompletion { viewModelScope.cancel() }
@@ -387,6 +403,7 @@ class ExploreViewModelTest {
             locationService = locationService,
             strings = strings,
             coroutineScope = viewModelScope,
+            track = track,
         ).also { viewModel ->
             viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
         }

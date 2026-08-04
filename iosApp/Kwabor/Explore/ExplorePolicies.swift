@@ -32,6 +32,54 @@ struct ExplorePaginationGuard {
     }
 }
 
+enum ContextualAuthenticationDismissalAction: Equatable {
+    case cancel
+    case keepForAuthenticatedReplay
+    case keepForPresentedRegistration
+    case presentRequestedRegistration
+}
+
+enum ContextualAuthenticationDismissalPolicy {
+    static func action(
+        hasCompleteAccount: Bool,
+        isRegistrationPresented: Bool,
+        registrationWasRequested: Bool
+    ) -> ContextualAuthenticationDismissalAction {
+        if isRegistrationPresented {
+            return .keepForPresentedRegistration
+        }
+        if hasCompleteAccount {
+            return .keepForAuthenticatedReplay
+        }
+        return registrationWasRequested ? .presentRequestedRegistration : .cancel
+    }
+}
+
+enum ProtectedDestinationReplayAction: Equatable {
+    case applyRootDeepLink(discardProtectedDestination: Bool)
+    case transferRootDeepLinkToAuthentication
+    case select(String)
+    case wait
+}
+
+enum ProtectedDestinationReplayPolicy {
+    static func action(
+        isGuest: Bool,
+        hasPendingRootDeepLink: Bool,
+        isRootDeepLinkProtected: Bool,
+        pendingDestinationKey: String?
+    ) -> ProtectedDestinationReplayAction {
+        if hasPendingRootDeepLink {
+            if isGuest && isRootDeepLinkProtected {
+                return .transferRootDeepLinkToAuthentication
+            }
+            return .applyRootDeepLink(discardProtectedDestination: pendingDestinationKey != nil)
+        }
+        guard let pendingDestinationKey else { return .wait }
+        return isGuest ? .wait : .select(pendingDestinationKey)
+    }
+}
+
 enum ExploreRemoteImageURLPolicy {
     static func acceptedURL(_ rawValue: String?) -> URL? {
         guard let rawValue,

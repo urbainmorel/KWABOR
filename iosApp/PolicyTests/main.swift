@@ -473,6 +473,93 @@ expect(
     "A refresh or filter change must reset the cursor guard."
 )
 
+expect(
+    ContextualAuthenticationDismissalPolicy.action(
+        hasCompleteAccount: false,
+        isRegistrationPresented: true,
+        registrationWasRequested: false
+    ) == .keepForPresentedRegistration,
+    "An incomplete federated registration must retain its contextual protected action."
+)
+expect(
+    ContextualAuthenticationDismissalPolicy.action(
+        hasCompleteAccount: true,
+        isRegistrationPresented: false,
+        registrationWasRequested: false
+    ) == .keepForAuthenticatedReplay,
+    "A successful authentication must preserve its pending protected destination until replay."
+)
+expect(
+    ContextualAuthenticationDismissalPolicy.action(
+        hasCompleteAccount: false,
+        isRegistrationPresented: false,
+        registrationWasRequested: true
+    ) == .presentRequestedRegistration,
+    "An explicit transition from authentication to registration must present registration."
+)
+expect(
+    ContextualAuthenticationDismissalPolicy.action(
+        hasCompleteAccount: false,
+        isRegistrationPresented: false,
+        registrationWasRequested: false
+    ) == .cancel,
+    "A dismissed authentication sheet without a registration transition must cancel the journey."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: true,
+        hasPendingRootDeepLink: false,
+        isRootDeepLinkProtected: false,
+        pendingDestinationKey: "profile"
+    ) == .wait,
+    "A protected destination must remain pending while the viewer is a guest."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: false,
+        hasPendingRootDeepLink: false,
+        isRootDeepLinkProtected: false,
+        pendingDestinationKey: "profile"
+    ) == .select("profile"),
+    "A protected destination must replay after successful authentication."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: true,
+        hasPendingRootDeepLink: true,
+        isRootDeepLinkProtected: true,
+        pendingDestinationKey: nil
+    ) == .transferRootDeepLinkToAuthentication,
+    "A protected root deep link must transfer atomically into guest authentication."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: false,
+        hasPendingRootDeepLink: true,
+        isRootDeepLinkProtected: true,
+        pendingDestinationKey: "profile"
+    ) == .applyRootDeepLink(discardProtectedDestination: true),
+    "A root deep link must take priority and consume an older protected destination."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: true,
+        hasPendingRootDeepLink: true,
+        isRootDeepLinkProtected: false,
+        pendingDestinationKey: nil
+    ) == .applyRootDeepLink(discardProtectedDestination: false),
+    "The public home root deep link must still open for a guest."
+)
+expect(
+    ProtectedDestinationReplayPolicy.action(
+        isGuest: true,
+        hasPendingRootDeepLink: false,
+        isRootDeepLinkProtected: false,
+        pendingDestinationKey: nil
+    ) == .wait,
+    "Cancelling a transferred root deep link must leave no trigger that reopens authentication."
+)
+
 private var guidePaginationGuard = ExplorePaginationGuard()
 expect(
     !guidePaginationGuard.shouldLoadNext(
@@ -592,6 +679,16 @@ private func requireCatalogDetailDelivery(
     return delivery
 }
 
+private func requireRootDelivery(
+    _ pending: PendingInternalDeepLink,
+    _ message: String
+) -> RootDeepLinkDelivery {
+    guard let delivery = pending.rootDelivery else {
+        fatalError(message)
+    }
+    return delivery
+}
+
 private let deepLinkListingID = "11111111-2222-4333-8444-555555555555"
 private let replacementDeepLinkListingID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
 private var pendingDeepLink = PendingInternalDeepLink()
@@ -631,15 +728,27 @@ expect(
     "Post-bootstrap routing must wait when no listing deep link is pending."
 )
 pendingDeepLink.enqueueRoot(destinationKey: "profile")
+private let initialRootDelivery = requireRootDelivery(
+    pendingDeepLink,
+    "The first root deep link must create a delivery."
+)
+pendingDeepLink.enqueueRoot(destinationKey: "profile")
+private let coalescedRootDelivery = requireRootDelivery(
+    pendingDeepLink,
+    "The coalesced root deep link must retain its delivery."
+)
 expect(
     pendingDeepLink.rootDestinationKey == "profile" &&
-        pendingDeepLink.catalogDetailListingID == nil,
-    "A root deep link must be the only pending navigation target."
+        pendingDeepLink.catalogDetailListingID == nil &&
+        coalescedRootDelivery == initialRootDelivery,
+    "An identical pending root deep link must coalesce into one delivery."
 )
 pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
 expect(
     pendingDeepLink.rootDestinationKey == nil &&
-        pendingDeepLink.catalogDetailListingID == deepLinkListingID,
+        pendingDeepLink.catalogDetailListingID == deepLinkListingID &&
+        !pendingDeepLink.isCurrentRoot(delivery: initialRootDelivery) &&
+        !pendingDeepLink.acknowledgeRoot(delivery: initialRootDelivery),
     "A listing deep link must replace a pending root destination atomically."
 )
 private let initialDeepLinkDelivery = requireCatalogDetailDelivery(
@@ -744,16 +853,46 @@ expect(
 )
 pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
 pendingDeepLink.enqueueRoot(destinationKey: "home")
+private let firstHomeRootDelivery = requireRootDelivery(
+    pendingDeepLink,
+    "The home root deep link must create a delivery."
+)
 expect(
     pendingDeepLink.rootDestinationKey == "home" &&
         pendingDeepLink.catalogDetailListingID == nil,
     "A later root deep link must replace a pending listing destination."
 )
 expect(
-    pendingDeepLink.consumeRoot() && !pendingDeepLink.consumeRoot(),
-    "A root deep link must also be claimable exactly once."
+    pendingDeepLink.acknowledgeRoot(delivery: firstHomeRootDelivery) &&
+        !pendingDeepLink.acknowledgeRoot(delivery: firstHomeRootDelivery),
+    "A matching root deep-link delivery must be acknowledged exactly once."
+)
+pendingDeepLink.enqueueRoot(destinationKey: "home")
+private let repeatedHomeRootDelivery = requireRootDelivery(
+    pendingDeepLink,
+    "The repeated home root deep link must create a new delivery."
+)
+expect(
+    repeatedHomeRootDelivery != firstHomeRootDelivery,
+    "The same root destination received after acknowledgement must have a new revision."
+)
+pendingDeepLink.enqueueRoot(destinationKey: "profile")
+private let replacementRootDelivery = requireRootDelivery(
+    pendingDeepLink,
+    "The replacement root deep link must create a delivery."
+)
+expect(
+    replacementRootDelivery != repeatedHomeRootDelivery &&
+        !pendingDeepLink.acknowledgeRoot(delivery: repeatedHomeRootDelivery) &&
+        pendingDeepLink.isCurrentRoot(delivery: replacementRootDelivery),
+    "A stale root callback must not consume a newer destination."
 )
 pendingDeepLink.enqueueCatalogDetail(validatedListingID: deepLinkListingID)
+expect(
+    !pendingDeepLink.isCurrentRoot(delivery: replacementRootDelivery) &&
+        !pendingDeepLink.acknowledgeRoot(delivery: replacementRootDelivery),
+    "A listing replacement must make the previous root delivery stale."
+)
 private let deliveryBeforeSensitiveReset = requireCatalogDetailDelivery(
     pendingDeepLink,
     "The pending listing before a sensitive reset must have a delivery."

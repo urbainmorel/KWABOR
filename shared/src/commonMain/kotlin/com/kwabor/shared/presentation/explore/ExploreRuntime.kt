@@ -3,6 +3,7 @@ package com.kwabor.shared.presentation.explore
 import com.kwabor.shared.domain.catalog.GeoPoint
 import com.kwabor.shared.domain.catalog.isWithinBeninBounds
 import com.kwabor.shared.domain.catalog.nearestCity
+import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.i18n.KwaborStrings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -71,6 +72,7 @@ sealed interface ExploreEffect {
     data class ProtectedActionReplayed(
         val kind: ExploreInteractionKind,
         val listingId: String,
+        val analyticsEvent: AnalyticsEvent?,
     ) : ExploreEffect
 
     data object RequestLocation : ExploreEffect
@@ -601,19 +603,8 @@ private class ExploreViewerSessionCoordinator(
             if (!isCurrentInteraction(viewerAtRequest, contextAtRequest)) return@withLock
             val before = stateStore.snapshot()
             if (before.listings.none { listing -> listing.id == listingId }) return@withLock
-            val result = when (kind) {
-                ExploreInteractionKind.Like -> presenter.toggleLike(before, listingId, strings)
-                ExploreInteractionKind.Favorite -> presenter.toggleFavorite(before, listingId, strings)
-            }
-            val authenticationRequired = result.pendingAuthInteraction != null &&
-                result.pendingAuthInteraction != before.pendingAuthInteraction
-            val replaySucceeded = replay != null &&
-                result.pendingAuthInteraction == null &&
-                !result.isOffline &&
-                result.queuedInteractions.none { queued ->
-                    queued.listingId == listingId && queued.kind == kind
-                } &&
-                result.hasInteractionChangeComparedTo(before, listingId)
+            val result = toggleListing(presenter, strings, before, listingId, kind)
+            val completedReplay = successfulReplay(replay, before, result, listingId, kind)
             val committed = stateStore.commitInteraction(
                 result = result,
                 baseline = before,
@@ -623,36 +614,19 @@ private class ExploreViewerSessionCoordinator(
                         stateStore.value.listings.any { listing -> listing.id == listingId }
                 },
             ) ?: return@withLock
-            if (authenticationRequired) {
-                committed.pendingAuthInteraction?.let { pending ->
-                    callbacks.publishEffect(
-                        ExploreEffect.AuthenticationRequired(
-                            kind = pending.kind,
-                            suggestedCityId = pending.suggestedCityId,
-                        ),
-                    )
-                }
-            }
-            if (replaySucceeded && replay != null) {
-                callbacks.publishEffect(
-                    ExploreEffect.ProtectedActionReplayed(
-                        kind = replay.kind,
-                        listingId = replay.listingId,
-                    ),
-                )
-            }
+            publishAuthenticationEffect(callbacks, before, result, committed)
+            publishReplayEffect(callbacks, completedReplay, before)
         }
     }
 
-    private suspend fun claimPendingReplay(pending: PendingExploreAuthInteraction): Boolean =
-        lifecycleMutex.withLock {
-            if (claimedPendingReplay != null) {
-                false
-            } else {
-                claimedPendingReplay = pending
-                true
-            }
+    private suspend fun claimPendingReplay(pending: PendingExploreAuthInteraction): Boolean = lifecycleMutex.withLock {
+        if (claimedPendingReplay != null) {
+            false
+        } else {
+            claimedPendingReplay = pending
+            true
         }
+    }
 
     private suspend fun releasePendingReplay(pending: PendingExploreAuthInteraction) {
         lifecycleMutex.withLock {
@@ -672,6 +646,66 @@ private class ExploreViewerSessionCoordinator(
         interactionSupervisor = SupervisorJob(coroutineScope.coroutineContext[Job])
         interactionScope = CoroutineScope(coroutineScope.coroutineContext + interactionSupervisor)
     }
+}
+
+private suspend fun toggleListing(
+    presenter: ExplorePresenter,
+    strings: KwaborStrings,
+    state: ExploreUiState,
+    listingId: String,
+    kind: ExploreInteractionKind,
+): ExploreUiState = when (kind) {
+    ExploreInteractionKind.Like -> presenter.toggleLike(state, listingId, strings)
+    ExploreInteractionKind.Favorite -> presenter.toggleFavorite(state, listingId, strings)
+}
+
+private suspend fun publishAuthenticationEffect(
+    callbacks: ExploreViewerSessionCallbacks,
+    before: ExploreUiState,
+    result: ExploreUiState,
+    committed: ExploreUiState,
+) {
+    if (
+        result.pendingAuthInteraction == null ||
+        result.pendingAuthInteraction == before.pendingAuthInteraction
+    ) {
+        return
+    }
+    val pending = committed.pendingAuthInteraction ?: return
+    callbacks.publishEffect(
+        ExploreEffect.AuthenticationRequired(
+            kind = pending.kind,
+            suggestedCityId = pending.suggestedCityId,
+        ),
+    )
+}
+
+private fun successfulReplay(
+    replay: PendingExploreAuthInteraction?,
+    before: ExploreUiState,
+    result: ExploreUiState,
+    listingId: String,
+    kind: ExploreInteractionKind,
+): PendingExploreAuthInteraction? = replay?.takeIf {
+    result.pendingAuthInteraction == null &&
+        !result.isOffline &&
+        result.queuedInteractions.none { queued -> queued.listingId == listingId && queued.kind == kind } &&
+        result.hasInteractionChangeComparedTo(before, listingId)
+}
+
+private suspend fun publishReplayEffect(
+    callbacks: ExploreViewerSessionCallbacks,
+    completedReplay: PendingExploreAuthInteraction?,
+    sourceState: ExploreUiState,
+) {
+    completedReplay ?: return
+    callbacks.publishEffect(
+        ExploreEffect.ProtectedActionReplayed(
+            kind = completedReplay.kind,
+            listingId = completedReplay.listingId,
+            analyticsEvent = sourceState.protectedActionReplayedAnalyticsEvent(completedReplay.listingId),
+        ),
+    )
 }
 
 private sealed interface ExploreViewerTransition {

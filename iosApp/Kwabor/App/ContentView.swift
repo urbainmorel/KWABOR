@@ -7,6 +7,7 @@ struct ContentView: View {
     let guideDiscoveryStore: GuideDiscoveryStore
     @ObservedObject var catalogDetailStore: CatalogDetailStore
     let isGuestSession: Bool
+    let pendingProtectedDestinationKey: String?
     let strings: OnboardingStrings
     let settingsStrings: SettingsStrings
     let accountEmail: String?
@@ -19,7 +20,8 @@ struct ContentView: View {
     let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
-    let onProtectedDestinationSelected: () -> Void
+    let onProtectedDestinationSelected: (String) -> Void
+    let onPendingProtectedDestinationConsumed: (String) -> Bool
     let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
@@ -27,8 +29,9 @@ struct ContentView: View {
     let onAccountDeletionStateChanged: (Bool) -> Void
     let onAccountDeleted: () -> Void
     let onObservabilityConsentChanged: (ObservabilityConsentCategory, Bool) -> Void
-    let rootDeepLinkDestinationKey: String?
-    let onRootDeepLinkConsumed: () -> Void
+    let rootDeepLinkDelivery: RootDeepLinkDelivery?
+    let onProtectedRootDeepLinkTransferred: (RootDeepLinkDelivery) -> Bool
+    let onRootDeepLinkAcknowledged: (RootDeepLinkDelivery) -> Bool
     let catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery?
     let isCatalogDetailDeepLinkCurrent: (CatalogDetailDeepLinkDelivery) -> Bool
     let onCatalogDetailDeepLinkAcknowledged: (CatalogDetailDeepLinkDelivery) -> Bool
@@ -40,6 +43,7 @@ struct ContentView: View {
         guideDiscoveryStore: GuideDiscoveryStore,
         catalogDetailStore: CatalogDetailStore,
         isGuestSession: Bool = false,
+        pendingProtectedDestinationKey: String? = nil,
         strings: OnboardingStrings? = nil,
         settingsStrings: SettingsStrings? = nil,
         accountEmail: String? = nil,
@@ -56,7 +60,8 @@ struct ContentView: View {
         latestAccountSecurityError: @escaping () -> String? = { nil },
         isSigningOutAccount: Bool = false,
         accountSignOutErrorMessage: String? = nil,
-        onProtectedDestinationSelected: @escaping () -> Void = {},
+        onProtectedDestinationSelected: @escaping (String) -> Void = { _ in },
+        onPendingProtectedDestinationConsumed: @escaping (String) -> Bool = { _ in true },
         onExploreAuthenticationRequired: @escaping (ExploreAuthenticationRequest) -> Void = { _ in },
         onSignOut: @escaping () -> Void = {},
         onDismissSignOutError: @escaping () -> Void = {},
@@ -64,8 +69,9 @@ struct ContentView: View {
         onAccountDeletionStateChanged: @escaping (Bool) -> Void = { _ in },
         onAccountDeleted: @escaping () -> Void = {},
         onObservabilityConsentChanged: @escaping (ObservabilityConsentCategory, Bool) -> Void = { _, _ in },
-        rootDeepLinkDestinationKey: String? = nil,
-        onRootDeepLinkConsumed: @escaping () -> Void = {},
+        rootDeepLinkDelivery: RootDeepLinkDelivery? = nil,
+        onProtectedRootDeepLinkTransferred: @escaping (RootDeepLinkDelivery) -> Bool = { _ in false },
+        onRootDeepLinkAcknowledged: @escaping (RootDeepLinkDelivery) -> Bool = { _ in false },
         catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery? = nil,
         isCatalogDetailDeepLinkCurrent: @escaping (CatalogDetailDeepLinkDelivery) -> Bool = { _ in false },
         onCatalogDetailDeepLinkAcknowledged: @escaping (CatalogDetailDeepLinkDelivery) -> Bool = { _ in false }
@@ -75,6 +81,7 @@ struct ContentView: View {
         self.guideDiscoveryStore = guideDiscoveryStore
         self.catalogDetailStore = catalogDetailStore
         self.isGuestSession = isGuestSession
+        self.pendingProtectedDestinationKey = pendingProtectedDestinationKey
         let resolvedStrings = strings ?? bridge.onboardingStrings()
         self.strings = resolvedStrings
         self.settingsStrings = settingsStrings ?? resolvedStrings.settings
@@ -89,6 +96,7 @@ struct ContentView: View {
         self.isSigningOutAccount = isSigningOutAccount
         self.accountSignOutErrorMessage = accountSignOutErrorMessage
         self.onProtectedDestinationSelected = onProtectedDestinationSelected
+        self.onPendingProtectedDestinationConsumed = onPendingProtectedDestinationConsumed
         self.onExploreAuthenticationRequired = onExploreAuthenticationRequired
         self.onSignOut = onSignOut
         self.onDismissSignOutError = onDismissSignOutError
@@ -96,8 +104,9 @@ struct ContentView: View {
         self.onAccountDeletionStateChanged = onAccountDeletionStateChanged
         self.onAccountDeleted = onAccountDeleted
         self.onObservabilityConsentChanged = onObservabilityConsentChanged
-        self.rootDeepLinkDestinationKey = rootDeepLinkDestinationKey
-        self.onRootDeepLinkConsumed = onRootDeepLinkConsumed
+        self.rootDeepLinkDelivery = rootDeepLinkDelivery
+        self.onProtectedRootDeepLinkTransferred = onProtectedRootDeepLinkTransferred
+        self.onRootDeepLinkAcknowledged = onRootDeepLinkAcknowledged
         self.catalogDetailDeepLinkDelivery = catalogDetailDeepLinkDelivery
         self.isCatalogDetailDeepLinkCurrent = isCatalogDetailDeepLinkCurrent
         self.onCatalogDetailDeepLinkAcknowledged = onCatalogDetailDeepLinkAcknowledged
@@ -124,7 +133,6 @@ struct ContentView: View {
                             latestAccountSecurityError: latestAccountSecurityError,
                             isSigningOutAccount: isSigningOutAccount,
                             accountSignOutErrorMessage: accountSignOutErrorMessage,
-                            onProtectedDestinationSelected: onProtectedDestinationSelected,
                             onExploreAuthenticationRequired: onExploreAuthenticationRequired,
                             onListingOpen: catalogDetailStore.open,
                             onSignOut: onSignOut,
@@ -158,10 +166,13 @@ struct ContentView: View {
                     ])
                     .presentationContentInteraction(.scrolls)
             }
-            .onAppear(perform: applyPendingRootDeepLink)
+            .onAppear(perform: replayPendingDestinationAfterAuthentication)
             .onAppear(perform: applyPendingCatalogDetailDeepLink)
-            .onChange(of: rootDeepLinkDestinationKey) { _, _ in
-                applyPendingRootDeepLink()
+            .onChange(of: rootDeepLinkDelivery) { _, _ in
+                replayPendingDestinationAfterAuthentication()
+            }
+            .onChange(of: pendingProtectedDestinationKey) { _, _ in
+                replayPendingDestinationAfterAuthentication()
             }
             .onChange(of: catalogDetailDeepLinkDelivery) { _, _ in
                 applyPendingCatalogDetailDeepLink()
@@ -170,7 +181,7 @@ struct ContentView: View {
                 if isGuest {
                     selectedDestination = .home
                 } else {
-                    applyPendingRootDeepLink()
+                    replayPendingDestinationAfterAuthentication()
                 }
             }
             .onDisappear(perform: catalogDetailStore.dismiss)
@@ -202,20 +213,46 @@ struct ContentView: View {
     @discardableResult
     private func selectDestinationIfAllowed(_ destination: RootDestination) -> Bool {
         guard destination == .home || !isGuestSession else {
-            onProtectedDestinationSelected()
+            onProtectedDestinationSelected(destination.rawValue)
             return false
         }
         selectedDestination = destination
         return true
     }
 
-    private func applyPendingRootDeepLink() {
-        guard let rootDeepLinkDestinationKey,
-              let destination = RootDestination(rawValue: rootDeepLinkDestinationKey) else {
-            return
+    private func replayPendingDestinationAfterAuthentication() {
+        let rootDestination = rootDeepLinkDelivery.flatMap {
+            RootDestination(rawValue: $0.destinationKey)
         }
-        if selectDestinationIfAllowed(destination) {
-            onRootDeepLinkConsumed()
+        switch ProtectedDestinationReplayPolicy.action(
+            isGuest: isGuestSession,
+            hasPendingRootDeepLink: rootDeepLinkDelivery != nil,
+            isRootDeepLinkProtected: rootDestination != nil && rootDestination != .home,
+            pendingDestinationKey: pendingProtectedDestinationKey
+        ) {
+        case let .applyRootDeepLink(discardProtectedDestination):
+            guard let rootDeepLinkDelivery else { return }
+            guard let rootDestination else {
+                _ = onRootDeepLinkAcknowledged(rootDeepLinkDelivery)
+                return
+            }
+            guard onRootDeepLinkAcknowledged(rootDeepLinkDelivery) else { return }
+            if discardProtectedDestination, let pendingProtectedDestinationKey {
+                _ = onPendingProtectedDestinationConsumed(pendingProtectedDestinationKey)
+            }
+            selectedDestination = rootDestination
+        case .transferRootDeepLinkToAuthentication:
+            guard let rootDeepLinkDelivery else { return }
+            _ = onProtectedRootDeepLinkTransferred(rootDeepLinkDelivery)
+        case let .select(destinationKey):
+            guard let destination = RootDestination(rawValue: destinationKey) else {
+                _ = onPendingProtectedDestinationConsumed(destinationKey)
+                return
+            }
+            guard onPendingProtectedDestinationConsumed(destinationKey) else { return }
+            selectedDestination = destination
+        case .wait:
+            break
         }
     }
 
@@ -256,7 +293,6 @@ private struct RootDestinationContent: View {
     let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
-    let onProtectedDestinationSelected: () -> Void
     let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onListingOpen: (String) -> Void
     let onSignOut: () -> Void

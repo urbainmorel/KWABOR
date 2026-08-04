@@ -104,18 +104,28 @@ internal class AuthFederatedCoordinator(
     }
 
     private suspend fun resumeOnboarding(session: AuthSession) {
-        if (!dependencies.authJourneyStore.write(InterruptedAuthJourney.SocialRegistration)) {
-            if (!dependencies.revokeObservabilityConsent()) {
-                publishMessage(runtime.platformState.value.surface, runtime.strings.settings.privacyPersistenceError)
-                return
-            }
-            val signedOutState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
-            dependencies.googleIdentityProvider.clearCredentialState()
-            runtime.authState.value = signedOutState
-            publishMessage(runtime.platformState.value.surface, runtime.strings.authInvalidInput)
-            return
+        if (!persistInterruptedSocialRegistration()) return
+        runtime.registrationState.value = prepareFederatedRegistrationState(session)
+        runtime.platformState.value = runtime.platformState.value.copy(surface = AuthSurface.Registration)
+    }
+
+    private suspend fun persistInterruptedSocialRegistration(): Boolean {
+        if (dependencies.authJourneyStore.write(InterruptedAuthJourney.SocialRegistration)) return true
+        if (!dependencies.revokeObservabilityConsent()) {
+            publishMessage(runtime.platformState.value.surface, runtime.strings.settings.privacyPersistenceError)
+            return false
         }
-        var registrationState = initialRegistrationUiState().copy(
+        val signedOutState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
+        dependencies.googleIdentityProvider.clearCredentialState()
+        runtime.authState.value = signedOutState
+        publishMessage(runtime.platformState.value.surface, runtime.strings.authInvalidInput)
+        return false
+    }
+
+    private suspend fun prepareFederatedRegistrationState(
+        session: AuthSession,
+    ): com.kwabor.shared.presentation.auth.RegistrationUiState {
+        val registrationState = initialRegistrationUiState().copy(
             step = RegistrationStep.Profile,
             method = RegistrationMethod.Federated,
             email = session.email.orEmpty(),
@@ -124,7 +134,7 @@ internal class AuthFederatedCoordinator(
             currentSession = session,
         )
         val preparedState = runtime.registrationState.value
-        registrationState = if (preparedState.requirementsStatus == RegistrationRequirementsStatus.Ready) {
+        return if (preparedState.requirementsStatus == RegistrationRequirementsStatus.Ready) {
             registrationState.copy(
                 startContext = preparedState.startContext,
                 requirementsStatus = preparedState.requirementsStatus,
@@ -140,8 +150,6 @@ internal class AuthFederatedCoordinator(
                 runtime.strings,
             )
         }
-        runtime.registrationState.value = registrationState
-        runtime.platformState.value = runtime.platformState.value.copy(surface = AuthSurface.Registration)
     }
 
     private fun prepareSoftWallRegistration() {

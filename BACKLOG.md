@@ -113,8 +113,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.
   - [x] Validations locales finales, reset Supabase, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
   - [x] Build Xcode macOS, PR et CI validés avant fusion.
-- [x] AUTH-UX-001 — Réduire l'inscription à quatre écrans email/un profil fédéré, rendre l'intro interactive, contextualiser la softwall et différer toute permission avant l'accueil.
-- [ ] PR-AUTH-UX-001 — Valider les configurations iOS simulateur sur macOS puis ouvrir/merger la PR après gates vertes.
+- [x] AUTH-UX-001 — Réduire l'inscription à quatre écrans email/un profil fédéré, rendre l'intro interactive, contextualiser la softwall et différer toute permission avant l'accueil ; portage local validé sur la ligne avancée Store-only.
+- [ ] PR-AUTH-UX-001 — Valider les configurations iOS simulateur sur macOS puis, après autorisation, publier et faire revoir la branche d'intégration avancée ; ne pas fusionner directement l'ancienne branche basée sur `main`.
 
 ### Offline, préférences et médias
 

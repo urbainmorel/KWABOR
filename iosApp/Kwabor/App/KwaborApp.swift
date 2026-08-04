@@ -26,7 +26,10 @@ struct KwaborApp: App {
             supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
         )
         self.compositionRoot = compositionRoot
-        let exploreStore = ExploreStore(controller: compositionRoot.exploreController)
+        let exploreStore = ExploreStore(
+            controller: compositionRoot.exploreController,
+            onProtectedActionReplayed: observability.track
+        )
         let catalogDetailStore = CatalogDetailStore(controller: compositionRoot.catalogDetailController)
         _exploreStore = StateObject(wrappedValue: exploreStore)
         _catalogDetailStore = StateObject(wrappedValue: catalogDetailStore)

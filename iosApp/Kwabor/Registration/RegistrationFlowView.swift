@@ -54,7 +54,7 @@ struct RegistrationFlowView: View {
                 if store.canGoBack {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(store.strings.registrationBack, action: store.goBack)
-                            .disabled(store.state?.isLoading ?? false)
+                            .disabled((store.state?.isLoading ?? false) || federatedStore.isLoading)
                     }
                 }
                 if store.canCancel {
@@ -62,14 +62,17 @@ struct RegistrationFlowView: View {
                         Button(store.strings.guestCancel, action: store.requestCancellation)
                             .disabled(
                                 (store.state?.isLoading ?? false) ||
-                                    coordinator.isCancellingRegistration
+                                    coordinator.isCancellingRegistration ||
+                                    federatedStore.isLoading
                             )
                     }
                 }
             }
         }
         .interactiveDismissDisabled(
-            store.state?.currentSession != nil || store.state?.isLoading == true
+            store.state?.currentSession != nil ||
+                store.state?.isLoading == true ||
+                federatedStore.isLoading
         )
     }
 }
@@ -81,6 +84,7 @@ private struct RegistrationStepContent: View {
     @ObservedObject var federatedStore: FederatedSignInStore
     @State private var lastAutoSubmittedOtp: String?
     @State private var isPasswordVisible = false
+    @AccessibilityFocusState private var accessibilityFocus: RegistrationAccessibilityFocus?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -102,7 +106,7 @@ private struct RegistrationStepContent: View {
                 feedback
             }
             .scrollDismissesKeyboard(.interactively)
-            .disabled(state.isLoading || !store.isConfigured)
+            .disabled(state.isLoading || federatedStore.isLoading || !store.isConfigured)
 
             if state.step != .completed {
                 Button(primaryActionTitle, action: store.submitPrimaryAction)
@@ -129,11 +133,16 @@ private struct RegistrationStepContent: View {
             guard state.step == .otp,
                   code.count == otpCodeLength,
                   code != lastAutoSubmittedOtp,
-                  !state.isLoading else {
+                  !state.isLoading,
+                  !federatedStore.isLoading else {
                 return
             }
             lastAutoSubmittedOtp = code
             store.submitPrimaryAction()
+        }
+        .onAppear { updateAccessibilityFocus(for: state.step) }
+        .onChange(of: state.step) { _, step in
+            updateAccessibilityFocus(for: step)
         }
     }
 
@@ -204,6 +213,7 @@ private struct RegistrationStepContent: View {
                 .textContentType(.emailAddress)
                 .submitLabel(.continue)
                 .onSubmit(store.submitPrimaryAction)
+                .accessibilityFocused($accessibilityFocus, equals: .email)
             }
         }
     }
@@ -235,6 +245,7 @@ private struct RegistrationStepContent: View {
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
                     .accessibilityLabel(store.strings.authOtpCode)
                     .accessibilityValue(store.otpCode)
+                    .accessibilityFocused($accessibilityFocus, equals: .otp)
             }
             Button(store.resendLabel, action: store.resendOtp)
                 .disabled(!store.canResendOtp || state.isLoading)
@@ -249,8 +260,10 @@ private struct RegistrationStepContent: View {
                 Group {
                     if isPasswordVisible {
                         TextField(store.strings.registrationPassword, text: $store.password)
+                            .accessibilityFocused($accessibilityFocus, equals: .password)
                     } else {
                         SecureField(store.strings.registrationPassword, text: $store.password)
+                            .accessibilityFocused($accessibilityFocus, equals: .password)
                     }
                 }
                 .textContentType(.newPassword)
@@ -289,6 +302,7 @@ private struct RegistrationStepContent: View {
                     )
                 )
                 .textContentType(.givenName)
+                .accessibilityFocused($accessibilityFocus, equals: .profile)
                 TextField(
                     store.strings.authLastName,
                     text: Binding(
@@ -448,7 +462,7 @@ private struct RegistrationStepContent: View {
     }
 
     private var primaryActionDisabled: Bool {
-        if state.isLoading || !store.isConfigured { return true }
+        if state.isLoading || federatedStore.isLoading || !store.isConfigured { return true }
         if state.step == .email {
             return state.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -483,6 +497,20 @@ private struct RegistrationStepContent: View {
         String(store.otpCode.dropFirst(index).prefix(1))
     }
 
+    private func updateAccessibilityFocus(for step: RegistrationStep) {
+        if step == .email {
+            accessibilityFocus = .email
+        } else if step == .otp {
+            accessibilityFocus = .otp
+        } else if step == .password {
+            accessibilityFocus = .password
+        } else if step == .profile {
+            accessibilityFocus = .profile
+        } else {
+            accessibilityFocus = nil
+        }
+    }
+
     private func legalAcceptance(
         document: LegalDocumentRevision?,
         title: String,
@@ -497,6 +525,13 @@ private struct RegistrationStepContent: View {
             onAcceptedChange: onAcceptedChange
         )
     }
+}
+
+private enum RegistrationAccessibilityFocus: Hashable {
+    case email
+    case otp
+    case password
+    case profile
 }
 
 private struct LegalAcceptanceRow: View {

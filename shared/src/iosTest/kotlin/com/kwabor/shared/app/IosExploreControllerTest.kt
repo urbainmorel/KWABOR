@@ -1,10 +1,15 @@
 package com.kwabor.shared.app
 
 import com.kwabor.shared.domain.i18n.AppLocale
+import com.kwabor.shared.domain.observability.AnalyticsContext
+import com.kwabor.shared.domain.observability.AnalyticsEntityType
+import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.AnalyticsEventName
+import com.kwabor.shared.domain.observability.AnalyticsSessionSource
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExploreEffect
-import com.kwabor.shared.presentation.explore.ExploreInteractionKind
 import com.kwabor.shared.presentation.explore.ExploreIntent
+import com.kwabor.shared.presentation.explore.ExploreInteractionKind
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
 import com.kwabor.shared.presentation.explore.initialExploreUiState
@@ -138,6 +143,15 @@ class IosExploreControllerTest {
         val runtime = FakeIosExploreRuntime()
         val controller = configuredController(runtime, testScheduler)
         val observedEffects = mutableListOf<IosExploreEffect>()
+        val replayEvent = AnalyticsEvent(
+            name = AnalyticsEventName.ProtectedActionReplayed,
+            context = AnalyticsContext(
+                cityId = "cotonou",
+                entityType = AnalyticsEntityType.Event,
+                entityId = "listing-1",
+                sessionSource = AnalyticsSessionSource.Sponsored,
+            ),
+        )
         controller.observe(
             stateObserver = {},
             effectObserver = observedEffects::add,
@@ -154,6 +168,7 @@ class IosExploreControllerTest {
             ExploreEffect.ProtectedActionReplayed(
                 kind = ExploreInteractionKind.Favorite,
                 listingId = "listing-1",
+                analyticsEvent = replayEvent,
             ),
         )
         runtime.publishEffect(ExploreEffect.RequestLocation)
@@ -161,14 +176,15 @@ class IosExploreControllerTest {
 
         assertEquals(
             listOf(
-                IosExploreEffect.RequireAuthentication,
-                IosExploreEffect.ProtectedActionReplayed,
-                IosExploreEffect.RequestLocation,
+                IosExploreEffectKind.RequireAuthentication,
+                IosExploreEffectKind.ProtectedActionReplayed,
+                IosExploreEffectKind.RequestLocation,
             ),
-            observedEffects,
+            observedEffects.map(IosExploreEffect::kind),
         )
         assertTrue(observedEffects.first().requiresAuthentication)
         assertTrue(observedEffects[1].replaysProtectedAction)
+        assertEquals(replayEvent, observedEffects[1].replayAnalyticsEvent)
         assertTrue(observedEffects.last().requestsLocation)
         controller.close()
     }

@@ -354,19 +354,24 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
   d'audit ; les accès Firebase hors adaptateur privé et les dépendances Firebase hors `androidApp`
   sont interdits. Swift/Xcode reste indisponible sur
   ce poste Windows.
-- AUTH-UX-001 est en cours de portage sémantique sur la ligne locale avancée : intro interactive,
-  quatre écrans email maximum, profil final compact, softwall contextuelle et aucune permission ni
-  nouveau consentement avant l'accueil. Le DTO/RPC/RLS Supabase reste inchangé et l'ADR-0026 trace
-  la décision sans réintroduire de média distant.
+- AUTH-UX-001 est terminée localement sur la ligne avancée : intro interactive, quatre écrans email
+  maximum, profil final compact, softwall contextuelle avec reprise unique de l'action protégée et
+  aucune permission ni nouveau consentement avant l'accueil. Le DTO/RPC/RLS Supabase reste inchangé
+  et l'ADR-0026 trace la décision sans réintroduire de média distant.
+- Validation locale AUTH-UX-001 : 399 tests shared et 224 tests Android sans échec ;
+  `spotlessCheck`, `detekt`, `check`, lint, compilation Kotlin/Native iOS disponible sous Windows et
+  `:androidApp:assembleDebug` sont verts. L'APK debug de 44 235 992 octets porte le SHA-256
+  `E7B8B3E4F495F625AEBF31668ED59BE8110C961D6834C4580C8FB076C3F777A9`. La compilation SwiftUI/Xcode
+  native reste à exécuter sur macOS avant publication de la branche.
 
 ## Tâche en cours
 
 SEC-001F, STAB-002A, IOS-PRIVACY-001A, IOS-PRIVACY-001B1 et SETTINGS-001B sont terminés localement sur
-`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A, sans push, relance de CI, déploiement ni
-publication. AUTH-UX-001 est en cours d'intégration locale sur
-`codex/auth-onboarding-ux-integration`. STAB-002B reste suspendu à la décision sur les cinq racines V1. OPS-001B dépend du
-provisionnement propriétaire et des gates d'observabilité ci-dessous ; SETTINGS-001 reste ouvert et
-ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
+`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A. AUTH-UX-001 est terminée localement sur
+`codex/auth-onboarding-ux-integration`. Aucun de ces nouveaux travaux n'a été poussé, soumis à une
+nouvelle CI, déployé ou publié. STAB-002B reste suspendu à la décision sur les cinq racines V1.
+OPS-001B dépend du provisionnement propriétaire et des gates d'observabilité ci-dessous ;
+SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
 ## Blocages / limites
 
@@ -442,8 +447,9 @@ ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
 ## Prochaine tâche logique
 
-Terminer et valider localement AUTH-UX-001, puis livrer SEARCH-001A, première tranche V1 non bloquée
-par un fournisseur. Préparer OPS-001B seulement après provisionnement staging ; avant d'activer
+Auditer puis livrer SEARCH-001, prochaine tranche V1 non bloquée par un fournisseur. Valider
+AUTH-UX-001 sous Xcode/macOS avant toute publication de sa branche. Préparer OPS-001B seulement après
+provisionnement staging ; avant d'activer
 `account-delete`, prouver les AMR réelles email, Google et Apple et faire approuver/tester la
 politique des en-têtes et journaux d'invocation. La vidéo d'intro reste embarquée : tout changement
 d'octets exige une nouvelle release Android/iOS dans les Stores.

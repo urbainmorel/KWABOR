@@ -68,6 +68,7 @@ internal fun RegistrationScreen(
         )
     }
 }
+
 @Composable
 private fun RegistrationBody(
     state: RegistrationScreenState,

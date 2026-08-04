@@ -5,9 +5,15 @@ struct CatalogDetailDeepLinkDelivery: Equatable {
     let revision: UInt64
 }
 
+struct RootDeepLinkDelivery: Equatable {
+    let destinationKey: String
+    let revision: UInt64
+}
+
 struct PendingInternalDeepLink: Equatable {
     private(set) var rootDestinationKey: String?
     private(set) var catalogDetailListingID: String?
+    private var rootDeliveryRevision: UInt64 = 0
     private var catalogDetailDeliveryRevision: UInt64 = 0
 
     init() {}
@@ -20,9 +26,19 @@ struct PendingInternalDeepLink: Equatable {
         )
     }
 
+    var rootDelivery: RootDeepLinkDelivery? {
+        guard let rootDestinationKey else { return nil }
+        return RootDeepLinkDelivery(
+            destinationKey: rootDestinationKey,
+            revision: rootDeliveryRevision
+        )
+    }
+
     mutating func enqueueRoot(destinationKey: String) {
-        rootDestinationKey = destinationKey
         catalogDetailListingID = nil
+        guard rootDestinationKey != destinationKey else { return }
+        rootDeliveryRevision &+= 1
+        rootDestinationKey = destinationKey
     }
 
     @discardableResult
@@ -35,9 +51,13 @@ struct PendingInternalDeepLink: Equatable {
         return true
     }
 
+    func isCurrentRoot(delivery: RootDeepLinkDelivery) -> Bool {
+        rootDelivery == delivery
+    }
+
     @discardableResult
-    mutating func consumeRoot() -> Bool {
-        guard rootDestinationKey != nil else { return false }
+    mutating func acknowledgeRoot(delivery: RootDeepLinkDelivery) -> Bool {
+        guard isCurrentRoot(delivery: delivery) else { return false }
         rootDestinationKey = nil
         return true
     }

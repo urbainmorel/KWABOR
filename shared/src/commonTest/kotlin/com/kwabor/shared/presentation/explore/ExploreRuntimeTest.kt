@@ -18,6 +18,8 @@ import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
+import com.kwabor.shared.domain.observability.AnalyticsEntityType
+import com.kwabor.shared.domain.observability.AnalyticsSessionSource
 import com.kwabor.shared.domain.preferences.AppPreferences
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.stringsFor
@@ -213,6 +215,12 @@ class ExploreRuntimeTest {
 
             assertEquals(ExploreInteractionKind.Favorite, replayed.kind)
             assertEquals(RUNTIME_LISTING_ID, replayed.listingId)
+            val analyticsContext = requireNotNull(replayed.analyticsEvent).context
+            assertEquals(AnalyticsEntityType.Place, analyticsContext.entityType)
+            assertEquals(RUNTIME_LISTING_ID, analyticsContext.entityId)
+            assertEquals("cotonou", analyticsContext.cityId)
+            assertEquals(AnalyticsSessionSource.Organic, analyticsContext.sessionSource)
+            assertEquals(KwaborCurrency.Xof, analyticsContext.displayCurrency)
             assertEquals(2, interactions.favoriteCalls)
             assertTrue(runtime.state.value.listings.single().favorited)
             assertNull(runtime.state.value.pendingAuthInteraction)
@@ -389,37 +397,41 @@ private class RuntimeInteractionRepository(
     }
 
     override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = true, favorited = false)
+        selectedInteraction(listingId = listingId, liked = true, favorited = false, persist = true)
 
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = false, favorited = false)
+        selectedInteraction(listingId = listingId, liked = false, favorited = false, persist = true)
 
     override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
         favoriteCalls += 1
-        return selectedInteraction(listingId = listingId, liked = false, favorited = true)
+        return selectedInteraction(listingId = listingId, liked = false, favorited = true, persist = true)
     }
 
     override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = false, favorited = false)
+        selectedInteraction(listingId = listingId, liked = false, favorited = false, persist = true)
 
     private suspend fun selectedInteraction(
         listingId: String,
         liked: Boolean,
         favorited: Boolean,
+        persist: Boolean = false,
     ): DomainResult<ListingViewerInteraction> {
         interactionGate?.also { gate ->
             interactionGate = null
             gate.await()
         }
         if (requiresAuthentication) return authenticationFailure()
-        return DomainResult.Success(
-            ListingViewerInteraction(
-                listingId = listingId,
-                likedByViewer = liked,
-                favoritedByViewer = favorited,
-                likesCount = if (liked) 1 else 0,
-            ),
+        val interaction = ListingViewerInteraction(
+            listingId = listingId,
+            likedByViewer = liked,
+            favoritedByViewer = favorited,
+            likesCount = if (liked) 1 else 0,
         )
+        if (persist) {
+            viewerInteractions = viewerInteractions
+                .filterNot { current -> current.listingId == listingId } + interaction
+        }
+        return DomainResult.Success(interaction)
     }
 
     private fun <T> authenticationFailure(): DomainResult<T> =
