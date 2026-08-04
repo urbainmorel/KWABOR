@@ -13,6 +13,12 @@ data class SettingsStrings(
     val authenticationMethodGoogle: String,
     val authenticationMethodApple: String,
     val authenticationMethodUnavailable: String,
+    val privacySectionTitle: String,
+    val privacySectionSupport: String,
+    val analyticsConsent: String,
+    val diagnosticsConsent: String,
+    val remoteConfigurationConsent: String,
+    val privacyPersistenceError: String,
 ) {
     fun accountEmail(rawValue: String?): String = rawValue
         ?.trim()
@@ -29,7 +35,7 @@ data class SettingsStrings(
 
 internal val frenchSettingsStrings = SettingsStrings(
     title = "Paramètres",
-    profileEntrySubtitle = "Compte, connexion et suppression du compte",
+    profileEntrySubtitle = "Compte, confidentialité et suppression du compte",
     accountSectionTitle = "Compte",
     emailLabel = "Adresse e-mail",
     emailUnavailable = "Adresse e-mail indisponible",
@@ -38,4 +44,12 @@ internal val frenchSettingsStrings = SettingsStrings(
     authenticationMethodGoogle = "Google",
     authenticationMethodApple = "Apple",
     authenticationMethodUnavailable = "Non renseignée",
+    privacySectionTitle = "Confidentialité",
+    privacySectionSupport =
+    "Ces choix sont facultatifs. Vous pouvez les modifier ou les retirer à tout moment.",
+    analyticsConsent = "Partager des statistiques d'utilisation pour améliorer Kwabor",
+    diagnosticsConsent = "Partager des informations sur les pannes et les lenteurs",
+    remoteConfigurationConsent =
+    "Autoriser certains réglages de l'application sans mise à jour (hors vidéo)",
+    privacyPersistenceError = "Impossible de terminer ce changement de confidentialité. Réessayez.",
 )

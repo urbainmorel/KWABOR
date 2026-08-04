@@ -20,6 +20,7 @@
 		1A0000010000000000000049 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000055 /* FirebaseCrashlytics */; };
 		1A0000010000000000000050 /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000056 /* FirebasePerformance */; };
 		1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000010000000000000057 /* FirebaseRemoteConfig */; };
+		1A00000100000000000000B8 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00000100000000000000B7 /* FirebaseInstallations */; };
 		1A0000010000000000000060 /* OnboardingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000061 /* OnboardingCoordinator.swift */; };
 		1A0000010000000000000062 /* LegacyRemoteIntroCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000063 /* LegacyRemoteIntroCleaner.swift */; };
 		1A0000010000000000000064 /* IntroVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000065 /* IntroVideoPlayer.swift */; };
@@ -126,6 +127,7 @@
 				1A0000010000000000000049 /* FirebaseCrashlytics in Frameworks */,
 				1A0000010000000000000050 /* FirebasePerformance in Frameworks */,
 				1A0000010000000000000051 /* FirebaseRemoteConfig in Frameworks */,
+				1A00000100000000000000B8 /* FirebaseInstallations in Frameworks */,
 				1A0000010000000000000087 /* GoogleSignIn in Frameworks */,
 				1A0000010000000000000088 /* GoogleSignInSwift in Frameworks */,
 			);
@@ -312,6 +314,7 @@
 				1A0000010000000000000055 /* FirebaseCrashlytics */,
 				1A0000010000000000000056 /* FirebasePerformance */,
 				1A0000010000000000000057 /* FirebaseRemoteConfig */,
+				1A00000100000000000000B7 /* FirebaseInstallations */,
 				1A0000010000000000000085 /* GoogleSignIn */,
 				1A0000010000000000000086 /* GoogleSignInSwift */,
 			);
@@ -513,6 +516,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		1A00000100000000000000B7 /* FirebaseInstallations */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A0000010000000000000052 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseInstallations;
 		};
 		1A0000010000000000000085 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -177,23 +177,89 @@ expect(
 expect(
     !PromoterActivationSessionPolicy.canExposeSession(
         cleanupRequired: true,
-        activationCallbackInProgress: false
+        activationCallbackInProgress: false,
+        activationPresented: false
     ),
     "A failed cleanup must keep every temporary session hidden between retries."
 )
 expect(
     !PromoterActivationSessionPolicy.canExposeSession(
         cleanupRequired: false,
-        activationCallbackInProgress: true
+        activationCallbackInProgress: true,
+        activationPresented: false
     ),
     "A callback in progress must keep its provisional session hidden."
 )
 expect(
+    !PromoterActivationSessionPolicy.canExposeSession(
+        cleanupRequired: false,
+        activationCallbackInProgress: false,
+        activationPresented: true
+    ),
+    "A presented activation must keep the shared session hidden until local completion succeeds."
+)
+expect(
     PromoterActivationSessionPolicy.canExposeSession(
         cleanupRequired: false,
-        activationCallbackInProgress: false
+        activationCallbackInProgress: false,
+        activationPresented: false
     ),
     "Session visibility may resume only when no callback or cleanup is active."
+)
+expect(
+    PromoterActivationSessionPolicy.canCompleteActivation(
+        resultUserID: "account-a",
+        authenticatedUserID: "account-a",
+        isAuthenticated: true,
+        isAuthenticationLoading: false,
+        cleanupInProgress: false,
+        callbackInProgress: false
+    ),
+    "Activation completion requires the result to match the live authenticated account."
+)
+expect(
+    !PromoterActivationSessionPolicy.canCompleteActivation(
+        resultUserID: "account-a",
+        authenticatedUserID: nil,
+        isAuthenticated: false,
+        isAuthenticationLoading: false,
+        cleanupInProgress: false,
+        callbackInProgress: false
+    ),
+    "A retained activation result must not recreate a session after sign-out."
+)
+expect(
+    !PromoterActivationSessionPolicy.canCompleteActivation(
+        resultUserID: "account-a",
+        authenticatedUserID: "account-b",
+        isAuthenticated: true,
+        isAuthenticationLoading: false,
+        cleanupInProgress: false,
+        callbackInProgress: false
+    ),
+    "An activation result must never bind a different authenticated account."
+)
+expect(
+    !PromoterActivationSessionPolicy.canCompleteActivation(
+        resultUserID: "account-a",
+        authenticatedUserID: "account-a",
+        isAuthenticated: true,
+        isAuthenticationLoading: true,
+        cleanupInProgress: false,
+        callbackInProgress: false
+    ),
+    "A retained activation result must not complete while sign-out is loading."
+)
+expect(
+    !PromoterActivationSessionPolicy.canCompleteActivation(
+        resultUserID: "account-a",
+        authenticatedUserID: "account-a",
+        isAuthenticated: true,
+        isAuthenticationLoading: false,
+        cleanupInProgress: true,
+        callbackInProgress: false
+    ),
+    "A retained activation result must not complete while cleanup is in progress."
 )
 expect(
     PromoterActivationSessionPolicy.failClosedCleanupAction(

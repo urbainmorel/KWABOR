@@ -81,6 +81,11 @@ class MainActivity : ComponentActivity() {
         showConfiguredApp(configuredApp)
     }
 
+    override fun onStart() {
+        super.onStart()
+        (application as KwaborApplication).observability.retryPendingMaintenance()
+    }
+
     private fun configuredAppOrNull(): ConfiguredApp? {
         val compositionRoot = (application as KwaborApplication).compositionRoot ?: return null
         val authPresenters = AuthPresenters(
@@ -112,6 +117,7 @@ class MainActivity : ComponentActivity() {
                 configuredApp.compositionRoot.dispatcherProvider,
             ),
             legalDocumentLauncher = AndroidLegalDocumentLauncher(applicationContext),
+            observabilityController = applicationState.observability,
             listingMediaUrlPolicy = PublicHttpsListingMediaUrlPolicy,
             detailExternalActionLauncher = AndroidDetailExternalActionLauncher(applicationContext),
         )
@@ -208,6 +214,7 @@ class MainActivity : ComponentActivity() {
                         idempotencyKeyProvider = UuidIdempotencyKeyProvider,
                         clockProvider = configuredApp.compositionRoot.clockProvider,
                         applyObservabilityConsent = applicationState.observability::updateConsent,
+                        revokeObservabilityConsent = applicationState.observability::revokeAllConsent,
                     ),
                     strings = strings,
                     coroutineScope = newViewModelScope(configuredApp.compositionRoot.dispatcherProvider),
@@ -231,9 +238,6 @@ class MainActivity : ComponentActivity() {
             }
         },
     )[OnboardingViewModel::class.java]
-
-    private fun newViewModelScope(dispatcherProvider: DispatcherProvider): CoroutineScope =
-        CoroutineScope(SupervisorJob() + dispatcherProvider.main)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -287,6 +291,9 @@ class MainActivity : ComponentActivity() {
         viewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
     }
 }
+
+private fun newViewModelScope(dispatcherProvider: DispatcherProvider): CoroutineScope =
+    CoroutineScope(SupervisorJob() + dispatcherProvider.main)
 
 private data class ConfiguredApp(
     val compositionRoot: KwaborCompositionRoot,

@@ -55,15 +55,17 @@ internal class AuthProfileCoordinator(
 
     private fun updateObservabilityConsent(transform: (ObservabilityConsent) -> ObservabilityConsent) {
         val consent = transform(runtime.registrationState.value.observabilityConsent)
-        runtime.platformState.value = runtime.platformState.value.copy(
-            observabilityConsentPersistenceFailed = false,
-        )
         runtime.reduce(RegistrationIntent.UpdateObservabilityConsent(consent))
+        val ownerUserId = currentObservabilityOwnerUserId()
+        val persisted = ownerUserId != null && dependencies.applyObservabilityConsent(ownerUserId, consent)
+        runtime.platformState.value = runtime.platformState.value.copy(
+            observabilityConsentPersistenceFailed = !persisted,
+        )
     }
 
     private fun completeOnboarding() {
         if (runtime.registrationState.value.isLoading || runtime.operationJob?.isActive == true) return
-        if (!dependencies.applyObservabilityConsent(runtime.registrationState.value.observabilityConsent)) {
+        if (!persistObservabilityConsent()) {
             runtime.platformState.value = runtime.platformState.value.copy(
                 observabilityConsentPersistenceFailed = true,
             )
@@ -98,4 +100,17 @@ internal class AuthProfileCoordinator(
             }
         }
     }
+
+    private fun persistObservabilityConsent(): Boolean {
+        val ownerUserId = currentObservabilityOwnerUserId() ?: return false
+        return dependencies.applyObservabilityConsent(
+            ownerUserId,
+            runtime.registrationState.value.observabilityConsent,
+        )
+    }
+
+    private fun currentObservabilityOwnerUserId(): String? =
+        (runtime.registrationState.value.currentSession?.userId ?: runtime.authState.value.currentSession?.userId)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
 }

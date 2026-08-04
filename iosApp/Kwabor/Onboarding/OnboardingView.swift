@@ -29,6 +29,8 @@ struct OnboardingView: View {
                     settingsStrings: coordinator.strings.settings,
                     accountEmail: coordinator.accountSettingsSession?.email,
                     accountAuthenticationMethod: coordinator.accountSettingsSession?.authenticationMethod,
+                    observabilityConsent: coordinator.observabilityConsent,
+                    observabilityConsentErrorMessage: coordinator.observabilityConsentErrorMessage,
                     accountSessionIdentity: coordinator.accountSettingsSession?.userId,
                     accountSecurityController: coordinator.authController,
                     federatedIdentityHintStore: coordinator.federatedIdentityHintStore,
@@ -38,10 +40,12 @@ struct OnboardingView: View {
                     onProtectedDestinationSelected: coordinator.presentAuthentication,
                     onSignOut: coordinator.signOutCurrentAccount,
                     onDismissSignOutError: coordinator.clearAccountSignOutError,
+                    onAccountDeletionWillStart: coordinator.prepareForAccountDeletion,
                     onAccountDeletionStateChanged: {
                         coordinator.accountDeletionStateChanged(isInProgress: $0)
                     },
                     onAccountDeleted: coordinator.accountDeletionCompleted,
+                    onObservabilityConsentChanged: coordinator.updateObservabilityConsent,
                     rootDeepLinkDestinationKey: coordinator.pendingRootDeepLinkDestinationKey,
                     onRootDeepLinkConsumed: coordinator.consumeRootDeepLinkDestination,
                     catalogDetailDeepLinkDelivery: coordinator.catalogDetailDeepLinkDeliveryReadyForOpening,
@@ -279,7 +283,7 @@ private struct SessionRestoreView: View {
                     .font(.largeTitle)
                     .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
                     .accessibilityHidden(true)
-                Text(coordinator.strings.authUnavailable)
+                Text(coordinator.observabilityConsentErrorMessage ?? coordinator.strings.authUnavailable)
                     .font(.headline)
                     .multilineTextAlignment(.center)
                 Button(coordinator.strings.retry) {

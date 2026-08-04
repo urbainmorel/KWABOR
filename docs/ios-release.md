@@ -45,15 +45,19 @@ python -B tools/verify-brand-assets.py
 `PrivacyInfo.xcprivacy` est une ressource de la cible. L'hôte ne déclare aucun tracking. Il déclare son
 accès direct à `UserDefaults` avec la raison approuvée `CA92.1`, car les préférences concernées restent
 accessibles uniquement à Kwabor : état de présentation de l'intro, reprise d'authentification,
-consentements, amorçage des notifications et marqueurs de migration. Le fichier déclare aussi
-actuellement les interactions produit non liées et la ville de profil comme localisation approximative
-liée au compte. La coordonnée ponctuelle utilisée pour proposer cette ville n'est ni transmise ni
-conservée. Apple documente les catégories et raisons autorisées dans
+amorçage des notifications et marqueurs de migration. Les consentements d'observabilité liés au
+compte résident dans le Keychain. L'inventaire hôte déclare aussi
+le nom, l'adresse e-mail, l'identifiant utilisateur, la ville de profil et les interactions produit
+comme données liées au compte. Les likes/favoris relèvent de la fonctionnalité ; les événements
+d'usage ne partent qu'après opt-in Analytics. La coordonnée ponctuelle utilisée pour proposer la ville
+n'est ni transmise ni conservée. Apple documente les catégories et raisons autorisées dans
 [Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
-Les déclarations de données collectées ne constituent pas encore une preuve Store complète. Avant la
-release, `IOS-PRIVACY-001B` doit inventorier les données réellement traitées par l'hôte et les SDK,
-valider leurs finalités et leur liaison au compte, puis rapprocher le résultat du Privacy Report Xcode
+`IOS-PRIVACY-001B1` a inventorié les traitements de l'hôte et des SDK et corrigé les catégories
+factuellement prouvées. Le rapport complet est dans
+[l'inventaire de confidentialité iOS](audits/2026-08-03-ios-privacy-inventory.md). Cette étape locale
+ne constitue pas encore une preuve Store complète : `IOS-PRIVACY-001B2` doit rapprocher l'archive
+Release et ses réglages production du Privacy Report Xcode, des décisions de rétention du propriétaire
 et du questionnaire App Store Connect. Les manifests fournis par les SDK tiers ne dispensent pas
 Kwabor de ce contrôle global. Apple exige le nom `PrivacyInfo.xcprivacy`, son inclusion dans les
 ressources et rejette les clés invalides :
@@ -61,7 +65,22 @@ ressources et rejette les clés invalides :
 [Adding a privacy manifest](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk).
 Le détail Firebase est tenu dans [Observabilité mobile](observability.md).
 
-Avant chaque release candidate : générer le Privacy Report Xcode, rapprocher le résultat du code et des SDK présents, puis mettre à jour les formulaires App Store Connect.
+Le premier build iOS distribué avec une configuration Firebase réelle doit partir d'une installation
+propre. Avant TestFlight, effacer les installations internes ayant déjà exécuté une ancienne build
+Firebase et confirmer qu'aucune build Firebase antérieure n'a été distribuée à des utilisateurs. Si
+une telle distribution est découverte, la release est bloquée jusqu'à un plan de migration dédié :
+l'API publique Crashlytics ne peut pas annuler un envoi déjà démarré sous un ancien override
+automatique. L'archive doit contenir les valeurs Analytics/Crashlytics/Performance désactivées par
+défaut, puis les parcours refus → accord → révocation doivent être vérifiés sur appareils staging.
+Le test staging doit aussi tuer l'app entre les écritures sensibles, vérifier qu'une purge contenant
+un rapport survit jusqu'au lancement suivant et confirmer qu'une seconde purge demandée après le check
+unique du processus garde les diagnostics désactivés jusqu'au redémarrage, sans couper un consentement
+Analytics ou Remote Config indépendant.
+
+Avant chaque release candidate : résoudre les packages, générer le Privacy Report Xcode depuis
+l'archive exacte, rapprocher le résultat du code, des SDK et des traitements backend présents, puis
+mettre à jour les formulaires App Store Connect. La politique de confidentialité publique approuvée
+doit aussi être accessible depuis l'app ; son URL propriétaire reste à fournir.
 
 ## Capacités et profils
 

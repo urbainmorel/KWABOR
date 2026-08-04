@@ -91,6 +91,10 @@ internal class AuthFederatedCoordinator(
 
     private suspend fun resumeOnboarding(session: AuthSession) {
         if (!dependencies.authJourneyStore.write(InterruptedAuthJourney.SocialRegistration)) {
+            if (!dependencies.revokeObservabilityConsent()) {
+                publishMessage(runtime.platformState.value.surface, runtime.strings.settings.privacyPersistenceError)
+                return
+            }
             val signedOutState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
             dependencies.googleIdentityProvider.clearCredentialState()
             runtime.authState.value = signedOutState

@@ -15,6 +15,32 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0" apply false
 }
 
+val verifyFirebaseDependencyBoundary by tasks.registering {
+    group = "verification"
+    description = "Rejects direct Firebase dependencies outside androidApp."
+
+    doLast {
+        val forbiddenDependencies =
+            rootProject.allprojects
+                .filter { project -> project.path != ":androidApp" }
+                .flatMap { project ->
+                    project.configurations.flatMap { configuration ->
+                        configuration.dependencies
+                            .filter { dependency -> dependency.group == "com.google.firebase" }
+                            .map { dependency ->
+                                val version = dependency.version ?: "managed"
+                                "${project.path}:${configuration.name} -> " +
+                                    "${dependency.group}:${dependency.name}:$version"
+                            }
+                    }
+                }.sorted()
+        check(forbiddenDependencies.isEmpty()) {
+            "Firebase dependencies are allowed only in :androidApp:\n" +
+                forbiddenDependencies.joinToString(separator = "\n")
+        }
+    }
+}
+
 fun Project.configureQualityTools() {
     val generatedKspDirectory = layout.buildDirectory.dir("generated/ksp").get().asFile.toPath()
 
@@ -56,6 +82,9 @@ fun Project.configureQualityTools() {
 }
 
 configureQualityTools()
+tasks.named("check") {
+    dependsOn(verifyFirebaseDependencyBoundary)
+}
 
 subprojects {
     apply(plugin = "base")
@@ -63,4 +92,7 @@ subprojects {
     apply(plugin = "io.gitlab.arturbosch.detekt")
 
     configureQualityTools()
+    tasks.matching { it.name == "check" }.configureEach {
+        dependsOn(rootProject.tasks.named("verifyFirebaseDependencyBoundary"))
+    }
 }

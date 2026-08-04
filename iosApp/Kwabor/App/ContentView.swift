@@ -11,6 +11,8 @@ struct ContentView: View {
     let settingsStrings: SettingsStrings
     let accountEmail: String?
     let accountAuthenticationMethod: AuthenticationMethod?
+    let observabilityConsent: ObservabilityConsent
+    let observabilityConsentErrorMessage: String?
     let accountSessionIdentity: String?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
@@ -20,8 +22,10 @@ struct ContentView: View {
     let onProtectedDestinationSelected: () -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onAccountDeletionWillStart: () -> Bool
     let onAccountDeletionStateChanged: (Bool) -> Void
     let onAccountDeleted: () -> Void
+    let onObservabilityConsentChanged: (ObservabilityConsentCategory, Bool) -> Void
     let rootDeepLinkDestinationKey: String?
     let onRootDeepLinkConsumed: () -> Void
     let catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery?
@@ -39,6 +43,12 @@ struct ContentView: View {
         settingsStrings: SettingsStrings? = nil,
         accountEmail: String? = nil,
         accountAuthenticationMethod: AuthenticationMethod? = nil,
+        observabilityConsent: ObservabilityConsent = ObservabilityConsent(
+            analyticsAllowed: false,
+            diagnosticsAllowed: false,
+            remoteConfigurationAllowed: false
+        ),
+        observabilityConsentErrorMessage: String? = nil,
         accountSessionIdentity: String? = nil,
         accountSecurityController: IosAuthController? = nil,
         federatedIdentityHintStore: FederatedIdentityHintPersisting? = nil,
@@ -48,8 +58,10 @@ struct ContentView: View {
         onProtectedDestinationSelected: @escaping () -> Void = {},
         onSignOut: @escaping () -> Void = {},
         onDismissSignOutError: @escaping () -> Void = {},
+        onAccountDeletionWillStart: @escaping () -> Bool = { true },
         onAccountDeletionStateChanged: @escaping (Bool) -> Void = { _ in },
         onAccountDeleted: @escaping () -> Void = {},
+        onObservabilityConsentChanged: @escaping (ObservabilityConsentCategory, Bool) -> Void = { _, _ in },
         rootDeepLinkDestinationKey: String? = nil,
         onRootDeepLinkConsumed: @escaping () -> Void = {},
         catalogDetailDeepLinkDelivery: CatalogDetailDeepLinkDelivery? = nil,
@@ -66,6 +78,8 @@ struct ContentView: View {
         self.settingsStrings = settingsStrings ?? resolvedStrings.settings
         self.accountEmail = accountEmail
         self.accountAuthenticationMethod = accountAuthenticationMethod
+        self.observabilityConsent = observabilityConsent
+        self.observabilityConsentErrorMessage = observabilityConsentErrorMessage
         self.accountSessionIdentity = accountSessionIdentity
         self.accountSecurityController = accountSecurityController
         self.federatedIdentityHintStore = federatedIdentityHintStore
@@ -75,8 +89,10 @@ struct ContentView: View {
         self.onProtectedDestinationSelected = onProtectedDestinationSelected
         self.onSignOut = onSignOut
         self.onDismissSignOutError = onDismissSignOutError
+        self.onAccountDeletionWillStart = onAccountDeletionWillStart
         self.onAccountDeletionStateChanged = onAccountDeletionStateChanged
         self.onAccountDeleted = onAccountDeleted
+        self.onObservabilityConsentChanged = onObservabilityConsentChanged
         self.rootDeepLinkDestinationKey = rootDeepLinkDestinationKey
         self.onRootDeepLinkConsumed = onRootDeepLinkConsumed
         self.catalogDetailDeepLinkDelivery = catalogDetailDeepLinkDelivery
@@ -98,6 +114,8 @@ struct ContentView: View {
                             settingsStrings: settingsStrings,
                             accountEmail: accountEmail,
                             accountAuthenticationMethod: accountAuthenticationMethod,
+                            observabilityConsent: observabilityConsent,
+                            observabilityConsentErrorMessage: observabilityConsentErrorMessage,
                             accountSecurityController: accountSecurityController,
                             federatedIdentityHintStore: federatedIdentityHintStore,
                             latestAccountSecurityError: latestAccountSecurityError,
@@ -107,8 +125,10 @@ struct ContentView: View {
                             onListingOpen: catalogDetailStore.open,
                             onSignOut: onSignOut,
                             onDismissSignOutError: onDismissSignOutError,
+                            onAccountDeletionWillStart: onAccountDeletionWillStart,
                             onAccountDeletionStateChanged: onAccountDeletionStateChanged,
-                            onAccountDeleted: onAccountDeleted
+                            onAccountDeleted: onAccountDeleted,
+                            onObservabilityConsentChanged: onObservabilityConsentChanged
                         )
                     }
                     .id(
@@ -225,6 +245,8 @@ private struct RootDestinationContent: View {
     let settingsStrings: SettingsStrings
     let accountEmail: String?
     let accountAuthenticationMethod: AuthenticationMethod?
+    let observabilityConsent: ObservabilityConsent
+    let observabilityConsentErrorMessage: String?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
@@ -234,8 +256,10 @@ private struct RootDestinationContent: View {
     let onListingOpen: (String) -> Void
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onAccountDeletionWillStart: () -> Bool
     let onAccountDeletionStateChanged: (Bool) -> Void
     let onAccountDeleted: () -> Void
+    let onObservabilityConsentChanged: (ObservabilityConsentCategory, Bool) -> Void
 
     var body: some View {
         Group {
@@ -294,6 +318,8 @@ private struct RootDestinationContent: View {
                     onboardingStrings: strings,
                     email: displayedAccountEmail,
                     authenticationMethodName: displayedAuthenticationMethodName,
+                    observabilityConsent: observabilityConsent,
+                    observabilityConsentErrorMessage: observabilityConsentErrorMessage,
                     accountSecurityController: accountSecurityController,
                     federatedIdentityHintStore: federatedIdentityHintStore,
                     latestAccountSecurityError: latestAccountSecurityError,
@@ -301,8 +327,10 @@ private struct RootDestinationContent: View {
                     accountSignOutErrorMessage: accountSignOutErrorMessage,
                     onSignOut: onSignOut,
                     onDismissSignOutError: onDismissSignOutError,
+                    onAccountDeletionWillStart: onAccountDeletionWillStart,
                     onAccountDeletionStateChanged: onAccountDeletionStateChanged,
-                    onAccountDeleted: onAccountDeleted
+                    onAccountDeleted: onAccountDeleted,
+                    onObservabilityConsentChanged: onObservabilityConsentChanged
                 )
             } label: {
                 SettingsNavigationRow(strings: settingsStrings)
@@ -385,6 +413,8 @@ private struct AccountSettingsView: View {
     let onboardingStrings: OnboardingStrings
     let email: String
     let authenticationMethodName: String
+    let observabilityConsent: ObservabilityConsent
+    let observabilityConsentErrorMessage: String?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
@@ -392,8 +422,10 @@ private struct AccountSettingsView: View {
     let accountSignOutErrorMessage: String?
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onAccountDeletionWillStart: () -> Bool
     let onAccountDeletionStateChanged: (Bool) -> Void
     let onAccountDeleted: () -> Void
+    let onObservabilityConsentChanged: (ObservabilityConsentCategory, Bool) -> Void
 
     var body: some View {
         ScrollView {
@@ -402,6 +434,12 @@ private struct AccountSettingsView: View {
                     strings: settingsStrings,
                     email: email,
                     authenticationMethodName: authenticationMethodName
+                )
+                PrivacyPreferencesSection(
+                    strings: settingsStrings,
+                    consent: observabilityConsent,
+                    errorMessage: observabilityConsentErrorMessage,
+                    onConsentChanged: onObservabilityConsentChanged
                 )
                 AccountDangerZoneSection(
                     controller: accountSecurityController,
@@ -412,6 +450,7 @@ private struct AccountSettingsView: View {
                     signOutErrorMessage: accountSignOutErrorMessage,
                     onSignOut: onSignOut,
                     onDismissSignOutError: onDismissSignOutError,
+                    onDeletionWillStart: onAccountDeletionWillStart,
                     onDeletionStateChanged: onAccountDeletionStateChanged,
                     onDeleted: onAccountDeleted
                 )
@@ -424,6 +463,66 @@ private struct AccountSettingsView: View {
         .navigationTitle(settingsStrings.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+    }
+}
+
+private struct PrivacyPreferencesSection: View {
+    let strings: SettingsStrings
+    let consent: ObservabilityConsent
+    let errorMessage: String?
+    let onConsentChanged: (ObservabilityConsentCategory, Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
+            Text(strings.privacySectionTitle)
+                .font(.headline)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            Text(strings.privacySectionSupport)
+                .font(.body)
+                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+            Toggle(strings.analyticsConsent, isOn: analyticsBinding)
+            Divider()
+            Toggle(strings.diagnosticsConsent, isOn: diagnosticsBinding)
+            Divider()
+            Toggle(strings.remoteConfigurationConsent, isOn: remoteConfigurationBinding)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.callout)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                    .accessibilityLabel(errorMessage)
+            }
+        }
+        .tint(KwaborDesignTokens.ColorToken.ink950)
+        .padding(KwaborDesignTokens.Spacing.lg)
+        .background(KwaborDesignTokens.ColorToken.surface0)
+        .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
+    }
+
+    private var analyticsBinding: Binding<Bool> {
+        Binding(
+            get: { consent.analyticsAllowed },
+            set: { allowed in
+                onConsentChanged(.analytics, allowed)
+            }
+        )
+    }
+
+    private var diagnosticsBinding: Binding<Bool> {
+        Binding(
+            get: { consent.diagnosticsAllowed },
+            set: { allowed in
+                onConsentChanged(.diagnostics, allowed)
+            }
+        )
+    }
+
+    private var remoteConfigurationBinding: Binding<Bool> {
+        Binding(
+            get: { consent.remoteConfigurationAllowed },
+            set: { allowed in
+                onConsentChanged(.remoteConfiguration, allowed)
+            }
+        )
     }
 }
 

@@ -11,9 +11,26 @@ class SettingsStringsTest {
     @Test
     fun exposesTheDeliveredSettingsCopy() {
         assertEquals("Paramètres", strings.title)
-        assertEquals("Compte, connexion et suppression du compte", strings.profileEntrySubtitle)
+        assertEquals("Compte, confidentialité et suppression du compte", strings.profileEntrySubtitle)
         assertEquals("Adresse e-mail", strings.emailLabel)
         assertEquals("Méthode de connexion", strings.authenticationMethodLabel)
+        assertEquals("Confidentialité", strings.privacySectionTitle)
+        assertEquals(
+            "Ces choix sont facultatifs. Vous pouvez les modifier ou les retirer à tout moment.",
+            strings.privacySectionSupport,
+        )
+        assertEquals(
+            "Partager des statistiques d'utilisation pour améliorer Kwabor",
+            strings.analyticsConsent,
+        )
+        assertEquals(
+            "Partager des informations sur les pannes et les lenteurs",
+            strings.diagnosticsConsent,
+        )
+        assertEquals(
+            "Autoriser certains réglages de l'application sans mise à jour (hors vidéo)",
+            strings.remoteConfigurationConsent,
+        )
     }
 
     @Test

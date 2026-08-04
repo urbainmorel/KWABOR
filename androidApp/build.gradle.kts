@@ -1,6 +1,8 @@
 import com.android.build.api.dsl.ApplicationBuildType
 import io.gitlab.arturbosch.detekt.Detekt
+import org.w3c.dom.Element
 import java.util.Properties
+import javax.xml.parsers.DocumentBuilderFactory
 
 plugins {
     id("com.android.application")
@@ -268,6 +270,7 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-config")
     implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-installations")
     implementation("com.google.firebase:firebase-perf")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
@@ -285,4 +288,106 @@ val detektUnitTest by tasks.registering(Detekt::class) {
 
 tasks.named("detekt") {
     dependsOn(detektUnitTest)
+}
+
+val firebasePrivacyManifestVariants =
+    mapOf(
+        "debug" to "Debug",
+        "staging" to "Staging",
+        "release" to "Release",
+    )
+val firebaseDisabledCollectionMetadata =
+    setOf(
+        "firebase_analytics_collection_enabled",
+        "firebase_data_collection_default_enabled",
+        "firebase_crashlytics_collection_enabled",
+        "firebase_performance_collection_enabled",
+        "google_analytics_adid_collection_enabled",
+        "google_analytics_default_allow_ad_personalization_signals",
+    )
+val firebaseForbiddenAttributionPermissions =
+    setOf(
+        "android.permission.ACCESS_ADSERVICES_AD_ID",
+        "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
+        "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+        "com.google.android.gms.permission.AD_ID",
+    )
+
+val verifyFirebaseMergedManifests by tasks.registering {
+    group = "verification"
+    description = "Verifies Firebase privacy defaults in every merged Android manifest."
+    firebasePrivacyManifestVariants.values.forEach { variantName ->
+        dependsOn("process${variantName}MainManifest")
+    }
+
+    doLast {
+        firebasePrivacyManifestVariants.forEach { (variantDirectory, variantName) ->
+            val manifestFile =
+                layout.buildDirectory
+                    .file(
+                        "intermediates/merged_manifest/$variantDirectory/" +
+                            "process${variantName}MainManifest/AndroidManifest.xml",
+                    ).get()
+                    .asFile
+            check(manifestFile.isFile) {
+                "Missing merged Android manifest for $variantDirectory: ${manifestFile.absolutePath}"
+            }
+            val documentBuilderFactory =
+                DocumentBuilderFactory.newInstance().apply {
+                    isNamespaceAware = true
+                    isExpandEntityReferences = false
+                    setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                    setFeature("http://xml.org/sax/features/external-general-entities", false)
+                    setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+                }
+            val document = documentBuilderFactory.newDocumentBuilder().parse(manifestFile)
+            val androidNamespace = "http://schemas.android.com/apk/res/android"
+
+            fun elements(tagName: String): List<Element> {
+                val nodes = document.getElementsByTagName(tagName)
+                return buildList {
+                    for (index in 0 until nodes.length) {
+                        (nodes.item(index) as? Element)?.let(::add)
+                    }
+                }
+            }
+
+            val permissionNames =
+                (elements("uses-permission") + elements("uses-permission-sdk-23"))
+                    .map { element -> element.getAttributeNS(androidNamespace, "name") }
+            val forbiddenPermissions = permissionNames.toSet() intersect firebaseForbiddenAttributionPermissions
+            check(forbiddenPermissions.isEmpty()) {
+                "$variantDirectory merged manifest contains forbidden attribution permissions: " +
+                    forbiddenPermissions.sorted().joinToString()
+            }
+
+            val providerNames =
+                elements("provider").map { element -> element.getAttributeNS(androidNamespace, "name") }
+            check("com.google.firebase.provider.FirebaseInitProvider" !in providerNames) {
+                "$variantDirectory merged manifest still contains FirebaseInitProvider"
+            }
+
+            val libraryNames =
+                elements("uses-library").map { element -> element.getAttributeNS(androidNamespace, "name") }
+            check("android.ext.adservices" !in libraryNames) {
+                "$variantDirectory merged manifest still contains android.ext.adservices"
+            }
+
+            val metadata = elements("meta-data")
+            firebaseDisabledCollectionMetadata.forEach { metadataName ->
+                val values =
+                    metadata
+                        .filter { element ->
+                            element.getAttributeNS(androidNamespace, "name") == metadataName
+                        }.map { element -> element.getAttributeNS(androidNamespace, "value") }
+                check(values == listOf("false")) {
+                    "$variantDirectory merged manifest must contain exactly one $metadataName=false"
+                }
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyFirebaseMergedManifests)
 }

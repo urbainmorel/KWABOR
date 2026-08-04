@@ -2,6 +2,7 @@ package com.kwabor.android.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -29,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -55,6 +59,7 @@ import com.kwabor.android.ui.screens.auth.AuthInlineMessage
 import com.kwabor.android.ui.screens.auth.AuthPasswordField
 import com.kwabor.android.ui.screens.auth.GoogleSignInButton
 import com.kwabor.shared.domain.auth.AuthenticationMethod
+import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.i18n.KwaborStrings
 
 internal data class SettingsScreenActions(
@@ -67,31 +72,37 @@ internal data class SettingsScreenActions(
     val onDeleteAccountWithGoogle: (String) -> Unit,
 )
 
+internal data class SettingsPrivacyActions(
+    val onAnalyticsConsentChanged: (Boolean) -> Boolean,
+    val onDiagnosticsConsentChanged: (Boolean) -> Boolean,
+    val onRemoteConfigurationConsentChanged: (Boolean) -> Boolean,
+)
+
+internal data class SettingsScreenCallbacks(
+    val account: SettingsScreenActions,
+    val privacy: SettingsPrivacyActions,
+    val onBack: () -> Unit,
+)
+
 internal data class SettingsScreenUiModel(
     val email: String?,
     val authenticationMethod: AuthenticationMethod?,
     val authAccessState: AuthAccessUiState,
-)
-
-internal data class SettingsAccountPresentation(
-    val email: String,
-    val authenticationMethod: String,
-    val accountDeletionAvailable: Boolean,
+    val observabilityConsent: ObservabilityConsent,
+    val observabilityPrivacyOperationFailed: Boolean,
 )
 
 private data class SettingsScaffoldUiModel(
     val account: SettingsAccountPresentation,
     val authAccessState: AuthAccessUiState,
+    val observabilityConsent: ObservabilityConsent,
+    val privacyPersistenceFailed: Boolean,
 )
 
-internal fun settingsAccountPresentation(
-    email: String?,
-    authenticationMethod: AuthenticationMethod?,
-    strings: KwaborStrings,
-): SettingsAccountPresentation = SettingsAccountPresentation(
-    email = strings.settings.accountEmail(email),
-    authenticationMethod = strings.settings.authenticationMethodName(authenticationMethod),
-    accountDeletionAvailable = authenticationMethod != null,
+private data class PrivacySectionActions(
+    val onAnalyticsConsentChanged: (Boolean) -> Unit,
+    val onDiagnosticsConsentChanged: (Boolean) -> Unit,
+    val onRemoteConfigurationConsentChanged: (Boolean) -> Unit,
 )
 
 internal object SettingsScreen {
@@ -99,8 +110,7 @@ internal object SettingsScreen {
     operator fun invoke(
         model: SettingsScreenUiModel,
         strings: KwaborStrings,
-        actions: SettingsScreenActions,
-        onBack: () -> Unit,
+        callbacks: SettingsScreenCallbacks,
         modifier: Modifier = Modifier,
     ) {
         val account = settingsAccountPresentation(
@@ -108,24 +118,49 @@ internal object SettingsScreen {
             authenticationMethod = model.authenticationMethod,
             strings = strings,
         )
+        val sectionActions = PrivacySectionActions(
+            onAnalyticsConsentChanged = { allowed ->
+                callbacks.privacy.onAnalyticsConsentChanged(allowed)
+            },
+            onDiagnosticsConsentChanged = { allowed ->
+                callbacks.privacy.onDiagnosticsConsentChanged(allowed)
+            },
+            onRemoteConfigurationConsentChanged = { allowed ->
+                callbacks.privacy.onRemoteConfigurationConsentChanged(allowed)
+            },
+        )
+        val scaffoldActions = SettingsScaffoldActions(
+            account = callbacks.account,
+            privacy = sectionActions,
+            onBack = callbacks.onBack,
+        )
         SettingsScaffold(
-            model = SettingsScaffoldUiModel(account, model.authAccessState),
+            model = SettingsScaffoldUiModel(
+                account = account,
+                authAccessState = model.authAccessState,
+                observabilityConsent = model.observabilityConsent,
+                privacyPersistenceFailed = model.observabilityPrivacyOperationFailed,
+            ),
             strings = strings,
-            actions = actions,
-            onBack = onBack,
+            actions = scaffoldActions,
             modifier = modifier,
         )
-        SensitiveSettingsDialogs(model = model, strings = strings, actions = actions)
+        SensitiveSettingsDialogs(model = model, strings = strings, actions = callbacks.account)
     }
 }
+
+private data class SettingsScaffoldActions(
+    val account: SettingsScreenActions,
+    val privacy: PrivacySectionActions,
+    val onBack: () -> Unit,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScaffold(
     model: SettingsScaffoldUiModel,
     strings: KwaborStrings,
-    actions: SettingsScreenActions,
-    onBack: () -> Unit,
+    actions: SettingsScaffoldActions,
     modifier: Modifier,
 ) {
     Scaffold(
@@ -136,7 +171,7 @@ private fun SettingsScaffold(
                 title = { Text(strings.settings.title) },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBack,
+                        onClick = actions.onBack,
                         modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
                     ) {
                         Icon(
@@ -149,10 +184,10 @@ private fun SettingsScaffold(
         },
     ) { paddingValues ->
         SettingsContent(
-            account = model.account,
-            authAccessState = model.authAccessState,
+            model = model,
             strings = strings,
-            actions = actions,
+            actions = actions.account,
+            privacyActions = actions.privacy,
             modifier = Modifier.padding(paddingValues),
         )
     }
@@ -186,10 +221,10 @@ private fun SensitiveSettingsDialogs(
 
 @Composable
 private fun SettingsContent(
-    account: SettingsAccountPresentation,
-    authAccessState: AuthAccessUiState,
+    model: SettingsScaffoldUiModel,
     strings: KwaborStrings,
     actions: SettingsScreenActions,
+    privacyActions: PrivacySectionActions,
     modifier: Modifier,
 ) {
     Column(
@@ -201,14 +236,86 @@ private fun SettingsContent(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Top,
     ) {
-        AccountSection(account = account, strings = strings)
+        AccountSection(account = model.account, strings = strings)
+        Spacer(Modifier.height(KwaborSpacing.Xxxl))
+        PrivacySection(
+            consent = model.observabilityConsent,
+            persistenceFailed = model.privacyPersistenceFailed,
+            strings = strings,
+            actions = privacyActions,
+        )
         Spacer(Modifier.height(KwaborSpacing.Xxxl))
         DangerZone(
-            authAccessState = authAccessState,
-            accountDeletionAvailable = account.accountDeletionAvailable,
+            authAccessState = model.authAccessState,
+            accountDeletionAvailable = model.account.accountDeletionAvailable,
             strings = strings,
             actions = actions,
         )
+    }
+}
+
+@Composable
+private fun PrivacySection(
+    consent: ObservabilityConsent,
+    persistenceFailed: Boolean,
+    strings: KwaborStrings,
+    actions: PrivacySectionActions,
+) {
+    SectionHeading(title = strings.settings.privacySectionTitle)
+    Spacer(Modifier.height(KwaborSpacing.Lg))
+    Text(
+        text = strings.settings.privacySectionSupport,
+        color = MaterialTheme.colorScheme.secondary,
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Lg))
+    PrivacyConsentRow(
+        label = strings.settings.analyticsConsent,
+        checked = consent.analyticsAllowed,
+        onCheckedChange = actions.onAnalyticsConsentChanged,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Md))
+    PrivacyConsentRow(
+        label = strings.settings.diagnosticsConsent,
+        checked = consent.diagnosticsAllowed,
+        onCheckedChange = actions.onDiagnosticsConsentChanged,
+    )
+    Spacer(Modifier.height(KwaborSpacing.Md))
+    PrivacyConsentRow(
+        label = strings.settings.remoteConfigurationConsent,
+        checked = consent.remoteConfigurationAllowed,
+        onCheckedChange = actions.onRemoteConfigurationConsentChanged,
+    )
+    if (persistenceFailed) {
+        Spacer(Modifier.height(KwaborSpacing.Lg))
+        Text(
+            text = strings.settings.privacyPersistenceError,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun PrivacyConsentRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f).padding(end = KwaborSpacing.Lg),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

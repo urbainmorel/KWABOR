@@ -22,11 +22,12 @@ final class RegistrationStore: ObservableObject {
     private let notificationPermissionRequester: RegistrationNotificationPermissionRequesting
     private let notificationPrimingStore: RegistrationNotificationPrimingPersisting
     private let interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting
-    private let applyObservabilityConsent: (ObservabilityConsent) -> Void
+    private let applyObservabilityConsent: (String?, ObservabilityConsent) -> Bool
     private let onCompleted: (AuthSession) -> Void
     private let onExistingAccountAuthenticated: (String?) -> Void
     private let onCancel: (Bool) -> Void
     private var completionReported = false
+    private var appliedObservabilityConsentOwnerUserId: String?
     private var clockTask: Task<Void, Never>?
 
     init(
@@ -36,7 +37,7 @@ final class RegistrationStore: ObservableObject {
         notificationPermissionRequester: RegistrationNotificationPermissionRequesting,
         notificationPrimingStore: RegistrationNotificationPrimingPersisting,
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting,
-        applyObservabilityConsent: @escaping (ObservabilityConsent) -> Void,
+        applyObservabilityConsent: @escaping (String?, ObservabilityConsent) -> Bool,
         onCompleted: @escaping (AuthSession) -> Void,
         onExistingAccountAuthenticated: @escaping (String?) -> Void,
         onCancel: @escaping (Bool) -> Void
@@ -196,7 +197,12 @@ final class RegistrationStore: ObservableObject {
         } else if state.step == .legal {
             controller.dispatch(intent: IosRegistrationContinueFromLegalIntent.shared)
         } else if state.step == .observability {
-            applyObservabilityConsent(state.observabilityConsent)
+            let ownerUserId = state.currentSession?.userId
+            guard applyObservabilityConsent(ownerUserId, state.observabilityConsent),
+                  let ownerUserId = normalizedUserId(ownerUserId) else {
+                return
+            }
+            appliedObservabilityConsentOwnerUserId = ownerUserId
             controller.dispatch(intent: IosRegistrationCompleteOnboardingIntent.shared)
         }
     }
@@ -275,7 +281,11 @@ final class RegistrationStore: ObservableObject {
 
     private func receive(_ updatedState: RegistrationUiState) {
         let previousStep = state?.step
+        let previousUserId = state?.currentSession?.userId
         state = updatedState
+        if previousUserId != updatedState.currentSession?.userId {
+            appliedObservabilityConsentOwnerUserId = nil
+        }
         if previousStep == .otp, updatedState.step != .otp {
             otpCode = ""
         }
@@ -310,20 +320,35 @@ final class RegistrationStore: ObservableObject {
         diagnostics: Bool,
         remoteConfiguration: Bool
     ) {
+        guard state?.isLoading == false else { return }
+        let updatedConsent = ObservabilityConsent(
+            analyticsAllowed: analytics,
+            diagnosticsAllowed: diagnostics,
+            remoteConfigurationAllowed: remoteConfiguration
+        )
         controller.dispatch(
             intent: IosRegistrationUpdateObservabilityConsentIntent(
-                consent: ObservabilityConsent(
-                    analyticsAllowed: analytics,
-                    diagnosticsAllowed: diagnostics,
-                    remoteConfigurationAllowed: remoteConfiguration
-                )
+                consent: updatedConsent
             )
         )
+        guard let ownerUserId = normalizedUserId(state?.currentSession?.userId),
+              ownerUserId == appliedObservabilityConsentOwnerUserId else {
+            return
+        }
+        guard applyObservabilityConsent(ownerUserId, updatedConsent) else {
+            appliedObservabilityConsentOwnerUserId = nil
+            return
+        }
     }
 
     private static var currentEpochMilliseconds: Int64 {
         Int64(Date().timeIntervalSince1970 * millisecondsPerSecond)
     }
+}
+
+private func normalizedUserId(_ userId: String?) -> String? {
+    let candidate = userId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return candidate.isEmpty ? nil : candidate
 }
 
 private let millisecondsPerSecond = 1_000.0

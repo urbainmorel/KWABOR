@@ -78,6 +78,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] IOS-PRIVACY-001B — Inventorier les données de l'hôte et des SDK, valider collecte, finalités,
     liaison au compte et tracking avec le propriétaire, puis contrôler le Privacy Report Xcode et le
     questionnaire App Store Connect.
+    - [x] IOS-PRIVACY-001B1 — Inventorier l'hôte et les SDK, corriger et verrouiller les catégories
+      hôte certaines, puis documenter le mapping et les inconnues.
+    - [ ] IOS-PRIVACY-001B2 — Valider rétention/finalités/réglages avec le propriétaire, générer le
+      Privacy Report de l'archive Release sur macOS et publier les réponses App Store Connect.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
   - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et la capacité Remote Config générique sur appareils avec consentement, valeurs sûres et révocation ; aucun canal média n'y est autorisé.
@@ -197,6 +201,17 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [ ] SETTINGS-001 — Livrer sécurité, sessions, préférences, thème, langue/devise/date, légal et Danger Zone.
   - [x] SETTINGS-001A — Séparer Profil et Paramètres sur Android/iOS, afficher l'identité et la méthode
     de connexion, puis livrer déconnexion et suppression de compte sans faux réglage.
+  - [x] SETTINGS-001B — Exposer les trois consentements d'observabilité réels dans Paramètres sur
+    Android/iOS, couper immédiatement les portes applicatives lors d'un retrait et persister les
+    maintenances fournisseur asynchrones jusqu'à leur succès.
+    - [x] Android : retirer l'initialisation Firebase automatique, garder Crashlytics manuel et rendre
+      les purges diagnostics/FID crash-safe, réessayables et protégées contre les callbacks obsolètes.
+    - [x] Android : retirer les permissions d'attribution héritées et vérifier les manifestes fusionnés
+      debug/staging/release dans la gate Gradle.
+    - [x] Android : rejeter après évaluation Gradle toute dépendance Firebase hors `androidApp` et
+      verrouiller l'inventaire exact des scripts de build audités.
+    - [x] Android/iOS : verrouiller les sources auditées et interdire tout accès Firebase hors des
+      adaptateurs plateforme approuvés.
 - [ ] SOCIAL-001 — Ajouter schéma/RLS feed, follows, post likes, médias, compteurs et pagination.
 - [ ] SOCIAL-002 — Livrer le feed photo/diaporama Android avec mention ≤ 25 %, Like, suivi et partage.
 - [ ] SOCIAL-IOS-001 — Livrer le feed SwiftUI avec parité fonctionnelle et accessibilité.

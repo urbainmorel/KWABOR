@@ -309,10 +309,55 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Validation locale IOS-PRIVACY-001A : syntaxe Python, parsing plist, intégrité du dépôt, contrat vidéo
   Store-only, révision Android/iOS et assets de marque verts. Le Privacy Report Xcode reste à générer
   sur macOS dans IOS-PRIVACY-001B.
+- IOS-PRIVACY-001B1 inventorie les traitements de l'hôte SwiftUI, du framework KMP et des SDK iOS.
+  Le manifest hôte déclare désormais nom, e-mail, identifiant utilisateur, ville approximative et
+  interactions produit comme liés au compte ; le vérificateur d'intégrité verrouille exactement ce
+  socle sans tracking. L'audit sépare les faits locaux des collectes SDK et décisions fournisseur qui
+  exigent l'archive Release et le Privacy Report Xcode.
+- SETTINGS-001B rend les trois consentements observabilité consultables et révocables depuis les
+  Paramètres Android et iOS. Les deux clients coupent les capacités avant de persister ; un échec
+  laisse donc l'observabilité désactivée et affiche une erreur lisible avec retry. Android retire
+  `FirebaseInitProvider`, construit son backend sans initialiser Firebase et ne le configure qu'après
+  liaison d'un compte consentant ou pour reprendre une maintenance durable. Ses écritures synchrones
+  en deux phases utilisent des retries bornés et restaurent explicitement l'historique antérieur sous
+  l'état fail-closed si le choix final échoue. Le bouton « Réessayer » rejoue le choix seulement pour
+  son compte et reste visible si le nouvel essai échoue ; un changement de session transforme une
+  mise à jour abandonnée en révocation sûre et prioritaire. Purges Crashlytics et suppressions FID portent un
+  état/requestId durable ; un rebind, un échec réseau ou un callback obsolète ne peut pas réactiver ni
+  acquitter l'ancien état. Si le stockage refuse toutes les écritures synchrones, l'opération échoue
+  honnêtement et le runtime courant reste fermé, sans prétendre garantir le prochain processus.
+  Crashlytics reste en mode manuel et Performance automatique reste désactivé. iOS diffère aussi le démarrage
+  Firebase jusqu'à la validation du compte et stocke le choix dans le Keychain avec une empreinte du
+  propriétaire. Une session momentanément absente suspend les capacités sans effacer le choix ; une
+  déconnexion, une annulation ou une suppression le révoque pour éviter tout héritage inter-compte.
+  Crashlytics iOS reste en envoi manuel : seul un consentement diagnostics restauré pour le même
+  compte envoie les rapports au lancement suivant et seulement sans purge attendue. Nouvel accord et
+  révocation utilisent un ordre de persistance crash-safe différent ; le check unique fournit toujours
+  l'action de suppression et toute seconde purge du même processus attend le prochain lancement. Cette
+  attente bloque seulement les diagnostics, tandis qu'une transaction Firebase Installations bloque
+  toutes les collectes, conserve l'intention finale, la réconcilie avant l'appel réseau et empêche un
+  ancien callback d'acquitter une demande plus récente. Un override absent/corrompu déclenche purge et
+  suppression FID ; si Firebase est déjà configuré, `awaitingRestart` est persisté atomiquement après
+  coupure des SDK. L'instrumentation Performance automatique iOS reste désactivée avant configuration
+  et au runtime dans la lignée supportée.
+- Android retire aussi `AD_ID`, les deux permissions AdServices, Install Referrer et la bibliothèque
+  AdServices. Une tâche Gradle rattachée à `check` analyse les manifestes fusionnés debug, staging et
+  release, en plus du contrôle Python des sources et variantes.
+- Validation locale SETTINGS-001B : 39 tests Android d'observabilité, 119 tests
+  structurels/adversariaux du vérificateur d'intégrité, 232 tests Android app et 390 tests shared sans
+  échec. La gate `spotlessCheck detekt check :androidApp:assembleDebug` est verte en 8 min 26 s ; elle
+  inclut lint, compilations Kotlin iOS disponibles sous Windows et les manifestes fusionnés debug,
+  staging et release sans `FirebaseInitProvider`, permission d'attribution ni AdServices, avec six
+  defaults de collecte exactement à `false`. L'APK debug de 44 270 529 octets a été produit avec le
+  SHA-256 `495ba46e4b641da19e50359a4fd95517e5a14d4a5fe2de99db5cb6e14b90fd2f`. Les
+  sources critiques Android/iOS et toute la configuration Gradle sont verrouillées par empreintes
+  d'audit ; les accès Firebase hors adaptateur privé et les dépendances Firebase hors `androidApp`
+  sont interdits. Swift/Xcode reste indisponible sur
+  ce poste Windows.
 
 ## Tâche en cours
 
-SEC-001F, STAB-002A et IOS-PRIVACY-001A sont terminés localement sur
+SEC-001F, STAB-002A, IOS-PRIVACY-001A, IOS-PRIVACY-001B1 et SETTINGS-001B sont terminés localement sur
 `codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A, sans push, relance de CI, déploiement ni
 publication. STAB-002B reste suspendu à la décision sur les cinq racines V1. OPS-001B dépend du
 provisionnement propriétaire et des gates d'observabilité ci-dessous ; SETTINGS-001 reste ouvert et
@@ -322,9 +367,11 @@ ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
 - Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
 - La navigation globale complète, les actions réelles du détail, l'administration opérateur, les contenus réels, le pipeline média et les validations natives/appareils bloquent encore une V1 commercialement exploitable.
-- IOS-PRIVACY-001B doit encore inventorier les données de l'hôte et des SDK, valider les finalités et
-  la liaison au compte, puis rapprocher le manifest du Privacy Report Xcode et d'App Store Connect.
-  IOS-PRIVACY-001A seul ne constitue donc pas une preuve de conformité Store complète.
+- IOS-PRIVACY-001B2 doit encore valider les finalités, la liaison, la rétention et les réglages
+  fournisseurs avec le propriétaire, puis rapprocher l'archive exacte du Privacy Report Xcode et
+  d'App Store Connect. L'inventaire local IOS-PRIVACY-001B1 ne constitue donc pas une preuve de
+  conformité Store complète. L'URL publique approuvée de politique de confidentialité reste aussi à
+  fournir avant de pouvoir l'exposer dans Paramètres sans inventer de destination.
 - SEC-001A n'est pas protectrice pour staging/production tant que sa PR n'est pas relue, fusionnée puis déployée.
 - ARCH-004 est empilée sur SEC-001A et n'atteindra `main` qu'après la fusion de `#35`, le retarget éventuel de `#36` et une CI toujours verte.
 - STAB-003 est empilée sur ARCH-004 et n'atteindra `main` qu'après `#35`, `#36`, le retarget de `#37` et une CI toujours verte.
@@ -343,6 +390,11 @@ ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 - Les sources SwiftUI SETTINGS-001A ont été revues statiquement, mais Swift/Xcode sont absents de ce
   poste Windows. Leur compilation native et les parcours VoiceOver restent à prouver sur macOS ; le
   rendu et TalkBack Android doivent aussi être vérifiés sur appareils configurés avant publication.
+  La même gate couvre les nouveaux toggles de confidentialité SETTINGS-001B.
+- La première distribution Android/iOS avec Firebase réel exige une installation staging propre et la preuve
+  qu'aucune ancienne build Firebase automatique n'a été diffusée. Une ancienne collecte Crashlytics automatique
+  ne permet pas de garantir l'annulation à chaud d'un upload déjà commencé ; toute population legacy
+  découverte bloque la release jusqu'à un plan de migration dédié.
 - `kwabor://listing/<uuid>` est volontairement interne et sans fallback. Un domaine HTTPS officiel,
   ses fichiers d'association, les fallbacks Store/serveur et le contrat de signalement sont requis
   avant de pouvoir livrer le partage public demandé par ACTIONS-001C.

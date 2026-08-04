@@ -117,10 +117,48 @@ restent des gates hébergées avant activation de `account-delete`.
 ## Intégrité, marque et média
 
 ```powershell
+python -B -m unittest tools/test_verify_repository_integrity.py
 python -B tools/verify-repository-integrity.py
 python -B tools/verify-brand-assets.py
 python -B tools/verify-onboarding-media.py
 ```
+
+Les 119 tests de régression actuels verrouillent le contrat exact du Privacy Manifest iOS, notamment la
+Required Reason API `UserDefaults` et `CA92.1`, ainsi que les invariants Firebase Android/iOS :
+initialisation Android différée, collecte Crashlytics automatique interdite, instrumentation
+Performance automatique interdite, envoi manuel, purges durables, transactions Firebase Installations,
+retry, callbacks obsolètes, reprise atomique des anciens overrides iOS et absence de liaison Firebase
+avant le nettoyage de première installation.
+
+Les quatre sources iOS, les sept sources Android et les trois fichiers de configuration Android qui
+portent ces garanties utilisent une empreinte
+SHA-256 d'audit. Seuls le BOM UTF-8 et la représentation LF/CRLF sont normalisés ; tout autre changement,
+même de formatage, exige une nouvelle revue avant mise à jour de l'empreinte. Les frontières globales
+interdisent aussi les accès Firebase hors adaptateur depuis Swift, Objective-C, Kotlin ou Java, y
+compris depuis `shared/src/androidMain`, par chargement dynamique ou via des échappements Unicode Java.
+Les dépendances déclarées sont inspectées après évaluation Gradle ; les scripts Gradle et catalogues de
+versions sont aussi parcourus dans tout le dépôt puis verrouillés par inventaire et empreinte. Les
+notations Maven directes, `group`/`name`, Groovy, TOML, concaténées ou calculées ne peuvent donc pas
+introduire Firebase hors d'`androidApp` sans faire échouer `check` ou l'intégrité statique.
+Les mutations adversariales vérifient les retours anticipés, gates forcées, appels supplémentaires,
+imports hors frontière, appel direct de l'adaptateur privé, variantes Objective-C et manifestes Android
+de variante. Les invariants sémantiques sont exercés avant les empreintes afin qu'un test ne réussisse
+pas seulement grâce au changement de hash.
+
+Les 39 tests JVM Android ciblés exercent en plus l'installation neuve sans configuration, les deux
+phases persistantes, les pannes d'écriture avec snapshot mémoire/disque fidèle, le rollback de
+l'historique, le rebind du même compte, le replay borné du choix échoué, son remplacement par une
+révocation sûre lors d'un changement de session, les purges diagnostics/FID,
+les changements de compte et les callbacks obsolètes.
+Ces tests inspectent les sources et détectent une régression de structure ; ils ne simulent ni le
+Keychain iOS, ni un crash de processus réel, ni le réseau Firebase. Les PolicyTests Swift et les scénarios sur
+appareil/macOS restent les preuves comportementales requises. Cette commande reste manuelle dans cette
+tranche : aucun workflow CI n'a été modifié sans accord explicite.
+
+La tâche `:androidApp:verifyFirebaseMergedManifests`, appelée par `check`, régénère les manifestes
+debug, staging et release. Elle exige l'absence de `FirebaseInitProvider`, `AD_ID`, des permissions
+AdServices, d'Install Referrer et de `android.ext.adservices`, puis exactement six valeurs de collecte
+à `false`.
 
 Le vérificateur vidéo exige `ffprobe`. Quand un asset de lancement ou son câblage change, la CI peut
 exiger en plus la matrice Android définie dans `.github/workflows/android-launch-evidence.yml`.

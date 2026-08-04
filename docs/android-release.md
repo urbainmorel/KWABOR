@@ -152,6 +152,13 @@ Chaque GitHub Environment doit contenir le secret `KWABOR_FIREBASE_ANDROID_CONFI
 depuis le `google-services.json` de ce même environnement. Le workflow le décode dans le checkout,
 vérifie le project ID et le package `com.kwabor.android`, puis le supprime même après échec.
 
+Avant la première distribution contenant une configuration Firebase réelle, prouver que la population
+ciblée n'a reçu aucune ancienne build ayant activé la collecte automatique Crashlytics ou Performance.
+Sur les appareils staging, partir d'une installation propre. Si une build Firebase antérieure a été
+distribuée, bloquer la release et documenter une migration dédiée : un override persistant déjà actif
+peut commencer son travail lors de l'initialisation et la nouvelle app ne peut pas annuler avec certitude
+un upload déjà engagé.
+
 ### Secrets de signature production
 
 Dans le GitHub Environment `production`, créer les secrets suivants :
@@ -201,5 +208,13 @@ Le workflow exécute la gate `check` avant de publier. Toute configuration dista
 - signature de l'AAB issue de la clé d'upload attendue ;
 - mapping R8 et SHA-256 archivés ;
 - aucun fichier de configuration ou secret ajouté à Git ;
+- manifest fusionné sans `FirebaseInitProvider`, six valeurs de collecte à `false` et instrumentation
+  Performance automatique désactivée ;
+- manifest fusionné sans `AD_ID`, permissions AdServices, Install Referrer ni
+  `android.ext.adservices`, contrôlé pour debug, staging et release par
+  `:androidApp:verifyFirebaseMergedManifests` ;
+- `verifyFirebaseDependencyBoundary` vert : les dépendances Gradle évaluées ne contiennent le groupe
+  Firebase que dans `:androidApp`, et l'inventaire des scripts audités est intact ;
+- lignée Firebase propre confirmée, ou plan de migration legacy approuvé avant rollout ;
 - CI de la révision `main` verte ;
 - formulaire Data safety, politique de confidentialité et consentements validés par le propriétaire.

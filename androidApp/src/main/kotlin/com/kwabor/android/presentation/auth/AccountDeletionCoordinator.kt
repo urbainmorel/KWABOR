@@ -66,6 +66,7 @@ internal class AccountDeletionCoordinator(
             publishError(runtime.strings.authInvalidInput)
             return
         }
+        if (!revokeObservabilityConsent()) return
         submit(AccountDeletionCredential.Password(password))
     }
 
@@ -80,6 +81,7 @@ internal class AccountDeletionCoordinator(
             publishError(runtime.strings.authInvalidInput)
             return
         }
+        if (!revokeObservabilityConsent()) return
         runtime.accessState.value = runtime.accessState.value.copy(
             accountDeletionInProgress = true,
             accountDeletionErrorMessage = null,
@@ -133,6 +135,12 @@ internal class AccountDeletionCoordinator(
         dependencies.googleIdentityProvider.clearCredentialState()
         accountDeletionCompleted = true
         runtime.effectChannel.send(AuthEffect.AccountDeleted)
+    }
+
+    private fun revokeObservabilityConsent(): Boolean {
+        if (dependencies.revokeObservabilityConsent()) return true
+        publishError(runtime.strings.settings.privacyPersistenceError)
+        return false
     }
 
     private fun completeNavigation() {

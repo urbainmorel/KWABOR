@@ -12,15 +12,60 @@ import kotlin.test.assertTrue
 
 class AndroidObservabilityControllerTest {
     @Test
-    fun startKeepsAllCollectionAndRemoteConfigurationDisabledWithoutStoredConsent() {
-        val backend = FakeObservabilityBackend()
-        val controller = AndroidObservabilityController(backend, InMemoryConsentStore())
+    fun freshInstallWithoutConfigurationDoesNotInitializeFirebase() {
+        val backend = TestObservabilityBackend(ensureConfiguredSucceeds = false)
+        val controller = AndroidObservabilityController(backend, TestConsentStore())
+
+        controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+
+        assertEquals(0, backend.ensureConfiguredCount)
+        assertFalse(backend.isConfigured)
+        assertEquals(emptyList(), backend.appliedConsents)
+        assertEquals(ObservabilityConsent(), controller.consent.value)
+        assertFalse(controller.privacyOperationFailed.value)
+    }
+
+    @Test
+    fun backendConfigurationFailureIsVisibleAndCanBeRetried() {
+        val backend = TestObservabilityBackend(ensureConfiguredSucceeds = false)
+        val controller = AndroidObservabilityController(
+            backend,
+            TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ObservabilityConsent(analyticsAllowed = true),
+            ),
+        )
+        controller.start()
+
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+
+        assertTrue(controller.privacyOperationFailed.value)
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+        assertEquals(1, backend.ensureConfiguredCount)
+
+        backend.ensureConfiguredSucceeds = true
+        controller.retryPendingMaintenance()
+
+        assertFalse(controller.privacyOperationFailed.value)
+        assertEquals(ObservabilityConsent(analyticsAllowed = true), backend.appliedConsent)
+        assertEquals(2, backend.ensureConfiguredCount)
+    }
+
+    @Test
+    fun startKeepsCollectionDisabledEvenWhenAStoredConsentExists() {
+        val backend = TestObservabilityBackend()
+        val store = TestConsentStore(ownerUserId = TEST_USER_ID, consent = ALL_OBSERVABILITY_GRANTED)
+        val controller = AndroidObservabilityController(backend, store)
 
         controller.start()
         controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
         controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
 
-        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+        assertEquals(ObservabilityConsent(), controller.consent.value)
+        assertEquals(0, backend.ensureConfiguredCount)
+        assertEquals(TEST_USER_ID, store.read().ownerUserId)
+        assertEquals(ALL_OBSERVABILITY_GRANTED, store.read().consent)
         assertEquals(emptyList(), backend.events)
         assertEquals(emptyList(), backend.diagnostics)
         assertFalse(backend.remoteConfigurationFetched)
@@ -28,23 +73,27 @@ class AndroidObservabilityControllerTest {
     }
 
     @Test
-    fun updateConsentPersistsChoiceAndGatesEveryBackendCapability() {
-        val backend = FakeObservabilityBackend()
-        val store = InMemoryConsentStore()
-        val controller = AndroidObservabilityController(backend, store)
-        controller.start()
-        val granted = ObservabilityConsent(
-            analyticsAllowed = true,
-            diagnosticsAllowed = true,
-            remoteConfigurationAllowed = true,
+    fun matchingAuthenticatedUserRestoresStoredConsentAndGatesEveryBackendCapability() {
+        val backend = TestObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            TestConsentStore(ownerUserId = TEST_USER_ID, consent = ALL_OBSERVABILITY_GRANTED),
         )
+        controller.start()
 
-        assertTrue(controller.updateConsent(granted))
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+        assertEquals(1, backend.diagnosticsCheckCount)
+        backend.completeNextDiagnosticsCheck(
+            DiagnosticsReportCheckResult.Success(hasUnsentReports = true),
+        )
         controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
         controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
         controller.startTrace(PerformanceTraceName.ExploreInitialLoad).stop()
 
-        assertEquals(granted, store.consent)
+        assertEquals(ALL_OBSERVABILITY_GRANTED, controller.consent.value)
+        assertEquals(ALL_OBSERVABILITY_GRANTED, backend.appliedConsent)
+        assertEquals(1, backend.ensureConfiguredCount)
+        assertEquals(1, backend.sendUnsentReportsCount)
         assertEquals(1, backend.events.size)
         assertEquals(listOf(DiagnosticCode.UnexpectedApplicationState), backend.diagnostics)
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
@@ -53,188 +102,76 @@ class AndroidObservabilityControllerTest {
     }
 
     @Test
-    fun updateConsentDoesNotApplyChoiceWhenDurableWriteFails() {
-        val backend = FakeObservabilityBackend()
-        val store = InMemoryConsentStore(writesSucceed = false)
-        val controller = AndroidObservabilityController(backend, store)
-        controller.start()
-        val granted = ObservabilityConsent(analyticsAllowed = true)
-
-        assertFalse(controller.updateConsent(granted))
-
-        assertEquals(ObservabilityConsent(), controller.consent.value)
-        assertEquals(ObservabilityConsent(), backend.appliedConsent)
-        assertEquals(ObservabilityConsent(), store.consent)
-    }
-
-    @Test
-    fun revokingConsentStopsRemoteUpdatesAndFurtherCollection() {
-        val backend = FakeObservabilityBackend()
+    fun staleRestoredDiagnosticsCheckCannotSendReportsAfterConsentRevocation() {
+        val backend = TestObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
-            InMemoryConsentStore(
-                ObservabilityConsent(
-                    analyticsAllowed = true,
-                    diagnosticsAllowed = true,
-                    remoteConfigurationAllowed = true,
-                ),
+            TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ObservabilityConsent(diagnosticsAllowed = true),
             ),
         )
         controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
 
-        controller.updateConsent(ObservabilityConsent())
-        controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
-        controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
+        assertEquals(1, backend.diagnosticsCheckCount)
+        assertTrue(controller.updateConsent(TEST_USER_ID, ObservabilityConsent()))
+        backend.completeNextDiagnosticsCheck(
+            DiagnosticsReportCheckResult.Success(hasUnsentReports = true),
+        )
 
-        assertEquals(emptyList(), backend.events)
-        assertEquals(emptyList(), backend.diagnostics)
+        assertEquals(0, backend.sendUnsentReportsCount)
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+    }
+
+    @Test
+    fun missingAuthenticatedUserSuspendsRuntimeConsentWithoutDeletingStoredChoice() {
+        val backend = TestObservabilityBackend()
+        val store = TestConsentStore(ownerUserId = TEST_USER_ID, consent = ALL_OBSERVABILITY_GRANTED)
+        val controller = AndroidObservabilityController(backend, store)
+        controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+
+        controller.bindToAuthenticatedUser(null)
+
+        assertEquals(ObservabilityConsent(), controller.consent.value)
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+        assertEquals(TEST_USER_ID, store.read().ownerUserId)
+        assertEquals(ALL_OBSERVABILITY_GRANTED, store.read().consent)
         assertEquals(1, backend.remoteUpdateStopCount)
     }
 
     @Test
-    fun failedGenericRemoteConfigurationFetchIsReportedOnlyWithDiagnosticsConsent() {
-        val backend = FakeObservabilityBackend(fetchSucceeds = false)
-        val controller = AndroidObservabilityController(
-            backend,
-            InMemoryConsentStore(
-                ObservabilityConsent(
-                    diagnosticsAllowed = true,
-                    remoteConfigurationAllowed = true,
-                ),
-            ),
-        )
-
+    fun differentAuthenticatedUserRevokesThePreviousAccountsStoredChoice() {
+        val backend = TestObservabilityBackend()
+        val store = TestConsentStore(ownerUserId = TEST_USER_ID, consent = ALL_OBSERVABILITY_GRANTED)
+        val controller = AndroidObservabilityController(backend, store)
         controller.start()
 
-        assertEquals(listOf(DiagnosticCode.RemoteConfigurationFetchFailed), backend.diagnostics)
-    }
+        controller.bindToAuthenticatedUser(TEST_OTHER_USER_ID)
 
-    @Test
-    fun staleRemoteConfigurationCallbackCannotReportAfterConsentRevocation() {
-        val backend = FakeObservabilityBackend()
-        val controller = AndroidObservabilityController(
-            backend,
-            InMemoryConsentStore(
-                ObservabilityConsent(
-                    diagnosticsAllowed = true,
-                    remoteConfigurationAllowed = true,
-                ),
-            ),
-        )
-        controller.start()
-
-        controller.updateConsent(ObservabilityConsent(diagnosticsAllowed = true))
-        backend.emitStaleRemoteUpdate(succeeded = false)
-
-        assertEquals(emptyList(), backend.diagnostics)
-    }
-
-    @Test
-    fun genericRealtimeRemoteConfigurationFailureIsReportedWhileConsentRemainsGranted() {
-        val backend = FakeObservabilityBackend()
-        val controller = AndroidObservabilityController(
-            backend,
-            InMemoryConsentStore(
-                ObservabilityConsent(
-                    diagnosticsAllowed = true,
-                    remoteConfigurationAllowed = true,
-                ),
-            ),
-        )
-        controller.start()
-
-        backend.emitRemoteUpdate(succeeded = false)
-
-        assertEquals(listOf(DiagnosticCode.RemoteConfigurationFetchFailed), backend.diagnostics)
+        assertEquals(StoredObservabilityConsent(null, ObservabilityConsent()), store.read())
+        assertEquals(ObservabilityConsent(), controller.consent.value)
+        assertEquals(1, store.revocationCount)
+        assertFalse(controller.privacyOperationFailed.value)
+        assertFalse(backend.remoteConfigurationFetched)
     }
 
     @Test
     fun closeRemovesTheGenericRealtimeRemoteConfigurationListener() {
-        val backend = FakeObservabilityBackend()
+        val backend = TestObservabilityBackend()
         val controller = AndroidObservabilityController(
             backend,
-            InMemoryConsentStore(ObservabilityConsent(remoteConfigurationAllowed = true)),
+            TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ObservabilityConsent(remoteConfigurationAllowed = true),
+            ),
         )
         controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
 
         controller.close()
 
         assertEquals(1, backend.remoteUpdateStopCount)
-    }
-}
-
-private class InMemoryConsentStore(
-    var consent: ObservabilityConsent = ObservabilityConsent(),
-    private val writesSucceed: Boolean = true,
-) : ObservabilityConsentStore {
-    override fun read(): ObservabilityConsent = consent
-
-    override fun write(consent: ObservabilityConsent): Boolean {
-        if (writesSucceed) this.consent = consent
-        return writesSucceed
-    }
-}
-
-private class FakeObservabilityBackend(
-    private val fetchSucceeds: Boolean = true,
-) : AndroidObservabilityBackend {
-    override val isConfigured: Boolean = true
-    var appliedConsent = ObservabilityConsent()
-    val events = mutableListOf<AnalyticsEvent>()
-    val diagnostics = mutableListOf<DiagnosticCode>()
-    val traces = mutableListOf<PerformanceTraceName>()
-    var remoteConfigurationFetched = false
-    var remoteUpdateStartCount = 0
-    var remoteUpdateStopCount = 0
-    var remoteUpdateCallback: ((Boolean) -> Unit)? = null
-    var staleRemoteUpdateCallback: ((Boolean) -> Unit)? = null
-    val remoteUpdatesStarted: Boolean get() = remoteUpdateCallback != null
-
-    override fun applyConsent(consent: ObservabilityConsent) {
-        appliedConsent = consent
-        if (!consent.analyticsAllowed) {
-            events.clear()
-        }
-        if (!consent.diagnosticsAllowed) {
-            diagnostics.clear()
-            traces.clear()
-        }
-    }
-
-    override fun track(event: AnalyticsEvent) {
-        events += event
-    }
-
-    override fun recordDiagnostic(code: DiagnosticCode) {
-        diagnostics += code
-    }
-
-    override fun startTrace(name: PerformanceTraceName): PerformanceTrace {
-        traces += name
-        return PerformanceTrace.None
-    }
-
-    override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
-        remoteConfigurationFetched = true
-        onResult(fetchSucceeds)
-    }
-
-    override fun startRemoteConfigurationUpdates(onResult: (Boolean) -> Unit) {
-        remoteUpdateStartCount += 1
-        remoteUpdateCallback = onResult
-        staleRemoteUpdateCallback = onResult
-    }
-
-    override fun stopRemoteConfigurationUpdates() {
-        remoteUpdateStopCount += 1
-        remoteUpdateCallback = null
-    }
-
-    fun emitRemoteUpdate(succeeded: Boolean) {
-        remoteUpdateCallback?.invoke(succeeded)
-    }
-
-    fun emitStaleRemoteUpdate(succeeded: Boolean) {
-        staleRemoteUpdateCallback?.invoke(succeeded)
     }
 }

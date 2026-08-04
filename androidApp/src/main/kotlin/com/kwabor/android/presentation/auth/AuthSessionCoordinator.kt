@@ -79,6 +79,13 @@ internal class AuthSessionCoordinator(
 
     private fun signOutPartialSession() {
         if (runtime.authState.value.isLoading) return
+        if (!dependencies.revokeObservabilityConsent()) {
+            val errorMessage = runtime.strings.settings.privacyPersistenceError
+            runtime.authState.value = runtime.authState.value.copy(isLoading = false, errorMessage = errorMessage)
+            runtime.registrationState.value = runtime.registrationState.value.copy(errorMessage = errorMessage)
+            runtime.accessState.value = runtime.accessState.value.copy(isLoading = false, errorMessage = errorMessage)
+            return
+        }
         runtime.operationJob?.cancel()
         runtime.authState.value = runtime.authState.value.copy(isLoading = true, errorMessage = null)
         runtime.operationJob = runtime.coroutineScope.launch {
@@ -108,6 +115,12 @@ internal class AuthSessionCoordinator(
 
     suspend fun redirectExistingAccountToSignIn(email: String) {
         if (runtime.accessState.value.isLoading) return
+        if (!dependencies.revokeObservabilityConsent()) {
+            val errorMessage = runtime.strings.settings.privacyPersistenceError
+            runtime.registrationState.value = runtime.registrationState.value.copy(errorMessage = errorMessage)
+            runtime.accessState.value = runtime.accessState.value.copy(isLoading = false, errorMessage = errorMessage)
+            return
+        }
         runtime.accessState.value = runtime.accessState.value.copy(isLoading = true, errorMessage = null)
         val updatedAuthState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
         if (updatedAuthState.errorMessage != null) {
@@ -277,6 +290,12 @@ private class AuthSessionRestorer(
 
     private suspend fun revokePendingPromoterActivationSession(): Boolean {
         if (!dependencies.promoterActivationSessionStore.hasPendingImportedSession()) return true
+        if (!dependencies.revokeObservabilityConsent()) {
+            runtime.authState.value = initialAuthUiState().copy(
+                errorMessage = runtime.strings.settings.privacyPersistenceError,
+            )
+            return false
+        }
         val signedOutState = dependencies.authPresenter.signOut(initialAuthUiState(), runtime.strings)
         if (signedOutState.errorMessage != null) {
             runtime.authState.value = signedOutState
@@ -362,6 +381,13 @@ private class AuthSignOutCoordinator(
     private fun confirm() {
         val accessState = runtime.accessState.value
         if (!runtime.authState.value.isAuthenticated || accessState.signOutInProgress) return
+        if (!dependencies.revokeObservabilityConsent()) {
+            runtime.accessState.value = accessState.copy(
+                signOutConfirmationVisible = false,
+                signOutErrorMessage = runtime.strings.settings.privacyPersistenceError,
+            )
+            return
+        }
         runtime.accessState.value = accessState.copy(signOutInProgress = true, signOutErrorMessage = null)
         runtime.operationJob?.cancel()
         runtime.operationJob = runtime.coroutineScope.launch {

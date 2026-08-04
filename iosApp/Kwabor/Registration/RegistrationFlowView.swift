@@ -411,30 +411,37 @@ private struct RegistrationStepContent: View {
 
     private var observabilityStep: some View {
         Section {
-            Toggle(
-                store.strings.registrationAnalyticsConsent,
-                isOn: Binding(
-                    get: { state.observabilityConsent.analyticsAllowed },
-                    set: store.updateAnalyticsConsent
+            if hasValidObservabilityOwner {
+                Toggle(
+                    store.strings.registrationAnalyticsConsent,
+                    isOn: Binding(
+                        get: { state.observabilityConsent.analyticsAllowed },
+                        set: store.updateAnalyticsConsent
+                    )
                 )
-            )
-            Toggle(
-                store.strings.registrationDiagnosticsConsent,
-                isOn: Binding(
-                    get: { state.observabilityConsent.diagnosticsAllowed },
-                    set: store.updateDiagnosticsConsent
+                Toggle(
+                    store.strings.registrationDiagnosticsConsent,
+                    isOn: Binding(
+                        get: { state.observabilityConsent.diagnosticsAllowed },
+                        set: store.updateDiagnosticsConsent
+                    )
                 )
-            )
-            Toggle(
-                store.strings.registrationRemoteConfigConsent,
-                isOn: Binding(
-                    get: { state.observabilityConsent.remoteConfigurationAllowed },
-                    set: store.updateRemoteConfigurationConsent
+                Toggle(
+                    store.strings.registrationRemoteConfigConsent,
+                    isOn: Binding(
+                        get: { state.observabilityConsent.remoteConfigurationAllowed },
+                        set: store.updateRemoteConfigurationConsent
+                    )
                 )
-            )
+            } else {
+                Text(store.strings.settings.privacyPersistenceError)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+                    .accessibilityLabel(store.strings.settings.privacyPersistenceError)
+            }
         } footer: {
             Text(store.strings.registrationObservabilitySupport)
         }
+        .tint(KwaborDesignTokens.ColorToken.ink950)
     }
 
     private var notificationStep: some View {
@@ -559,7 +566,13 @@ private struct RegistrationStepContent: View {
                 state.privacyDocument == nil ||
                 state.ugcDocument == nil
         }
+        if state.step == .observability { return !hasValidObservabilityOwner }
         return false
+    }
+
+    private var hasValidObservabilityOwner: Bool {
+        let userId = state.currentSession?.userId.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !userId.isEmpty
     }
 
     private var progress: Double {

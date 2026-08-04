@@ -220,6 +220,10 @@ internal class PromoterActivationCleanupCoordinator(
             errorMessage = null,
         )
         runtime.promoterActivationJob = runtime.coroutineScope.launch {
+            if (!dependencies.revokeObservabilityConsent()) {
+                publishCleanupError(runtime.strings.settings.privacyPersistenceError)
+                return@launch
+            }
             val signedOutState = dependencies.authPresenter.signOut(runtime.authState.value, runtime.strings)
             val signOutErrorMessage = signedOutState.errorMessage
             if (signOutErrorMessage != null) {

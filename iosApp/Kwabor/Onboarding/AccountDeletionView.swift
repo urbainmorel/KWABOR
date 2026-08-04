@@ -14,6 +14,7 @@ final class AccountDeletionStore: ObservableObject {
 
     private let controller: IosAuthController
     private let latestAuthError: () -> String?
+    private let onDeletionWillStart: () -> Bool
     private let onDeletionStateChanged: (Bool) -> Void
     private let onDeleted: () -> Void
     private var idempotencyKey = UUID().uuidString
@@ -22,12 +23,14 @@ final class AccountDeletionStore: ObservableObject {
         controller: IosAuthController,
         strings: OnboardingStrings,
         latestAuthError: @escaping () -> String?,
+        onDeletionWillStart: @escaping () -> Bool,
         onDeletionStateChanged: @escaping (Bool) -> Void,
         onDeleted: @escaping () -> Void
     ) {
         self.controller = controller
         self.strings = strings
         self.latestAuthError = latestAuthError
+        self.onDeletionWillStart = onDeletionWillStart
         self.onDeletionStateChanged = onDeletionStateChanged
         self.onDeleted = onDeleted
     }
@@ -43,6 +46,10 @@ final class AccountDeletionStore: ObservableObject {
 
     func deleteWithPassword() {
         guard hasConfirmedDeletion, !password.isEmpty, !isLoading else { return }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            return
+        }
         isLoading = true
         errorMessage = nil
         let submittedPassword = password
@@ -64,6 +71,11 @@ final class AccountDeletionStore: ObservableObject {
             onCompleted(false)
             return
         }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            onCompleted(false)
+            return
+        }
         isLoading = true
         errorMessage = nil
         onDeletionStateChanged(true)
@@ -75,6 +87,16 @@ final class AccountDeletionStore: ObservableObject {
             self?.finish(completed: didComplete)
             onCompleted(didComplete)
         }
+    }
+
+    func prepareFederatedDeletion() -> Bool {
+        guard hasConfirmedDeletion, !isLoading else { return false }
+        guard onDeletionWillStart() else {
+            errorMessage = strings.settings.privacyPersistenceError
+            return false
+        }
+        errorMessage = nil
+        return true
     }
 
     func reset() {
@@ -109,6 +131,7 @@ struct AccountDangerZoneSection: View {
     let signOutErrorMessage: String?
     let onSignOut: () -> Void
     let onDismissSignOutError: () -> Void
+    let onDeletionWillStart: () -> Bool
     let onDeletionStateChanged: (Bool) -> Void
     let onDeleted: () -> Void
     @State private var isDeletionPresented = false
@@ -171,6 +194,7 @@ struct AccountDangerZoneSection: View {
                     strings: strings,
                     identityHintStore: identityHintStore,
                     latestAuthError: latestAuthError,
+                    onDeletionWillStart: onDeletionWillStart,
                     onDeletionStateChanged: onDeletionStateChanged,
                     onDeleted: {
                         isDeletionPresented = false
@@ -192,6 +216,7 @@ private struct AccountDeletionConfirmationView: View {
         strings: OnboardingStrings,
         identityHintStore: FederatedIdentityHintPersisting,
         latestAuthError: @escaping () -> String?,
+        onDeletionWillStart: @escaping () -> Bool,
         onDeletionStateChanged: @escaping (Bool) -> Void,
         onDeleted: @escaping () -> Void
     ) {
@@ -199,6 +224,7 @@ private struct AccountDeletionConfirmationView: View {
             controller: controller,
             strings: strings,
             latestAuthError: latestAuthError,
+            onDeletionWillStart: onDeletionWillStart,
             onDeletionStateChanged: onDeletionStateChanged,
             onDeleted: onDeleted
         )
@@ -209,6 +235,8 @@ private struct AccountDeletionConfirmationView: View {
                 presenterProvider: WindowScenePresentingViewControllerProvider(),
                 identityHintStore: identityHintStore,
                 reportsSubmissionFailure: false,
+                attemptPreflight: deletionStore.prepareFederatedDeletion,
+                attemptPreflightErrorMessage: strings.settings.privacyPersistenceError,
                 onCredential: deletionStore.deleteWithFederatedCredential
             )
         )

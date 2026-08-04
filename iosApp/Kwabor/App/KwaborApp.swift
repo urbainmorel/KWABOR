@@ -5,6 +5,7 @@ import SwiftUI
 
 @main
 struct KwaborApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
@@ -58,6 +59,11 @@ struct KwaborApp: App {
                 .onOpenURL { url in
                     if !GIDSignIn.sharedInstance.handle(url) {
                         _ = coordinator.handleIncomingUrl(url)
+                    }
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active {
+                        coordinator.applicationBecameActive()
                     }
                 }
         }

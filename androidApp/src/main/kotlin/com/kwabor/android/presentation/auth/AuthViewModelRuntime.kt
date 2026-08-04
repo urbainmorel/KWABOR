@@ -70,5 +70,9 @@ internal data class AuthViewModelDependencies(
     val googleIdentityUnavailableMessage: String,
     val idempotencyKeyProvider: com.kwabor.android.auth.IdempotencyKeyProvider,
     val clockProvider: com.kwabor.shared.domain.core.ClockProvider,
-    val applyObservabilityConsent: (com.kwabor.shared.domain.observability.ObservabilityConsent) -> Boolean,
+    val applyObservabilityConsent: (
+        String,
+        com.kwabor.shared.domain.observability.ObservabilityConsent,
+    ) -> Boolean,
+    val revokeObservabilityConsent: () -> Boolean,
 )

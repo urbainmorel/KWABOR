@@ -2,6 +2,7 @@
 
 - **Statut** : accepté
 - **Date** : 2026-07-14
+- **Dernière précision** : 2026-08-03
 - **Décideurs** : Produit Kwabor, Architecture, Mobile, Data
 - **Remplace** : —
 
@@ -32,7 +33,48 @@ Les règles suivantes sont obligatoires :
 - Crashlytics filtre toute donnée utilisateur sensible ;
 - Remote Config pilote des valeurs UX et feature flags, jamais une autorisation, un prix, un paiement ou une règle RLS ;
 - Remote Config ne transporte aucun média ou URL de contenu ; la vidéo d'intro est distribuée exclusivement avec les versions Store selon l'ADR-0021 ;
+- sur Android, `FirebaseInitProvider` est retiré du manifest fusionné. La construction de l'adaptateur
+  reste inerte et Firebase n'est configuré qu'après liaison du compte consentant ou pour reprendre une
+  maintenance durable, avec Analytics, Crashlytics et Performance d'abord forcés à `false` ;
+- sur Android, Crashlytics reste en collecte automatique désactivée. L'envoi et la suppression des
+  rapports sont manuels après le check unique du processus ; une purge porte un identifiant de requête
+  durable et reste attendue jusqu'à ce qu'un processus confirme l'absence de rapport ;
+- sur Android, une révocation complète, une révocation Remote Config ou un changement de propriétaire
+  persiste une suppression Firebase Installations identifiée avant l'appel réseau. Toutes les
+  collectes restent suspendues jusqu'au succès et un callback ancien ne peut pas acquitter une demande
+  plus récente ;
+- sur Android, le stockage applique une écriture synchrone en deux phases : état fail-closed et
+  maintenances d'abord, choix final ensuite. Chaque commit est réessayé de façon bornée et un échec de
+  la phase finale restaure explicitement l'historique antérieur sous l'état fail-closed. Le runtime ne
+  réactive jamais l'ancien consentement dans le processus et le choix non confirmé reste visible avec
+  retry pour le même compte ; un changement de session convertit ce choix abandonné en révocation
+  prioritaire. Si le stockage refuse toutes les tentatives synchrones, l'opération retourne un échec et ne
+  prétend pas être durable : après arrêt du processus, seul le dernier état réellement écrit peut être
+  relu ;
+- sur iOS, Crashlytics reste en collecte automatique désactivée. Tout nouvel accord diagnostics est
+  précédé d'un marqueur Keychain de purge ; toute révocation persiste d'abord le consentement final
+  désactivé. Le check unique du processus fournit toujours l'action de suppression et le marqueur
+  reste jusqu'au processus suivant si un rapport existe ou si une nouvelle purge survient après ce
+  check. Seuls les diagnostics attendent cette purge ; les autres catégories gardent leurs propres
+  portes de consentement ;
+- sur iOS, toute révocation Remote Config ou révocation complète qui exige une suppression Firebase
+  Installations est une transaction Keychain typée : l'intention finale du consentement est durable et
+  réconciliée avant l'appel réseau, toutes les collectes restent suspendues jusqu'au succès client, et
+  un callback ancien ne peut pas acquitter une demande plus récente ; seule une première installation
+  reconnue peut effacer le marqueur survivant avant configuration, car l'ancien FID n'est plus
+  adressable depuis le nouveau sandbox ;
+- sur iOS, une migration d'override Firebase absente ou corrompue persiste purge diagnostics et
+  suppression FID avant restauration. Si Firebase est déjà configuré après avoir été coupé, la phase
+  de redémarrage attendu est écrite atomiquement ; tout échec Keychain maintient les SDK effectifs
+  désactivés ;
 - des valeurs sûres sont embarquées, le dernier Remote Config valide est mis en cache et une configuration invalide est rejetée ;
+- les sources critiques d'observabilité sont verrouillées par empreintes d'audit normalisées et tout
+  accès direct au SDK Firebase hors des adaptateurs approuvés est interdit ;
+- les dépendances déclarées sont contrôlées après évaluation Gradle et les scripts Gradle sont
+  verrouillés par inventaire et empreinte ; le groupe Firebase est interdit hors d'`androidApp` ;
+- Android vérifie aussi les manifestes fusionnés debug, staging et release : le provider automatique,
+  les permissions d'attribution publicitaire et la bibliothèque AdServices doivent être absents, et
+  les six valeurs de collecte doivent rester exactement à `false` ;
 - les fichiers de configuration et secrets spécifiques aux environnements sont injectés par CI et ne sont pas versionnés avec des valeurs réelles.
 
 Firebase documente FCM comme solution cross-platform dont l'envoi doit venir d'un environnement de confiance, avec un transport spécifique à Android ou Apple : [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging). La page tarifaire classe actuellement FCM, Analytics, Crashlytics, Performance et Remote Config parmi les produits sans coût direct, sans que cette tarification devienne une hypothèse immuable : [Firebase Pricing](https://firebase.google.com/pricing).
