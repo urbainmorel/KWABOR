@@ -8,12 +8,12 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 4 août 2026 |
-| Référence Git | `main` au commit de fusion `d173a9d75c4ab40ed4f4c290f1abd211dc6a67ec` |
-| Intégration | PR `#50` fusionnée ; son arbre est identique à la tête d'intégration `ff0ef613` |
+| Référence Git | Base `main` avant HISTORY-001A : merge `7e279c012372d0d1b0aa2fb3bdd780df19ae5950` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY et `#52` optimisation CI fusionnées |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Checks exact-head de `#50` et run post-fusion `30926418990` de `main` entièrement verts |
+| CI de la fusion | Runs post-fusion `30926418990`, `30932997743` et `30935484599` entièrement verts |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -105,17 +105,19 @@ La clôture administrative de cette pile est terminée. Les gates physiques, env
 La décision produit du 4 août exige de conserver l'historique des recherches soumises pour Search,
 le futur Assistant IA et le fil organique pertinent.
 
-État actuel : **socle domaine livré dans ce lot ; persistance, synchronisation et UI non implémentées**.
+État actuel : **socle domaine et autorité Supabase livrés ; miroir Room, synchronisation et UI non
+implémentés**.
 
 - Le cache SEARCH-001A conserve des résultats catalogue bornés, pas les requêtes de l'utilisateur.
 - Le domaine Kotlin pur partage la canonicalisation avec Search, modélise les scopes invité/compte,
   l'import invité confirmé, l'effacement, les préférences et les erreurs sans exposer le texte dans
   ses représentations de diagnostic.
-- Aucune table Supabase, persistance Room, synchronisation multi-appareil ou UI de récents n'existe.
+- L’autorité Supabase propriétaire expose un snapshot borné et l’effacement via RPC ; aucune
+  persistance Room, synchronisation multi-appareil ou UI de récents n’existe encore.
 - Seules les requêtes explicitement soumises pourront être conservées ; jamais les frappes,
   suggestions survolées, analytics ou logs bruts.
-- L'autorité d'un compte devra être propriétaire via RLS, effaçable, supprimée avec le compte et
-  distincte du consentement de personnalisation.
+- L’autorité d’un compte est propriétaire via RLS, effaçable, supprimée avec le compte et distincte
+  du consentement de personnalisation.
 - Les signaux destinés à l'IA ou au fil organique devront être structurés et bornés ; l'historique
   brut complet ne devra jamais être envoyé au modèle.
 
@@ -128,12 +130,17 @@ Seules la rétention glissante serveur proposée de **180 jours** et l'activatio
 personnalisation restent bloquées par une validation Juridique/DPO. La mise en œuvre doit rester
 découpée entre autorité serveur, miroir local/synchronisation et UI des récents.
 
+HISTORY-001A livre désormais l’autorité Supabase propriétaire : RPC versionnées d’enregistrement,
+snapshot, effacement unitaire/global, plafond concurrent de 200, préférence désactivée et purge de
+compte. La tête porte 85 assertions HISTORY et 11 assertions de concurrence dédiées ; elle attend sa
+validation GitHub exacte. Elle n’active ni rétention, ni signaux dérivés, ni déploiement automatique
+d’environnement distant.
+
 ## Prochains lots bornés
 
-1. **HISTORY-001A — autorité et politique** : appliquer ADR-0029, le plafond serveur de 200,
-   l'upsert sans doublon, le schéma Supabase, la RLS propriétaire, la liste/l'effacement bornés,
-   la suppression de compte et pgTAP ; garder la rétention 180 jours inactive en attente du
-   Juridique/DPO et ne livrer aucune UI dans ce lot.
+1. **HISTORY-001B — synchronisation offline** : définir le protocole versionné de révisions,
+   tombstones et watermark, puis raccorder le miroir Room et l’outbox sans résurrection après
+   effacement ; conserver 50 requêtes distinctes par scope et appareil.
 2. **FAVORITES-001A — consultation des favoris** : lecture paginée, repository/runtime partagé et
    écran Android/iOS minimal ouvrant le détail ; outbox persistante séparée.
 3. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles

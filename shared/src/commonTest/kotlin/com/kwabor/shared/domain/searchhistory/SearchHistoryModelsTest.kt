@@ -13,14 +13,24 @@ import kotlin.test.assertTrue
 class SearchHistoryModelsTest {
     @Test
     fun historyQueryValidationAndCanonicalizationStayInParityWithSearch() {
-        val inputs = listOf(
-            "a",
-            "  Restaurant à Cotonou  ",
-            "a".repeat(120),
-            "   ",
-            "a".repeat(121),
-            "restaurant\nCotonou",
-        )
+        val emoji = "\uD83D\uDE00"
+        val inputs =
+            listOf(
+                "a",
+                "  Restaurant à Cotonou  ",
+                "\tRestaurant à Cotonou\t",
+                "a".repeat(120),
+                emoji.repeat(119),
+                emoji.repeat(120),
+                "   ",
+                "\u00A0\u00A0",
+                "a".repeat(121),
+                emoji.repeat(121),
+                "restaurant\nCotonou",
+                "\uD83D",
+                "\uDE00",
+                "\uD83Da",
+            )
 
         inputs.forEach { input ->
             val searchResult = SearchQuery.from(input)

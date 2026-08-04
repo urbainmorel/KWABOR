@@ -2,28 +2,30 @@
 
 ## Phase actuelle
 
-Post-intégration V1 — la PR `#50` est fusionnée dans `main`, l'état documentaire est resynchronisé
-et les prochains lots doivent rester petits et indépendants.
+Post-intégration V1 — les PR `#50`, `#51` et `#52` sont fusionnées dans `main`, l’état documentaire
+est resynchronisé et les prochains lots restent petits et indépendants.
 
 ## Snapshot courant — 4 août 2026
 
-- `main` pointe sur le commit de fusion `d173a9d75c4ab40ed4f4c290f1abd211dc6a67ec` de la PR `#50`.
-  Son arbre est identique à la tête d'intégration `ff0ef613`.
+- La base `main` validée avant HISTORY-001A pointe sur le commit de fusion
+  `7e279c012372d0d1b0aa2fb3bdd780df19ae5950` de la PR `#52`. Elle inclut la fondation HISTORY-001
+  de la PR `#51` et l’intégration V1 de la PR `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
 - La PR parallèle `#34` est fermée sans fusion avec commentaire de supersession et n'est pas ancêtre
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
-- Les checks exact-head de `#50` et le run post-fusion `30926418990` du merge commit sont verts pour
-  l'intégrité, Gradle, Supabase, l'Edge Function de suppression de compte, Android API 30/31/36,
-  les tests Swift et Xcode simulateur Debug/Staging/Release.
+- Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`) et `30935484599` (`#52`) sont
+  verts pour l’intégrité, Gradle, Supabase, l’Edge Function et Xcode simulateur
+  Debug/Staging/Release. CI-001 force toujours iOS sur `main` et ne l’omet en PR que pour les
+  périmètres explicitement sûrs ; tout chemin inconnu reste fail-safe.
 - Sont désormais présents dans `main` : sécurité/architecture de la pile, intro Store-only,
   authentification et onboarding compacts, paramètres de compte et de confidentialité, persistance
   locale durcie, Explore Android/iOS offline-first, recherche lexicale Android/iOS, détail natif,
   actions externes, découverte des guides et deep link interne de fiche.
 - Ne sont pas terminés : racines Social/Ajouter/Notifications, écran Favoris et outbox durable,
-  persistance/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
+  miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
   classement/sponsoring final, carte, avis, partage public, signalement, claim, IA, contribution,
   B2B, paiement et notifications.
 - La décision de release reste **no-go** : staging/production, fournisseurs réels, préflight des
@@ -37,6 +39,12 @@ et les prochains lots doivent rester petits et indépendants.
   ADR-0029 fixe les plafonds 200 serveur/50 local, le défaut de personnalisation désactivé et la
   resoumission sans doublon ; seules la rétention serveur proposée de 180 jours et l'activation de
   la personnalisation restent bloquées par le Juridique/DPO.
+- HISTORY-001A livre l’autorité Supabase RPC-only, le snapshot propriétaire, la préférence
+  désactivée, le cap concurrent de 200 et la purge de compte. Le protocole tombstone/watermark reste
+  explicitement réservé à HISTORY-001B. La tête définit 85 assertions HISTORY et conserve les
+  harness de concurrence existant (12) et HISTORY (11) ; leur validation GitHub exacte reste la gate
+  avant fusion. Aucun job de rétention ni déploiement automatique d’environnement distant n’est
+  activé.
 
 ## Historique des tâches terminées
 
@@ -449,14 +457,11 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-STATE-001 resynchronise les trois sources opérationnelles sur la fusion `#50`. Il ne modifie ni le
-PRD ni le DESIGN et conserve explicitement la divergence entre la V1 complète et la réduction
-proposée. Les anciens jalons PR `#36` à `#48` sont fermés comme intégrés/supersédés et la PR `#34`
-est fermée sans fusion ; chaque clôture porte son commentaire de supersession.
-
-Le prochain lot fonctionnel prioritaire est HISTORY-001A, limité à la politique et à l'autorité
-serveur. FAVORITES-001A et EXPLORE-002B2A peuvent être préparés séparément sans recréer une pile
-d'intégration longue. STAB-002B reste suspendu à la décision structurante sur les cinq racines V1.
+HISTORY-001A livre la politique et l’autorité serveur bornée sans UI ni protocole offline. Le lot
+prioritaire suivant est HISTORY-001B : définir d’abord le protocole versionné tombstone/watermark,
+puis raccorder Room et l’outbox sans résurrection d’un historique effacé. FAVORITES-001A et
+EXPLORE-002B2A peuvent avancer séparément sans recréer une pile d’intégration longue. STAB-002B
+reste suspendu à la décision structurante sur les cinq racines V1.
 
 ## Blocages / limites
 
@@ -538,10 +543,9 @@ d'intégration longue. STAB-002B reste suspendu à la décision structurante sur
 
 ## Prochaine tâche logique
 
-Terminer la revue de STATE-001 et intégrer ce commit documentaire dans le flux coordonné. Le premier
-lot fonctionnel suivant est HISTORY-001A : appliquer ADR-0029 à l'autorité Supabase/RLS et à ses
-tests, sans UI ni activation de la rétention 180 jours avant validation Juridique/DPO. FAVORITES-001A
-et EXPLORE-002B2A restent les deux lots indépendants suivants. OPS-001B ne démarre qu'après
+Concevoir HISTORY-001B autour d’un protocole offline versionné avec révisions, tombstones et
+watermark avant toute outbox ou synchronisation Room. FAVORITES-001A et EXPLORE-002B2A restent les
+deux lots indépendants suivants. OPS-001B ne démarre qu'après
 provisionnement staging ; avant d'activer `account-delete`, les AMR réelles et la politique des
 en-têtes/journaux doivent être qualifiées. Tout changement d'octets de la vidéo embarquée exige
 toujours une nouvelle release Android/iOS dans les Stores.

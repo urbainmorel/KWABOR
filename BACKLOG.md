@@ -196,6 +196,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] HISTORY-001A — Créer l’autorité Supabase propriétaire avec upsert/liste/effacement bornés,
     appliquer le plafond serveur de 200, la cascade de suppression de compte et la couverture pgTAP ;
     garder la rétention glissante proposée de 180 jours inactive jusqu'à validation Juridique/DPO.
+    - [x] RPC `*_v1`, RLS propriétaire, grants RPC-only, préférence désactivée, verrou concurrent
+      par compte, plafond 200 et purge de compte livrés sans activer la rétention.
+    - [ ] Obtenir sur la tête exacte 85 assertions HISTORY, 899 assertions pgTAP au total et 11
+      assertions de concurrence HISTORY, sans déploiement automatique d’environnement distant.
   - [ ] HISTORY-001B — Capturer uniquement les requêtes soumises, appliquer le plafond local de 50
     par scope et appareil, isoler invité/comptes dans Room, synchroniser le même compte et proposer
     l’import invité explicitement.
