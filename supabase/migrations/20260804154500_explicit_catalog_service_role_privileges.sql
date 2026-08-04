@@ -5,3 +5,9 @@
 grant select, insert, update, delete
 on table public.listings, public.listing_media
 to service_role;
+
+-- The listing taxonomy trigger is SECURITY INVOKER and validates every write
+-- against the canonical category row before any privileged server workflow proceeds.
+grant select
+on table public.categories
+to service_role;

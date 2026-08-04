@@ -882,9 +882,10 @@ select ok(
   and has_table_privilege('service_role', 'public.listing_media', 'insert')
   and has_table_privilege('service_role', 'public.listing_media', 'update')
   and has_table_privilege('service_role', 'public.listing_media', 'delete')
+  and has_table_privilege('service_role', 'public.categories', 'select')
   and has_column_privilege('service_role', 'public.room_types', 'id', 'select')
   and has_column_privilege('service_role', 'public.ticket_tiers', 'created_at', 'select'),
-  'service role retains required catalog DML and internal detail reads'
+  'service role retains required catalog DML, taxonomy, and internal detail reads'
 );
 
 select is(
