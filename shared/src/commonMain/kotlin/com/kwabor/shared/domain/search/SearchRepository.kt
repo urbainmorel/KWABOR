@@ -11,22 +11,24 @@ data class SearchQuery private constructor(
     val filters: ListingFilters,
 ) {
     init {
-        require(text.isValidSearchText()) { "Search query text is invalid." }
+        require(CanonicalSearchText.from(text)?.value == text) { "Search query text is invalid." }
         require(filters.isValidForSearch()) { "Search query filters are invalid." }
     }
 
     companion object {
         fun from(text: String, filters: ListingFilters = ListingFilters()): DomainResult<SearchQuery> {
-            val canonicalText = text.trim()
-            if (!canonicalText.isValidSearchText()) {
+            val canonicalText = CanonicalSearchText.from(text)
+            if (canonicalText == null) {
                 return DomainResult.Failure(DomainError.Validation(SEARCH_QUERY_INVALID_ERROR_KEY))
             }
             if (!filters.isValidForSearch()) {
                 return DomainResult.Failure(DomainError.Validation(SEARCH_FILTERS_INVALID_ERROR_KEY))
             }
-            return DomainResult.Success(SearchQuery(text = canonicalText, filters = filters))
+            return DomainResult.Success(SearchQuery(text = canonicalText.value, filters = filters))
         }
     }
+
+    override fun toString(): String = "SearchQuery(text=<redacted>, filters=$filters)"
 }
 
 data class SearchPageRequest(
@@ -74,9 +76,6 @@ interface SearchRepository {
     suspend fun search(query: SearchQuery, page: SearchPageRequest = SearchPageRequest()): DomainResult<SearchResult>
 }
 
-private fun String.isValidSearchText(): Boolean =
-    length in MIN_SEARCH_QUERY_LENGTH..MAX_SEARCH_QUERY_LENGTH && none(Char::isISOControl)
-
 private fun ListingFilters.isValidForSearch(): Boolean =
     onlyPublished && cityId.isValidOptionalSearchId() && categoryId.isValidOptionalSearchId()
 
@@ -88,8 +87,6 @@ private fun String.isValidSearchId(): Boolean =
 private fun String?.isValidSearchCursor(): Boolean =
     this == null || (isNotBlank() && length <= MAX_SEARCH_CURSOR_LENGTH && none(Char::isWhitespace))
 
-private const val MIN_SEARCH_QUERY_LENGTH = 1
-private const val MAX_SEARCH_QUERY_LENGTH = 120
 private const val MAX_SEARCH_ID_LENGTH = 100
 private const val MAX_SEARCH_CURSOR_LENGTH = 4_096
 private const val SEARCH_QUERY_INVALID_ERROR_KEY = "error.search.query_invalid"
