@@ -192,19 +192,16 @@ struct SearchActiveContent: View {
     @ViewBuilder
     private var loadedContent: some View {
         if let errorMessage = store.state.errorMessage {
-            SearchStateMessage(
-                title: commonStrings.errorStateTitle,
-                supportingText: errorMessage,
-                actionLabel: commonStrings.retry,
-                action: store.retry
-            )
-        } else if store.state.isEmpty {
-            SearchStateMessage(
-                title: store.strings.emptyTitle,
-                supportingText: store.strings.emptyMessage,
-                actionLabel: store.canOpenAssistant ? store.strings.tryAssistant : nil,
-                action: store.canOpenAssistant ? store.openAssistant : nil
-            )
+            resultErrorContent(errorMessage)
+        } else {
+            successfulContent
+        }
+    }
+
+    @ViewBuilder
+    private var successfulContent: some View {
+        if store.state.isEmpty {
+            emptyContent
         } else {
             SearchResultsGrid(
                 store: store,
@@ -212,6 +209,32 @@ struct SearchActiveContent: View {
                 columns: columns
             )
         }
+    }
+
+    private var emptyContent: SearchStateMessage {
+        if store.canOpenAssistant {
+            return SearchStateMessage(
+                title: store.strings.emptyTitle,
+                supportingText: store.strings.emptyMessage,
+                actionLabel: store.strings.tryAssistant,
+                action: { store.openAssistant() }
+            )
+        }
+        return SearchStateMessage(
+            title: store.strings.emptyTitle,
+            supportingText: store.strings.emptyMessage,
+            actionLabel: nil,
+            action: nil
+        )
+    }
+
+    private func resultErrorContent(_ errorMessage: String) -> SearchStateMessage {
+        SearchStateMessage(
+            title: commonStrings.errorStateTitle,
+            supportingText: errorMessage,
+            actionLabel: commonStrings.retry,
+            action: { store.retry() }
+        )
     }
 }
 
@@ -296,7 +319,7 @@ struct SearchAppendFooter: View {
                 title: commonStrings.errorStateTitle,
                 supportingText: appendErrorMessage,
                 actionLabel: commonStrings.retry,
-                action: store.retryAppend
+                action: { store.retryAppend() }
             )
         }
     }
