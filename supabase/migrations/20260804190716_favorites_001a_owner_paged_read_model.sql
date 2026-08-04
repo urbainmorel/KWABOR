@@ -314,7 +314,7 @@ begin
     case
       when page.type = 'evenement'::public.listing_type
         and page.event_start_at is not null
-      then v_as_of > coalesce(page.event_end_at, page.event_start_at)
+      then v_as_of >= coalesce(page.event_end_at, page.event_start_at)
       else false
     end as is_event_ended,
     false as is_sponsored_placement,

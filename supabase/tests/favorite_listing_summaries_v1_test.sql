@@ -404,8 +404,18 @@ select ok(
       'public.remove_listing_from_favorites(uuid)'::regprocedure
       and grantee.rolname = 'service_role'
       and privilege_definition.privilege_type = 'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.add_listing_to_favorites(uuid)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.remove_listing_from_favorites(uuid)',
+    'EXECUTE'
   ),
-  'both legacy wrappers retain direct service-role execute grants'
+  'legacy wrappers retain direct service-role grants without anonymous access'
 );
 
 select ok(
