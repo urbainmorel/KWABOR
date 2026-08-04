@@ -144,8 +144,10 @@ dérivés, ni déploiement automatique d’environnement distant.
 1. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
    protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
    résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.
-2. **FAVORITES-001A — consultation des favoris** : lecture paginée, repository/runtime partagé et
-   écran Android/iOS minimal ouvrant le détail ; outbox persistante séparée.
+2. **FAVORITES-001A2 — consommation mobile des favoris** : l'autorité Supabase FAVORITES-001A1
+   fournit désormais lecture propriétaire keyset, mutation idempotente, retrait dépublié et purge
+   concurrente ; raccorder repository/runtime partagé et écran Android/iOS minimal ouvrant le détail,
+   avec Room et outbox persistante dans un lot séparé.
 3. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
    de dates et plafond sponsorisé avant de raccorder les filtres mobiles.
 

@@ -2,24 +2,24 @@
 
 ## Phase actuelle
 
-Post-intégration V1 — les PR `#50`, `#51`, `#52` et `#53` sont fusionnées dans `main`, l’état
+Post-intégration V1 — les PR `#50`, `#51`, `#52`, `#53` et `#54` sont fusionnées dans `main`, l’état
 documentaire est resynchronisé et les prochains lots restent petits et indépendants.
 
 ## Snapshot courant — 4 août 2026
 
-- `main` pointe sur le commit de fusion `8571752e6febcd64d4a74d0e3b55125dce70a308` de la PR `#53`.
-  Il inclut l’autorité Supabase HISTORY-001A, la fondation domaine de `#51`, l’optimisation CI de
-  `#52` et l’intégration V1 de `#50`.
+- `main` pointe sur le commit de fusion `94556a4538e3d2de643573d814718e3f0447e8f8` de la PR `#54`.
+  Il inclut la resynchronisation d'état et ADR-0031 proposé, l’autorité Supabase HISTORY-001A, la
+  fondation domaine de `#51`, l’optimisation CI de `#52` et l’intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
 - La PR parallèle `#34` est fermée sans fusion avec commentaire de supersession et n'est pas ancêtre
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
-- Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`) et
-  `30940684400` (`#53`) sont verts pour l’intégrité, Gradle, Supabase, l’Edge Function et Xcode simulateur
-  Debug/Staging/Release. CI-001 force toujours iOS sur `main` et ne l’omet en PR que pour les
-  périmètres explicitement sûrs ; tout chemin inconnu reste fail-safe.
+- Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`),
+  `30940684400` (`#53`) et `30945274481` (`#54`) sont verts pour l’intégrité, Gradle, Supabase,
+  l’Edge Function et Xcode simulateur Debug/Staging/Release. CI-001 force toujours iOS sur `main` et
+  ne l’omet en PR que pour les périmètres explicitement sûrs ; tout chemin inconnu reste fail-safe.
 - Sont désormais présents dans `main` : sécurité/architecture de la pile, intro Store-only,
   authentification et onboarding compacts, paramètres de compte et de confidentialité, persistance
   locale durcie, Explore Android/iOS offline-first, recherche lexicale Android/iOS, détail natif,
@@ -48,6 +48,11 @@ documentaire est resynchronisé et les prochains lots restent petits et indépen
   automatique d’environnement distant n’est activé. Le run post-fusion `30940684400` est également
   entièrement vert sur le SHA `8571752e6febcd64d4a74d0e3b55125dce70a308`, avec validation iOS
   complète forcée sur `main`.
+- FAVORITES-001A1 livre l'autorité Supabase propriétaire : projection de cartes paginée par dernier
+  ajout, filtre de type, événements terminés conservés, aucun avantage sponsorisé et mutation V1
+  idempotente. Une fiche dépubliée reste liée mais masquée et retirable ; les anciennes RPC restent
+  des wrappers dépréciés jusqu'au raccord KMP atomique. ADR-0032 borne aussi l'usage IA aux favoris
+  actifs sans journal d'activité. Room, outbox, repository/runtime et UI restent ouverts.
 
 ## Historique des tâches terminées
 
