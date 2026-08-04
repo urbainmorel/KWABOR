@@ -193,16 +193,21 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] HISTORY-001-FOUNDATION — Partager la canonicalisation avec Search et livrer les modèles,
     scopes, préférences, demandes et contrats repository en domaine Kotlin pur, avec texte expurgé
     des représentations de diagnostic et tests des invariants.
-  - [ ] HISTORY-001A — Créer l’autorité Supabase propriétaire avec upsert/liste/effacement bornés,
+  - [x] HISTORY-001A — Créer l’autorité Supabase propriétaire avec upsert/liste/effacement bornés,
     appliquer le plafond serveur de 200, la cascade de suppression de compte et la couverture pgTAP ;
     garder la rétention glissante proposée de 180 jours inactive jusqu'à validation Juridique/DPO.
     - [x] RPC `*_v1`, RLS propriétaire, grants RPC-only, préférence désactivée, verrou concurrent
       par compte, plafond 200 et purge de compte livrés sans activer la rétention.
-    - [ ] Obtenir sur la tête exacte 85 assertions HISTORY, 899 assertions pgTAP au total et 11
-      assertions de concurrence HISTORY, sans déploiement automatique d’environnement distant.
+    - [x] Run exact-head `30938251112` vert : 85 assertions HISTORY, 899 assertions pgTAP au total
+      et 11 assertions de concurrence HISTORY, sans déploiement automatique d’environnement distant.
   - [ ] HISTORY-001B — Capturer uniquement les requêtes soumises, appliquer le plafond local de 50
     par scope et appareil, isoler invité/comptes dans Room, synchroniser le même compte et proposer
     l’import invité explicitement.
+    - [x] Rédiger ADR-0031 en statut proposé : génération, révisions, tombstones sans texte,
+      watermark, idempotence, isolation de session et transition V1/V2.
+    - [ ] Faire arbitrer tous les gates et acteurs listés dans ADR-0031 — Produit, Sécurité,
+      Juridique/DPO et Opérations — avant toute migration V2, outbox Room ou activation de
+      synchronisation.
   - [ ] HISTORY-001C — Ajouter récents Android/iOS, effacement unitaire/global et contrôle distinct
     de personnalisation désactivé par défaut, sans texte libre dans analytics ou logs ; purger les
     signaux dérivés avec le compte et ne fournir à l’IA/au fil organique que des signaux structurés

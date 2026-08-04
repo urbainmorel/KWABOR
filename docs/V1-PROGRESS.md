@@ -8,12 +8,12 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 4 août 2026 |
-| Référence Git | Base `main` avant HISTORY-001A : merge `7e279c012372d0d1b0aa2fb3bdd780df19ae5950` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY et `#52` optimisation CI fusionnées |
+| Référence Git | `main` au merge `8571752e6febcd64d4a74d0e3b55125dce70a308` de la PR `#53` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI et `#53` autorité HISTORY fusionnées |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Runs post-fusion `30926418990`, `30932997743` et `30935484599` entièrement verts |
+| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599` et `30940684400` entièrement verts |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -126,21 +126,24 @@ compte côté serveur, au plus **50 par scope et par appareil** en local, person
 **désactivée par défaut**, et resoumission canonique identique qui remonte l'entrée existante sans
 créer de doublon.
 
-Seules la rétention glissante serveur proposée de **180 jours** et l'activation juridique de la
-personnalisation restent bloquées par une validation Juridique/DPO. La mise en œuvre doit rester
-découpée entre autorité serveur, miroir local/synchronisation et UI des récents.
+Pour le texte actif V1, la rétention glissante serveur proposée de **180 jours** et l'activation
+juridique de la personnalisation restent bloquées par une validation Juridique/DPO. ADR-0031 reste
+proposé et ajoute des gates V2, notamment la durée de conservation des tombstones et clés
+d’idempotence avec Juridique/DPO et Opérations. La mise en œuvre doit rester découpée entre autorité
+serveur, miroir local/synchronisation et UI des récents.
 
 HISTORY-001A livre désormais l’autorité Supabase propriétaire : RPC versionnées d’enregistrement,
 snapshot, effacement unitaire/global, plafond concurrent de 200, préférence désactivée et purge de
-compte. La tête porte 85 assertions HISTORY et 11 assertions de concurrence dédiées ; elle attend sa
-validation GitHub exacte. Elle n’active ni rétention, ni signaux dérivés, ni déploiement automatique
-d’environnement distant.
+compte. Le run exact-head `30938251112` passe 85 assertions HISTORY, 899 assertions pgTAP au total et
+11 assertions de concurrence dédiées. Le run post-fusion `30940684400` est lui aussi entièrement
+vert sur `main`, avec iOS Debug/Staging/Release forcés. Le lot n’active ni rétention, ni signaux
+dérivés, ni déploiement automatique d’environnement distant.
 
 ## Prochains lots bornés
 
-1. **HISTORY-001B — synchronisation offline** : définir le protocole versionné de révisions,
-   tombstones et watermark, puis raccorder le miroir Room et l’outbox sans résurrection après
-   effacement ; conserver 50 requêtes distinctes par scope et appareil.
+1. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
+   protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
+   résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.
 2. **FAVORITES-001A — consultation des favoris** : lecture paginée, repository/runtime partagé et
    écran Android/iOS minimal ouvrant le détail ; outbox persistante séparée.
 3. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
