@@ -90,6 +90,38 @@ class CatalogDtoMappingTest {
     }
 
     @Test
+    fun catalogSearchRpc_encodesTheVersionedSearchContract() {
+        val parameters = CatalogSearchSummaryPageRpcDto(
+            searchQuery = "restaurant cotonou",
+            cityId = "cotonou",
+            categoryId = "commercial-restaurant",
+            listingType = "etablissement",
+            listingClass = "commercial",
+            cursor = "cursor-current",
+            limit = 20,
+        )
+        val encodedParameters = Json.encodeToJsonElement(
+            CatalogSearchSummaryPageRpcDto.serializer(),
+            parameters,
+        ).jsonObject
+
+        assertEquals(
+            setOf(
+                "p_search_query",
+                "p_city_id",
+                "p_category_id",
+                "p_listing_type",
+                "p_listing_class",
+                "p_cursor",
+                "p_limit",
+            ),
+            encodedParameters.keys,
+        )
+        assertEquals("restaurant cotonou", encodedParameters.getValue("p_search_query").jsonPrimitive.content)
+        assertEquals("commercial-restaurant", encodedParameters.getValue("p_category_id").jsonPrimitive.content)
+    }
+
+    @Test
     fun catalogDetailRpc_encodesOnlyTheVersionedListingParameter() {
         val parameters = CatalogDetailRpcParametersDto(listingId = CATALOG_LISTING_ID_ONE)
         val encodedParameters = Json.encodeToJsonElement(

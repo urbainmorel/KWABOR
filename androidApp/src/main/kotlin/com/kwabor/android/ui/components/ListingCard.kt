@@ -45,8 +45,8 @@ private const val LISTING_CARD_HEIGHT_RATIO = 4f
 
 data class ListingCardActions(
     val onClick: (() -> Unit)?,
-    val onLikeClick: () -> Unit,
-    val onFavoriteClick: () -> Unit,
+    val onLikeClick: (() -> Unit)? = null,
+    val onFavoriteClick: (() -> Unit)? = null,
 )
 
 @Composable
@@ -195,19 +195,23 @@ private fun ListingCardTopBar(
             verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ListingActionButton(
-                label = strings.favorite,
-                selected = state.favorited,
-                imageVector = Icons.Filled.Bookmark,
-                onClick = actions.onFavoriteClick,
-            )
-            ListingActionButton(
-                label = strings.like,
-                selected = state.liked,
-                selectedColor = KwaborColors.Ticket,
-                imageVector = Icons.Filled.Favorite,
-                onClick = actions.onLikeClick,
-            )
+            actions.onFavoriteClick?.let { onFavoriteClick ->
+                ListingActionButton(
+                    label = strings.favorite,
+                    selected = state.favorited,
+                    imageVector = Icons.Filled.Bookmark,
+                    onClick = onFavoriteClick,
+                )
+            }
+            actions.onLikeClick?.let { onLikeClick ->
+                ListingActionButton(
+                    label = strings.like,
+                    selected = state.liked,
+                    selectedColor = KwaborColors.Ticket,
+                    imageVector = Icons.Filled.Favorite,
+                    onClick = onLikeClick,
+                )
+            }
         }
     }
 }

@@ -1344,3 +1344,72 @@ expect(
     ) == nil,
     "Oversized external targets must fail closed before parsing."
 )
+
+expect(
+    SearchGridPolicy.columnCount(
+        availableWidth: 390,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: false
+    ) == 2,
+    "Search uses two columns on a regular phone width."
+)
+expect(
+    SearchGridPolicy.columnCount(
+        availableWidth: 700,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: false
+    ) == 3,
+    "Search uses three columns at the tablet breakpoint."
+)
+expect(
+    SearchGridPolicy.columnCount(
+        availableWidth: 700,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: true
+    ) == 1,
+    "Search must collapse to one column for accessibility text sizes."
+)
+expect(
+    !SearchPaginationPolicy.isNearEnd(index: 14, itemCount: 20) &&
+        SearchPaginationPolicy.isNearEnd(index: 16, itemCount: 20),
+    "Search pagination starts only inside the bounded end threshold."
+)
+expect(
+    !SearchPaginationPolicy.isNearEnd(index: -1, itemCount: 20) &&
+        !SearchPaginationPolicy.isNearEnd(index: 20, itemCount: 20) &&
+        !SearchPaginationPolicy.isNearEnd(index: 0, itemCount: 0),
+    "Search pagination rejects invalid item positions."
+)
+
+private var searchPaginationGuard = SearchPaginationGuard()
+expect(
+    searchPaginationGuard.shouldLoadNext(
+        cursor: "search-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "Search pagination requests an eligible cursor once."
+)
+expect(
+    !searchPaginationGuard.shouldLoadNext(
+        cursor: "search-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "Search pagination de-duplicates an in-flight cursor."
+)
+expect(
+    !searchPaginationGuard.shouldLoadNext(
+        cursor: "search-cursor-2",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: true
+    ),
+    "Search pagination stops automatic loading after an append error."
+)
+expect(
+    searchPaginationGuard.shouldRetry(cursor: "search-cursor-2", canLoadMore: true),
+    "Search pagination permits an explicit retry after an append error."
+)

@@ -62,6 +62,24 @@ internal data class ListingSummaryPageRpcDto(
     val limit: Int,
 )
 
+@Serializable
+internal data class CatalogSearchSummaryPageRpcDto(
+    @SerialName("p_search_query")
+    val searchQuery: String,
+    @SerialName("p_city_id")
+    val cityId: String?,
+    @SerialName("p_category_id")
+    val categoryId: String?,
+    @SerialName("p_listing_type")
+    val listingType: String?,
+    @SerialName("p_listing_class")
+    val listingClass: String?,
+    @SerialName("p_cursor")
+    val cursor: String?,
+    @SerialName("p_limit")
+    val limit: Int,
+)
+
 internal fun ListingSummaryDto.toDomain(): ListingSummary = ListingSummary(
     id = id,
     type = type.toListingType(),

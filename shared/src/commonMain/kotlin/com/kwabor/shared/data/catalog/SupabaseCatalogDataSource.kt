@@ -18,6 +18,9 @@ private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_CONFLICT = 409
 private const val HTTP_UNPROCESSABLE_CONTENT = 422
+private const val HTTP_BAD_GATEWAY = 502
+private const val HTTP_SERVICE_UNAVAILABLE = 503
+private const val HTTP_GATEWAY_TIMEOUT = 504
 private const val POSTGREST_SCHEMA_CACHE_ERROR_PREFIX = "PGRST2"
 
 internal class SupabaseCatalogDataSource(
@@ -43,16 +46,17 @@ internal class SupabaseCatalogDataSource(
     override suspend fun listListings(filters: ListingFilters, page: ListingPageRequest): ListingSummaryPageDto =
         loadListingSummaryPage(
             filters = filters,
-            searchQuery = null,
             page = page,
         )
 
     override suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto =
-        loadListingSummaryPage(
-            filters = query.filters,
-            searchQuery = query.text,
-            page = page,
-        )
+        runPostgrest {
+            postgrest.rpc(
+                function = SEARCH_CATALOG_SUMMARIES,
+                parameters = query.toSearchSummaryPageRpcDto(page),
+            ).decodeList<ListingSummaryDto>()
+                .toSummaryPage(page.limit)
+        }
 
     override suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto = runPostgrest {
         postgrest.rpc(
@@ -107,12 +111,11 @@ internal class SupabaseCatalogDataSource(
 
     private suspend fun loadListingSummaryPage(
         filters: ListingFilters,
-        searchQuery: String?,
         page: ListingPageRequest,
     ): ListingSummaryPageDto = runPostgrest {
         postgrest.rpc(
             function = LIST_CATALOG_SUMMARIES,
-            parameters = filters.toSummaryPageRpcDto(searchQuery = searchQuery, page = page),
+            parameters = filters.toSummaryPageRpcDto(page),
         ).decodeList<ListingSummaryDto>()
             .toSummaryPage(page.limit)
     }
@@ -121,20 +124,30 @@ internal class SupabaseCatalogDataSource(
 private const val CITIES = "cities"
 private const val CATEGORIES = "categories"
 private const val LIST_CATALOG_SUMMARIES = "list_catalog_summaries"
+private const val SEARCH_CATALOG_SUMMARIES = "search_catalog_summaries_v1"
 private const val GET_CATALOG_DETAIL = "get_catalog_detail_v1"
 
-private fun ListingFilters.toSummaryPageRpcDto(
-    searchQuery: String?,
-    page: ListingPageRequest,
-): ListingSummaryPageRpcDto = ListingSummaryPageRpcDto(
-    cityId = cityId,
-    categoryId = categoryId,
-    listingType = listingType?.toDatabaseValue(),
-    listingClass = listingClass?.toDatabaseValue(),
-    searchQuery = searchQuery,
-    cursor = page.cursor,
-    limit = page.limit,
-)
+private fun ListingFilters.toSummaryPageRpcDto(page: ListingPageRequest): ListingSummaryPageRpcDto =
+    ListingSummaryPageRpcDto(
+        cityId = cityId,
+        categoryId = categoryId,
+        listingType = listingType?.toDatabaseValue(),
+        listingClass = listingClass?.toDatabaseValue(),
+        searchQuery = null,
+        cursor = page.cursor,
+        limit = page.limit,
+    )
+
+private fun ListingSearchQuery.toSearchSummaryPageRpcDto(page: ListingPageRequest): CatalogSearchSummaryPageRpcDto =
+    CatalogSearchSummaryPageRpcDto(
+        searchQuery = text,
+        cityId = filters.cityId,
+        categoryId = filters.categoryId,
+        listingType = filters.listingType?.toDatabaseValue(),
+        listingClass = filters.listingClass?.toDatabaseValue(),
+        cursor = page.cursor,
+        limit = page.limit,
+    )
 
 internal fun List<ListingSummaryDto>.toSummaryPage(limit: Int): ListingSummaryPageDto {
     val items = take(limit)
@@ -189,5 +202,9 @@ private fun RestException.toStatusMappedCatalogDataException(): CatalogDataExcep
     HTTP_CONFLICT,
     HTTP_UNPROCESSABLE_CONTENT,
     -> CatalogDataException.Validation(cause = this)
+    HTTP_BAD_GATEWAY,
+    HTTP_SERVICE_UNAVAILABLE,
+    HTTP_GATEWAY_TIMEOUT,
+    -> CatalogDataException.NetworkUnavailable(this)
     else -> CatalogDataException.Unexpected(this)
 }

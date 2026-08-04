@@ -1,0 +1,41 @@
+package com.kwabor.shared.i18n
+
+data class SearchStrings(
+    val title: String,
+    val placeholder: String,
+    val submit: String,
+    val clear: String,
+    val close: String,
+    val activeTabScope: String,
+    val allScope: String,
+    val initialHint: String,
+    val invalidQuery: String,
+    val emptyTitle: String,
+    val emptyMessage: String,
+    val tryAssistant: String,
+    val loadFailed: String,
+    val refreshFailed: String,
+    val loadMoreFailed: String,
+    val oneResult: String,
+    val manyResults: String,
+)
+
+internal val frenchSearchStrings = SearchStrings(
+    title = "Recherche",
+    placeholder = "Rechercher un lieu, un événement",
+    submit = "Rechercher",
+    clear = "Effacer la recherche",
+    close = "Fermer la recherche",
+    activeTabScope = "Onglet actif",
+    allScope = "Tout",
+    initialHint = "Saisissez un mot-clé pour explorer le catalogue.",
+    invalidQuery = "Saisissez entre 1 et 120 caractères, sans caractère de contrôle.",
+    emptyTitle = "Aucun résultat",
+    emptyMessage = "Élargissez la recherche ou modifiez les mots-clés.",
+    tryAssistant = "Essayer l’assistant IA",
+    loadFailed = "La recherche est indisponible pour le moment.",
+    refreshFailed = "Actualisation impossible. Les résultats précédents restent affichés.",
+    loadMoreFailed = "Impossible de charger plus de résultats.",
+    oneResult = "1 résultat",
+    manyResults = "{count} résultats",
+)

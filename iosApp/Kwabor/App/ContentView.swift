@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     @ObservedObject var catalogDetailStore: CatalogDetailStore
     let isGuestSession: Bool
@@ -40,6 +41,7 @@ struct ContentView: View {
     init(
         bridge: KwaborSharedBridge,
         exploreStore: ExploreStore,
+        searchStore: SearchStore,
         guideDiscoveryStore: GuideDiscoveryStore,
         catalogDetailStore: CatalogDetailStore,
         isGuestSession: Bool = false,
@@ -78,6 +80,7 @@ struct ContentView: View {
     ) {
         self.bridge = bridge
         self.exploreStore = exploreStore
+        self.searchStore = searchStore
         self.guideDiscoveryStore = guideDiscoveryStore
         self.catalogDetailStore = catalogDetailStore
         self.isGuestSession = isGuestSession
@@ -121,6 +124,7 @@ struct ContentView: View {
                             destination: destination,
                             bridge: bridge,
                             exploreStore: exploreStore,
+                            searchStore: searchStore,
                             guideDiscoveryStore: guideDiscoveryStore,
                             strings: strings,
                             settingsStrings: settingsStrings,
@@ -183,6 +187,9 @@ struct ContentView: View {
                 } else {
                     replayPendingDestinationAfterAuthentication()
                 }
+            }
+            .onChange(of: accountSessionIdentity) { _, _ in
+                searchStore.close()
             }
             .onDisappear(perform: catalogDetailStore.dismiss)
         }
@@ -281,6 +288,7 @@ private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let strings: OnboardingStrings
     let settingsStrings: SettingsStrings
@@ -307,6 +315,7 @@ private struct RootDestinationContent: View {
             if destination == .home {
                 ExploreView(
                     store: exploreStore,
+                    searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     onListingOpen: onListingOpen,
                     onAuthenticationRequired: onExploreAuthenticationRequired

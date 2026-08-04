@@ -52,14 +52,13 @@ import com.kwabor.android.presentation.onboarding.OnboardingEffect
 import com.kwabor.android.presentation.onboarding.OnboardingIntent
 import com.kwabor.android.presentation.onboarding.OnboardingUiState
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
+import com.kwabor.android.presentation.search.SearchViewModel
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.android.ui.screens.auth.AuthSheet
 import com.kwabor.android.ui.screens.auth.AuthSheetState
 import com.kwabor.android.ui.screens.auth.RegistrationScreenState
 import com.kwabor.android.ui.screens.detail.CatalogDetailPlatformDependencies
 import com.kwabor.android.ui.screens.detail.CatalogDetailSheet
-import com.kwabor.android.ui.screens.explore.ExploreScreen
-import com.kwabor.android.ui.screens.explore.ExploreScreenUiModel
 import com.kwabor.shared.domain.auth.AuthSessionPurpose
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.observability.ObservabilityConsent
@@ -158,6 +157,7 @@ private fun SoftWallOverlay(platformState: AuthPlatformUiState, strings: KwaborS
 
 internal data class KwaborAppDependencies(
     val exploreViewModel: ExploreViewModel,
+    val searchViewModel: SearchViewModel,
     val catalogDetailViewModel: CatalogDetailViewModel,
     val guideDiscoveryViewModel: GuideDiscoveryViewModel,
     val authViewModel: AuthViewModel,
@@ -222,6 +222,7 @@ private data class CollectedAuthenticationState(
 
 internal data class HomeShellDependencies(
     val exploreViewModel: ExploreViewModel,
+    val searchViewModel: SearchViewModel,
     val catalogDetailViewModel: CatalogDetailViewModel,
     val guideDiscoveryViewModel: GuideDiscoveryViewModel,
     val authViewModel: AuthViewModel,
@@ -232,6 +233,7 @@ internal data class HomeShellDependencies(
 ) {
     constructor(dependencies: KwaborAppDependencies) : this(
         exploreViewModel = dependencies.exploreViewModel,
+        searchViewModel = dependencies.searchViewModel,
         catalogDetailViewModel = dependencies.catalogDetailViewModel,
         guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
         authViewModel = dependencies.authViewModel,
@@ -418,12 +420,35 @@ private fun KwaborAppContent(
         { pendingDestinationKey = null },
         KwaborDeepLinkCallbacks(onDeepLinkAcknowledged, onDeepLinksReset),
     )
+    KwaborHomeEffectHandlers(
+        state = state,
+        pendingDestinationKey = pendingDestinationKey,
+        dependencies = dependencies,
+        actions = actions,
+    )
+    KwaborNavigationShell(
+        navController = navController,
+        strings = stringsFor(AppLocale.French),
+        dependencies = dependencies,
+        state = state,
+        onDestinationSelected = requestDestination,
+    )
+}
+
+@Composable
+private fun KwaborHomeEffectHandlers(
+    state: HomeShellState,
+    pendingDestinationKey: String?,
+    dependencies: HomeShellDependencies,
+    actions: KwaborAppEffectActions,
+) {
     DeepLinkEffectHandler(deepLink = state.deepLink, actions = actions.deepLink)
     ExploreViewerContextHandler(
         viewerId = state.auth.exploreViewerId,
         exploreViewModel = dependencies.exploreViewModel,
     )
     ExploreEffectHandler(dependencies = dependencies)
+    SearchEffectHandler(dependencies = dependencies)
     GuideDiscoveryEffectHandler(
         guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
         catalogDetailViewModel = dependencies.catalogDetailViewModel,
@@ -432,13 +457,6 @@ private fun KwaborAppContent(
         pendingDestinationKey = pendingDestinationKey,
         dependencies = dependencies,
         actions = actions.root,
-    )
-    KwaborNavigationShell(
-        navController = navController,
-        strings = stringsFor(AppLocale.French),
-        dependencies = dependencies,
-        state = state,
-        onDestinationSelected = requestDestination,
     )
 }
 
@@ -664,41 +682,6 @@ private val rootDestinationRequester =
             }
         }
     }
-
-@Composable
-private fun ExploreRoute(
-    dependencies: HomeShellDependencies,
-    strings: KwaborStrings,
-    isGuestSession: Boolean,
-    modifier: Modifier = Modifier,
-    onGuideDiscoveryRequested: () -> Unit,
-) {
-    val exploreState by dependencies.exploreViewModel.state.collectAsStateWithLifecycle()
-
-    ExploreScreen(
-        model = ExploreScreenUiModel(
-            state = exploreState,
-            isGuestSession = isGuestSession,
-        ),
-        strings = strings,
-        mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
-        modifier = modifier,
-        actions = remember(
-            dependencies.exploreViewModel,
-            dependencies.catalogDetailViewModel,
-            onGuideDiscoveryRequested,
-        ) {
-            dependencies.exploreViewModel.detailEnabledScreenActions(
-                onListingClick = { listingId ->
-                    dependencies.catalogDetailViewModel.onIntent(
-                        CatalogDetailIntent.Open(listingId),
-                    )
-                },
-                onGuideDiscoveryClick = onGuideDiscoveryRequested,
-            )
-        },
-    )
-}
 
 @Composable
 private fun KwaborRootContent(

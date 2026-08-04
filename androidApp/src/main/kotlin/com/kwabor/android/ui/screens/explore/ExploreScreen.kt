@@ -1,5 +1,6 @@
 package com.kwabor.android.ui.screens.explore
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -67,6 +69,8 @@ import com.kwabor.shared.presentation.explore.ExploreListingItem
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
 import com.kwabor.shared.presentation.explore.label
+import com.kwabor.shared.presentation.search.SearchScope
+import com.kwabor.shared.presentation.search.SearchUiState
 
 @Composable
 fun ExploreScreen(
@@ -77,24 +81,29 @@ fun ExploreScreen(
     actions: ExploreScreenActions,
 ) {
     val state = model.state
+    val searchState = model.searchState
+    val focusManager = LocalFocusManager.current
+    BackHandler(enabled = searchState.isActive) {
+        focusManager.clearFocus()
+        actions.onSearchClose()
+    }
     Column(modifier = modifier.fillMaxSize()) {
-        if (state.isOffline) {
+        if (if (searchState.isActive) searchState.isOffline else state.isOffline) {
             OfflineBanner(strings = strings)
         }
         state.interactionMessage?.let { message ->
             KwaborInlineBanner(text = message)
         }
-        state.refreshMessage?.let { message ->
+        (if (searchState.isActive) searchState.refreshMessage else state.refreshMessage)?.let { message ->
             KwaborInlineBanner(text = message)
         }
         state.locationMessage
             ?.takeUnless { state.isCitySelectorOpen }
             ?.let { message -> KwaborInlineBanner(text = message) }
         ExploreContent(
-            state = state,
+            model = model,
             strings = strings,
             mediaUrlPolicy = mediaUrlPolicy,
-            isGuestSession = model.isGuestSession,
             actions = actions,
         )
     }
@@ -109,52 +118,99 @@ fun ExploreScreen(
 
 data class ExploreScreenUiModel(
     val state: ExploreUiState,
+    val searchState: SearchUiState = SearchUiState(),
     val isGuestSession: Boolean = true,
 )
 
 @Composable
 private fun ExploreContent(
-    state: ExploreUiState,
+    model: ExploreScreenUiModel,
     strings: KwaborStrings,
     mediaUrlPolicy: ListingMediaUrlPolicy,
-    isGuestSession: Boolean,
     actions: ExploreScreenActions,
 ) {
-    val gridState = rememberLazyGridState()
+    val state = model.state
+    val searchState = model.searchState
+    val exploreGridState = rememberLazyGridState()
+    val searchGridState = rememberLazyGridState()
+    val gridState = if (searchState.isActive) searchGridState else exploreGridState
     val gridContent = ExploreGridContent(
         state = state,
+        searchState = searchState,
         strings = strings,
         mediaUrlPolicy = mediaUrlPolicy,
-        isGuestSession = isGuestSession,
+        isGuestSession = model.isGuestSession,
+        actions = actions,
     )
-    val paginationGuard = remember(state.selectedTab, state.selectedChipId, state.selectedCityId) {
+    val explorePaginationGuard = remember(state.selectedTab, state.selectedChipId, state.selectedCityId) {
         ExplorePaginationGuard()
     }
-    ExplorePaginationEffect(
-        state = state,
+    val searchPaginationGuard = remember { SearchPaginationGuard() }
+    ExploreSurfacePaginationEffect(
+        content = gridContent,
         gridState = gridState,
-        guard = paginationGuard,
-        onLoadNext = actions.onLoadNext,
+        exploreGuard = explorePaginationGuard,
+        searchGuard = searchPaginationGuard,
     )
     ExploreRefreshableGrid(
         content = gridContent,
         gridState = gridState,
         onAppendRetry = {
-            paginationGuard.requestedCursor = state.nextCursor
-            actions.onLoadNext()
+            retryExploreSurfaceAppend(gridContent, explorePaginationGuard, searchPaginationGuard)
         },
-        actions = actions,
+        isRefreshing = if (searchState.isActive) searchState.isRefreshing else state.isRefreshing,
+        onRefresh = if (searchState.isActive) actions.onSearchRefresh else actions.onRefresh,
     )
 }
 
 private data class ExploreGridContent(
     val state: ExploreUiState,
+    val searchState: SearchUiState,
     val strings: KwaborStrings,
     val mediaUrlPolicy: ListingMediaUrlPolicy,
     val isGuestSession: Boolean,
+    val actions: ExploreScreenActions,
 )
 
 private class ExplorePaginationGuard(var requestedCursor: String? = null)
+
+private fun retryExploreSurfaceAppend(
+    content: ExploreGridContent,
+    exploreGuard: ExplorePaginationGuard,
+    searchGuard: SearchPaginationGuard,
+) {
+    if (content.searchState.isActive) {
+        searchGuard.requestedCursor = content.searchState.nextCursor
+        content.actions.onSearchLoadNext()
+    } else {
+        exploreGuard.requestedCursor = content.state.nextCursor
+        content.actions.onLoadNext()
+    }
+}
+
+@Composable
+private fun ExploreSurfacePaginationEffect(
+    content: ExploreGridContent,
+    gridState: LazyGridState,
+    exploreGuard: ExplorePaginationGuard,
+    searchGuard: SearchPaginationGuard,
+) {
+    if (content.searchState.isActive) {
+        SearchPaginationEffect(
+            state = content.searchState,
+            gridState = gridState,
+            guard = searchGuard,
+            onLoadNext = content.actions.onSearchLoadNext,
+        )
+    } else {
+        ExplorePaginationEffect(
+            state = content.state,
+            gridState = gridState,
+            guard = exploreGuard,
+            onLoadNext = content.actions.onLoadNext,
+        )
+    }
+}
 
 @Composable
 private fun ExplorePaginationEffect(
@@ -198,32 +254,32 @@ private fun ExploreRefreshableGrid(
     content: ExploreGridContent,
     gridState: LazyGridState,
     onAppendRetry: () -> Unit,
-    actions: ExploreScreenActions,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
 ) {
     PullToRefreshBox(
-        isRefreshing = content.state.isRefreshing,
-        onRefresh = actions.onRefresh,
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
         ExploreListingsGrid(
             content = content,
             gridState = gridState,
             onAppendRetry = onAppendRetry,
-            actions = actions,
         )
     }
 }
 
 @Composable
-private fun ExploreListingsGrid(
-    content: ExploreGridContent,
-    gridState: LazyGridState,
-    onAppendRetry: () -> Unit,
-    actions: ExploreScreenActions,
-) {
+private fun ExploreListingsGrid(content: ExploreGridContent, gridState: LazyGridState, onAppendRetry: () -> Unit) {
     val state = content.state
+    val searchState = content.searchState
     val strings = content.strings
-    val liveRegionStatus = exploreFeedLiveRegionStatus(state, strings)
+    val liveRegionStatus = if (searchState.isActive) {
+        searchLiveRegionStatus(searchState, strings)
+    } else {
+        exploreFeedLiveRegionStatus(state, strings)
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -243,20 +299,39 @@ private fun ExploreListingsGrid(
             horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
             verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                ExploreHeader(state, strings, content.isGuestSession, actions)
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                ExploreGuideDiscoveryEntry(strings = strings, onClick = actions.onGuideDiscoveryClick)
-            }
-            exploreGridItems(
-                state = state,
-                strings = strings,
-                mediaUrlPolicy = content.mediaUrlPolicy,
-                actions = actions,
-            )
-            exploreAppendFooter(state = state, strings = strings, onRetry = onAppendRetry)
+            exploreSurfaceItems(content = content, onAppendRetry = onAppendRetry)
         }
+    }
+}
+
+private fun LazyGridScope.exploreSurfaceItems(content: ExploreGridContent, onAppendRetry: () -> Unit) {
+    val state = content.state
+    val searchState = content.searchState
+    val strings = content.strings
+    val actions = content.actions
+    item(span = { GridItemSpan(maxLineSpan) }) {
+        ExploreHeader(state, searchState, strings, content.isGuestSession, actions)
+    }
+    if (!searchState.isActive) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            ExploreGuideDiscoveryEntry(strings = strings, onClick = actions.onGuideDiscoveryClick)
+        }
+    }
+    if (searchState.isActive) {
+        searchGridItems(
+            state = searchState,
+            strings = strings,
+            mediaUrlPolicy = content.mediaUrlPolicy,
+            actions = actions,
+        )
+    } else {
+        exploreGridItems(
+            state = state,
+            strings = strings,
+            mediaUrlPolicy = content.mediaUrlPolicy,
+            actions = actions,
+        )
+        exploreAppendFooter(state = state, strings = strings, onRetry = onAppendRetry)
     }
 }
 
@@ -342,6 +417,7 @@ private fun LazyGridScope.stateMessageItem(
 @Composable
 private fun ExploreHeader(
     state: ExploreUiState,
+    searchState: SearchUiState,
     strings: KwaborStrings,
     isGuestSession: Boolean,
     actions: ExploreScreenActions,
@@ -358,7 +434,10 @@ private fun ExploreHeader(
         )
         Text(text = strings.homeTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         ExploreTabs(state.selectedTab, strings, actions.onTabSelected)
-        ExploreChips(state.chips, state.selectedChipId, actions.onChipSelected)
+        ExploreSearchControl(state = searchState, strings = strings, actions = actions)
+        if (!searchState.isActive || searchState.scope == SearchScope.ActiveTab) {
+            ExploreChips(state.chips, state.selectedChipId, actions.onChipSelected)
+        }
     }
 }
 
@@ -473,7 +552,7 @@ private fun ExploreChips(chips: List<ExploreChip>, selectedChipId: String?, onCh
     }
 }
 
-private fun ExploreListingItem.toCardState(priceOptions: PriceTagOptions): ListingCardState = ListingCardState(
+internal fun ExploreListingItem.toCardState(priceOptions: PriceTagOptions): ListingCardState = ListingCardState(
     title = title,
     cityLabel = cityLabel,
     coverImageUrl = coverImageUrl,

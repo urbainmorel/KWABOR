@@ -33,6 +33,8 @@ internal abstract class KwaborDatabase : RoomDatabase() {
     internal abstract fun exploreFeedPersistenceDao(): ExploreFeedPersistenceDao
 
     internal abstract fun explorePersistenceWatermarkDao(): ExplorePersistenceWatermarkDao
+
+    internal abstract fun searchCacheDao(): SearchCacheDao
 }
 
 internal expect object KwaborDatabaseConstructor : RoomDatabaseConstructor<KwaborDatabase>

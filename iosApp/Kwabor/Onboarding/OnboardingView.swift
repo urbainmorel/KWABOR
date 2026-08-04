@@ -4,6 +4,7 @@ import SwiftUI
 struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
     @ObservedObject var exploreStore: ExploreStore
+    @ObservedObject var searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let catalogDetailStore: CatalogDetailStore
     @State private var contextualSoftWallRequest: ExploreAuthenticationRequest?
@@ -21,6 +22,7 @@ struct OnboardingView: View {
                 ContentView(
                     bridge: coordinator.bridge,
                     exploreStore: exploreStore,
+                    searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     catalogDetailStore: catalogDetailStore,
                     isGuestSession: coordinator.isGuestSession,

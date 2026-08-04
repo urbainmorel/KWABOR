@@ -35,7 +35,10 @@ internal fun ListingSummary.toExploreCacheSnapshotItemEntity(
     isSponsoredPlacement = isSponsoredPlacement,
 )
 
-internal fun ExploreCachedListingRecord.toDomain(): ListingSummary = listing.run {
+internal fun ExploreCachedListingRecord.toDomain(): ListingSummary =
+    listing.toDomain(isSponsoredPlacement = isSponsoredPlacement)
+
+internal fun ExploreCachedListingEntity.toDomain(isSponsoredPlacement: Boolean? = null): ListingSummary = run {
     val summary = ListingSummary(
         id = listingId,
         type = listingType.toCachedListingType(),
@@ -50,7 +53,7 @@ internal fun ExploreCachedListingRecord.toDomain(): ListingSummary = listing.run
         likesCount = likesCount.requireNonNegative("likes_count"),
         verified = verified,
         sponsoredUntilEpochMilliseconds = sponsoredUntilEpochMilliseconds,
-        isSponsoredPlacement = this@toDomain.isSponsoredPlacement,
+        isSponsoredPlacement = isSponsoredPlacement,
     )
     val invalidField = summary.invalidExploreCacheFieldOrNull()
     if (invalidField != null) {
@@ -99,13 +102,13 @@ private fun Double?.isInvalidExploreCacheRating(): Boolean {
     return !isFinite() || this !in MIN_EXPLORE_CACHE_RATING..MAX_EXPLORE_CACHE_RATING
 }
 
-private fun ListingType.toCacheValue(): String = when (this) {
+internal fun ListingType.toCacheValue(): String = when (this) {
     ListingType.Place -> "place"
     ListingType.Establishment -> "establishment"
     ListingType.Event -> "event"
 }
 
-private fun ListingClass.toCacheValue(): String = when (this) {
+internal fun ListingClass.toCacheValue(): String = when (this) {
     ListingClass.Heritage -> "heritage"
     ListingClass.Commercial -> "commercial"
     ListingClass.Event -> "event"

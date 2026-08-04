@@ -372,20 +372,38 @@ Reprise V1 — audit de préparation terminé, stabilisation sécurité priorita
 - Validation locale OFFLINE-002 : 146 tests structurels/adversariaux et 402 tests Android hôte verts,
   manifestes fusionnés et ressources de sauvegarde empaquetées debug/staging/release conformes,
   compilations production et tests Kotlin/Native iOS X64 verts. La gate finale de 130 tâches
-  (`spotlessCheck`, `detekt`, `check`, lint et APK debug) est verte en 4 min 56 s ; les tests Android
-  `bmgr`/transfert et le runtime filesystem iOS restent à exécuter sur appareils.
+  (`spotlessCheck`, `detekt`, `check`, lint et APK debug) est verte en 4 min 56 s. Sur émulateur
+  Android 11/API 30, l’APK cible 36 ne porte pas le flag runtime `ALLOW_BACKUP` et le transport local
+  `bmgr backupnow` répond `Backup is not allowed` ; aucun jeu n’ayant été créé, un cycle de
+  désinstallation/restauration n’aurait rien prouvé et n’a pas été exécuté. Les API 31/36.1, le
+  transfert OEM/croisé et le runtime filesystem iOS restent à qualifier.
 - La décision produit du 4 août conserve l’historique de recherche d’un compte pour Search, le futur
   Assistant IA et le fil organique. HISTORY-001 porte désormais l’autorité Supabase/RLS, la
   synchronisation multi-appareil et les contrôles de personnalisation ; aucun texte libre ne rejoint
   les analytics ou les logs. PRD et DESIGN reflètent ce contrat ; rétention, plafonds et valeur par
   défaut du contrôle de personnalisation restent à valider avant toute migration serveur.
+- SEARCH-001A est implémentée localement : RPC lexical `security invoker` publié-only, curseur
+  autoportant borné, mots exacts avec ponctuation/diacritiques alignés, runtime KMP, UI Compose et
+  SwiftUI, ouverture de fiche et repli sur les 3 200 candidats maximum du cache Room Explore. Le
+  cache ne contient toujours pas les tags et l’UI signale donc honnêtement ce résultat partiel.
+- La soumission est explicite et n’envoie dans Analytics que l’événement `search_query` et la devise
+  d’affichage capturée atomiquement ; aucune frappe ni requête brute n’est persistée ou journalisée.
+  HISTORY-001 reste séparée et doit conserver uniquement les requêtes réellement soumises.
+- Les validations ciblées ont passé 11 tests repository Search et 7 tests runtime avant le dernier
+  durcissement d’effet, puis 6 tests Android Search après ce raccord. Detekt Android est vert et les 13 écarts de complexité ont été
+  corrigés sans `Suppress` ni baseline. Le plan pgTAP final compte 61 assertions ; son exécution et
+  la compilation Xcode du commit exact restent confiées à GitHub.
+- La CI est préparée pour paralléliser intégrité/médias, Gradle, Edge Function, Supabase et iOS. Les
+  trois configurations Xcode consomment un XCFramework partagé, les advisors sécurité sont bloquants,
+  les versions Swift restent verrouillées et les noms des checks protégés sont conservés. Actionlint
+  et les 146 tests d’intégrité du dépôt sont verts localement.
 
 ## Tâche en cours
 
 SEC-001F, STAB-002A, IOS-PRIVACY-001A, IOS-PRIVACY-001B1 et SETTINGS-001B sont terminés localement sur
-`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A. AUTH-UX-001 est terminée localement et
-OFFLINE-002 est en qualification sur `codex/auth-onboarding-ux-integration`. Aucun de ces nouveaux travaux n'a été poussé, soumis à une
-nouvelle CI, déployé ou publié. STAB-002B reste suspendu à la décision sur les cinq racines V1.
+`codex/sec-001f-account-delete-step-up`, empilés sur OPS-001A. AUTH-UX-001 et OFFLINE-002 sont intégrés
+sur `codex/auth-onboarding-ux-integration`; SEARCH-001A et la CI parallèle y sont en qualification
+exact-head avant publication puis fusion. STAB-002B reste suspendu à la décision sur les cinq racines V1.
 OPS-001B dépend du provisionnement propriétaire et des gates d'observabilité ci-dessous ;
 SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions produit de son audit.
 
@@ -404,10 +422,13 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
 - OFFLINE-002 compile pour iOS X64 sous Windows et ouvre Room sous Robolectric dans le chemin Android
-  `noBackup`, mais l’exclusion/protection iOS doit encore être exécutée sur simulateur macOS et
-  appareil réel. Android exige aussi une qualification `bmgr` API 30/31/36.1 et un transfert OEM ;
-  les règles de sauvegarde plateforme ne sont pas une preuve cryptographique de liaison à l’appareil.
-- Le moteur Docker local Kwabor n'est pas actif après l'arrêt code 137 de son conteneur Supabase. Il n'a pas été redémarré pour ne pas perturber les autres projets ; le run exact-head `30759824206` fournit la preuve finale sur une stack isolée avec 632 assertions standard et 12 assertions concurrentes vertes.
+  `noBackup`, mais l’émulateur API 30 a subi des ANR du système/Pixel Launcher avant l’ouverture
+  observable de Room par l’application. L’exclusion/protection iOS doit encore être exécutée sur
+  simulateur macOS et appareil réel. Android exige encore `bmgr` API 31/36.1 et un transfert OEM ; les
+  règles de sauvegarde plateforme ne sont pas une preuve cryptographique de liaison à l’appareil.
+- La stack Supabase locale Kwabor a été recréée puis arrêtée proprement après reset, lint applicatif
+  et 58 assertions SEARCH-001A vertes. Les trois durcissements finaux portent le plan à 61 ; la suite
+  complète, les advisors et le harnais concurrent doivent maintenant être exécutés sur GitHub.
 - Les 77 assertions GUIDE-001B ont été vérifiées statiquement mais pas exécutées contre PostgreSQL :
   Docker/Supabase local n'a volontairement pas été redémarré. Une stack isolée est obligatoire avant
   publication ou déploiement de la migration.
@@ -435,7 +456,10 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
-- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, et ouvre le DetailSheet connecté. Explore iOS ouvre aussi la fiche SwiftUI native. Les actions réelles, la carte, les avis, les tris métier par onglet, les filtres prix/date et les plafonds sponsorisés restent à livrer ; recherche et assistant ne sont pas affichés tant que leurs contrats manquent.
+- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, ouvre le
+  DetailSheet connecté et affiche la recherche lexicale SEARCH-001A ; iOS possède la parité SwiftUI.
+  Les récents durables, l’autocomplétion, les filtres avancés, l’Assistant IA, les actions réelles, la
+  carte, les avis, les tris métier et les plafonds sponsorisés restent à livrer.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
@@ -467,8 +491,9 @@ SETTINGS-001 reste ouvert et ACTIONS-001C2 reste suspendu aux cinq décisions pr
 
 ## Prochaine tâche logique
 
-Formaliser puis livrer HISTORY-001 et SEARCH-001, prochaines tranches V1 non bloquées par un fournisseur. Valider
-AUTH-UX-001 sous Xcode/macOS avant toute publication de sa branche. Préparer OPS-001B seulement après
+Publier SEARCH-001A, exécuter sa CI parallèle exact-head puis fusionner uniquement si Android,
+Supabase et Xcode Debug/Staging/Release sont verts. Ensuite, faire valider les trois paramètres de
+rétention de HISTORY-001 et livrer les récents durables. Préparer OPS-001B seulement après
 provisionnement staging ; avant d'activer
 `account-delete`, prouver les AMR réelles email, Google et Apple et faire approuver/tester la
 politique des en-têtes et journaux d'invocation. La vidéo d'intro reste embarquée : tout changement

@@ -4,9 +4,26 @@ import SwiftUI
 struct ExploreCard: View {
     let listing: ExploreListingItem
     let strings: KwaborStrings
+    let showsInteractions: Bool
     let onOpen: () -> Void
     let onLike: () -> Void
     let onFavorite: () -> Void
+
+    init(
+        listing: ExploreListingItem,
+        strings: KwaborStrings,
+        showsInteractions: Bool = true,
+        onOpen: @escaping () -> Void,
+        onLike: @escaping () -> Void,
+        onFavorite: @escaping () -> Void
+    ) {
+        self.listing = listing
+        self.strings = strings
+        self.showsInteractions = showsInteractions
+        self.onOpen = onOpen
+        self.onLike = onLike
+        self.onFavorite = onFavorite
+    }
 
     private var priceLabel: String {
         PriceLabelFormatter.shared.compactXof(price: listing.price, freeLabel: strings.free)
@@ -53,31 +70,33 @@ struct ExploreCard: View {
             .accessibilityLabel(accessibilitySummary)
             .accessibilitySortPriority(3)
 
-            VStack {
-                HStack {
-                    Spacer()
-                    VStack(spacing: KwaborDesignTokens.Spacing.sm) {
-                        ExploreCardActionButton(
-                            label: strings.like,
-                            systemImage: listing.liked ? "heart.fill" : "heart",
-                            selected: listing.liked,
-                            selectedColor: KwaborDesignTokens.ColorToken.ticket,
-                            accessibilitySortPriority: 2,
-                            action: onLike
-                        )
-                        ExploreCardActionButton(
-                            label: strings.favorite,
-                            systemImage: listing.favorited ? "bookmark.fill" : "bookmark",
-                            selected: listing.favorited,
-                            selectedColor: KwaborDesignTokens.ColorToken.ink950,
-                            accessibilitySortPriority: 1,
-                            action: onFavorite
-                        )
+            if showsInteractions {
+                VStack {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: KwaborDesignTokens.Spacing.sm) {
+                            ExploreCardActionButton(
+                                label: strings.like,
+                                systemImage: listing.liked ? "heart.fill" : "heart",
+                                selected: listing.liked,
+                                selectedColor: KwaborDesignTokens.ColorToken.ticket,
+                                accessibilitySortPriority: 2,
+                                action: onLike
+                            )
+                            ExploreCardActionButton(
+                                label: strings.favorite,
+                                systemImage: listing.favorited ? "bookmark.fill" : "bookmark",
+                                selected: listing.favorited,
+                                selectedColor: KwaborDesignTokens.ColorToken.ink950,
+                                accessibilitySortPriority: 1,
+                                action: onFavorite
+                            )
+                        }
                     }
+                    Spacer()
                 }
-                Spacer()
+                .padding(KwaborDesignTokens.Spacing.md)
             }
-            .padding(KwaborDesignTokens.Spacing.md)
         }
         .aspectRatio(threeToFourAspectRatio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))

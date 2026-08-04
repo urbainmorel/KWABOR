@@ -130,7 +130,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] iOS : isoler Room dans un dossier exclu des sauvegardes, protégé et fail-closed avec repli
     mémoire ; invalider le cache v2 historique.
   - [x] Verrouiller les politiques sources, les manifestes fusionnés et la compilation Kotlin/Native par tests.
-  - [ ] Qualifier avec `bmgr` les API 30/31/36.1 puis un transfert sur appareil Android/OEM ; confirmer
+  - [x] Qualifier l’APK debug sur émulateur Android 11/API 30 : la cible 36 ne porte pas le flag
+    runtime `ALLOW_BACKUP` et `bmgr backupnow` répond `Backup is not allowed`, sans jeu restaurable.
+  - [ ] Qualifier avec `bmgr` les API 31/36.1 puis un transfert sur appareil Android/OEM ; confirmer
     notamment qu’aucune donnée privée n’entre dans le nouveau transfert Android↔iOS.
   - [ ] Exécuter le test filesystem sur simulateur macOS puis qualifier exclusion/protection sur appareil iOS.
 - [ ] SYNC-001 — Persister l'outbox, coalescer Like/Favori, appliquer idempotence, backoff et drain réseau/session.
@@ -171,6 +173,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] Dériver des signaux bornés pour IA/fil organique sans exposer l’historique brut au modèle ni
     modifier le classement ou l’attribution sponsorisés.
 - [ ] SEARCH-001 — Livrer récents durables, autocomplétion, résultats, filtres et fallback texte offline.
+  - [ ] SEARCH-001A — Livrer la recherche lexicale versionnée publiée-only, pagination, résultats
+    Android/iOS et repli Room borné sans persistance de requête.
+    - [x] Implémentation KMP, Compose, SwiftUI, RPC/RLS/grants, tests ciblés et ADR locaux.
+    - [ ] Prouver le commit exact par la CI GitHub parallèle, dont Xcode Debug/Staging/Release.
+  - [ ] SEARCH-001B — Livrer autocomplétion, filtres avancés et raccord aux récents de HISTORY-001.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
   - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
     contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.

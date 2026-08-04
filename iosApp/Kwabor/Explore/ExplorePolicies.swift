@@ -32,6 +32,58 @@ struct ExplorePaginationGuard {
     }
 }
 
+struct SearchPaginationGuard {
+    private(set) var requestedCursor: String?
+
+    mutating func shouldLoadNext(
+        cursor: String?,
+        canLoadMore: Bool,
+        isNearEnd: Bool,
+        hasAppendError: Bool
+    ) -> Bool {
+        guard canLoadMore,
+              isNearEnd,
+              !hasAppendError,
+              let cursor,
+              !cursor.isEmpty,
+              cursor != requestedCursor else {
+            return false
+        }
+        requestedCursor = cursor
+        return true
+    }
+
+    mutating func shouldRetry(cursor: String?, canLoadMore: Bool) -> Bool {
+        guard canLoadMore, let cursor, !cursor.isEmpty else { return false }
+        requestedCursor = cursor
+        return true
+    }
+
+    mutating func reset() {
+        requestedCursor = nil
+    }
+}
+
+enum SearchPaginationPolicy {
+    static func isNearEnd(index: Int, itemCount: Int, threshold: Int = 4) -> Bool {
+        guard index >= 0, itemCount > 0, threshold > 0, index < itemCount else { return false }
+        return index >= max(itemCount - threshold, 0)
+    }
+}
+
+enum SearchGridPolicy {
+    static func columnCount(
+        availableWidth: Double,
+        tabletBreakpoint: Double,
+        usesAccessibilityLayout: Bool
+    ) -> Int {
+        if usesAccessibilityLayout {
+            return 1
+        }
+        return availableWidth >= tabletBreakpoint ? 3 : 2
+    }
+}
+
 enum ContextualAuthenticationDismissalAction: Equatable {
     case cancel
     case keepForAuthenticatedReplay

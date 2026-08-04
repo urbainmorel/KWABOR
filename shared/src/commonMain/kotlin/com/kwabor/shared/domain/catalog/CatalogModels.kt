@@ -223,4 +223,21 @@ data class ListingFilters(
 data class ListingSearchQuery(
     val text: String,
     val filters: ListingFilters = ListingFilters(),
-)
+) {
+    init {
+        require(text == text.trim()) { "Listing search query must be canonical." }
+        require(text.length in 1..MAX_LISTING_SEARCH_QUERY_LENGTH) {
+            "Listing search query must contain between 1 and $MAX_LISTING_SEARCH_QUERY_LENGTH characters."
+        }
+        require(text.none(Char::isISOControl)) { "Listing search query contains control characters." }
+        require(filters.onlyPublished) { "Listing search only supports published listings." }
+        require(filters.cityId.isValidListingSearchFilterId()) { "Listing search city id is invalid." }
+        require(filters.categoryId.isValidListingSearchFilterId()) { "Listing search category id is invalid." }
+    }
+}
+
+private fun String?.isValidListingSearchFilterId(): Boolean =
+    this == null || (isNotBlank() && length <= MAX_LISTING_SEARCH_FILTER_ID_LENGTH && none(Char::isISOControl))
+
+private const val MAX_LISTING_SEARCH_QUERY_LENGTH = 120
+private const val MAX_LISTING_SEARCH_FILTER_ID_LENGTH = 100

@@ -59,13 +59,15 @@
 		1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B1 /* GuideDiscoveryStore.swift */; };
 		1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B3 /* GuideDiscoveryCard.swift */; };
 		1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000B5 /* GuideDiscoveryView.swift */; };
+		1A00000100000000000000C0 /* SearchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000C1 /* SearchStore.swift */; };
+		1A00000100000000000000C2 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000100000000000000C3 /* SearchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1A0000010000000000000002 /* KwaborApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborApp.swift; sourceTree = "<group>"; };
 		1A0000010000000000000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1A0000010000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = ../shared/build/XCFrameworks/debug/Shared.xcframework; sourceTree = "<group>"; };
+		1A0000010000000000000008 /* Shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Shared.xcframework; path = "../shared/build/XCFrameworks/$(KWABOR_SHARED_BUILD_TYPE)/Shared.xcframework"; sourceTree = "<group>"; };
 		1A0000010000000000000009 /* Kwabor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kwabor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000010000000000000029 /* KwaborDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KwaborDesignTokens.swift; sourceTree = "<group>"; };
 		1A0000010000000000000031 /* RootNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootNavigation.swift; sourceTree = "<group>"; };
@@ -114,6 +116,8 @@
 		1A00000100000000000000B1 /* GuideDiscoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryStore.swift; sourceTree = "<group>"; };
 		1A00000100000000000000B3 /* GuideDiscoveryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryCard.swift; sourceTree = "<group>"; };
 		1A00000100000000000000B5 /* GuideDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDiscoveryView.swift; sourceTree = "<group>"; };
+		1A00000100000000000000C1 /* SearchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchStore.swift; sourceTree = "<group>"; };
+		1A00000100000000000000C3 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +161,7 @@
 				1A0000010000000000000046 /* Observability */,
 				1A0000010000000000000076 /* Registration */,
 				1A0000010000000000000016 /* Resources */,
+				1A00000100000000000000C4 /* Search */,
 			);
 			path = Kwabor;
 			sourceTree = "<group>";
@@ -288,6 +293,15 @@
 				1A00000100000000000000B5 /* GuideDiscoveryView.swift */,
 			);
 			path = Guide;
+			sourceTree = "<group>";
+		};
+		1A00000100000000000000C4 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000100000000000000C1 /* SearchStore.swift */,
+				1A00000100000000000000C3 /* SearchView.swift */,
+			);
+			path = Search;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -467,6 +481,8 @@
 				1A00000100000000000000B0 /* GuideDiscoveryStore.swift in Sources */,
 				1A00000100000000000000B2 /* GuideDiscoveryCard.swift in Sources */,
 				1A00000100000000000000B4 /* GuideDiscoveryView.swift in Sources */,
+				1A00000100000000000000C0 /* SearchStore.swift in Sources */,
+				1A00000100000000000000C2 /* SearchView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

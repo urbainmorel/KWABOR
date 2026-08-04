@@ -15,6 +15,7 @@ import com.kwabor.shared.domain.core.DomainResult
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class DataCatalogRepositoryTest {
@@ -110,20 +111,13 @@ class DataCatalogRepositoryTest {
     }
 
     @Test
-    fun searchListings_rejectsUnpublishedScopeWithoutCallingDataSource() = runTest {
-        val dataSource = FakeCatalogDataSource()
-        val repository = DataCatalogRepository(dataSource)
-
-        val result = repository.searchListings(
-            query = ListingSearchQuery(
+    fun listingSearchQuery_rejectsUnpublishedScopeBeforeCallingTheDataLayer() {
+        assertFailsWith<IllegalArgumentException> {
+            ListingSearchQuery(
                 text = "restaurant",
                 filters = ListingFilters(onlyPublished = false),
-            ),
-        )
-
-        val failure = assertIs<DomainResult.Failure>(result)
-        assertIs<DomainError.Validation>(failure.error)
-        assertEquals(0, dataSource.searchCallCount)
+            )
+        }
     }
 
     @Test

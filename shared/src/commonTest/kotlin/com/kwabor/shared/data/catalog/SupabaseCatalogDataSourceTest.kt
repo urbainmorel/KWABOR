@@ -1,6 +1,11 @@
 package com.kwabor.shared.data.catalog
 
 import com.kwabor.shared.domain.catalog.CatalogDetail
+import com.kwabor.shared.domain.catalog.ListingClass
+import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingPageRequest
+import com.kwabor.shared.domain.catalog.ListingSearchQuery
+import com.kwabor.shared.domain.catalog.ListingType
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
@@ -9,14 +14,73 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SupabaseCatalogDataSourceTest {
+    @Test
+    fun searchListings_callsTheVersionedRpcWithCanonicalParametersAndBuildsAKeysetPage() = runTest {
+        val client = createCatalogSearchTestClient { request ->
+            assertEquals("/rest/v1/rpc/search_catalog_summaries_v1", request.url.encodedPath)
+            val body = assertIs<OutgoingContent.ByteArrayContent>(request.body).bytes().decodeToString()
+            val parameters = Json.parseToJsonElement(body).jsonObject
+            assertEquals("restaurant", parameters.getValue("p_search_query").jsonPrimitive.content)
+            assertEquals("cotonou", parameters.getValue("p_city_id").jsonPrimitive.content)
+            assertEquals("commercial-restaurant", parameters.getValue("p_category_id").jsonPrimitive.content)
+            assertEquals("etablissement", parameters.getValue("p_listing_type").jsonPrimitive.content)
+            assertEquals("commercial", parameters.getValue("p_listing_class").jsonPrimitive.content)
+            assertEquals("cursor-before", parameters.getValue("p_cursor").jsonPrimitive.content)
+            assertEquals(2, parameters.getValue("p_limit").jsonPrimitive.content.toInt())
+            CATALOG_SEARCH_RPC_RESPONSE
+        }
+
+        try {
+            val page = SupabaseCatalogDataSource(client.postgrest).searchListings(
+                query = ListingSearchQuery(
+                    text = "restaurant",
+                    filters = ListingFilters(
+                        cityId = "cotonou",
+                        categoryId = "commercial-restaurant",
+                        listingType = ListingType.Establishment,
+                        listingClass = ListingClass.Commercial,
+                    ),
+                ),
+                page = ListingPageRequest(cursor = "cursor-before", limit = 2),
+            ).toDomain()
+
+            assertEquals(listOf("listing-1", "listing-2"), page.items.map { item -> item.id })
+            assertEquals("cursor-2", page.nextCursor)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun searchListings_mapsTransientGatewayFailuresToNetworkUnavailable() = runTest {
+        val client = createCatalogSearchTestClient(status = HttpStatusCode.ServiceUnavailable) {
+            """{"code":"TEMPORARY","message":"Service unavailable"}"""
+        }
+
+        try {
+            assertFailsWith<CatalogDataException.NetworkUnavailable> {
+                SupabaseCatalogDataSource(client.postgrest).searchListings(
+                    query = ListingSearchQuery(text = "restaurant"),
+                    page = ListingPageRequest(),
+                )
+            }
+        } finally {
+            client.close()
+        }
+    }
+
     @Test
     fun getListingDetail_decodesTheVersionedRpcWrapperAndMapsItsDomainContract() = runTest {
         val client = createCatalogTestClient(CATALOG_DETAIL_RPC_RESPONSE, HttpStatusCode.OK)
@@ -143,6 +207,23 @@ private fun createCatalogTestClient(responseBody: String, status: HttpStatusCode
     install(Postgrest)
 }
 
+private fun createCatalogSearchTestClient(
+    status: HttpStatusCode = HttpStatusCode.OK,
+    responseProvider: (io.ktor.client.request.HttpRequestData) -> String,
+) = createSupabaseClient(
+    supabaseUrl = "https://example.invalid",
+    supabaseKey = "publishable-test-key",
+) {
+    httpEngine = MockEngine { request ->
+        respond(
+            content = responseProvider(request),
+            status = status,
+            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+        )
+    }
+    install(Postgrest)
+}
+
 private const val VALID_LISTING_ID = "11111111-1111-4111-8111-111111111111"
 private const val MISSING_RPC_RESPONSE = """
 {
@@ -221,6 +302,29 @@ private const val CATALOG_DETAIL_RPC_RESPONSE = """
         "menu_url": null
       }
     }
+  }
+]
+"""
+
+private const val CATALOG_SEARCH_RPC_RESPONSE = """
+[
+  {
+    "id":"listing-1","type":"etablissement","listing_class":"commercial","status":"publie",
+    "name":"Restaurant 1","city_id":"cotonou","category_id":"commercial-restaurant",
+    "cover_image_url":null,"price_from_xof":5000,"rating_avg":4.5,"likes_count":12,
+    "verified":true,"sponsored_until":null,"is_sponsored_placement":false,"row_cursor":"cursor-1"
+  },
+  {
+    "id":"listing-2","type":"etablissement","listing_class":"commercial","status":"publie",
+    "name":"Restaurant 2","city_id":"cotonou","category_id":"commercial-restaurant",
+    "cover_image_url":null,"price_from_xof":7000,"rating_avg":4.2,"likes_count":8,
+    "verified":true,"sponsored_until":null,"is_sponsored_placement":false,"row_cursor":"cursor-2"
+  },
+  {
+    "id":"listing-3","type":"etablissement","listing_class":"commercial","status":"publie",
+    "name":"Restaurant 3","city_id":"cotonou","category_id":"commercial-restaurant",
+    "cover_image_url":null,"price_from_xof":9000,"rating_avg":4.0,"likes_count":4,
+    "verified":false,"sponsored_until":null,"is_sponsored_placement":false,"row_cursor":"cursor-3"
   }
 ]
 """

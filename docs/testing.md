@@ -2,6 +2,26 @@
 
 > Exécuter les validations proportionnées au risque, puis la gate complète avant de proposer une PR.
 
+## Stratégie rapide sans baisse de qualité
+
+Le cycle de développement commence par les contrôles directement liés aux fichiers modifiés :
+compilation de la cible, tests de la feature, Detekt du module et pgTAP du contrat concerné. Les
+commandes Gradle compatibles sont regroupées dans une seule invocation afin de réutiliser le daemon,
+le graphe configuré et le cache. Une gate globale n’est relancée localement qu’après stabilisation du
+lot, pas après chaque petite correction.
+
+Le workflow GitHub répartit ensuite les preuves longues entre des workers indépendants : intégrité
+dépôt/médias, Gradle, Edge Function, base Supabase complète et préparation iOS. Les configurations
+Xcode Debug, Staging et Release consomment le même artefact XCFramework puis s’exécutent en matrice
+parallèle. Les checks protégés `quality`, `iOS simulator build` et
+`Android launch evidence gate` restent inchangés ; un lot n’est donc pas déclaré livrable avant le
+succès du commit exact sur GitHub. La concurrence annule uniquement les anciens runs d’une même PR,
+jamais un run de `main`.
+
+En cas d’échec hébergé, ne relancer localement que la frontière en cause avant de republier : test
+Kotlin ciblé, fichier pgTAP, configuration Xcode concernée ou vérificateur média. Cette discipline
+évite les matrices locales répétées tout en conservant une preuve finale Android/iOS/Supabase.
+
 ## Gate locale principale
 
 Sous Windows :
@@ -46,6 +66,36 @@ Sur Android, `:shared:testAndroidHostTest` ouvre réellement Room dans `noBackup
 nettoyage du cache historique ainsi que le repli mémoire. Cette preuve hôte ne remplace pas les tests
 `bmgr` sur API 30/31/36.1 ni les transferts sur un appareil OEM représentatif.
 
+### Qualification Android des sauvegardes
+
+Sur chaque niveau d’API, installer l’APK à qualifier puis relever d’abord l’état du gestionnaire et le
+transport actifs afin de pouvoir les restaurer après le test :
+
+```powershell
+adb -s <serial> shell dumpsys package com.kwabor.android
+adb -s <serial> shell bmgr enabled
+adb -s <serial> shell bmgr list transports
+```
+
+Activer temporairement le gestionnaire, sélectionner le transport local disponible sur l’image et
+demander une sauvegarde explicite :
+
+```powershell
+adb -s <serial> shell bmgr enable true
+adb -s <serial> shell bmgr transport com.android.localtransport/.LocalTransport
+adb -s <serial> shell bmgr backupnow com.kwabor.android
+```
+
+L’attendu KWABOR est `Backup is not allowed`. Dans ce cas aucun jeu de sauvegarde n’existe : une
+désinstallation/restauration ne fournirait pas de preuve supplémentaire. Si le paquet est accepté,
+considérer le test en échec, conserver les journaux et exécuter le protocole officiel complet de
+sauvegarde/restauration avant toute correction. À la fin, remettre le transport initial et l’état
+initial de `bmgr` ; supprimer uniquement les données de test explicitement créées.
+
+La preuve locale du 4 août 2026 couvre Android 11/API 30 avec une APK ciblant l’API 36 : le paquet ne
+porte pas `ALLOW_BACKUP` à l’exécution et le transport local le refuse. Les API 31/36.1, un appareil
+OEM et le transfert Android↔iOS restent des gates séparées.
+
 Rapports HTML habituels :
 
 ```text
@@ -78,6 +128,93 @@ python -B tools/test-event-details-concurrency.py
 Une modification de migration/RLS doit aussi passer un reset isolé et le lint Supabase adaptés au
 lot. Ne jamais utiliser un reset destructif sur staging ou production. Le harnais de concurrence
 événement est séparé de la suite pgTAP standard et exige la stack locale attendue.
+
+## Recherche catalogue SEARCH-001A
+
+SEARCH-001A combine un RPC PostgreSQL versionné, un runtime KMP, un repli sur le cache Room Explore
+et deux UI natives. Les validations doivent couvrir ces quatre frontières ; un test vert du seul
+écran ne prouve pas le contrat serveur ni le comportement hors ligne.
+
+### Contrat serveur
+
+Sur une stack Supabase locale jetable, reconstruire la base depuis toutes les migrations puis lancer
+la suite pgTAP complète :
+
+```powershell
+supabase db start
+supabase db reset --local --yes
+supabase test db
+supabase db lint --local --level warning
+```
+
+Le reset est destructif pour la base locale ciblée : vérifier le projet et les ports avant de
+l’exécuter, et ne jamais appliquer ce protocole à staging ou production. Le fichier
+`supabase/tests/search_catalog_summaries_v1_test.sql` doit notamment prouver :
+
+- la signature stable, `security invoker`, le `search_path` fixé, les grants `anon`/`authenticated`
+  et l’absence de grant public inattendu ;
+- la recherche par nom, ville, catégorie et tags, y compris une requête dont les mots correspondent
+  à plusieurs champs ;
+- l’invisibilité des brouillons pour les appels anonymes comme authentifiés ;
+- le trim, la casse, les caractères spéciaux traités comme texte et le refus des requêtes, limites
+  ou curseurs invalides ;
+- la ligne sentinelle, la continuation sans omission et le refus d’un curseur réutilisé avec une
+  autre requête ou un autre filtre.
+
+Ne pas figer le nombre total d’assertions dans les scripts : il évolue avec les migrations. Toute
+modification du document indexé, des grants, du tri ou du curseur exige un nouveau test pgTAP
+négatif correspondant.
+
+### Domaine, data, Room et Android
+
+Sous Windows, la porte ciblée de la tranche est :
+
+```powershell
+.\gradlew.bat :shared:testAndroidHostTest --tests "*Search*" :androidApp:testDebugUnitTest --tests "*Search*" :androidApp:compileDebugKotlin --no-daemon --console=plain
+```
+
+Elle doit couvrir la validation de la requête, les états submit/refresh/append, l’annulation des
+réponses obsolètes, le mapping du RPC, le repli uniquement sur erreur réseau, les erreurs Room
+typées, la déduplication, les bornes de pagination locale et l’ouverture réelle du cache Room. Les
+tests Android vérifient aussi les politiques de pagination/accessibilité et que l’événement
+`search_query` ne contient pas le texte brut.
+
+Élargir ensuite selon le risque :
+
+```powershell
+.\gradlew.bat spotlessCheck detekt check :androidApp:lintDebug :androidApp:assembleDebug --no-daemon --console=plain
+```
+
+### Kotlin iOS et SwiftUI
+
+Sous Windows, la compilation Kotlin/Native suivante vérifie les signatures du contrôleur iOS, mais
+ne remplace pas une exécution Apple :
+
+```powershell
+.\gradlew.bat :shared:compileTestKotlinIosX64 --no-daemon --console=plain
+```
+
+La preuve fonctionnelle exige ensuite, sur macOS, `:shared:iosSimulatorArm64Test`, les PolicyTests
+Swift et les builds simulateur décrits dans « Validation iOS native ». Elle doit couvrir les effets
+du contrôleur, le changement de portée, l’accessibilité, la pagination et l’ouverture d’une fiche.
+
+### Parcours fonctionnel minimal
+
+Sur Android et iOS :
+
+1. soumettre une recherche par nom, ville et catégorie dans l’onglet actif, puis dans « Tout » ;
+2. vérifier pagination, refresh, changement de contexte et ouverture d’une fiche sans doublon ;
+3. confirmer qu’une simple frappe ne lance ni requête ni événement Analytics ;
+4. après avoir alimenté Explore, couper le réseau et vérifier le badge hors ligne ainsi qu’un match
+   par nom/ville/catégorie depuis Room ;
+5. vérifier qu’un tag présent seulement côté serveur n’est pas annoncé comme disponible hors ligne :
+   le cache résumé actuel ne garantit pas cette parité ;
+6. redémarrer l’application et confirmer que SEARCH-001A n’affiche aucun récent : cette tranche ne
+   persiste volontairement aucune requête.
+
+Le point 6 n’est pas la politique produit finale. L’historique durable des comptes, les récents
+invités, l’import explicite et les signaux consentis pour l’Assistant IA et le fil organique doivent
+être validés dans la tranche HISTORY séparée, uniquement à partir des requêtes soumises.
 
 ## Edge Function `account-delete`
 
@@ -163,8 +300,8 @@ révocation sûre lors d'un changement de session, les purges diagnostics/FID,
 les changements de compte et les callbacks obsolètes.
 Ces tests inspectent les sources et détectent une régression de structure ; ils ne simulent ni le
 Keychain iOS, ni un crash de processus réel, ni le réseau Firebase. Les PolicyTests Swift et les scénarios sur
-appareil/macOS restent les preuves comportementales requises. Cette commande reste manuelle dans cette
-tranche : aucun workflow CI n'a été modifié sans accord explicite.
+appareil/macOS restent les preuves comportementales requises. Les contrôles statiques reproductibles
+sont répartis dans les workers GitHub ; les preuves appareil restent manuelles.
 
 La tâche `:androidApp:verifyFirebaseMergedManifests`, appelée par `check`, régénère les manifestes
 debug, staging et release. Elle exige l'absence de `FirebaseInitProvider`, `AD_ID`, des permissions

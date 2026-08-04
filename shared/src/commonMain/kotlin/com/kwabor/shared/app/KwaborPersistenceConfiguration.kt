@@ -9,6 +9,7 @@ import com.kwabor.shared.data.local.ExploreFeedPersistenceStore
 import com.kwabor.shared.data.local.ExplorePersistenceWatermarkStore
 import com.kwabor.shared.data.local.ExploreReferenceStore
 import com.kwabor.shared.data.local.KwaborDatabase
+import com.kwabor.shared.data.local.SearchCacheStore
 import com.kwabor.shared.data.local.buildKwaborDatabase
 import com.kwabor.shared.data.preferences.DataStoreAppPreferencesRepository
 import com.kwabor.shared.data.preferences.createAppPreferencesDataStore
@@ -76,6 +77,11 @@ private fun Module.registerExplorePersistenceStores() {
     single {
         ExplorePersistenceWatermarkStore(
             dao = get<KwaborDatabase>().explorePersistenceWatermarkDao(),
+        )
+    }
+    single {
+        SearchCacheStore(
+            dao = get<KwaborDatabase>().searchCacheDao(),
         )
     }
 }

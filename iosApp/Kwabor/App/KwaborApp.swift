@@ -9,6 +9,7 @@ struct KwaborApp: App {
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
+    @StateObject private var searchStore: SearchStore
     @StateObject private var guideDiscoveryStore: GuideDiscoveryStore
     @StateObject private var catalogDetailStore: CatalogDetailStore
 
@@ -33,6 +34,16 @@ struct KwaborApp: App {
         let catalogDetailStore = CatalogDetailStore(controller: compositionRoot.catalogDetailController)
         _exploreStore = StateObject(wrappedValue: exploreStore)
         _catalogDetailStore = StateObject(wrappedValue: catalogDetailStore)
+        _searchStore = StateObject(
+            wrappedValue: SearchStore(
+                controller: compositionRoot.searchController,
+                offlineMessage: exploreStore.strings.offlineBanner,
+                loadingMessage: exploreStore.strings.loading,
+                onOpenListing: catalogDetailStore.open,
+                onQuerySubmitted: observability.track,
+                onOpenAssistant: nil
+            )
+        )
         _guideDiscoveryStore = StateObject(
             wrappedValue: GuideDiscoveryStore(
                 controller: compositionRoot.guideDiscoveryController,
@@ -56,6 +67,7 @@ struct KwaborApp: App {
             OnboardingView(
                 coordinator: coordinator,
                 exploreStore: exploreStore,
+                searchStore: searchStore,
                 guideDiscoveryStore: guideDiscoveryStore,
                 catalogDetailStore: catalogDetailStore
             )

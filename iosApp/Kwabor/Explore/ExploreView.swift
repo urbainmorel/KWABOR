@@ -4,6 +4,7 @@ import UIKit
 
 struct ExploreView: View {
     @ObservedObject var store: ExploreStore
+    @ObservedObject var searchStore: SearchStore
     @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let onListingOpen: (String) -> Void
     let onAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
@@ -12,10 +13,18 @@ struct ExploreView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ExploreOfflineBanner(store: store)
+            if searchStore.state.isActive {
+                SearchOfflineBanner(
+                    store: searchStore,
+                    offlineText: store.strings.offlineBanner
+                )
+            } else {
+                ExploreOfflineBanner(store: store)
+            }
             GeometryReader { proxy in
                 ExploreScrollContent(
                     store: store,
+                    searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     columns: gridColumns(availableWidth: proxy.size.width),
                     onListingOpen: onListingOpen
@@ -34,6 +43,16 @@ struct ExploreView: View {
             guard let announcement = store.latestAnnouncement else { return }
             UIAccessibility.post(notification: .announcement, argument: announcement)
         }
+        .onChange(of: searchStore.announcementRevision) { _, _ in
+            guard let announcement = searchStore.latestAnnouncement else { return }
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+        }
+        .onChange(of: searchContextFingerprint) { _, _ in
+            searchStore.updateExploreContext(store.state)
+        }
+        .onAppear {
+            searchStore.updateExploreContext(store.state)
+        }
     }
 
     private var citySelectorBinding: Binding<Bool> {
@@ -48,14 +67,11 @@ struct ExploreView: View {
     }
 
     private func gridColumns(availableWidth: CGFloat) -> [GridItem] {
-        let count: Int
-        if dynamicTypeSize >= .xxLarge {
-            count = 1
-        } else if availableWidth >= KwaborDesignTokens.Sizing.exploreTabletBreakpoint {
-            count = 3
-        } else {
-            count = 2
-        }
+        let count = SearchGridPolicy.columnCount(
+            availableWidth: Double(availableWidth),
+            tabletBreakpoint: Double(KwaborDesignTokens.Sizing.exploreTabletBreakpoint),
+            usesAccessibilityLayout: dynamicTypeSize >= .xxLarge
+        )
         return Array(
             repeating: GridItem(
                 .flexible(minimum: 0, maximum: .infinity),
@@ -65,10 +81,32 @@ struct ExploreView: View {
             count: count
         )
     }
+
+    private var searchContextFingerprint: String {
+        let tab: String
+        if store.state.isPlacesTabSelected {
+            tab = "places"
+        } else if store.state.isEventsTabSelected {
+            tab = "events"
+        } else {
+            tab = "establishments"
+        }
+        let cityFingerprint = store.state.availableCities
+            .map { "\($0.id):\($0.label)" }
+            .joined(separator: "|")
+        return [
+            tab,
+            store.state.selectedChipId ?? "",
+            store.state.selectedCityId ?? "",
+            String(describing: store.state.currency),
+            cityFingerprint,
+        ].joined(separator: "#")
+    }
 }
 
 private struct ExploreScrollContent: View {
     @ObservedObject var store: ExploreStore
+    @ObservedObject var searchStore: SearchStore
     @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let columns: [GridItem]
     let onListingOpen: (String) -> Void
@@ -76,37 +114,58 @@ private struct ExploreScrollContent: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.lg) {
-                ExploreTransientBanners(store: store)
-                ExploreHeader(store: store)
-                GuideDiscoveryEntryLink(store: guideDiscoveryStore)
-                if store.state.isRefreshing {
-                    HStack(spacing: KwaborDesignTokens.Spacing.sm) {
-                        ProgressView()
-                        Text(store.strings.loading)
-                            .font(.callout)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityElement(children: .combine)
+                if searchStore.state.isActive {
+                    SearchTransientBanners(store: searchStore)
+                } else {
+                    ExploreTransientBanners(store: store)
                 }
-                ExploreFeedContent(
-                    store: store,
-                    columns: columns,
-                    onListingOpen: onListingOpen
-                )
-                ExploreAppendFooter(store: store)
+                ExploreHeader(store: store, searchStore: searchStore)
+                if searchStore.state.isActive {
+                    SearchActiveContent(
+                        store: searchStore,
+                        commonStrings: store.strings,
+                        columns: columns
+                    )
+                    SearchAppendFooter(
+                        store: searchStore,
+                        commonStrings: store.strings
+                    )
+                } else {
+                    GuideDiscoveryEntryLink(store: guideDiscoveryStore)
+                    if store.state.isRefreshing {
+                        HStack(spacing: KwaborDesignTokens.Spacing.sm) {
+                            ProgressView()
+                            Text(store.strings.loading)
+                                .font(.callout)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .combine)
+                    }
+                    ExploreFeedContent(
+                        store: store,
+                        columns: columns,
+                        onListingOpen: onListingOpen
+                    )
+                    ExploreAppendFooter(store: store)
+                }
             }
             .padding(.horizontal, KwaborDesignTokens.Spacing.lg)
             .padding(.top, KwaborDesignTokens.Spacing.lg)
             .padding(.bottom, KwaborDesignTokens.Spacing.xxxl)
         }
         .refreshable {
-            store.refresh()
+            if searchStore.state.isActive {
+                searchStore.refresh()
+            } else {
+                store.refresh()
+            }
         }
     }
 }
 
 private struct ExploreHeader: View {
     @ObservedObject var store: ExploreStore
+    @ObservedObject var searchStore: SearchStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
@@ -132,7 +191,12 @@ private struct ExploreHeader: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             ExploreTabs(store: store)
-            if !store.state.chips.isEmpty {
+            SearchEntryField(
+                searchStore: searchStore,
+                exploreState: store.state
+            )
+            if !store.state.chips.isEmpty,
+               (!searchStore.state.isActive || searchStore.state.isActiveTabScope) {
                 ExploreChips(store: store)
             }
         }
@@ -294,6 +358,21 @@ private struct ExploreOfflineBanner: View {
         if store.state.isOffline {
             ExploreBanner(
                 text: store.strings.offlineBanner,
+                foreground: KwaborDesignTokens.ColorToken.surface0,
+                background: KwaborDesignTokens.ColorToken.ink900
+            )
+        }
+    }
+}
+
+private struct SearchOfflineBanner: View {
+    @ObservedObject var store: SearchStore
+    let offlineText: String
+
+    var body: some View {
+        if store.state.isOffline {
+            ExploreBanner(
+                text: offlineText,
                 foreground: KwaborDesignTokens.ColorToken.surface0,
                 background: KwaborDesignTokens.ColorToken.ink900
             )
