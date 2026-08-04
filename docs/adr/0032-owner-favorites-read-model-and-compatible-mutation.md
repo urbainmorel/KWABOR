@@ -77,6 +77,9 @@ même pour une fiche masquée. Dans ce seul cas, son ancien champ agrégé `like
 que de contourner RLS pour révéler une métrique privée ; l'état Favori, seule autorité consommée par
 le retrait, reste exact. Le même résultat neutre est utilisé lorsqu'un ancien client répète un ajout
 déjà réussi après que la fiche a été masquée : la relation reste vraie, sans exposer la métrique.
+Les grants `EXECUTE` de `authenticated` et `service_role` sont redéclarés explicitement sur ces deux
+wrappers, afin qu'une base recréée et une base mise à niveau aient la même ACL sans dépendre du graphe
+d'héritage des rôles fourni par une version particulière de la CLI Supabase.
 
 La suppression des anciennes RPC, de leurs grants ou des accès table compatibles est reportée à un
 lot KMP atomique : les deux applications doivent d'abord utiliser le contrat V1, puis une migration

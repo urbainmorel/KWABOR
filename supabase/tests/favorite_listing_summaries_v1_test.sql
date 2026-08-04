@@ -13,7 +13,7 @@ begin
 end;
 $$;
 
-select plan(82);
+select plan(83);
 
 insert into auth.users (
   id,
@@ -370,6 +370,42 @@ select ok(
     'EXECUTE'
   ),
   'the preserved service-role legacy RPC path can reach its V1 dependency'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_proc as procedure_definition
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        procedure_definition.proacl,
+        pg_catalog.acldefault('f', procedure_definition.proowner)
+      )
+    ) as privilege_definition
+    join pg_catalog.pg_roles as grantee
+      on grantee.oid = privilege_definition.grantee
+    where procedure_definition.oid =
+      'public.add_listing_to_favorites(uuid)'::regprocedure
+      and grantee.rolname = 'service_role'
+      and privilege_definition.privilege_type = 'EXECUTE'
+  )
+  and exists (
+    select 1
+    from pg_catalog.pg_proc as procedure_definition
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        procedure_definition.proacl,
+        pg_catalog.acldefault('f', procedure_definition.proowner)
+      )
+    ) as privilege_definition
+    join pg_catalog.pg_roles as grantee
+      on grantee.oid = privilege_definition.grantee
+    where procedure_definition.oid =
+      'public.remove_listing_from_favorites(uuid)'::regprocedure
+      and grantee.rolname = 'service_role'
+      and privilege_definition.privilege_type = 'EXECUTE'
+  ),
+  'both legacy wrappers retain direct service-role execute grants'
 );
 
 select ok(

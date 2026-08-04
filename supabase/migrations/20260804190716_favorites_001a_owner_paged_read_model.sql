@@ -578,8 +578,24 @@ $$;
 comment on function public.remove_listing_from_favorites(uuid) is
   'DEPRECATED compatibility wrapper. It remains idempotent and can remove a relation whose listing is no longer published.';
 
--- CREATE OR REPLACE preserves the legacy ACLs. Keep their existing EXECUTE
--- grants and the owner-only favorites RLS policies until the KMP migration is
+-- Supabase CLI 2.111 fresh role graphs do not preserve the historical
+-- service_role inheritance observed by older local stacks. Restate every
+-- compatibility grant explicitly so clean and upgraded environments agree.
+revoke all
+on function public.add_listing_to_favorites(uuid)
+from public, anon;
+revoke all
+on function public.remove_listing_from_favorites(uuid)
+from public, anon;
+
+grant execute
+on function public.add_listing_to_favorites(uuid)
+to authenticated, service_role;
+grant execute
+on function public.remove_listing_from_favorites(uuid)
+to authenticated, service_role;
+
+-- Keep the owner-only favorites RLS policies until the KMP migration is
 -- shipped as one backward-compatible lot.
 
 reset lock_timeout;
