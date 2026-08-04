@@ -57,10 +57,11 @@ Sur macOS, le runtime KMP iOS se teste avec :
 ```
 
 Ce test exécute aussi la politique Room iOS sur le système de fichiers du simulateur : exclusion des
-sauvegardes, protection `CompleteUntilFirstUserAuthentication`, idempotence et repli mémoire
-fail-closed en cas de collision. La compilation `:shared:compileTestKotlinIosX64` sous Windows ne
-prouve que les signatures Kotlin/Native ; le test runtime macOS et une qualification sur appareil
-restent requis.
+sauvegardes, appel Foundation de la protection `CompleteUntilFirstUserAuthentication`, idempotence,
+protection déterministe de la famille SQLite et repli mémoire fail-closed. Le simulateur ne restitue
+pas toujours la classe de protection après écriture ; la relecture exacte reste donc une preuve à
+qualifier sur appareil. La compilation `:shared:compileTestKotlinIosX64` sous Windows ne prouve que
+les signatures Kotlin/Native ; le test runtime macOS et une qualification sur appareil restent requis.
 
 Sur Android, `:shared:testAndroidHostTest` ouvre réellement Room dans `noBackupFilesDir` et couvre le
 nettoyage du cache historique ainsi que le repli mémoire. Cette preuve hôte ne remplace pas les tests

@@ -25,21 +25,28 @@ class IosRoomStorageProtectionTest {
     @Test
     fun protectedRoomDirectoryIsBackupExcludedAndIdempotent() = withTemporaryApplicationSupport { rootUrl ->
         val firstDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager)
-        val secondDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager)
+        val protectionApplicator = RecordingIosRoomFileProtectionApplicator()
+        val secondDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager, protectionApplicator)
 
         assertEquals(firstDirectoryUrl.path, secondDirectoryUrl.path)
-        assertRoomDirectoryPolicy(firstDirectoryUrl)
+        assertBackupExcluded(firstDirectoryUrl)
+        val directoryPath = assertNotNull(firstDirectoryUrl.path)
+        assertProtectionApplied(
+            protectionApplicator = protectionApplicator,
+            expectedPaths = listOf(directoryPath),
+        )
     }
 
     @Test
     fun existingDatabaseFamilyIsProtectedAndLegacyCacheIsRemoved() = withTemporaryApplicationSupport { rootUrl ->
+        val protectionApplicator = RecordingIosRoomFileProtectionApplicator()
         val rootPath = assertNotNull(rootUrl.path)
         IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
             val legacyPath = "$rootPath/$KWABOR_DATABASE_FILENAME$suffix"
             assertTrue(fileManager.createFileAtPath(legacyPath, contents = null, attributes = null))
         }
 
-        val roomDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager)
+        val roomDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager, protectionApplicator)
         val roomDirectoryPath = assertNotNull(roomDirectoryUrl.path)
         IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
             val legacyPath = "$rootPath/$KWABOR_DATABASE_FILENAME$suffix"
@@ -49,15 +56,18 @@ class IosRoomStorageProtectionTest {
             assertTrue(fileManager.createFileAtPath(protectedPath, contents = null, attributes = null))
         }
 
-        prepareIosRoomDirectory(rootUrl, fileManager)
+        protectionApplicator.clear()
+        prepareIosRoomDirectory(rootUrl, fileManager, protectionApplicator)
 
-        val protectionKey = assertNotNull(NSFileProtectionKey)
-        val protectionValue = assertNotNull(NSFileProtectionCompleteUntilFirstUserAuthentication)
-        IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
-            val protectedPath = "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME$suffix"
-            val attributes = fileManager.attributesOfItemAtPath(protectedPath, error = null)
-            assertEquals(protectionValue, attributes?.get(protectionKey))
-        }
+        assertProtectionApplied(
+            protectionApplicator = protectionApplicator,
+            expectedPaths = buildList {
+                add(roomDirectoryPath)
+                IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
+                    add("$roomDirectoryPath/$KWABOR_DATABASE_FILENAME$suffix")
+                }
+            },
+        )
     }
 
     @Test
@@ -106,6 +116,62 @@ class IosRoomStorageProtectionTest {
         }
     }
 
+    @Test
+    fun fileProtectionFailureUsesMemoryOnlyFallback() = runTest {
+        withTemporaryApplicationSupport { rootUrl ->
+            val rootPath = assertNotNull(rootUrl.path)
+            val roomDirectoryPath = "$rootPath/KwaborRoom"
+            val protectionApplicator = RecordingIosRoomFileProtectionApplicator { false }
+            var failureReported = false
+
+            val database = buildKwaborDatabase(
+                builder = createIosKwaborDatabaseBuilder(
+                    applicationSupportUrl = rootUrl,
+                    fileManager = fileManager,
+                    protectionApplicator = protectionApplicator,
+                    onPolicyFailure = { failureReported = true },
+                ),
+                queryCoroutineContext = coroutineContext,
+            )
+            try {
+                assertNull(database.exploreCacheDao().findSnapshot("missing"))
+                assertTrue(failureReported)
+                assertProtectionApplied(
+                    protectionApplicator = protectionApplicator,
+                    expectedPaths = listOf(roomDirectoryPath),
+                )
+                IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
+                    assertFalse(
+                        fileManager.fileExistsAtPath(
+                            "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME$suffix",
+                        ),
+                    )
+                }
+            } finally {
+                database.close()
+            }
+        }
+    }
+
+    @Test
+    fun existingDatabaseFileProtectionFailureFailsClosed() = withTemporaryApplicationSupport { rootUrl ->
+        val roomDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager)
+        val roomDirectoryPath = assertNotNull(roomDirectoryUrl.path)
+        val databasePath = "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME"
+        assertTrue(fileManager.createFileAtPath(databasePath, contents = null, attributes = null))
+        val protectionApplicator = RecordingIosRoomFileProtectionApplicator { path ->
+            path != databasePath
+        }
+
+        assertFailsWith<IosRoomStoragePolicyException> {
+            prepareIosRoomDirectory(rootUrl, fileManager, protectionApplicator)
+        }
+        assertProtectionApplied(
+            protectionApplicator = protectionApplicator,
+            expectedPaths = listOf(roomDirectoryPath, databasePath),
+        )
+    }
+
     private fun createLegacyDatabaseFamily(rootPath: String) {
         IOS_TEST_DATABASE_SUFFIXES.forEach { suffix ->
             val legacyPath = "$rootPath/$KWABOR_DATABASE_FILENAME$suffix"
@@ -120,17 +186,23 @@ class IosRoomStorageProtectionTest {
         }
     }
 
-    private fun assertRoomDirectoryPolicy(directoryUrl: NSURL) {
+    private fun assertBackupExcluded(directoryUrl: NSURL) {
         val backupKey = assertNotNull(NSURLIsExcludedFromBackupKey)
         val backupValues = directoryUrl.resourceValuesForKeys(listOf(backupKey), error = null)
         val isExcluded = backupValues?.get(backupKey) as? NSNumber
         assertEquals(true, isExcluded?.boolValue)
+    }
 
-        val directoryPath = assertNotNull(directoryUrl.path)
+    private fun assertProtectionApplied(
+        protectionApplicator: RecordingIosRoomFileProtectionApplicator,
+        expectedPaths: List<String>,
+    ) {
         val protectionKey = assertNotNull(NSFileProtectionKey)
         val protectionValue = assertNotNull(NSFileProtectionCompleteUntilFirstUserAuthentication)
-        val attributes = fileManager.attributesOfItemAtPath(directoryPath, error = null)
-        assertEquals(protectionValue, attributes?.get(protectionKey))
+        assertEquals(expectedPaths, protectionApplicator.applications.map { application -> application.path })
+        protectionApplicator.applications.forEach { application ->
+            assertEquals(protectionValue, application.attributes[protectionKey])
+        }
     }
 
     private inline fun withTemporaryApplicationSupport(block: (NSURL) -> Unit) {
@@ -155,3 +227,26 @@ class IosRoomStorageProtectionTest {
 }
 
 private val IOS_TEST_DATABASE_SUFFIXES = listOf("", "-wal", "-shm", "-journal")
+
+private class RecordingIosRoomFileProtectionApplicator(
+    private val shouldSucceed: (String) -> Boolean = { true },
+) : IosRoomFileProtectionApplicator {
+    private val recordedApplications = mutableListOf<ProtectionApplication>()
+
+    val applications: List<ProtectionApplication>
+        get() = recordedApplications.toList()
+
+    override fun apply(path: String, attributes: Map<Any?, Any?>): Boolean {
+        recordedApplications += ProtectionApplication(path = path, attributes = attributes.toMap())
+        return shouldSucceed(path)
+    }
+
+    fun clear() {
+        recordedApplications.clear()
+    }
+}
+
+private data class ProtectionApplication(
+    val path: String,
+    val attributes: Map<Any?, Any?>,
+)

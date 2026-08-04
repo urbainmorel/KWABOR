@@ -1120,6 +1120,48 @@ class IosRoomStorageContractValidationTest(unittest.TestCase):
         with self.assertRaisesRegex(VERIFIER.RepositoryIntegrityError, "local-storage control"):
             VERIFIER.validate_ios_room_storage_contract(changed)
 
+    def test_production_file_protection_adapter_cannot_be_stubbed(self) -> None:
+        delegation = """\
+        setAttributes(
+            attributes = attributes,
+            ofItemAtPath = path,
+            error = null,
+        )
+"""
+        changed = self.source.replace(delegation, "        true\n", 1)
+        self.assertNotEqual(changed, self.source)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "production file-protection adapter",
+        ):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_both_storage_scopes_must_use_the_protection_applicator(self) -> None:
+        changed = self.source.replace(
+            "protectionApplicator.apply(",
+            "bypassedProtectionApplicator.apply(",
+            1,
+        )
+        self.assertNotEqual(changed, self.source)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "Room directory and existing database family",
+        ):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
+    def test_both_entry_points_must_default_to_the_production_adapter(self) -> None:
+        changed = self.source.replace(
+            "fileManager.iosRoomFileProtectionApplicator()",
+            "testOnlyFileProtectionApplicator()",
+            1,
+        )
+        self.assertNotEqual(changed, self.source)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "default both entry points",
+        ):
+            VERIFIER.validate_ios_room_storage_contract(changed)
+
     def test_crlf_is_accepted(self) -> None:
         VERIFIER.validate_ios_room_storage_contract(self.source.replace("\n", "\r\n"))
 

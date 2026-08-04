@@ -28,7 +28,7 @@ IOS_ROOM_DATABASE_BUILDER_PATH = (
     "IosKwaborDatabaseBuilder.kt"
 )
 IOS_ROOM_DATABASE_BUILDER_SHA256 = (
-    "9e02ce3ad1345b4793da940392013e39413d8823776014450d4557bc0fb24f4b"
+    "15fcfc8200f26445f1fd44c2e5e836e8d70cb0ac3b6507659f5255f646eb960e"
 )
 IOS_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     IOS_OBSERVABILITY_SOURCE_PATH: "123738c638e69c098955f4683e0e2448b7f4014cfe041f7f42aed930a80cd638",
@@ -711,7 +711,10 @@ def validate_ios_room_storage_contract(source: str) -> None:
         "prepareIosRoomDirectory(",
         "NSFileProtectionCompleteUntilFirstUserAuthentication",
         "fileManager.createDirectoryAtURL(",
-        "fileManager.setAttributes(",
+        "internal fun interface IosRoomFileProtectionApplicator",
+        "private fun NSFileManager.iosRoomFileProtectionApplicator()",
+        "IosRoomFileProtectionApplicator { path, attributes ->",
+        "protectionApplicator.apply(",
         "roomDirectoryUrl.setResourceValue(",
         "NSNumber(bool = true)",
         "NSURLIsExcludedFromBackupKey",
@@ -736,6 +739,36 @@ def validate_ios_room_storage_contract(source: str) -> None:
         and "catch (_: IosRoomStoragePolicyException)" in active_source,
         f"{IOS_ROOM_DATABASE_BUILDER_PATH} must catch only its typed policy failure",
     )
+    require(
+        active_source.count("fileManager.iosRoomFileProtectionApplicator()") == 2,
+        f"{IOS_ROOM_DATABASE_BUILDER_PATH} must default both entry points to the production "
+        "file-protection adapter",
+    )
+    require(
+        active_source.count("protectionApplicator.apply(") == 2,
+        f"{IOS_ROOM_DATABASE_BUILDER_PATH} must apply the injected protection policy to the "
+        "Room directory and existing database family",
+    )
+    adapter_start = active_source.index(
+        "private fun NSFileManager.iosRoomFileProtectionApplicator()"
+    )
+    adapter_end = active_source.index(
+        "private fun resolveIosRoomDirectoryUrl",
+        adapter_start,
+    )
+    adapter_source = active_source[adapter_start:adapter_end]
+    for fragment in (
+        "IosRoomFileProtectionApplicator { path, attributes ->",
+        "setAttributes(",
+        "attributes = attributes",
+        "ofItemAtPath = path",
+        "error = null",
+    ):
+        require(
+            fragment in adapter_source,
+            f"{IOS_ROOM_DATABASE_BUILDER_PATH} production file-protection adapter must "
+            f"delegate to NSFileManager.setAttributes: {fragment}",
+        )
     require(
         active_source.index("removeLegacyIosDatabaseFiles(")
         < active_source.index("val roomDirectoryUrl = resolveIosRoomDirectoryUrl"),

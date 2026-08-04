@@ -36,6 +36,7 @@ internal fun createIosKwaborDatabaseBuilder(): RoomDatabase.Builder<KwaborDataba
 internal fun createIosKwaborDatabaseBuilder(
     applicationSupportUrl: NSURL?,
     fileManager: NSFileManager,
+    protectionApplicator: IosRoomFileProtectionApplicator = fileManager.iosRoomFileProtectionApplicator(),
     onPolicyFailure: () -> Unit = ::reportIosRoomStoragePolicyFailure,
 ): RoomDatabase.Builder<KwaborDatabase> {
     val databasePath = try {
@@ -45,6 +46,7 @@ internal fun createIosKwaborDatabaseBuilder(
                 "The iOS application support directory is unavailable.",
             ),
             fileManager = fileManager,
+            protectionApplicator = protectionApplicator,
         )
         val roomDirectoryPath = requireIosRoomPolicyValue(
             roomDirectoryUrl.path,
@@ -68,6 +70,7 @@ internal fun createIosKwaborDatabaseBuilder(
 internal fun prepareIosRoomDirectory(
     applicationSupportUrl: NSURL,
     fileManager: NSFileManager = NSFileManager.defaultManager,
+    protectionApplicator: IosRoomFileProtectionApplicator = fileManager.iosRoomFileProtectionApplicator(),
 ): NSURL {
     val applicationSupportPath = requireIosRoomPolicyValue(
         applicationSupportUrl.path,
@@ -83,11 +86,18 @@ internal fun prepareIosRoomDirectory(
         "The protected iOS Room directory path is unavailable.",
     )
     val roomPolicy = resolveIosRoomPolicy()
-    enforceIosRoomDirectoryPolicy(roomDirectoryUrl, roomDirectoryPath, roomPolicy, fileManager)
+    enforceIosRoomDirectoryPolicy(
+        roomDirectoryUrl = roomDirectoryUrl,
+        roomDirectoryPath = roomDirectoryPath,
+        policy = roomPolicy,
+        fileManager = fileManager,
+        protectionApplicator = protectionApplicator,
+    )
     protectExistingIosDatabaseFiles(
         roomDirectoryPath = roomDirectoryPath,
         protectionAttributes = roomPolicy.protectionAttributes,
         fileManager = fileManager,
+        protectionApplicator = protectionApplicator,
     )
     return roomDirectoryUrl
 }
@@ -98,6 +108,20 @@ private data class IosRoomPolicy(
 )
 
 internal class IosRoomStoragePolicyException(message: String) : IllegalStateException(message)
+
+internal fun interface IosRoomFileProtectionApplicator {
+    fun apply(path: String, attributes: Map<Any?, Any?>): Boolean
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun NSFileManager.iosRoomFileProtectionApplicator(): IosRoomFileProtectionApplicator =
+    IosRoomFileProtectionApplicator { path, attributes ->
+        setAttributes(
+            attributes = attributes,
+            ofItemAtPath = path,
+            error = null,
+        )
+    }
 
 @OptIn(ExperimentalForeignApi::class)
 private fun resolveIosRoomDirectoryUrl(applicationSupportUrl: NSURL): NSURL = requireIosRoomPolicyValue(
@@ -133,6 +157,7 @@ private fun enforceIosRoomDirectoryPolicy(
     roomDirectoryPath: String,
     policy: IosRoomPolicy,
     fileManager: NSFileManager,
+    protectionApplicator: IosRoomFileProtectionApplicator,
 ) {
     val directoryCreated = fileManager.createDirectoryAtURL(
         url = roomDirectoryUrl,
@@ -140,11 +165,7 @@ private fun enforceIosRoomDirectoryPolicy(
         attributes = policy.protectionAttributes,
         error = null,
     )
-    val directoryProtected = fileManager.setAttributes(
-        attributes = policy.protectionAttributes,
-        ofItemAtPath = roomDirectoryPath,
-        error = null,
-    )
+    val directoryProtected = protectionApplicator.apply(roomDirectoryPath, policy.protectionAttributes)
     val directoryExcludedFromBackup = roomDirectoryUrl.setResourceValue(
         value = NSNumber(bool = true),
         forKey = policy.backupKey,
@@ -174,19 +195,16 @@ private fun removeLegacyIosDatabaseFiles(applicationSupportPath: String, fileMan
 @OptIn(ExperimentalForeignApi::class)
 private fun protectExistingIosDatabaseFiles(
     roomDirectoryPath: String,
-    protectionAttributes: Map<Any?, *>,
+    protectionAttributes: Map<Any?, Any?>,
     fileManager: NSFileManager,
+    protectionApplicator: IosRoomFileProtectionApplicator,
 ) {
     var allFilesProtected = true
     IOS_DATABASE_FILE_SUFFIXES.forEach { suffix ->
         val databaseFilePath = "$roomDirectoryPath/$KWABOR_DATABASE_FILENAME$suffix"
         if (
             fileManager.fileExistsAtPath(databaseFilePath) &&
-            !fileManager.setAttributes(
-                attributes = protectionAttributes,
-                ofItemAtPath = databaseFilePath,
-                error = null,
-            )
+            !protectionApplicator.apply(databaseFilePath, protectionAttributes)
         ) {
             allFilesProtected = false
         }
