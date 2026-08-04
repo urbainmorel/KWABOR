@@ -151,49 +151,47 @@ struct SearchActiveContent: View {
     let columns: [GridItem]
 
     var body: some View {
-        Group {
-            if !store.isConfigured {
-                SearchStateMessage(
-                    title: commonStrings.errorStateTitle,
-                    supportingText: store.strings.loadFailed,
-                    actionLabel: nil,
-                    action: nil
-                )
-            } else if let queryErrorMessage = store.state.queryErrorMessage {
-                SearchStateMessage(
-                    title: store.strings.title,
-                    supportingText: queryErrorMessage,
-                    actionLabel: nil,
-                    action: nil
-                )
-            } else if !store.state.hasSubmittedQuery {
-                SearchInitialHint(text: store.strings.initialHint)
-            } else if store.state.isLoading && store.state.listings.isEmpty {
-                SearchLoadingGrid(
-                    columns: columns,
-                    loadingLabel: commonStrings.loading
-                )
-            } else if let errorMessage = store.state.errorMessage {
-                SearchStateMessage(
-                    title: commonStrings.errorStateTitle,
-                    supportingText: errorMessage,
-                    actionLabel: commonStrings.retry,
-                    action: store.retry
-                )
-            } else if store.state.isEmpty {
-                SearchStateMessage(
-                    title: store.strings.emptyTitle,
-                    supportingText: store.strings.emptyMessage,
-                    actionLabel: store.canOpenAssistant ? store.strings.tryAssistant : nil,
-                    action: store.canOpenAssistant ? store.openAssistant : nil
-                )
-            } else {
-                SearchResultsGrid(
-                    store: store,
-                    commonStrings: commonStrings,
-                    columns: columns
-                )
-            }
+        if !store.isConfigured {
+            SearchStateMessage(
+                title: commonStrings.errorStateTitle,
+                supportingText: store.strings.loadFailed,
+                actionLabel: nil,
+                action: nil
+            )
+        } else if let queryErrorMessage = store.state.queryErrorMessage {
+            SearchStateMessage(
+                title: store.strings.title,
+                supportingText: queryErrorMessage,
+                actionLabel: nil,
+                action: nil
+            )
+        } else if !store.state.hasSubmittedQuery {
+            SearchInitialHint(text: store.strings.initialHint)
+        } else if store.state.isLoading && store.state.listings.isEmpty {
+            SearchLoadingGrid(
+                columns: columns,
+                loadingLabel: commonStrings.loading
+            )
+        } else if let errorMessage = store.state.errorMessage {
+            SearchStateMessage(
+                title: commonStrings.errorStateTitle,
+                supportingText: errorMessage,
+                actionLabel: commonStrings.retry,
+                action: store.retry
+            )
+        } else if store.state.isEmpty {
+            SearchStateMessage(
+                title: store.strings.emptyTitle,
+                supportingText: store.strings.emptyMessage,
+                actionLabel: store.canOpenAssistant ? store.strings.tryAssistant : nil,
+                action: store.canOpenAssistant ? store.openAssistant : nil
+            )
+        } else {
+            SearchResultsGrid(
+                store: store,
+                commonStrings: commonStrings,
+                columns: columns
+            )
         }
     }
 }
