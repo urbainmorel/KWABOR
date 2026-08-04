@@ -196,8 +196,51 @@ jobs:
         continue-on-error: true
         run: supabase stop --project-id KWABOR --no-backup
 
+  ios_validation_scope:
+    name: iOS validation scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect native iOS validation scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest tools.test_detect_ios_validation_scope
+
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            required=true
+          elif ! required="$(
+            python3 tools/detect_ios_validation_scope.py \
+              --base "$BASE_SHA" \
+              --head "$HEAD_SHA"
+          )"; then
+            echo "::warning::iOS scope detection failed; running the full matrix."
+            required=true
+          fi
+
+          if [[ "$required" != "true" && "$required" != "false" ]]; then
+            echo "::warning::iOS scope detection returned an invalid value; running the full matrix."
+            required=true
+          fi
+
+          echo "required=$required" >>"$GITHUB_OUTPUT"
+          echo "Native iOS validation required: $required"
+
   ios_prepare:
     name: Prepare shared iOS artifacts
+    needs: ios_validation_scope
+    if: needs.ios_validation_scope.outputs.required == 'true'
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -296,7 +339,12 @@ jobs:
 
   ios_configuration:
     name: iOS ${{ matrix.configuration }} simulator
-    needs: ios_prepare
+    needs: [ios_validation_scope, ios_prepare]
+    if: >-
+      always() &&
+      needs.ios_validation_scope.result == 'success' &&
+      needs.ios_validation_scope.outputs.required == 'true' &&
+      needs.ios_prepare.result == 'success'
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -357,18 +405,37 @@ jobs:
   ios:
     name: iOS simulator build
     if: always()
-    needs: [ios_prepare, ios_configuration]
+    needs: [ios_validation_scope, ios_prepare, ios_configuration]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Enforce iOS preparation and configuration matrix
         shell: bash
         env:
+          SCOPE_RESULT: ${{ needs.ios_validation_scope.result }}
+          IOS_REQUIRED: ${{ needs.ios_validation_scope.outputs.required }}
           PREPARE_RESULT: ${{ needs.ios_prepare.result }}
           CONFIGURATION_RESULT: ${{ needs.ios_configuration.result }}
         run: |
-          if [[ "$PREPARE_RESULT" != "success" || "$CONFIGURATION_RESULT" != "success" ]]; then
-            echo "iOS validation failed: prepare=$PREPARE_RESULT configurations=$CONFIGURATION_RESULT" >&2
+          if [[ "$SCOPE_RESULT" != "success" ]]; then
+            echo "iOS scope detection did not succeed: $SCOPE_RESULT" >&2
+            exit 1
+          fi
+
+          if [[ "$IOS_REQUIRED" == "true" ]]; then
+            if [[ "$PREPARE_RESULT" != "success" || "$CONFIGURATION_RESULT" != "success" ]]; then
+              echo "iOS validation failed: prepare=$PREPARE_RESULT configurations=$CONFIGURATION_RESULT" >&2
+              exit 1
+            fi
+            echo "iOS preparation and every configuration succeeded."
+          elif [[ "$IOS_REQUIRED" == "false" ]]; then
+            if [[ "$PREPARE_RESULT" != "skipped" || "$CONFIGURATION_RESULT" != "skipped" ]]; then
+              echo "iOS validation was not required but workers were not skipped: prepare=$PREPARE_RESULT configurations=$CONFIGURATION_RESULT" >&2
+              exit 1
+            fi
+            echo "iOS validation was safely skipped for this pull request."
+          else
+            echo "iOS scope detection returned an invalid requirement: $IOS_REQUIRED" >&2
             exit 1
           fi
 
