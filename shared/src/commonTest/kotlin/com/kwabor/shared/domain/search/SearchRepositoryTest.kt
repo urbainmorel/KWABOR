@@ -10,7 +10,9 @@ import com.kwabor.shared.domain.core.DomainResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class SearchRepositoryTest {
     @Test
@@ -22,9 +24,19 @@ class SearchRepositoryTest {
         val query = assertIs<DomainResult.Success<SearchQuery>>(result).value
         assertEquals("Restaurant Kwabor", query.text)
         assertEquals(filters, query.filters)
+        assertFalse(query.toString().contains("Restaurant Kwabor"))
         assertIs<DomainResult.Success<SearchQuery>>(
             SearchQuery.from("kwabor", ListingFilters(categoryId = "a".repeat(100))),
         )
+    }
+
+    @Test
+    fun canonicalTextUsesOneValidatedAndRedactedRepresentation() {
+        val canonicalText = assertNotNull(CanonicalSearchText.from("  Restaurant secret  "))
+
+        assertEquals("Restaurant secret", canonicalText.value)
+        assertEquals("CanonicalSearchText(value=<redacted>)", canonicalText.toString())
+        assertFalse(canonicalText.toString().contains(canonicalText.value))
     }
 
     @Test
