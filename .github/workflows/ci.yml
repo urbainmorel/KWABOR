@@ -200,18 +200,57 @@ jobs:
     name: Prepare shared iOS artifacts
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      PACKAGE_LOCK: iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+      - name: Verify Xcode 16.4
+        shell: bash
+        run: |
+          xcodebuild -version
+          test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "16.4"
+
+      - name: Resolve iOS packages and detect lock drift
+        id: resolve_packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project iosApp/Kwabor.xcodeproj \
+            -scheme Kwabor
+          test -f "$PACKAGE_LOCK"
+
+          if git diff --quiet -- "$PACKAGE_LOCK"; then
+            echo "lock_changed=false" >>"$GITHUB_OUTPUT"
+            echo "Package.resolved is current for Xcode 16.4."
+          else
+            echo "lock_changed=true" >>"$GITHUB_OUTPUT"
+            git --no-pager diff -- "$PACKAGE_LOCK"
+          fi
+
+      - name: Upload regenerated iOS package lock
+        if: steps.resolve_packages.outputs.lock_changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          distribution: temurin
-          java-version: "21"
+          name: resolved-ios-package-lock-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.PACKAGE_LOCK }}
+          if-no-files-found: error
+          retention-days: 7
 
-      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Xcode version
-        run: xcodebuild -version
+      - name: Enforce committed iOS package lock
+        shell: bash
+        env:
+          ARTIFACT_NAME: resolved-ios-package-lock-${{ github.sha }}-${{ github.run_attempt }}
+        run: |
+          if [[ "${{ steps.resolve_packages.outputs.lock_changed }}" == "true" ]]; then
+            echo "::error file=$PACKAGE_LOCK::Package.resolved is stale for Xcode 16.4."
+            echo "Download the regenerated lock with:"
+            echo "gh run download $GITHUB_RUN_ID --repo $GITHUB_REPOSITORY --name $ARTIFACT_NAME"
+          fi
+          git diff --exit-code -- "$PACKAGE_LOCK"
 
       - name: Test pure Swift policies
         run: |
@@ -225,6 +264,13 @@ jobs:
             iosApp/PolicyTests/main.swift \
             -o "$RUNNER_TEMP/kwabor-ios-policy-tests"
           "$RUNNER_TEMP/kwabor-ios-policy-tests"
+
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Test shared runtime and build XCFrameworks
         run: >-
@@ -253,6 +299,8 @@ jobs:
     needs: ios_prepare
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     strategy:
       fail-fast: false
       matrix:
