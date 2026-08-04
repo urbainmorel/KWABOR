@@ -874,12 +874,17 @@ select ok(
 );
 
 select ok(
-  has_column_privilege('service_role', 'public.listings', 'owner_id', 'select')
-  and has_column_privilege('service_role', 'public.listings', 'organization_id', 'select')
-  and has_column_privilege('service_role', 'public.listing_media', 'storage_path', 'select')
+  has_table_privilege('service_role', 'public.listings', 'select')
+  and has_table_privilege('service_role', 'public.listings', 'insert')
+  and has_table_privilege('service_role', 'public.listings', 'update')
+  and has_table_privilege('service_role', 'public.listings', 'delete')
+  and has_table_privilege('service_role', 'public.listing_media', 'select')
+  and has_table_privilege('service_role', 'public.listing_media', 'insert')
+  and has_table_privilege('service_role', 'public.listing_media', 'update')
+  and has_table_privilege('service_role', 'public.listing_media', 'delete')
   and has_column_privilege('service_role', 'public.room_types', 'id', 'select')
   and has_column_privilege('service_role', 'public.ticket_tiers', 'created_at', 'select'),
-  'service role keeps its full internal read privileges'
+  'service role retains required catalog DML and internal detail reads'
 );
 
 select is(
