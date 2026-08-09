@@ -2,15 +2,15 @@
 
 ## Phase actuelle
 
-Livraison V1 incrémentale — l'autorité Supabase Favoris de la PR `#55` est fusionnée et le présent
-lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par session.
+Livraison V1 incrémentale — Favoris est livré de l'autorité Supabase aux clients Android/iOS dans
+`main`. Le présent lot versionne côté serveur le classement, les fenêtres événement, les bornes prix
+et le placement sponsorisé d'Explore sans modifier le contrat consommé par les versions Store.
 
 ## Snapshot courant — 9 août 2026
 
-- La base de ce lot est le commit de fusion `1c0c7059f4d69431d570535280ad9c35f7c7b1d7` de la PR `#55`.
-  Elle inclut l'autorité Supabase FAVORITES-001A1, la resynchronisation d'état et ADR-0031 proposé,
-  l'autorité HISTORY-001A, la fondation domaine de `#51`, l'optimisation CI de `#52` et
-  l'intégration V1 de `#50`.
+- La base de ce lot est le commit de fusion `878ed8f067ca129fd6156de6395004fef501d8e6` de la PR `#56`.
+  Elle inclut FAVORITES-001A de bout en bout, l'autorité HISTORY-001A, ADR-0031 proposé, la fondation
+  domaine de `#51`, l'optimisation CI de `#52` et l'intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
@@ -18,7 +18,8 @@ lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par ses
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
 - Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`),
-  `30940684400` (`#53`), `30945274481` (`#54`) et `31298370818` (`#55`) sont verts pour
+  `30940684400` (`#53`), `30945274481` (`#54`), `31298370818` (`#55`) et `31316774201` (`#56`)
+  sont verts pour
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
@@ -29,8 +30,8 @@ lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par ses
   Profil → Favoris natif.
 - Ne sont pas terminés : racines Social/Ajouter/Notifications, outbox durable,
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
-  classement/sponsoring final, carte, avis, partage public, signalement, claim, IA, contribution,
-  B2B, paiement et notifications.
+  raccord mobile du classement/sponsoring versionné, carte, avis, partage public, signalement, claim,
+  IA, contribution, B2B, paiement et notifications.
 - La décision de release reste **no-go** : staging/production, fournisseurs réels, préflight des
   données, corpus, juridique, builds signés, appareils physiques, accessibilité, performance,
   sauvegarde et rollback ne sont pas qualifiés.
@@ -59,6 +60,11 @@ lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par ses
   legacy restent disponibles pour les anciennes versions Store. ADR-0032 borne l'usage IA aux
   favoris actifs sans journal d'activité et ADR-0033 fixe la cohérence client. Room et l'outbox
   persistante restent ouvertes dans SYNC-001.
+- EXPLORE-002B2A ajoute dans le présent lot un RPC public v2 distinct : tri de popularité en `bigint`,
+  proximité temporelle des événements, fenêtre UTC semi-ouverte, bornes prix XOF, curseur keyset lié
+  à son snapshot et au fingerprint des filtres, puis au plus deux placements sponsorisés en tête du
+  résultat. Le RPC v1 reste inchangé pour les versions Store ; le raccord Android/iOS appartient à
+  EXPLORE-002B2B. ADR-0034 documente ce contrat et reporte tout index au plan représentatif staging.
 
 ## Historique des tâches terminées
 
@@ -472,11 +478,10 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-FAVORITES-001A est livré de l'autorité Supabase aux vues Android/iOS ; sa persistance offline durable
-reste volontairement dans SYNC-001. HISTORY-001A livre la politique et l'autorité serveur bornée sans
-UI ni protocole offline. ADR-0031 propose le protocole versionné de HISTORY-001B, mais tous ses gates
-Produit, Sécurité, Juridique/DPO et Opérations restent à arbitrer avant Room ou l'outbox.
-EXPLORE-002B2A peut avancer séparément sans recréer une pile d'intégration longue. STAB-002B reste
+EXPLORE-002B2A versionne et teste le classement public côté Supabase sans modifier le RPC v1 ni les
+clients Store. FAVORITES-001A est livré de bout en bout ; sa persistance offline durable reste dans
+SYNC-001. HISTORY-001A conserve l'autorité serveur bornée, mais ADR-0031 et ses gates Produit,
+Sécurité, Juridique/DPO et Opérations doivent être arbitrés avant Room ou l'outbox. STAB-002B reste
 suspendu à la décision structurante sur les cinq racines V1.
 
 ## Blocages / limites
@@ -523,12 +528,15 @@ suspendu à la décision structurante sur les cinq racines V1.
 - Le mécanisme de signature/archivage iOS est prêt, mais aucun archive réelle ne peut être produite tant que le propriétaire n'a pas activé APNs/Sign in with Apple sur l'App ID et fourni certificat, profil et secrets GitHub.
 - Les budgets publicitaires d'équipe ne sont pas encore reliés à la création/consommation réelle de campagnes ; cette intégration appartient à une tranche Promotion dédiée.
 - L'envoi email/SMS d'invitations n'est pas encore implémenté ; le RPC génère un hash serveur et prépare le flux sécurisé.
-- Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel index de classement exige un corpus staging représentatif et un nouveau plan `EXPLAIN (ANALYZE, BUFFERS)`.
+- Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel
+  index de classement exige un corpus staging représentatif et un nouveau plan
+  `EXPLAIN (ANALYZE, BUFFERS)` ; EXPLORE-002B2A n'ajoute donc aucun index spéculatif.
 - Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, ouvre le
   DetailSheet connecté et affiche la recherche lexicale SEARCH-001A ; iOS possède la parité SwiftUI.
-  Les récents durables, l’autocomplétion, les filtres avancés, l’Assistant IA, la carte, les avis, le
-  partage public, le signalement, le claim, les tris métier et les plafonds sponsorisés restent à
-  livrer ; itinéraire, contact, menu et billetterie externe sont déjà intégrés.
+  Les récents durables, l’autocomplétion, le raccord mobile du RPC Explore v2, l’Assistant IA, la
+  carte, les avis, le partage public, le signalement et le claim restent à livrer ; le classement,
+  les bornes prix/date et le plafond sponsorisé sont définis côté serveur dans le présent lot.
+  Itinéraire, contact, menu et billetterie externe sont déjà intégrés.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
@@ -561,11 +569,10 @@ suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Faire arbitrer ADR-0031 avant d'implémenter HISTORY-001B, puis construire le protocole offline
-versionné avec révisions, tombstones et watermark avant toute outbox ou synchronisation Room. Les
+Raccorder EXPLORE-002B2B au RPC v2 dans les clients Android/iOS, avec mapping strict du curseur et
+sans classement client divergent. En parallèle, faire arbitrer ADR-0031 avant HISTORY-001B ; les
 recherches récentes restent conservées par conception pour l'assistant IA et la pertinence du fil,
-sous les plafonds et choix de personnalisation à arbitrer. EXPLORE-002B2A reste le lot produit
-indépendant suivant. OPS-001B ne démarre qu'après
+sous les plafonds et choix de personnalisation à arbitrer. OPS-001B ne démarre qu'après
 provisionnement staging ; avant d'activer `account-delete`, les AMR réelles et la politique des
 en-têtes/journaux doivent être qualifiées. Tout changement d'octets de la vidéo embarquée exige
 toujours une nouvelle release Android/iOS dans les Stores.

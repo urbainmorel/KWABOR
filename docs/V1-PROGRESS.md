@@ -8,12 +8,12 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 9 août 2026 |
-| Référence Git | Base du lot : `main` au merge `1c0c7059f4d69431d570535280ad9c35f7c7b1d7` de la PR `#55` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031 et `#55` autorité FAVORITES fusionnées ; client FAVORITES-001A2 présent dans ce lot |
+| Référence Git | Base du lot : `main` au merge `878ed8f067ca129fd6156de6395004fef501d8e6` de la PR `#56` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031, `#55` autorité FAVORITES et `#56` client FAVORITES fusionnées ; EXPLORE-002B2A présent dans ce lot |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599`, `30940684400`, `30945274481` et `31298370818` entièrement verts |
+| CI de la fusion | Runs post-fusion jusqu'à `31316774201` entièrement verts, dont Supabase, Gradle et iOS Debug/Staging/Release sur la fusion de `#56` |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -60,6 +60,9 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - FAVORITES-001A fournit la lecture propriétaire paginée et Profil → Favoris sur Android/iOS, avec
   filtres de type, ruban « Terminé », retrait, ouverture du détail, accessibilité et synchronisation
   bidirectionnelle avec Explore cloisonnée par compte et epoch de session.
+- EXPLORE-002B2A fournit dans le présent lot un RPC v2 séparé : popularité, proximité temporelle,
+  fenêtres événement UTC, bornes prix XOF, curseur keyset lié au snapshot et deux placements
+  sponsorisés au plus en tête. Le RPC v1 reste inchangé pour les clients Store existants.
 
 ## Incomplet ou absent
 
@@ -71,8 +74,8 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - La queue offline Like/Favori reste en mémoire et ne draine pas encore durablement après
   reconnexion ; Room et l'outbox persistante restent dans SYNC-001.
 - La recherche n'a pas encore de récents durables, d'autocomplétion ni de filtres avancés.
-- Explore n'applique pas encore le contrat final de popularité, dates, prix, placement et plafond
-  sponsorisé.
+- Android et iOS ne consomment pas encore le RPC Explore v2 ; le serveur porte le contrat dans le
+  présent lot, mais EXPLORE-002B2B doit raccorder les filtres sans reproduire le classement côté client.
 - Le détail ne fournit pas encore la carte intégrée, les avis, le partage public, le signalement ni
   le claim sécurisé. Les actions externes déjà intégrées ne couvrent pas ces fonctions.
 
@@ -144,11 +147,11 @@ dérivés, ni déploiement automatique d’environnement distant.
 
 ## Prochains lots bornés
 
-1. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
+1. **EXPLORE-002B2B — raccord mobile** : consommer le contrat v2 dans Android/iOS, conserver le
+   classement serveur et couvrir filtres, pagination, cache, hors-ligne et accessibilité.
+2. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
    protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
    résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.
-2. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
-   de dates et plafond sponsorisé avant de raccorder les filtres mobiles.
 
 Ces lots touchent des zones distinctes et évitent de recréer une pile d'intégration longue. Le
 nettoyage administratif des PR supersédées et la synchronisation documentaire ne doivent pas être

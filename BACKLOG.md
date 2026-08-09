@@ -171,7 +171,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       `30729830885` vert ; PR source fermée avec commentaire de supersession.
     - [ ] EXPLORE-002B2 — Figer la popularité, les placements sponsorisés et les intervalles de dates,
       puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
-      - [ ] EXPLORE-002B2A — Figer et tester côté serveur popularité, intervalles de dates, placement
+      - [x] EXPLORE-002B2A — Figer et tester côté serveur popularité, intervalles de dates, placement
         et plafond sponsorisé, sans raccorder d'UI dans ce lot.
       - [ ] EXPLORE-002B2B — Raccorder le contrat versionné aux filtres Android/iOS sans classement
         client divergent.
