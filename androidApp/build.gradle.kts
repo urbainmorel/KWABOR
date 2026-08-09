@@ -235,6 +235,10 @@ android {
         resValues = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -278,7 +282,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation(kotlin("test-junit"))
+    testImplementation("androidx.navigation:navigation-testing:2.9.8")
+    testImplementation("androidx.test:core:1.7.0")
+    testImplementation(compose.uiTestJUnit4)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("org.robolectric:robolectric:4.16")
 }
 
 val detektUnitTest by tasks.registering(Detekt::class) {

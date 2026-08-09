@@ -290,20 +290,6 @@ class DataCatalogRepositoryTest {
     }
 
     @Test
-    fun favoriteListing_delegatesAndMapsState() = runTest {
-        val dataSource = FakeCatalogDataSource(
-            interaction = listingViewerInteractionDto(favoritedByCurrentUser = true),
-        )
-        val repository = DataCatalogRepository(dataSource)
-
-        val result = repository.favoriteListing(CATALOG_LISTING_ID_ONE)
-
-        val interaction = assertIs<DomainResult.Success<ListingViewerInteraction>>(result).value
-        assertEquals(CATALOG_LISTING_ID_ONE, dataSource.lastInteractionListingId)
-        assertEquals(true, interaction.favoritedByViewer)
-    }
-
-    @Test
     fun blankListingInteractionId_mapsToValidationFailure() = runTest {
         val repository = DataCatalogRepository(FakeCatalogDataSource())
 
@@ -319,7 +305,7 @@ class DataCatalogRepositoryTest {
             FakeCatalogDataSource(interactionException = CatalogDataException.AuthenticationRequired()),
         )
 
-        val result = repository.favoriteListing(CATALOG_LISTING_ID_ONE)
+        val result = repository.likeListing(CATALOG_LISTING_ID_ONE)
 
         val failure = assertIs<DomainResult.Failure>(result)
         assertIs<DomainError.AuthenticationRequired>(failure.error)
@@ -409,10 +395,6 @@ private class FakeCatalogDataSource(
     override suspend fun likeListing(listingId: String): ListingViewerInteractionDto = runInteraction(listingId)
 
     override suspend fun unlikeListing(listingId: String): ListingViewerInteractionDto = runInteraction(listingId)
-
-    override suspend fun favoriteListing(listingId: String): ListingViewerInteractionDto = runInteraction(listingId)
-
-    override suspend fun unfavoriteListing(listingId: String): ListingViewerInteractionDto = runInteraction(listingId)
 
     private fun runInteraction(listingId: String): ListingViewerInteractionDto {
         interactionException?.let { exception -> throw exception }

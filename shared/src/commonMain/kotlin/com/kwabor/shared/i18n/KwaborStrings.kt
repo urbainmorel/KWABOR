@@ -188,6 +188,7 @@ data class KwaborStrings(
     val search: SearchStrings,
     val settings: SettingsStrings,
     val guideDiscovery: GuideDiscoveryStrings,
+    val favorites: FavoritesStrings,
     val detail: CatalogDetailStrings,
 )
 
@@ -395,5 +396,6 @@ private val frenchStrings = KwaborStrings(
     search = frenchSearchStrings,
     settings = frenchSettingsStrings,
     guideDiscovery = frenchGuideDiscoveryStrings,
+    favorites = frenchFavoritesStrings,
     detail = frenchCatalogDetailStrings,
 )

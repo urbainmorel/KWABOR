@@ -6,6 +6,7 @@ import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.shared.presentation.session.ViewerSessionScope
 
 private const val SAMPLE_MAIN_PRICE_XOF = 25_000L
 private const val SAMPLE_SECONDARY_PRICE_XOF = 5_000L
@@ -89,6 +90,8 @@ data class ExploreUiState(
     val interactionMessage: String? = null,
     val pendingAuthInteraction: PendingExploreAuthInteraction? = null,
     val queuedInteractions: List<QueuedExploreInteraction> = emptyList(),
+    internal val contentIsOffline: Boolean = false,
+    internal val viewerScope: ViewerSessionScope = ViewerSessionScope.InitialGuest,
 ) {
     val isPlacesTabSelected: Boolean
         get() = selectedTab == ExploreTab.Places

@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let favoritesStore: FavoritesStore
     let searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     @ObservedObject var catalogDetailStore: CatalogDetailStore
@@ -41,6 +42,7 @@ struct ContentView: View {
     init(
         bridge: KwaborSharedBridge,
         exploreStore: ExploreStore,
+        favoritesStore: FavoritesStore,
         searchStore: SearchStore,
         guideDiscoveryStore: GuideDiscoveryStore,
         catalogDetailStore: CatalogDetailStore,
@@ -80,6 +82,7 @@ struct ContentView: View {
     ) {
         self.bridge = bridge
         self.exploreStore = exploreStore
+        self.favoritesStore = favoritesStore
         self.searchStore = searchStore
         self.guideDiscoveryStore = guideDiscoveryStore
         self.catalogDetailStore = catalogDetailStore
@@ -124,6 +127,7 @@ struct ContentView: View {
                             destination: destination,
                             bridge: bridge,
                             exploreStore: exploreStore,
+                            favoritesStore: favoritesStore,
                             searchStore: searchStore,
                             guideDiscoveryStore: guideDiscoveryStore,
                             strings: strings,
@@ -288,6 +292,7 @@ private struct RootDestinationContent: View {
     let destination: RootDestination
     let bridge: KwaborSharedBridge
     let exploreStore: ExploreStore
+    let favoritesStore: FavoritesStore
     let searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let strings: OnboardingStrings
@@ -361,6 +366,8 @@ private struct RootDestinationContent: View {
                 title: settingsStrings.accountSectionTitle,
                 email: displayedAccountEmail
             )
+
+            FavoritesEntryLink(store: favoritesStore)
 
             NavigationLink {
                 AccountSettingsView(

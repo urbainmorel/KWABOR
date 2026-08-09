@@ -17,6 +17,7 @@ import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.AuthViewModelDependencies
 import com.kwabor.android.presentation.detail.CatalogDetailViewModel
 import com.kwabor.android.presentation.explore.ExploreViewModel
+import com.kwabor.android.presentation.favorites.FavoritesViewModel
 import com.kwabor.android.presentation.guide.GuideDiscoveryViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.presentation.search.SearchViewModel
@@ -69,6 +70,8 @@ internal class MainActivityAppFactory(
 
     fun createDependencies(authViewModel: AuthViewModel): KwaborAppDependencies = KwaborAppDependencies(
         exploreViewModel = createExploreViewModel(),
+        favoritesViewModel = createFavoritesViewModel(),
+        viewerSessionScopeTracker = compositionRoot.viewerSessionScopeTracker,
         searchViewModel = createSearchViewModel(),
         catalogDetailViewModel = createCatalogDetailViewModel(),
         guideDiscoveryViewModel = createGuideDiscoveryViewModel(),
@@ -89,11 +92,26 @@ internal class MainActivityAppFactory(
                     locationService = AndroidApproximateLocationService(activity.applicationContext),
                     strings = strings,
                     coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                    viewerSessionScopeTracker = compositionRoot.viewerSessionScopeTracker,
                     track = applicationState.observability::track,
                 )
             }
         },
     )[ExploreViewModel::class.java]
+
+    private fun createFavoritesViewModel(): FavoritesViewModel = ViewModelProvider(
+        owner = activity,
+        factory = viewModelFactory {
+            initializer {
+                FavoritesViewModel(
+                    presenter = compositionRoot.favoritesPresenter,
+                    strings = strings.favorites,
+                    coroutineScope = newViewModelScope(compositionRoot.dispatcherProvider),
+                    viewerSessionScopeTracker = compositionRoot.viewerSessionScopeTracker,
+                )
+            }
+        },
+    )[FavoritesViewModel::class.java]
 
     private fun createSearchViewModel(): SearchViewModel = ViewModelProvider(
         owner = activity,

@@ -2,14 +2,15 @@
 
 ## Phase actuelle
 
-Post-intégration V1 — les PR `#50`, `#51`, `#52`, `#53` et `#54` sont fusionnées dans `main`, l’état
-documentaire est resynchronisé et les prochains lots restent petits et indépendants.
+Livraison V1 incrémentale — l'autorité Supabase Favoris de la PR `#55` est fusionnée et le présent
+lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par session.
 
-## Snapshot courant — 4 août 2026
+## Snapshot courant — 9 août 2026
 
-- `main` pointe sur le commit de fusion `94556a4538e3d2de643573d814718e3f0447e8f8` de la PR `#54`.
-  Il inclut la resynchronisation d'état et ADR-0031 proposé, l’autorité Supabase HISTORY-001A, la
-  fondation domaine de `#51`, l’optimisation CI de `#52` et l’intégration V1 de `#50`.
+- La base de ce lot est le commit de fusion `1c0c7059f4d69431d570535280ad9c35f7c7b1d7` de la PR `#55`.
+  Elle inclut l'autorité Supabase FAVORITES-001A1, la resynchronisation d'état et ADR-0031 proposé,
+  l'autorité HISTORY-001A, la fondation domaine de `#51`, l'optimisation CI de `#52` et
+  l'intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
@@ -17,14 +18,15 @@ documentaire est resynchronisé et les prochains lots restent petits et indépen
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
 - Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`),
-  `30940684400` (`#53`) et `30945274481` (`#54`) sont verts pour l’intégrité, Gradle, Supabase,
-  l’Edge Function et Xcode simulateur Debug/Staging/Release. CI-001 force toujours iOS sur `main` et
-  ne l’omet en PR que pour les périmètres explicitement sûrs ; tout chemin inconnu reste fail-safe.
+  `30940684400` (`#53`), `30945274481` (`#54`) et `31298370818` (`#55`) sont verts pour
+  l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
+  force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
+  chemin inconnu reste fail-safe.
 - Sont désormais présents dans `main` : sécurité/architecture de la pile, intro Store-only,
   authentification et onboarding compacts, paramètres de compte et de confidentialité, persistance
   locale durcie, Explore Android/iOS offline-first, recherche lexicale Android/iOS, détail natif,
-  actions externes, découverte des guides et deep link interne de fiche.
-- Ne sont pas terminés : racines Social/Ajouter/Notifications, écran Favoris et outbox durable,
+  actions externes, découverte des guides, deep link interne de fiche et Profil → Favoris natif.
+- Ne sont pas terminés : racines Social/Ajouter/Notifications, outbox durable,
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
   classement/sponsoring final, carte, avis, partage public, signalement, claim, IA, contribution,
   B2B, paiement et notifications.
@@ -48,11 +50,14 @@ documentaire est resynchronisé et les prochains lots restent petits et indépen
   automatique d’environnement distant n’est activé. Le run post-fusion `30940684400` est également
   entièrement vert sur le SHA `8571752e6febcd64d4a74d0e3b55125dce70a308`, avec validation iOS
   complète forcée sur `main`.
-- FAVORITES-001A1 livre l'autorité Supabase propriétaire : projection de cartes paginée par dernier
-  ajout, filtre de type, événements terminés conservés, aucun avantage sponsorisé et mutation V1
-  idempotente. Une fiche dépubliée reste liée mais masquée et retirable ; les anciennes RPC restent
-  des wrappers dépréciés jusqu'au raccord KMP atomique. ADR-0032 borne aussi l'usage IA aux favoris
-  actifs sans journal d'activité. Room, outbox, repository/runtime et UI restent ouverts.
+- FAVORITES-001A livre désormais l'autorité Supabase propriétaire et sa consommation mobile :
+  projection de cartes paginée par dernier ajout, filtre de type, événements terminés conservés,
+  mutation idempotente et écran Profil → Favoris Android/iOS. Le runtime partagé clôt les réponses,
+  effets et piles privées par scope de session, synchronise Explore dans les deux sens et conserve
+  Like indépendant de Favori. Une fiche dépubliée reste liée mais masquée et retirable ; les RPC
+  legacy restent disponibles pour les anciennes versions Store. ADR-0032 borne l'usage IA aux
+  favoris actifs sans journal d'activité et ADR-0033 fixe la cohérence client. Room et l'outbox
+  persistante restent ouvertes dans SYNC-001.
 
 ## Historique des tâches terminées
 
@@ -466,11 +471,12 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-HISTORY-001A livre la politique et l’autorité serveur bornée sans UI ni protocole offline. ADR-0031
-propose le protocole versionné de HISTORY-001B, mais tous ses gates Produit, Sécurité,
-Juridique/DPO et Opérations restent à arbitrer avant Room ou l’outbox. FAVORITES-001A et
-EXPLORE-002B2A peuvent avancer séparément sans recréer une pile d’intégration longue. STAB-002B
-reste suspendu à la décision structurante sur les cinq racines V1.
+FAVORITES-001A est livré de l'autorité Supabase aux vues Android/iOS ; sa persistance offline durable
+reste volontairement dans SYNC-001. HISTORY-001A livre la politique et l'autorité serveur bornée sans
+UI ni protocole offline. ADR-0031 propose le protocole versionné de HISTORY-001B, mais tous ses gates
+Produit, Sécurité, Juridique/DPO et Opérations restent à arbitrer avant Room ou l'outbox.
+EXPLORE-002B2A peut avancer séparément sans recréer une pile d'intégration longue. STAB-002B reste
+suspendu à la décision structurante sur les cinq racines V1.
 
 ## Blocages / limites
 
@@ -554,10 +560,11 @@ reste suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Faire arbitrer ADR-0031 avant d’implémenter HISTORY-001B, puis construire le protocole offline
-versionné avec révisions, tombstones et watermark avant toute outbox ou synchronisation Room.
-FAVORITES-001A et EXPLORE-002B2A restent les deux lots indépendants suivants. OPS-001B ne démarre
-qu'après
+Faire arbitrer ADR-0031 avant d'implémenter HISTORY-001B, puis construire le protocole offline
+versionné avec révisions, tombstones et watermark avant toute outbox ou synchronisation Room. Les
+recherches récentes restent conservées par conception pour l'assistant IA et la pertinence du fil,
+sous les plafonds et choix de personnalisation à arbitrer. EXPLORE-002B2A reste le lot produit
+indépendant suivant. OPS-001B ne démarre qu'après
 provisionnement staging ; avant d'activer `account-delete`, les AMR réelles et la politique des
 en-têtes/journaux doivent être qualifiées. Tout changement d'octets de la vidéo embarquée exige
 toujours une nouvelle release Android/iOS dans les Stores.

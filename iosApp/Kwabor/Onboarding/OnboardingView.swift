@@ -4,9 +4,11 @@ import SwiftUI
 struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
     @ObservedObject var exploreStore: ExploreStore
+    let favoritesStore: FavoritesStore
     @ObservedObject var searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let catalogDetailStore: CatalogDetailStore
+    let onViewerContextChanged: (String?) -> ViewerSessionScope
     @State private var contextualSoftWallRequest: ExploreAuthenticationRequest?
 
     var body: some View {
@@ -22,6 +24,7 @@ struct OnboardingView: View {
                 ContentView(
                     bridge: coordinator.bridge,
                     exploreStore: exploreStore,
+                    favoritesStore: favoritesStore,
                     searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     catalogDetailStore: catalogDetailStore,
@@ -44,13 +47,24 @@ struct OnboardingView: View {
                     },
                     onPendingProtectedDestinationConsumed: coordinator.consumePendingProtectedDestination,
                     onExploreAuthenticationRequired: presentContextualSoftWall,
-                    onSignOut: coordinator.signOutCurrentAccount,
+                    onSignOut: {
+                        coordinator.signOutCurrentAccount()
+                        if coordinator.isSigningOutAccount {
+                            applyViewerContext(nil)
+                        }
+                    },
                     onDismissSignOutError: coordinator.clearAccountSignOutError,
                     onAccountDeletionWillStart: coordinator.prepareForAccountDeletion,
                     onAccountDeletionStateChanged: {
                         coordinator.accountDeletionStateChanged(isInProgress: $0)
+                        applyViewerContext(
+                            $0 ? nil : coordinator.exploreViewerID
+                        )
                     },
-                    onAccountDeleted: coordinator.accountDeletionCompleted,
+                    onAccountDeleted: {
+                        coordinator.accountDeletionCompleted()
+                        applyViewerContext(nil)
+                    },
                     onObservabilityConsentChanged: coordinator.updateObservabilityConsent,
                     rootDeepLinkDelivery: coordinator.pendingRootDeepLinkDelivery,
                     onProtectedRootDeepLinkTransferred: {
@@ -106,10 +120,15 @@ struct OnboardingView: View {
             Text(coordinator.promoterActivationErrorMessage ?? coordinator.strings.authPromoterInviteInvalid)
         }
         .onAppear {
-            exploreStore.updateViewerContext(coordinator.exploreViewerID)
+            applyViewerContext(coordinator.exploreViewerID)
         }
         .onChange(of: coordinator.exploreViewerID) { _, viewerID in
-            exploreStore.updateViewerContext(viewerID)
+            applyViewerContext(viewerID)
+        }
+        .onChange(of: coordinator.isSigningOutAccount) { _, isSigningOut in
+            applyViewerContext(
+                isSigningOut ? nil : coordinator.exploreViewerID
+            )
         }
         .onChange(of: exploreStore.authenticationRequest?.id) { _, requestID in
             if requestID == nil {
@@ -158,6 +177,14 @@ struct OnboardingView: View {
 
     private func presentContextualSoftWall(_ request: ExploreAuthenticationRequest) {
         contextualSoftWallRequest = request
+    }
+
+    private func applyViewerContext(_ accountID: String?) {
+        exploreStore.prepareViewerContext(accountID)
+        favoritesStore.prepareViewerContext(accountID)
+        let scope = onViewerContextChanged(accountID)
+        exploreStore.commitViewerScope(scope)
+        favoritesStore.commitViewerScope(scope)
     }
 }
 

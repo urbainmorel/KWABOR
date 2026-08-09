@@ -9,6 +9,7 @@ struct KwaborApp: App {
     private let compositionRoot: IosKwaborCompositionRoot
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
+    @StateObject private var favoritesStore: FavoritesStore
     @StateObject private var searchStore: SearchStore
     @StateObject private var guideDiscoveryStore: GuideDiscoveryStore
     @StateObject private var catalogDetailStore: CatalogDetailStore
@@ -32,7 +33,27 @@ struct KwaborApp: App {
             onProtectedActionReplayed: observability.track
         )
         let catalogDetailStore = CatalogDetailStore(controller: compositionRoot.catalogDetailController)
+        let favoritesStore = FavoritesStore(
+            controller: compositionRoot.favoritesController,
+            commonStrings: exploreStore.strings,
+            onListingOpen: catalogDetailStore.open,
+            onFavoriteChanged: { [weak exploreStore] listingID, favorited, scope in
+                exploreStore?.applyFavoriteState(
+                    listingID: listingID,
+                    favorited: favorited,
+                    scope: scope
+                )
+            }
+        )
+        exploreStore.setFavoriteChangeHandler { [weak favoritesStore] listingID, favorited, scope in
+            favoritesStore?.applyFavoriteState(
+                listingID: listingID,
+                favorited: favorited,
+                scope: scope
+            )
+        }
         _exploreStore = StateObject(wrappedValue: exploreStore)
+        _favoritesStore = StateObject(wrappedValue: favoritesStore)
         _catalogDetailStore = StateObject(wrappedValue: catalogDetailStore)
         _searchStore = StateObject(
             wrappedValue: SearchStore(
@@ -67,9 +88,16 @@ struct KwaborApp: App {
             OnboardingView(
                 coordinator: coordinator,
                 exploreStore: exploreStore,
+                favoritesStore: favoritesStore,
                 searchStore: searchStore,
                 guideDiscoveryStore: guideDiscoveryStore,
-                catalogDetailStore: catalogDetailStore
+                catalogDetailStore: catalogDetailStore,
+                onViewerContextChanged: { accountID in
+                    compositionRoot.updateViewerSessionScope(
+                        accountId: accountID,
+                        accountSetupComplete: accountID != nil
+                    )
+                }
             )
                 .onOpenURL { url in
                     if !GIDSignIn.sharedInstance.handle(url) {

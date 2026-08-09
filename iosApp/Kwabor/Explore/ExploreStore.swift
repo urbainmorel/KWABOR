@@ -26,10 +26,12 @@ final class ExploreStore: ObservableObject {
     private let controller: IosExploreController
     private let locationProvider: ApproximateLocationProviding
     private let onProtectedActionReplayed: (AnalyticsEvent) -> Void
+    private var onFavoriteChanged: (String, Bool, ViewerSessionScope) -> Void
     private var paginationGuard = ExplorePaginationGuard()
     private var locationTask: Task<Void, Never>?
     private var lastAnnouncement: String?
     private var lastViewerID: String?
+    private var currentViewerScope: ViewerSessionScope?
     private var hasAppliedViewerContext = false
     private var authenticationRequestRevision = 0
 
@@ -38,11 +40,13 @@ final class ExploreStore: ObservableObject {
     init(
         controller: IosExploreController,
         locationProvider: ApproximateLocationProviding? = nil,
-        onProtectedActionReplayed: @escaping (AnalyticsEvent) -> Void = { _ in }
+        onProtectedActionReplayed: @escaping (AnalyticsEvent) -> Void = { _ in },
+        onFavoriteChanged: @escaping (String, Bool, ViewerSessionScope) -> Void = { _, _, _ in }
     ) {
         self.controller = controller
         self.locationProvider = locationProvider ?? CoreLocationApproximateLocationProvider()
         self.onProtectedActionReplayed = onProtectedActionReplayed
+        self.onFavoriteChanged = onFavoriteChanged
         state = controller.currentState
         strings = controller.strings
         isConfigured = controller.isConfigured
@@ -54,12 +58,25 @@ final class ExploreStore: ObservableObject {
         controller.unobserve()
     }
 
-    func updateViewerContext(_ viewerID: String?) {
+    func prepareViewerContext(_ rawViewerID: String?) {
+        let viewerID = normalizedViewerID(rawViewerID)
         guard !hasAppliedViewerContext || viewerID != lastViewerID else { return }
         hasAppliedViewerContext = true
         lastViewerID = viewerID
+        currentViewerScope = nil
+        authenticationRequest = nil
         paginationGuard.reset()
-        controller.interactionActions.updateViewerContext(viewerId: viewerID)
+    }
+
+    func commitViewerScope(_ scope: ViewerSessionScope) {
+        guard scope.accountId == lastViewerID else { return }
+        currentViewerScope = scope
+    }
+
+    func setFavoriteChangeHandler(
+        _ handler: @escaping (String, Bool, ViewerSessionScope) -> Void
+    ) {
+        onFavoriteChanged = handler
     }
 
     func selectPlacesTab() {
@@ -135,16 +152,31 @@ final class ExploreStore: ObservableObject {
     }
 
     func toggleLike(_ listingID: String) {
+        guard currentViewerScope != nil else { return }
         controller.interactionActions.toggleLike(listingId: listingID)
     }
 
     func toggleFavorite(_ listingID: String) {
+        guard currentViewerScope != nil else { return }
         controller.interactionActions.toggleFavorite(listingId: listingID)
+    }
+
+    func applyFavoriteState(
+        listingID: String,
+        favorited: Bool,
+        scope: ViewerSessionScope
+    ) {
+        guard matchesCurrentViewerScope(scope) else { return }
+        controller.interactionActions.applyFavoriteState(
+            listingId: listingID,
+            favorited: favorited,
+            scope: scope
+        )
     }
 
     func clearPendingAuthentication() {
         authenticationRequest = nil
-        controller.interactionActions.updateViewerContext(viewerId: nil)
+        controller.interactionActions.clearPendingAuthentication()
     }
 
     private func observeController() {
@@ -157,6 +189,12 @@ final class ExploreStore: ObservableObject {
             effectObserver: { [weak self] effect in
                 MainActor.assumeIsolated {
                     self?.accept(effect)
+                }
+            },
+            favoriteObserver: { [weak self] listingID, favorited, scope in
+                MainActor.assumeIsolated {
+                    guard let self, self.matchesCurrentViewerScope(scope) else { return }
+                    self.onFavoriteChanged(listingID, favorited.boolValue, scope)
                 }
             }
         )
@@ -171,15 +209,17 @@ final class ExploreStore: ObservableObject {
             paginationGuard.reset()
         }
         state = updatedState
-        publishAuthenticationRequestIfNeeded(updatedState.pendingAuthInteraction)
         publishAnnouncementIfNeeded(previousState: previousState, updatedState: updatedState)
     }
 
     private func accept(_ effect: IosExploreEffect) {
+        if effect.requestsLocation {
+            resolveLocation()
+            return
+        }
+        guard let scope = effect.scope, matchesCurrentViewerScope(scope) else { return }
         if effect.requiresAuthentication {
             publishAuthenticationRequestIfNeeded(state.pendingAuthInteraction)
-        } else if effect.requestsLocation {
-            resolveLocation()
         } else if effect.replaysProtectedAction {
             authenticationRequest = nil
             if let event = effect.replayAnalyticsEvent {
@@ -206,6 +246,17 @@ final class ExploreStore: ObservableObject {
             action: action,
             suggestedCityID: pending.suggestedCityId
         )
+    }
+
+    private func matchesCurrentViewerScope(_ scope: ViewerSessionScope) -> Bool {
+        guard let currentViewerScope else { return false }
+        return scope.accountId == currentViewerScope.accountId &&
+            scope.epoch == currentViewerScope.epoch
+    }
+
+    private func normalizedViewerID(_ rawValue: String?) -> String? {
+        let candidate = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return candidate.isEmpty ? nil : candidate
     }
 
     private func resolveLocation() {

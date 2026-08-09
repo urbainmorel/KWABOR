@@ -95,20 +95,6 @@ internal class SupabaseCatalogDataSource(
         ).decodeSingle()
     }
 
-    override suspend fun favoriteListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
-        postgrest.rpc(
-            function = "add_listing_to_favorites",
-            parameters = ListingInteractionRpcDto(listingId = listingId),
-        ).decodeSingle()
-    }
-
-    override suspend fun unfavoriteListing(listingId: String): ListingViewerInteractionDto = runPostgrest {
-        postgrest.rpc(
-            function = "remove_listing_from_favorites",
-            parameters = ListingInteractionRpcDto(listingId = listingId),
-        ).decodeSingle()
-    }
-
     private suspend fun loadListingSummaryPage(
         filters: ListingFilters,
         page: ListingPageRequest,

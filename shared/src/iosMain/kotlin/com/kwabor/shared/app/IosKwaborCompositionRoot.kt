@@ -4,6 +4,8 @@ import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
 import com.kwabor.shared.data.local.createIosKwaborDatabaseBuilder
 import com.kwabor.shared.data.preferences.createIosAppPreferencesStorage
+import com.kwabor.shared.presentation.session.ViewerSessionScope
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 
 class IosKwaborCompositionRoot(
     environmentName: String?,
@@ -23,11 +25,18 @@ class IosKwaborCompositionRoot(
         },
     )
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
+    private val viewerSessionScopeTracker = sharedRoot?.viewerSessionScopeTracker ?: ViewerSessionScopeTracker()
 
     val bridge = KwaborSharedBridge(hasCatalogConfiguration = sharedRoot != null)
     val exploreController = IosExploreController(
         presenter = sharedRoot?.explorePresenter,
         dispatcherProvider = dispatcherProvider,
+        viewerSessionScopeTracker = viewerSessionScopeTracker,
+    )
+    val favoritesController = IosFavoritesController(
+        presenter = sharedRoot?.favoritesPresenter,
+        dispatcherProvider = dispatcherProvider,
+        viewerSessionScopeTracker = viewerSessionScopeTracker,
     )
     val searchController = IosSearchController(
         presenter = sharedRoot?.searchPresenter,
@@ -54,8 +63,16 @@ class IosKwaborCompositionRoot(
         dispatcherProvider = dispatcherProvider,
     )
 
+    fun updateViewerSessionScope(accountId: String?, accountSetupComplete: Boolean): ViewerSessionScope {
+        val scope = viewerSessionScopeTracker.update(accountId, accountSetupComplete)
+        exploreController.interactionActions.updateViewerContext(scope)
+        favoritesController.actions.updateViewerContext(scope)
+        return scope
+    }
+
     fun close() {
         exploreController.close()
+        favoritesController.close()
         searchController.close()
         guideDiscoveryController.close()
         catalogDetailController.close()

@@ -1,8 +1,5 @@
 package com.kwabor.android.app
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,9 +41,9 @@ import com.kwabor.android.presentation.auth.AuthSurface
 import com.kwabor.android.presentation.auth.AuthViewModel
 import com.kwabor.android.presentation.auth.PromoterActivationUiState
 import com.kwabor.android.presentation.detail.CatalogDetailViewModel
-import com.kwabor.android.presentation.explore.ExploreEffect
 import com.kwabor.android.presentation.explore.ExploreIntent
 import com.kwabor.android.presentation.explore.ExploreViewModel
+import com.kwabor.android.presentation.favorites.FavoritesViewModel
 import com.kwabor.android.presentation.guide.GuideDiscoveryViewModel
 import com.kwabor.android.presentation.onboarding.OnboardingEffect
 import com.kwabor.android.presentation.onboarding.OnboardingIntent
@@ -72,6 +69,7 @@ import com.kwabor.shared.presentation.navigation.RootNavigationDestination
 import com.kwabor.shared.presentation.navigation.label
 import com.kwabor.shared.presentation.onboarding.OnboardingEntry
 import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
@@ -157,6 +155,8 @@ private fun SoftWallOverlay(platformState: AuthPlatformUiState, strings: KwaborS
 
 internal data class KwaborAppDependencies(
     val exploreViewModel: ExploreViewModel,
+    val favoritesViewModel: FavoritesViewModel,
+    val viewerSessionScopeTracker: ViewerSessionScopeTracker,
     val searchViewModel: SearchViewModel,
     val catalogDetailViewModel: CatalogDetailViewModel,
     val guideDiscoveryViewModel: GuideDiscoveryViewModel,
@@ -222,6 +222,8 @@ private data class CollectedAuthenticationState(
 
 internal data class HomeShellDependencies(
     val exploreViewModel: ExploreViewModel,
+    val favoritesViewModel: FavoritesViewModel,
+    val viewerSessionScopeTracker: ViewerSessionScopeTracker,
     val searchViewModel: SearchViewModel,
     val catalogDetailViewModel: CatalogDetailViewModel,
     val guideDiscoveryViewModel: GuideDiscoveryViewModel,
@@ -233,6 +235,8 @@ internal data class HomeShellDependencies(
 ) {
     constructor(dependencies: KwaborAppDependencies) : this(
         exploreViewModel = dependencies.exploreViewModel,
+        favoritesViewModel = dependencies.favoritesViewModel,
+        viewerSessionScopeTracker = dependencies.viewerSessionScopeTracker,
         searchViewModel = dependencies.searchViewModel,
         catalogDetailViewModel = dependencies.catalogDetailViewModel,
         guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
@@ -249,7 +253,7 @@ private object AuthEffectDispatcher {
         { effect, pendingDestinationKey, dependencies, actions ->
             when (effect) {
                 AuthEffect.AuthenticationCompleted -> {
-                    dependencies.syncExploreViewerContext()
+                    dependencies.syncViewerSessionScope()
                     val destination = pendingDestinationKey?.let(RootNavigationDestination::fromRouteKey)
                     if (destination != null) {
                         actions.onAuthenticatedDestinationRequested(destination)
@@ -257,27 +261,27 @@ private object AuthEffectDispatcher {
                     actions.onDestinationResolved()
                 }
                 AuthEffect.GuestContinuationSelected -> {
+                    dependencies.clearViewerSessionScope()
                     actions.onDestinationResolved()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                 }
                 AuthEffect.SignedOut -> {
+                    dependencies.clearViewerSessionScope()
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
                     actions.onAuthenticationEnded()
                     actions.onDestinationResolved()
                     actions.onDeepLinksReset()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.SignOutNavigationHandled)
                 }
                 AuthEffect.AccountDeleted -> {
+                    dependencies.clearViewerSessionScope()
                     dependencies.onboardingViewModel.onIntent(OnboardingIntent.GuestConfirmed)
                     actions.onAuthenticationEnded()
                     actions.onDestinationResolved()
                     actions.onDeepLinksReset()
-                    dependencies.exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
                     dependencies.authViewModel.onIntent(AuthIntent.AccountDeletionNavigationHandled)
                 }
                 is AuthEffect.PromoterActivationCompleted -> {
-                    dependencies.syncExploreViewerContext()
+                    dependencies.syncViewerSessionScope()
                     actions.onAuthenticatedDestinationRequested(RootNavigationDestination.Home)
                     actions.onDestinationResolved()
                     actions.onDeepLinksReset()
@@ -405,6 +409,10 @@ private fun KwaborAppContent(
     onDeepLinksReset: () -> Unit,
 ) {
     val navController = rememberNavController()
+    FavoritesNavigationPrivacyEffect(
+        accountId = state.auth.viewerAccountId,
+        navController = navController,
+    )
     var pendingDestinationKey by rememberSaveable { mutableStateOf<String?>(null) }
     val requestDestination = rootDestinationRequester(
         navController,
@@ -443,11 +451,18 @@ private fun KwaborHomeEffectHandlers(
     actions: KwaborAppEffectActions,
 ) {
     DeepLinkEffectHandler(deepLink = state.deepLink, actions = actions.deepLink)
-    ExploreViewerContextHandler(
-        viewerId = state.auth.exploreViewerId,
-        exploreViewModel = dependencies.exploreViewModel,
+    ViewerSessionScopeHandler(
+        accountId = state.auth.viewerAccountId,
+        accountSetupComplete = state.auth.isAuthenticated,
+        dependencies = dependencies,
     )
     ExploreEffectHandler(dependencies = dependencies)
+    FavoritesEffectHandler(
+        favoritesViewModel = dependencies.favoritesViewModel,
+        exploreViewModel = dependencies.exploreViewModel,
+        catalogDetailViewModel = dependencies.catalogDetailViewModel,
+        viewerSessionScopeTracker = dependencies.viewerSessionScopeTracker,
+    )
     SearchEffectHandler(dependencies = dependencies)
     GuideDiscoveryEffectHandler(
         guideDiscoveryViewModel = dependencies.guideDiscoveryViewModel,
@@ -523,6 +538,13 @@ private fun KwaborRootNavHost(
         )
         rootAnchorRoutes(paddingValues = paddingValues, strings = strings)
         profileRoute(navController, paddingValues, strings, state)
+        favoritesChildRoute(
+            navController = navController,
+            viewModel = dependencies.favoritesViewModel,
+            strings = strings,
+            mediaUrlPolicy = dependencies.listingMediaUrlPolicy,
+            paddingValues = paddingValues,
+        )
         settingsRoute(navController, paddingValues, strings, dependencies, state)
     }
 }
@@ -568,34 +590,6 @@ private inline fun <reified Route : Any> NavGraphBuilder.rootAnchor(
 }
 
 @Composable
-private fun ExploreEffectHandler(dependencies: HomeShellDependencies) {
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        dependencies.exploreViewModel.onIntent(ExploreIntent.LocationPermissionResult(granted))
-    }
-    LaunchedEffect(dependencies.exploreViewModel, dependencies.authViewModel) {
-        dependencies.exploreViewModel.effects.collect { effect ->
-            when (effect) {
-                is ExploreEffect.AuthenticationRequired -> {
-                    dependencies.authViewModel.onIntent(
-                        AuthIntent.OpenSoftWall(
-                            AuthSoftWallContext(
-                                action = effect.kind.toProtectedAction(),
-                                suggestedCityId = effect.suggestedCityId,
-                            ),
-                        ),
-                    )
-                }
-                ExploreEffect.RequestLocationPermission -> {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun AuthEffectHandler(
     pendingDestinationKey: String?,
     dependencies: HomeShellDependencies,
@@ -603,7 +597,11 @@ private fun AuthEffectHandler(
 ) {
     val currentPendingDestinationKey by rememberUpdatedState(pendingDestinationKey)
     val currentActions by rememberUpdatedState(actions)
-    LaunchedEffect(dependencies.authViewModel, dependencies.exploreViewModel) {
+    LaunchedEffect(
+        dependencies.authViewModel,
+        dependencies.exploreViewModel,
+        dependencies.favoritesViewModel,
+    ) {
         dependencies.authViewModel.effects.collect { effect ->
             AuthEffectDispatcher.dispatch(effect, currentPendingDestinationKey, dependencies, currentActions)
         }
@@ -652,11 +650,20 @@ private fun kwaborAppEffectActions(
     ),
 )
 
-private val AuthUiState.exploreViewerId: String?
+private val AuthUiState.viewerAccountId: String?
     get() = currentSession?.userId?.takeIf { isAuthenticated }
 
-private fun HomeShellDependencies.syncExploreViewerContext() {
-    exploreViewModel.onIntent(ExploreIntent.ViewerContextChanged(authViewModel.state.value.exploreViewerId))
+private fun HomeShellDependencies.syncViewerSessionScope() {
+    val auth = authViewModel.state.value
+    publishViewerSessionScope(
+        accountId = auth.viewerAccountId,
+        accountSetupComplete = auth.isAuthenticated,
+    )
+}
+
+private fun HomeShellDependencies.clearViewerSessionScope() {
+    publishViewerSessionScope(accountId = null, accountSetupComplete = false)
+    exploreViewModel.onIntent(ExploreIntent.ClearPendingAuthentication)
 }
 
 private val rootDestinationRequester =

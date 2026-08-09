@@ -27,10 +27,6 @@ internal interface CatalogInteractionDataSource {
     suspend fun likeListing(listingId: String): ListingViewerInteractionDto
 
     suspend fun unlikeListing(listingId: String): ListingViewerInteractionDto
-
-    suspend fun favoriteListing(listingId: String): ListingViewerInteractionDto
-
-    suspend fun unfavoriteListing(listingId: String): ListingViewerInteractionDto
 }
 
 internal sealed class CatalogDataException(

@@ -30,8 +30,4 @@ interface CatalogInteractionRepository {
     suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction>
 
     suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction>
-
-    suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction>
-
-    suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction>
 }

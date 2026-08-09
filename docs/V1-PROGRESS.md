@@ -7,13 +7,13 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 
 | Élément | État vérifié |
 | --- | --- |
-| Date du snapshot | 4 août 2026 |
-| Référence Git | `main` au merge `94556a4538e3d2de643573d814718e3f0447e8f8` de la PR `#54` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY et `#54` état/ADR-0031 fusionnées |
+| Date du snapshot | 9 août 2026 |
+| Référence Git | Base du lot : `main` au merge `1c0c7059f4d69431d570535280ad9c35f7c7b1d7` de la PR `#55` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031 et `#55` autorité FAVORITES fusionnées ; client FAVORITES-001A2 présent dans ce lot |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599`, `30940684400` et `30945274481` entièrement verts |
+| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599`, `30940684400`, `30945274481` et `31298370818` entièrement verts |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -57,16 +57,19 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
   email, menu et billetterie externe.
 - GUIDE-001B et ACTIONS-001C1 fournissent la découverte publique des guides et le deep link interne
   strict `kwabor://listing/<uuid>`.
+- FAVORITES-001A fournit la lecture propriétaire paginée et Profil → Favoris sur Android/iOS, avec
+  filtres de type, ruban « Terminé », retrait, ouverture du détail, accessibilité et synchronisation
+  bidirectionnelle avec Explore cloisonnée par compte et epoch de session.
 
 ## Incomplet ou absent
 
 ### Parcours visibles
 
 - Les racines Social, Ajouter et Notifications affichent encore le placeholder
-  `Socle applicatif en place` sur Android et iOS. Le Profil reste limité à l'identité et à l'accès
-  aux Paramètres. Ces surfaces interdisent une release publique.
-- Aucun écran Favoris ne permet de retrouver les fiches enregistrées. La queue offline Like/Favori
-  reste en mémoire et ne draine pas encore durablement après reconnexion.
+  `Socle applicatif en place` sur Android et iOS. Le Profil reste limité à l'identité, aux Favoris et
+  à l'accès aux Paramètres. Ces surfaces interdisent une release publique.
+- La queue offline Like/Favori reste en mémoire et ne draine pas encore durablement après
+  reconnexion ; Room et l'outbox persistante restent dans SYNC-001.
 - La recherche n'a pas encore de récents durables, d'autocomplétion ni de filtres avancés.
 - Explore n'applique pas encore le contrat final de popularité, dates, prix, placement et plafond
   sponsorisé.
@@ -144,11 +147,7 @@ dérivés, ni déploiement automatique d’environnement distant.
 1. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
    protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
    résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.
-2. **FAVORITES-001A2 — consommation mobile des favoris** : l'autorité Supabase FAVORITES-001A1
-   fournit désormais lecture propriétaire keyset, mutation idempotente, retrait dépublié et purge
-   concurrente ; raccorder repository/runtime partagé et écran Android/iOS minimal ouvrant le détail,
-   avec Room et outbox persistante dans un lot séparé.
-3. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
+2. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
    de dates et plafond sponsorisé avant de raccorder les filtres mobiles.
 
 Ces lots touchent des zones distinctes et évitent de recréer une pile d'intégration longue. Le

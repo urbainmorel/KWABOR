@@ -15,6 +15,7 @@ import com.kwabor.shared.domain.explore.ExploreFeedQuery
 import com.kwabor.shared.domain.explore.ExploreFeedRepository
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
+import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.preferences.AppPreferences
@@ -167,9 +168,11 @@ private fun presenter(
     feedRepository: ExploreFeedRepository,
     preferencesRepository: AppPreferencesRepository? = null,
     interactionRepository: CatalogInteractionRepository = EmptyInteractionRepository,
+    favoritesRepository: FavoritesRepository = RecordingExploreFavoritesRepository(),
 ): ExplorePresenter = ExplorePresenter(
     exploreFeedRepository = feedRepository,
     catalogInteractionRepository = interactionRepository,
+    favoritesRepository = favoritesRepository,
     appPreferencesRepository = preferencesRepository,
     clockProvider = TestClock,
 )
@@ -218,12 +221,6 @@ private object EmptyInteractionRepository : CatalogInteractionRepository {
         DomainResult.Failure(DomainError.AuthenticationRequired())
 
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        DomainResult.Failure(DomainError.AuthenticationRequired())
-
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        DomainResult.Failure(DomainError.AuthenticationRequired())
-
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
         DomainResult.Failure(DomainError.AuthenticationRequired())
 }
 
