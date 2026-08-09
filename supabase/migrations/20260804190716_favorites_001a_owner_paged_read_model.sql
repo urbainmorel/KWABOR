@@ -453,14 +453,7 @@ on function public.list_favorite_listing_summaries_v1(text, text, integer)
 to authenticated;
 grant execute
 on function public.set_listing_favorite_v1(uuid, boolean)
-to authenticated, service_role;
-
--- The released legacy RPCs have always retained service_role EXECUTE. Their
--- implementation now delegates to the V1 setter, so keep that real invocation
--- path operational as well as its catalogue-visible ACL.
-grant execute
-on function app_private.require_completed_onboarding()
-to service_role;
+to authenticated;
 
 -- Compatibility wrappers stay executable for the currently released KMP
 -- clients. Their removal and the direct table ACL migration require one
@@ -578,22 +571,22 @@ $$;
 comment on function public.remove_listing_from_favorites(uuid) is
   'DEPRECATED compatibility wrapper. It remains idempotent and can remove a relation whose listing is no longer published.';
 
--- Supabase CLI 2.111 fresh role graphs do not preserve the historical
--- service_role inheritance observed by older local stacks. Restate every
--- compatibility grant explicitly so clean and upgraded environments agree.
+-- Only authenticated Store clients consume these legacy RPCs. service_role is
+-- intentionally excluded: supporting it would require broad direct table ACLs
+-- on favorites and likes despite there being no server-side caller.
 revoke all
 on function public.add_listing_to_favorites(uuid)
-from public, anon;
+from public, anon, service_role;
 revoke all
 on function public.remove_listing_from_favorites(uuid)
-from public, anon;
+from public, anon, service_role;
 
 grant execute
 on function public.add_listing_to_favorites(uuid)
-to authenticated, service_role;
+to authenticated;
 grant execute
 on function public.remove_listing_from_favorites(uuid)
-to authenticated, service_role;
+to authenticated;
 
 -- Keep the owner-only favorites RLS policies until the KMP migration is
 -- shipped as one backward-compatible lot.

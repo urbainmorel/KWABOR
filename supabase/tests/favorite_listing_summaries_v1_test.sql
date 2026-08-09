@@ -13,7 +13,7 @@ begin
 end;
 $$;
 
-select plan(83);
+select plan(80);
 
 insert into auth.users (
   id,
@@ -359,21 +359,23 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
-    'service_role',
-    'public.set_listing_favorite_v1(uuid,boolean)',
-    'EXECUTE'
+  not exists (
+    select 1
+    from pg_catalog.pg_proc as procedure_definition
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        procedure_definition.proacl,
+        pg_catalog.acldefault('f', procedure_definition.proowner)
+      )
+    ) as privilege_definition
+    join pg_catalog.pg_roles as grantee
+      on grantee.oid = privilege_definition.grantee
+    where procedure_definition.oid =
+      'public.set_listing_favorite_v1(uuid,boolean)'::regprocedure
+      and grantee.rolname = 'service_role'
+      and privilege_definition.privilege_type = 'EXECUTE'
   )
-  and has_function_privilege(
-    'service_role',
-    'app_private.require_completed_onboarding()',
-    'EXECUTE'
-  ),
-  'the preserved service-role legacy RPC path can reach its V1 dependency'
-);
-
-select ok(
-  exists (
+  and not exists (
     select 1
     from pg_catalog.pg_proc as procedure_definition
     cross join lateral pg_catalog.aclexplode(
@@ -389,7 +391,7 @@ select ok(
       and grantee.rolname = 'service_role'
       and privilege_definition.privilege_type = 'EXECUTE'
   )
-  and exists (
+  and not exists (
     select 1
     from pg_catalog.pg_proc as procedure_definition
     cross join lateral pg_catalog.aclexplode(
@@ -415,7 +417,7 @@ select ok(
     'public.remove_listing_from_favorites(uuid)',
     'EXECUTE'
   ),
-  'legacy wrappers retain direct service-role grants without anonymous access'
+  'favorites mutations expose no direct service-role or anonymous execute path'
 );
 
 select ok(
@@ -616,30 +618,6 @@ select throws_ok(
   null,
   'a five-digit year cannot produce an unusable cursor'
 );
-
-select tests.use_auth_context(
-  'service_role',
-  'fa100000-0000-4000-8000-000000000002'
-);
-select lives_ok(
-  $sql$
-    select *
-    from public.remove_listing_from_favorites(
-      '00000000-0000-4000-8000-000000000101'
-    )
-  $sql$,
-  'the preserved service-role grant can invoke legacy remove'
-);
-select lives_ok(
-  $sql$
-    select *
-    from public.add_listing_to_favorites(
-      '00000000-0000-4000-8000-000000000101'
-    )
-  $sql$,
-  'the preserved service-role grant can invoke legacy add'
-);
-reset role;
 
 select tests.use_auth_context(
   'authenticated',
