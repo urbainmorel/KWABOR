@@ -69,6 +69,7 @@ class FavoritesViewModelTest {
         val changed = assertIs<FavoritesEffect.FavoriteChanged>(viewModel.effects.first())
         assertEquals(TEST_LISTING_ID, changed.listingId)
         assertFalse(changed.favorited)
+        assertEquals(TEST_CLIENT_MUTATION_SEQUENCE, changed.clientMutationSequence)
         assertEquals(scope, changed.scope)
         assertTrue(viewModel.state.value.items.isEmpty())
     }
@@ -127,6 +128,7 @@ class FavoritesViewModelTest {
 private class FakeFavoritesRepository : FavoritesRepository {
     var listRequestCount: Int = 0
         private set
+    private var clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE - 1L
 
     override suspend fun listFavorites(
         filter: ListingType?,
@@ -141,14 +143,17 @@ private class FakeFavoritesRepository : FavoritesRepository {
         )
     }
 
-    override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> =
-        DomainResult.Success(
+    override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> {
+        val sequence = ++clientMutationSequence
+        return DomainResult.Success(
             FavoriteMutation(
                 listingId = listingId,
                 favorited = favorited,
+                clientMutationSequence = sequence,
                 favoritedAtEpochMilliseconds = if (favorited) TEST_FAVORITED_AT else null,
             ),
         )
+    }
 }
 
 private fun testFavoriteListing(): FavoriteListing = FavoriteListing(
@@ -176,3 +181,4 @@ private const val TEST_ACCOUNT_A = "00000000-0000-4000-8000-000000000001"
 private const val TEST_ACCOUNT_B = "00000000-0000-4000-8000-000000000002"
 private const val TEST_LISTING_ID = "00000000-0000-4000-8000-000000000003"
 private const val TEST_FAVORITED_AT = 1_000L
+private const val TEST_CLIENT_MUTATION_SEQUENCE = 4_294_967_297L

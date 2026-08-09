@@ -83,7 +83,11 @@ internal fun FavoriteListingPageDto.toDomain(expectedType: ListingType? = null):
     )
 }
 
-internal fun FavoriteMutationRowDto.toDomain(expectedListingId: String, expectedFavorited: Boolean): FavoriteMutation {
+internal fun FavoriteMutationRowDto.toDomain(
+    expectedListingId: String,
+    expectedFavorited: Boolean,
+    clientMutationSequence: Long,
+): FavoriteMutation {
     val mappedListingId = listingId.requireFavoriteUuid("listing_id")
     if (mappedListingId != expectedListingId) {
         invalidFavoriteValue("listing_id", mappedListingId)
@@ -94,10 +98,14 @@ internal fun FavoriteMutationRowDto.toDomain(expectedListingId: String, expected
     if (favoritedByCurrentUser != (favoritedAt != null)) {
         invalidFavoriteValue("favorited_at", favoritedAt ?: "null")
     }
+    if (clientMutationSequence <= 0L) {
+        invalidFavoriteValue("client_mutation_sequence", clientMutationSequence.toString())
+    }
     return FavoriteMutation(
         listingId = mappedListingId,
         favorited = favoritedByCurrentUser,
         favoritedAtEpochMilliseconds = favoritedAt?.requireFavoriteTimestamp("favorited_at"),
+        clientMutationSequence = clientMutationSequence,
     )
 }
 

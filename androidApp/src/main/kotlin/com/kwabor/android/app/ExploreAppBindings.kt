@@ -51,10 +51,14 @@ private fun HomeShellDependencies.handleAuthenticationRequired(effect: ExploreEf
 private fun HomeShellDependencies.handleFavoriteChanged(effect: ExploreEffect.FavoriteChanged) {
     if (effect.scope != viewerSessionScopeTracker.currentScope) return
     favoritesViewModel.onIntent(
-        FavoritesIntent.ExternalFavoriteStateChanged(
-            listingId = effect.listingId,
-            favorited = effect.favorited,
-            scope = effect.scope,
-        ),
+        effect.toFavoritesIntent(),
     )
 }
+
+internal fun ExploreEffect.FavoriteChanged.toFavoritesIntent(): FavoritesIntent.ExternalFavoriteStateChanged =
+    FavoritesIntent.ExternalFavoriteStateChanged(
+        listingId = listingId,
+        favorited = favorited,
+        clientMutationSequence = clientMutationSequence,
+        scope = scope,
+    )

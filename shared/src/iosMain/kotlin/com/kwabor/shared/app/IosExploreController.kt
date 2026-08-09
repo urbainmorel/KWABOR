@@ -152,11 +152,17 @@ class IosExploreInteractionActions internal constructor(
         dispatch(ExploreIntent.ClearPendingAuthentication)
     }
 
-    fun applyFavoriteState(listingId: String, favorited: Boolean, scope: ViewerSessionScope) {
+    fun applyFavoriteState(
+        listingId: String,
+        favorited: Boolean,
+        clientMutationSequence: Long,
+        scope: ViewerSessionScope,
+    ) {
         dispatch(
             ExploreIntent.FavoriteStateChanged(
                 listingId = listingId,
                 favorited = favorited,
+                clientMutationSequence = clientMutationSequence,
                 scope = scope,
             ),
         )
@@ -227,7 +233,7 @@ class IosExploreController private constructor(
     private val runtime = runtimeProvider(scope, strings)
     private var stateObserver: ((ExploreUiState) -> Unit)? = null
     private var effectObserver: ((IosExploreEffect) -> Unit)? = null
-    private var favoriteObserver: ((String, Boolean, ViewerSessionScope) -> Unit)? = null
+    private var favoriteObserver: ((String, Boolean, Long, ViewerSessionScope) -> Unit)? = null
     private var observationVersion = 0L
     private var deliveredStateVersion = -1L
     private var deliveredState: ExploreUiState? = null
@@ -270,7 +276,12 @@ class IosExploreController private constructor(
                         is ExploreEffect.FavoriteChanged -> if (
                             effect.scope == viewerSessionScopeTracker.currentScope
                         ) {
-                            favoriteObserver?.invoke(effect.listingId, effect.favorited, effect.scope)
+                            favoriteObserver?.invoke(
+                                effect.listingId,
+                                effect.favorited,
+                                effect.clientMutationSequence,
+                                effect.scope,
+                            )
                         }
                         ExploreEffect.RequestLocation -> effectObserver?.invoke(
                             ExploreEffect.RequestLocation.toIosEffect(),
@@ -284,7 +295,7 @@ class IosExploreController private constructor(
     fun observe(
         stateObserver: (ExploreUiState) -> Unit,
         effectObserver: (IosExploreEffect) -> Unit,
-        favoriteObserver: (String, Boolean, ViewerSessionScope) -> Unit,
+        favoriteObserver: (String, Boolean, Long, ViewerSessionScope) -> Unit,
     ) {
         if (isClosed) return
         observationVersion += 1

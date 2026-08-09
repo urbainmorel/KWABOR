@@ -59,7 +59,11 @@ internal class SupabaseFavoritesDataSource(
                 )
             }
             rows.single().also { row ->
-                row.toDomain(expectedListingId = listingId, expectedFavorited = favorited)
+                row.toDomain(
+                    expectedListingId = listingId,
+                    expectedFavorited = favorited,
+                    clientMutationSequence = 1L,
+                )
             }
         }
 }

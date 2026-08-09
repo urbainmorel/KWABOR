@@ -265,17 +265,68 @@ class ExploreRuntimeTest {
             ExploreIntent.FavoriteStateChanged(
                 listingId = RUNTIME_LISTING_ID,
                 favorited = true,
+                clientMutationSequence = 1L,
                 scope = AUTHENTICATED_SCOPE,
             ),
         )
         runCurrent()
+        interactions.viewerInteractions = listOf(runtimeViewerInteraction(liked = true, favorited = false, likes = 11))
         refreshGate.complete(Unit)
         advanceUntilIdle()
 
         val listing = runtime.state.value.listings.single()
         assertTrue(listing.favorited)
         assertTrue(listing.liked)
-        assertEquals(1, listing.likesCount)
+        assertEquals(11, listing.likesCount)
+        runtime.close()
+    }
+
+    @Test
+    fun offlineFavoriteQueueOverridesAnOlderConfirmationDuringRefresh() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val interactions = RuntimeInteractionRepository(favoriteNetworkUnavailable = true)
+        val runtime = runtime(feedRepository, interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+        runtime.dispatch(favoriteStateChanged(favorited = true, clientMutationSequence = 1L))
+        advanceUntilIdle()
+        assertTrue(runtime.state.value.listings.single().favorited)
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.Refresh)
+        runCurrent()
+
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        runCurrent()
+        assertFalse(runtime.state.value.listings.single().favorited)
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(runtime.state.value.listings.single().favorited)
+        assertEquals(ExploreInteractionKind.Favorite, runtime.state.value.queuedInteractions.single().kind)
+        runtime.close()
+    }
+
+    @Test
+    fun likeChangedDuringRefreshDoesNotOverwriteAFreshFavoriteValue() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val interactions = RuntimeInteractionRepository()
+        val runtime = runtime(feedRepository, interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.Refresh)
+        runCurrent()
+
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        runCurrent()
+        interactions.viewerInteractions = listOf(runtimeViewerInteraction(liked = true, favorited = true, likes = 1))
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.listings.single().liked)
+        assertTrue(runtime.state.value.listings.single().favorited)
         runtime.close()
     }
 
@@ -293,6 +344,7 @@ class ExploreRuntimeTest {
             ExploreIntent.FavoriteStateChanged(
                 listingId = RUNTIME_LISTING_ID,
                 favorited = true,
+                clientMutationSequence = 1L,
                 scope = AUTHENTICATED_SCOPE,
             ),
         )
@@ -326,6 +378,7 @@ class ExploreRuntimeInteractionTest {
             ExploreIntent.FavoriteStateChanged(
                 listingId = RUNTIME_LISTING_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = AUTHENTICATED_SCOPE,
             ),
         )
@@ -365,6 +418,7 @@ class ExploreRuntimeInteractionTest {
             ExploreIntent.FavoriteStateChanged(
                 listingId = RUNTIME_LISTING_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = AUTHENTICATED_SCOPE,
             ),
         )
@@ -400,6 +454,7 @@ class ExploreRuntimeInteractionTest {
                 ExploreIntent.FavoriteStateChanged(
                     listingId = RUNTIME_LISTING_ID,
                     favorited = true,
+                    clientMutationSequence = 2L,
                     scope = AUTHENTICATED_SCOPE,
                 ),
             )
@@ -416,6 +471,174 @@ class ExploreRuntimeInteractionTest {
     }
 
     @Test
+    fun newerLocalFavoriteConfirmationWinsAgainstAnOlderBridgeWhileInFlight() = runTest {
+        val favoriteGate = CompletableDeferred<Unit>()
+        val interactions = RuntimeInteractionRepository(
+            interactionGate = favoriteGate,
+            nextClientMutationSequence = 2L,
+        )
+        val runtime = runtime(interactions = interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+
+        runtime.effects.test {
+            runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+            runCurrent()
+            runtime.dispatch(
+                ExploreIntent.FavoriteStateChanged(
+                    listingId = RUNTIME_LISTING_ID,
+                    favorited = false,
+                    clientMutationSequence = 1L,
+                    scope = AUTHENTICATED_SCOPE,
+                ),
+            )
+            runCurrent()
+
+            favoriteGate.complete(Unit)
+            advanceUntilIdle()
+
+            val changed = assertIs<ExploreEffect.FavoriteChanged>(awaitItem())
+            assertTrue(runtime.state.value.listings.single().favorited)
+            assertTrue(changed.favorited)
+            assertEquals(2L, changed.clientMutationSequence)
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun duplicateAndOlderFavoriteConfirmationsAreIgnoredWithoutInvalidatingLike() = runTest {
+        val runtime = runtime()
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+
+        runtime.dispatch(favoriteStateChanged(favorited = true, clientMutationSequence = 2L))
+        runtime.dispatch(favoriteStateChanged(favorited = false, clientMutationSequence = 1L))
+        runtime.dispatch(favoriteStateChanged(favorited = false, clientMutationSequence = 2L))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.listings.single().favorited)
+        assertTrue(runtime.state.value.listings.single().liked)
+        runtime.close()
+    }
+
+    @Test
+    fun newerBridgeWhileListingIsHiddenRejectsAnOlderLocalConfirmation() = runTest {
+        val favoriteGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val interactions = RuntimeInteractionRepository(interactionGate = favoriteGate)
+        val runtime = runtime(feedRepository, interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+
+        runtime.effects.test {
+            runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+            runCurrent()
+            feedRepository.refreshSnapshot = runtimeSnapshot(items = emptyList())
+            runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Events))
+            runCurrent()
+            assertTrue(runtime.state.value.listings.isEmpty())
+
+            runtime.dispatch(favoriteStateChanged(favorited = false, clientMutationSequence = 2L))
+            runCurrent()
+            favoriteGate.complete(Unit)
+            advanceUntilIdle()
+
+            assertTrue(runtime.state.value.listings.isEmpty())
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun hiddenFavoriteBridgeOverlaysAFeedResponseThatStartedEarlier() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val runtime = runtime(feedRepository = feedRepository)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+        feedRepository.refreshSnapshot = runtimeSnapshot(items = emptyList())
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Events))
+        advanceUntilIdle()
+        assertTrue(runtime.state.value.listings.isEmpty())
+
+        feedRepository.refreshSnapshot = runtimeSnapshot()
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Places))
+        runCurrent()
+        runtime.dispatch(favoriteStateChanged(favorited = true, clientMutationSequence = 2L))
+        runCurrent()
+        assertTrue(runtime.state.value.listings.isEmpty())
+
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.listings.single().favorited)
+        runtime.close()
+    }
+
+    @Test
+    fun newerHiddenConfirmationUpdatesThePriorVisibleOverride() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val runtime = runtime(feedRepository = feedRepository)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+        runtime.dispatch(favoriteStateChanged(favorited = true, clientMutationSequence = 1L))
+        advanceUntilIdle()
+        feedRepository.refreshSnapshot = runtimeSnapshot(items = emptyList())
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Events))
+        advanceUntilIdle()
+
+        feedRepository.refreshSnapshot = runtimeSnapshot()
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Places))
+        runCurrent()
+        runtime.dispatch(favoriteStateChanged(favorited = false, clientMutationSequence = 2L))
+        runCurrent()
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(runtime.state.value.listings.single().favorited)
+        runtime.close()
+    }
+
+    @Test
+    fun hiddenLocalFavoriteConfirmationDoesNotOverrideFresherLikeData() = runTest {
+        val favoriteGate = CompletableDeferred<Unit>()
+        val refreshGate = CompletableDeferred<Unit>()
+        val feedRepository = RuntimeFeedRepository()
+        val interactions = RuntimeInteractionRepository(interactionGate = favoriteGate)
+        val runtime = runtime(feedRepository, interactions)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        runCurrent()
+        feedRepository.refreshSnapshot = runtimeSnapshot(items = emptyList())
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Events))
+        runCurrent()
+        feedRepository.refreshSnapshot = runtimeSnapshot()
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.SelectTab(ExploreTab.Places))
+        runCurrent()
+
+        favoriteGate.complete(Unit)
+        runCurrent()
+        interactions.viewerInteractions = listOf(runtimeViewerInteraction(liked = true, favorited = true, likes = 7))
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        val listing = runtime.state.value.listings.single()
+        assertTrue(listing.favorited)
+        assertTrue(listing.liked)
+        assertEquals(7, listing.likesCount)
+        runtime.close()
+    }
+
+    @Test
     fun confirmedFavoriteMutationPublishesItsExactViewerScope() = runTest {
         val runtime = runtime()
         runtime.dispatch(ExploreIntent.ViewerContextChanged(AUTHENTICATED_SCOPE))
@@ -427,6 +650,7 @@ class ExploreRuntimeInteractionTest {
 
             assertEquals(RUNTIME_LISTING_ID, changed.listingId)
             assertTrue(changed.favorited)
+            assertEquals(1L, changed.clientMutationSequence)
             assertEquals(AUTHENTICATED_SCOPE, changed.scope)
             cancelAndIgnoreRemainingEvents()
         }
@@ -449,6 +673,7 @@ class ExploreRuntimeInteractionTest {
                 ExploreIntent.FavoriteStateChanged(
                     listingId = RUNTIME_LISTING_ID,
                     favorited = true,
+                    clientMutationSequence = 1L,
                     scope = AUTHENTICATED_SCOPE,
                 ),
             )
@@ -461,7 +686,10 @@ class ExploreRuntimeInteractionTest {
         }
         runtime.close()
     }
+}
 
+@OptIn(ExperimentalCoroutinesApi::class)
+class ExploreRuntimeInteractionContextTest {
     @Test
     fun authenticationFailure_afterFeedContextChangeIsDiscarded() = runTest {
         val interactionGate = CompletableDeferred<Unit>()
@@ -673,6 +901,7 @@ class ExploreRuntimeReplayAndLocationTest {
             val favoriteChanged = assertIs<ExploreEffect.FavoriteChanged>(awaitItem())
             assertEquals(AUTHENTICATED_SCOPE, favoriteChanged.scope)
             assertTrue(favoriteChanged.favorited)
+            assertEquals(2L, favoriteChanged.clientMutationSequence)
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
@@ -783,6 +1012,24 @@ private fun kotlinx.coroutines.test.TestScope.runtime(
     coroutineScope = this,
 )
 
+private fun favoriteStateChanged(
+    favorited: Boolean,
+    clientMutationSequence: Long,
+): ExploreIntent.FavoriteStateChanged = ExploreIntent.FavoriteStateChanged(
+    listingId = RUNTIME_LISTING_ID,
+    favorited = favorited,
+    clientMutationSequence = clientMutationSequence,
+    scope = AUTHENTICATED_SCOPE,
+)
+
+private fun runtimeViewerInteraction(liked: Boolean, favorited: Boolean, likes: Int): ListingViewerInteraction =
+    ListingViewerInteraction(
+        listingId = RUNTIME_LISTING_ID,
+        likedByViewer = liked,
+        favoritedByViewer = favorited,
+        likesCount = likes,
+    )
+
 private class RuntimePreferencesRepository : AppPreferencesRepository {
     var getGate: CompletableDeferred<Unit>? = null
 
@@ -839,6 +1086,7 @@ private class RuntimeInteractionRepository(
     var interactionGate: CompletableDeferred<Unit>? = null,
     var favoriteNetworkUnavailable: Boolean = false,
     var viewerInteractionsNetworkUnavailable: Boolean = false,
+    var nextClientMutationSequence: Long = 1L,
 ) : CatalogInteractionRepository, FavoritesRepository {
     var viewerInteractions: List<ListingViewerInteraction> = emptyList()
     var favoriteCalls: Int = 0
@@ -868,27 +1116,35 @@ private class RuntimeInteractionRepository(
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> {
         favoriteCalls += 1
+        val clientMutationSequence = nextClientMutationSequence++
         interactionGate?.also { gate ->
             interactionGate = null
             gate.await()
         }
-        if (requiresAuthentication) return authenticationFailure()
-        if (favoriteNetworkUnavailable) return DomainResult.Failure(DomainError.NetworkUnavailable())
-        val current = viewerInteractions.firstOrNull { interaction -> interaction.listingId == listingId }
-        viewerInteractions = viewerInteractions.filterNot { interaction -> interaction.listingId == listingId } +
-            ListingViewerInteraction(
-                listingId = listingId,
-                likedByViewer = current?.likedByViewer ?: false,
-                favoritedByViewer = favorited,
-                likesCount = current?.likesCount ?: 0,
-            )
-        return DomainResult.Success(
-            FavoriteMutation(
-                listingId = listingId,
-                favorited = favorited,
-                favoritedAtEpochMilliseconds = if (favorited) RUNTIME_NOW_EPOCH_MILLISECONDS else null,
-            ),
-        )
+        return when {
+            requiresAuthentication -> authenticationFailure()
+            favoriteNetworkUnavailable -> DomainResult.Failure(DomainError.NetworkUnavailable())
+            else -> {
+                val current = viewerInteractions.firstOrNull { interaction -> interaction.listingId == listingId }
+                val otherInteractions = viewerInteractions.filterNot { interaction ->
+                    interaction.listingId == listingId
+                }
+                viewerInteractions = otherInteractions + ListingViewerInteraction(
+                    listingId = listingId,
+                    likedByViewer = current?.likedByViewer ?: false,
+                    favoritedByViewer = favorited,
+                    likesCount = current?.likesCount ?: 0,
+                )
+                DomainResult.Success(
+                    FavoriteMutation(
+                        listingId = listingId,
+                        favorited = favorited,
+                        favoritedAtEpochMilliseconds = if (favorited) RUNTIME_NOW_EPOCH_MILLISECONDS else null,
+                        clientMutationSequence = clientMutationSequence,
+                    ),
+                )
+            }
+        }
     }
 
     private suspend fun selectedInteraction(

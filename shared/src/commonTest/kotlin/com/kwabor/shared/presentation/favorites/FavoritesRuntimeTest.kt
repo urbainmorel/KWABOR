@@ -209,13 +209,7 @@ class FavoritesRuntimeTest {
         runCurrent()
 
         runtime.dispatch(FavoritesIntent.ScreenDisappeared)
-        runtime.dispatch(
-            FavoritesIntent.ExternalFavoriteStateChanged(
-                listingId = externallyAddedListingId,
-                favorited = true,
-                scope = ACCOUNT_A_SCOPE,
-            ),
-        )
+        runtime.dispatch(externalFavoriteStateChanged(listingId = externallyAddedListingId, favorited = true))
         runtime.dispatch(FavoritesIntent.ScreenAppeared)
         runCurrent()
         assertEquals(2, repository.pageRequests.size)
@@ -265,6 +259,7 @@ class FavoritesRuntimeTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -289,6 +284,7 @@ class FavoritesRuntimeTest {
         val removal = FavoritesIntent.ExternalFavoriteStateChanged(
             listingId = FAVORITE_ID,
             favorited = false,
+            clientMutationSequence = 1L,
             scope = ACCOUNT_A_SCOPE,
         )
         runtime.dispatch(removal)
@@ -330,6 +326,7 @@ class FavoritesRuntimeTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -391,11 +388,8 @@ class FavoritesRuntimeMutationTest {
         val repository = RuntimeFavoritesRepository(
             pageResponses = mutableListOf(
                 RuntimePageResponse.success(
-                    FavoriteListingPage(
-                        items = listOf(
-                            favoriteListing(id = FAVORITE_ID),
-                            favoriteListing(id = remainingListingId),
-                        ),
+                    favoritePage(
+                        ids = listOf(FAVORITE_ID, remainingListingId),
                         nextCursor = "cursor-2",
                     ),
                 ),
@@ -447,13 +441,7 @@ class FavoritesRuntimeMutationTest {
         runtime.dispatch(FavoritesIntent.LoadNext)
         runCurrent()
         listOf(FAVORITE_ID, appendedListingId).forEach { listingId ->
-            runtime.dispatch(
-                FavoritesIntent.ExternalFavoriteStateChanged(
-                    listingId = listingId,
-                    favorited = false,
-                    scope = ACCOUNT_A_SCOPE,
-                ),
-            )
+            runtime.dispatch(externalFavoriteStateChanged(listingId = listingId, favorited = false))
         }
         runCurrent()
 
@@ -512,7 +500,8 @@ class FavoritesRuntimeMutationTest {
         runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
         runCurrent()
 
-        assertIs<FavoritesEffect.FavoriteChanged>(changed.await())
+        val effect = assertIs<FavoritesEffect.FavoriteChanged>(changed.await())
+        assertEquals(1L, effect.clientMutationSequence)
         assertTrue(runtime.state.value.items.isEmpty())
         refreshGate.complete(Unit)
         advanceUntilIdle()
@@ -566,13 +555,7 @@ class FavoritesRuntimeMutationTest {
         runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
         advanceUntilIdle()
 
-        runtime.dispatch(
-            FavoritesIntent.ExternalFavoriteStateChanged(
-                listingId = otherListingId,
-                favorited = false,
-                scope = ACCOUNT_A_SCOPE,
-            ),
-        )
+        runtime.dispatch(externalFavoriteStateChanged(listingId = otherListingId, favorited = false))
         advanceUntilIdle()
 
         assertEquals(strings.removeFailed, runtime.state.value.mutationMessage)
@@ -651,6 +634,7 @@ class FavoritesRuntimeExternalSyncTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -677,6 +661,7 @@ class FavoritesRuntimeExternalSyncTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = true,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -688,7 +673,7 @@ class FavoritesRuntimeExternalSyncTest {
     }
 
     @Test
-    fun externalAdditionInvalidatesAnOlderLocalRemovalStillInFlight() = runTest {
+    fun newerExternalAdditionWinsAgainstDelayedLocalRemovalWithoutAStaleEffect() = runTest {
         val mutationGate = CompletableDeferred<Unit>()
         val repository = externallyInvalidatedRemovalRepository(mutationGate)
         val runtime = activeRuntime(repository)
@@ -702,6 +687,7 @@ class FavoritesRuntimeExternalSyncTest {
                 FavoritesIntent.ExternalFavoriteStateChanged(
                     listingId = FAVORITE_ID,
                     favorited = true,
+                    clientMutationSequence = 2L,
                     scope = ACCOUNT_A_SCOPE,
                 ),
             )
@@ -719,6 +705,129 @@ class FavoritesRuntimeExternalSyncTest {
     }
 
     @Test
+    fun newerLocalRemovalWinsAgainstAnExternalEventReceivedWhileItIsInFlight() = runTest {
+        val mutationGate = CompletableDeferred<Unit>()
+        val repository = RuntimeFavoritesRepository(
+            pageResponses = mutableListOf(
+                RuntimePageResponse.success(favoritePage()),
+                RuntimePageResponse.success(favoritePage()),
+            ),
+            mutationResponses = mutableListOf(
+                RuntimeMutationResponse.success(
+                    listingId = FAVORITE_ID,
+                    clientMutationSequence = 2L,
+                    gate = mutationGate,
+                    nonCancellable = true,
+                ),
+            ),
+        )
+        val runtime = activeRuntime(repository)
+
+        runtime.effects.test {
+            runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
+            runCurrent()
+            runtime.dispatch(externalFavoriteStateChanged(favorited = true))
+            runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
+            runCurrent()
+
+            assertEquals(listOf(FAVORITE_ID to false), repository.mutationRequests)
+            assertEquals(listOf(FAVORITE_ID), runtime.state.value.items.map { item -> item.id })
+
+            mutationGate.complete(Unit)
+            advanceUntilIdle()
+
+            val effect = assertIs<FavoritesEffect.FavoriteChanged>(awaitItem())
+            assertEquals(2L, effect.clientMutationSequence)
+            assertTrue(runtime.state.value.items.isEmpty())
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun duplicateAndOutOfOrderExternalEventsAreIgnored() = runTest {
+        val repository = RuntimeFavoritesRepository()
+        val runtime = activeRuntime(repository)
+        val confirmedRemoval = externalFavoriteStateChanged(
+            favorited = false,
+            clientMutationSequence = 2L,
+        )
+
+        runtime.dispatch(confirmedRemoval)
+        runtime.dispatch(externalFavoriteStateChanged(favorited = true))
+        runtime.dispatch(confirmedRemoval)
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.items.isEmpty())
+        assertEquals(1, repository.pageRequests.size)
+        assertTrue(repository.mutationRequests.isEmpty())
+        runtime.close()
+    }
+
+    @Test
+    fun confirmedSequenceHistoryIsResetForTheNextViewerScope() = runTest {
+        val repository = RuntimeFavoritesRepository(
+            pageResponses = mutableListOf(
+                RuntimePageResponse.success(favoritePage()),
+                RuntimePageResponse.success(favoritePage()),
+            ),
+        )
+        val runtime = activeRuntime(repository)
+
+        runtime.dispatch(externalFavoriteStateChanged(favorited = false, clientMutationSequence = 2L))
+        advanceUntilIdle()
+        runtime.dispatch(FavoritesIntent.ViewerContextChanged(ACCOUNT_B_SCOPE))
+        advanceUntilIdle()
+        runtime.dispatch(
+            externalFavoriteStateChanged(
+                favorited = false,
+                clientMutationSequence = 1L,
+                scope = ACCOUNT_B_SCOPE,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.items.isEmpty())
+        assertEquals(2, repository.pageRequests.size)
+        runtime.close()
+    }
+
+    @Test
+    fun failedLocalRemovalDoesNotShowAnErrorAfterANewerExternalConfirmation() = runTest {
+        val mutationGate = CompletableDeferred<Unit>()
+        val repository = RuntimeFavoritesRepository(
+            mutationResponses = mutableListOf(
+                RuntimeMutationResponse(
+                    result = DomainResult.Failure(DomainError.NetworkUnavailable()),
+                    gate = mutationGate,
+                    nonCancellable = true,
+                ),
+            ),
+        )
+        val runtime = activeRuntime(repository)
+
+        runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
+        runCurrent()
+        runtime.dispatch(
+            externalFavoriteStateChanged(
+                favorited = false,
+                clientMutationSequence = 2L,
+            ),
+        )
+        runCurrent()
+
+        mutationGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.items.isEmpty())
+        assertTrue(runtime.state.value.removingListingIds.isEmpty())
+        assertEquals(null, runtime.state.value.mutationMessage)
+        assertFalse(runtime.state.value.isOffline)
+        runtime.close()
+    }
+
+    @Test
     fun externalAdditionWhileHiddenIsReloadedOnTheNextScreenAppearance() = runTest {
         val repository = RuntimeFavoritesRepository(
             pageResponses = mutableListOf(
@@ -732,6 +841,7 @@ class FavoritesRuntimeExternalSyncTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = true,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -764,6 +874,7 @@ class FavoritesRuntimeExternalSyncTest {
             FavoritesIntent.ExternalFavoriteStateChanged(
                 listingId = FAVORITE_ID,
                 favorited = false,
+                clientMutationSequence = 1L,
                 scope = ACCOUNT_A_SCOPE,
             ),
         )
@@ -800,14 +911,8 @@ class FavoritesRuntimeExternalSyncTest {
                 RuntimePageResponse.success(favoritePage(id = "account-b-item")),
             ),
             mutationResponses = mutableListOf(
-                RuntimeMutationResponse(
-                    result = DomainResult.Success(
-                        FavoriteMutation(
-                            listingId = "account-a-item",
-                            favorited = false,
-                            favoritedAtEpochMilliseconds = null,
-                        ),
-                    ),
+                RuntimeMutationResponse.success(
+                    listingId = "account-a-item",
                     gate = mutationGate,
                     nonCancellable = true,
                 ),
@@ -860,6 +965,7 @@ private fun TestScope.runtime(repository: FavoritesRepository): FavoritesRuntime
     coroutineScope = this,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.activeRuntime(repository: FavoritesRepository): FavoritesRuntime =
     runtime(repository).also { runtime ->
         runtime.dispatch(FavoritesIntent.ViewerContextChanged(ACCOUNT_A_SCOPE))
@@ -907,6 +1013,7 @@ private fun externallyInvalidatedRemovalRepository(
                     listingId = FAVORITE_ID,
                     favorited = false,
                     favoritedAtEpochMilliseconds = null,
+                    clientMutationSequence = 1L,
                 ),
             ),
             gate = mutationGate,
@@ -966,17 +1073,23 @@ private data class RuntimeMutationResponse(
     suspend fun await(): DomainResult<FavoriteMutation> = awaitResponse(result, gate, nonCancellable)
 
     companion object {
-        fun success(listingId: String, gate: CompletableDeferred<Unit>? = null): RuntimeMutationResponse =
-            RuntimeMutationResponse(
-                result = DomainResult.Success(
-                    FavoriteMutation(
-                        listingId = listingId,
-                        favorited = false,
-                        favoritedAtEpochMilliseconds = null,
-                    ),
+        fun success(
+            listingId: String,
+            clientMutationSequence: Long = 1L,
+            gate: CompletableDeferred<Unit>? = null,
+            nonCancellable: Boolean = false,
+        ): RuntimeMutationResponse = RuntimeMutationResponse(
+            result = DomainResult.Success(
+                FavoriteMutation(
+                    listingId = listingId,
+                    favorited = false,
+                    favoritedAtEpochMilliseconds = null,
+                    clientMutationSequence = clientMutationSequence,
                 ),
-                gate = gate,
-            )
+            ),
+            gate = gate,
+            nonCancellable = nonCancellable,
+        )
     }
 }
 
@@ -1000,6 +1113,23 @@ private fun favoritePage(
 ): FavoriteListingPage = FavoriteListingPage(
     items = listOf(favoriteListing(id = id, type = type)),
     nextCursor = nextCursor,
+)
+
+private fun favoritePage(ids: List<String>, nextCursor: String? = null): FavoriteListingPage = FavoriteListingPage(
+    items = ids.map { id -> favoriteListing(id = id) },
+    nextCursor = nextCursor,
+)
+
+private fun externalFavoriteStateChanged(
+    listingId: String = FAVORITE_ID,
+    favorited: Boolean,
+    clientMutationSequence: Long = 1L,
+    scope: ViewerSessionScope = ACCOUNT_A_SCOPE,
+): FavoritesIntent.ExternalFavoriteStateChanged = FavoritesIntent.ExternalFavoriteStateChanged(
+    listingId = listingId,
+    favorited = favorited,
+    clientMutationSequence = clientMutationSequence,
+    scope = scope,
 )
 
 private val ACCOUNT_A_SCOPE = ViewerSessionScope(accountId = "account-a", epoch = 1L)

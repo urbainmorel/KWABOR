@@ -16,6 +16,7 @@ class DataFavoritesRepository internal constructor(
     private val dataSource: FavoritesDataSource,
 ) : FavoritesRepository {
     private val favoriteMutationMutex = Mutex()
+    private var clientMutationSequence = 0L
 
     override suspend fun listFavorites(
         filter: ListingType?,
@@ -29,11 +30,16 @@ class DataFavoritesRepository internal constructor(
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> =
         favoriteMutationMutex.withLock {
+            val sequence = ++clientMutationSequence
             withContext(NonCancellable) {
                 runFavoritesCall {
                     val requiredListingId = listingId.toRequiredFavoriteListingId()
                     dataSource.setFavorite(listingId = requiredListingId, favorited = favorited)
-                        .toDomain(expectedListingId = requiredListingId, expectedFavorited = favorited)
+                        .toDomain(
+                            expectedListingId = requiredListingId,
+                            expectedFavorited = favorited,
+                            clientMutationSequence = sequence,
+                        )
                 }
             }
         }

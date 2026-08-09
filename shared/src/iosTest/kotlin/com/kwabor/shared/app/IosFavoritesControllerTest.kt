@@ -36,7 +36,7 @@ class IosFavoritesControllerTest {
         controller.observe(
             stateObserver = { state -> observedState = state },
             detailObserver = { _, _ -> },
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
 
@@ -70,35 +70,28 @@ class IosFavoritesControllerTest {
         val tracker = ViewerSessionScopeTracker()
         val controller = configuredFavoritesController(runtime, testScheduler, tracker)
         val accountScope = tracker.update("account-a", accountSetupComplete = true)
-        val openedListings = mutableListOf<Pair<String, ViewerSessionScope>>()
-        val favoriteChanges = mutableListOf<Triple<String, Boolean, ViewerSessionScope>>()
-
-        controller.observe(
-            stateObserver = {},
-            detailObserver = { listingId, scope -> openedListings += listingId to scope },
-            favoriteObserver = { listingId, favorited, scope ->
-                favoriteChanges += Triple(listingId, favorited, scope)
-            },
-        )
+        val observations = controller.observeFavoriteEffects()
         runCurrent()
         runtime.publishEffect(FavoritesEffect.OpenCatalogDetail("listing-1", accountScope))
-        runtime.publishEffect(
-            FavoritesEffect.FavoriteChanged("listing-2", favorited = false, scope = accountScope),
-        )
+        runtime.publishFavoriteChanged("listing-2", TEST_CLIENT_MUTATION_SEQUENCE, accountScope)
         runCurrent()
 
-        assertEquals(listOf("listing-1" to accountScope), openedListings)
-        assertEquals(listOf(Triple("listing-2", false, accountScope)), favoriteChanges)
+        assertEquals(listOf("listing-1" to accountScope), observations.openedListings)
+        assertEquals(
+            listOf(observedFavoritesChange("listing-2", TEST_CLIENT_MUTATION_SEQUENCE, accountScope)),
+            observations.favoriteChanges,
+        )
 
         controller.unobserve()
         runtime.publishEffect(FavoritesEffect.OpenCatalogDetail("listing-3", accountScope))
-        runtime.publishEffect(
-            FavoritesEffect.FavoriteChanged("listing-4", favorited = false, scope = accountScope),
-        )
+        runtime.publishFavoriteChanged("listing-4", TEST_CLIENT_MUTATION_SEQUENCE + 1L, accountScope)
         runCurrent()
 
-        assertEquals(listOf("listing-1" to accountScope), openedListings)
-        assertEquals(listOf(Triple("listing-2", false, accountScope)), favoriteChanges)
+        assertEquals(listOf("listing-1" to accountScope), observations.openedListings)
+        assertEquals(
+            listOf(observedFavoritesChange("listing-2", TEST_CLIENT_MUTATION_SEQUENCE, accountScope)),
+            observations.favoriteChanges,
+        )
         controller.close()
     }
 
@@ -112,7 +105,7 @@ class IosFavoritesControllerTest {
         controller.observe(
             stateObserver = { state -> observedState = state },
             detailObserver = { _, _ -> },
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
         runtime.publishState(privateFavoritesState("private-account-a-state"))
@@ -146,15 +139,7 @@ class IosFavoritesControllerTest {
         val runtime = FakeIosFavoritesRuntime()
         val tracker = ViewerSessionScopeTracker()
         val controller = configuredFavoritesController(runtime, testScheduler, tracker)
-        val openedListings = mutableListOf<Pair<String, ViewerSessionScope>>()
-        val favoriteChanges = mutableListOf<Triple<String, Boolean, ViewerSessionScope>>()
-        controller.observe(
-            stateObserver = {},
-            detailObserver = { listingId, scope -> openedListings += listingId to scope },
-            favoriteObserver = { listingId, favorited, scope ->
-                favoriteChanges += Triple(listingId, favorited, scope)
-            },
-        )
+        val observations = controller.observeFavoriteEffects()
         runCurrent()
 
         val accountAFirstScope = tracker.update("account-a", accountSetupComplete = true)
@@ -163,12 +148,12 @@ class IosFavoritesControllerTest {
 
         val accountBScope = tracker.update("account-b", accountSetupComplete = true)
         runtime.publishEffect(FavoritesEffect.OpenCatalogDetail("stale-a", accountAFirstScope))
-        runtime.publishEffect(FavoritesEffect.FavoriteChanged("listing-b", false, accountBScope))
+        runtime.publishFavoriteChanged("listing-b", TEST_CLIENT_MUTATION_SEQUENCE, accountBScope)
         runCurrent()
 
         tracker.update(null, accountSetupComplete = false)
         val accountASecondScope = tracker.update("account-a", accountSetupComplete = true)
-        runtime.publishEffect(FavoritesEffect.FavoriteChanged("stale-a-epoch", false, accountAFirstScope))
+        runtime.publishFavoriteChanged("stale-a-epoch", TEST_CLIENT_MUTATION_SEQUENCE + 1L, accountAFirstScope)
         runtime.publishEffect(FavoritesEffect.OpenCatalogDetail("listing-a-new", accountASecondScope))
         runCurrent()
 
@@ -177,11 +162,11 @@ class IosFavoritesControllerTest {
                 "listing-a" to accountAFirstScope,
                 "listing-a-new" to accountASecondScope,
             ),
-            openedListings,
+            observations.openedListings,
         )
         assertEquals(
-            listOf(Triple("listing-b", false, accountBScope)),
-            favoriteChanges,
+            listOf(observedFavoritesChange("listing-b", TEST_CLIENT_MUTATION_SEQUENCE, accountBScope)),
+            observations.favoriteChanges,
         )
         controller.close()
     }
@@ -196,13 +181,13 @@ class IosFavoritesControllerTest {
         controller.observe(
             stateObserver = { firstObserverCalls += 1 },
             detailObserver = { _, _ -> },
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
         controller.observe(
             stateObserver = { secondObserverCalls += 1 },
             detailObserver = { _, _ -> },
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
         runtime.publishState(runtime.state.value.copy(isRefreshing = true))
@@ -234,6 +219,54 @@ class IosFavoritesControllerTest {
     )
 }
 
+private data class FavoritesEffectObservations(
+    val openedListings: MutableList<Pair<String, ViewerSessionScope>> = mutableListOf(),
+    val favoriteChanges: MutableList<ObservedFavoritesChange> = mutableListOf(),
+)
+
+private fun IosFavoritesController.observeFavoriteEffects(): FavoritesEffectObservations {
+    val observations = FavoritesEffectObservations()
+    observe(
+        stateObserver = {},
+        detailObserver = { listingId, scope -> observations.openedListings += listingId to scope },
+        favoriteObserver = { listingId, favorited, clientMutationSequence, scope ->
+            observations.favoriteChanges += ObservedFavoritesChange(
+                listingId = listingId,
+                favorited = favorited,
+                clientMutationSequence = clientMutationSequence,
+                scope = scope,
+            )
+        },
+    )
+    return observations
+}
+
+private fun FakeIosFavoritesRuntime.publishFavoriteChanged(
+    listingId: String,
+    clientMutationSequence: Long,
+    scope: ViewerSessionScope,
+) {
+    publishEffect(
+        FavoritesEffect.FavoriteChanged(
+            listingId = listingId,
+            favorited = false,
+            clientMutationSequence = clientMutationSequence,
+            scope = scope,
+        ),
+    )
+}
+
+private fun observedFavoritesChange(
+    listingId: String,
+    clientMutationSequence: Long,
+    scope: ViewerSessionScope,
+): ObservedFavoritesChange = ObservedFavoritesChange(
+    listingId = listingId,
+    favorited = false,
+    clientMutationSequence = clientMutationSequence,
+    scope = scope,
+)
+
 private fun dispatchAllFavoritesActions(
     controller: IosFavoritesController,
     accountScope: ViewerSessionScope,
@@ -242,7 +275,12 @@ private fun dispatchAllFavoritesActions(
     controller.actions.screenAppeared()
     controller.actions.screenDisappeared()
     controller.actions.updateViewerContext(accountScope)
-    controller.actions.applyExternalFavoriteState("listing-0", favorited = true, scope = accountScope)
+    controller.actions.applyExternalFavoriteState(
+        listingId = "listing-0",
+        favorited = true,
+        clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+        scope = accountScope,
+    )
     controller.actions.updateViewerContext(guestScope)
     controller.actions.selectAll()
     controller.actions.selectPlaces()
@@ -262,7 +300,12 @@ private fun expectedFavoritesIntents(
     FavoritesIntent.ScreenAppeared,
     FavoritesIntent.ScreenDisappeared,
     FavoritesIntent.ViewerContextChanged(accountScope),
-    FavoritesIntent.ExternalFavoriteStateChanged("listing-0", favorited = true, scope = accountScope),
+    FavoritesIntent.ExternalFavoriteStateChanged(
+        listingId = "listing-0",
+        favorited = true,
+        clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+        scope = accountScope,
+    ),
     FavoritesIntent.ViewerContextChanged(guestScope),
     FavoritesIntent.SelectFilter(FavoritesFilter.All),
     FavoritesIntent.SelectFilter(FavoritesFilter.Places),
@@ -287,6 +330,13 @@ private fun privateFavoritesState(
 private fun assertFavoritesReset(scope: ViewerSessionScope, actual: FavoritesUiState) {
     assertEquals(FavoritesUiState(isAccountReady = true, viewerScope = scope), actual)
 }
+
+private data class ObservedFavoritesChange(
+    val listingId: String,
+    val favorited: Boolean,
+    val clientMutationSequence: Long,
+    val scope: ViewerSessionScope,
+)
 
 private class FakeIosFavoritesRuntime : IosFavoritesRuntime {
     private val mutableState = MutableStateFlow(FavoritesUiState())
@@ -329,3 +379,5 @@ private fun favoritesTestDispatcherProvider(scheduler: TestCoroutineScheduler): 
         override val main: CoroutineDispatcher = dispatcher
     }
 }
+
+private const val TEST_CLIENT_MUTATION_SEQUENCE = 4_294_967_297L

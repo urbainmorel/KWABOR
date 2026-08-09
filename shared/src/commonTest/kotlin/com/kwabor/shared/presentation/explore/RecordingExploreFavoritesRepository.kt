@@ -10,6 +10,7 @@ import com.kwabor.shared.domain.favorites.FavoritesRepository
 
 internal class RecordingExploreFavoritesRepository(
     var mutationResult: DomainResult<FavoriteMutation>? = null,
+    var nextClientMutationSequence: Long = 1L,
 ) : FavoritesRepository {
     val mutations = mutableListOf<Pair<String, Boolean>>()
 
@@ -20,11 +21,13 @@ internal class RecordingExploreFavoritesRepository(
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> {
         mutations += listingId to favorited
+        val clientMutationSequence = nextClientMutationSequence++
         return mutationResult ?: DomainResult.Success(
             FavoriteMutation(
                 listingId = listingId,
                 favorited = favorited,
                 favoritedAtEpochMilliseconds = if (favorited) 1_000L else null,
+                clientMutationSequence = clientMutationSequence,
             ),
         )
     }

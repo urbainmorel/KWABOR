@@ -5,6 +5,7 @@ import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.favorites.FavoriteListing
 import com.kwabor.shared.domain.favorites.FavoriteListingPage
+import com.kwabor.shared.domain.favorites.FavoriteMutation
 import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.i18n.FavoritesStrings
 import kotlin.math.roundToInt
@@ -77,11 +78,13 @@ class FavoritesPresenter(
     suspend fun removeFavorite(listingId: String, strings: FavoritesStrings): FavoriteRemovalOutcome =
         when (val result = repository.setFavorite(listingId = listingId, favorited = false)) {
             is DomainResult.Success -> if (
-                result.value.listingId == listingId &&
-                !result.value.favorited &&
-                result.value.favoritedAtEpochMilliseconds == null
+                result.value.isConfirmedRemovalOf(listingId) &&
+                result.value.clientMutationSequence > 0L
             ) {
-                FavoriteRemovalOutcome.Removed(listingId)
+                FavoriteRemovalOutcome.Removed(
+                    listingId = listingId,
+                    clientMutationSequence = result.value.clientMutationSequence,
+                )
             } else {
                 FavoriteRemovalOutcome.Failed(
                     message = strings.removeFailed,
@@ -102,13 +105,19 @@ class FavoritesPresenter(
 }
 
 sealed interface FavoriteRemovalOutcome {
-    data class Removed(val listingId: String) : FavoriteRemovalOutcome
+    data class Removed(
+        val listingId: String,
+        val clientMutationSequence: Long,
+    ) : FavoriteRemovalOutcome
 
     data class Failed(
         val message: String,
         val isOffline: Boolean,
     ) : FavoriteRemovalOutcome
 }
+
+private fun FavoriteMutation.isConfirmedRemovalOf(expectedListingId: String): Boolean =
+    listingId == expectedListingId && !favorited && favoritedAtEpochMilliseconds == null
 
 private fun FavoriteListingPage.toLoadedState(filter: FavoritesFilter, strings: FavoritesStrings): FavoritesUiState {
     if (!isValidFor(filter)) {

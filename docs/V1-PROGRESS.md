@@ -20,7 +20,7 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 Les anciens pourcentages d'avancement ont été retirés : ils n'étaient pas reliés à une matrice de
 couverture vérifiable et donnaient une précision trompeuse après la fusion de la pile.
 
-## Intégré dans `main`
+## Intégré dans `main` ou livré par le présent lot
 
 ### Architecture, sécurité et livraison
 

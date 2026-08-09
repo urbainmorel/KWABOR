@@ -46,7 +46,7 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = { state -> observedState = state },
             effectObserver = {},
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
 
@@ -67,13 +67,13 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = { firstObserverCalls += 1 },
             effectObserver = {},
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
         controller.observe(
             stateObserver = { secondObserverCalls += 1 },
             effectObserver = {},
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
         runtime.publishState(runtime.state.value.copy(isRefreshing = true))
@@ -116,7 +116,7 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = { state -> observedState = state },
             effectObserver = {},
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
 
@@ -161,7 +161,7 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = {},
             effectObserver = observedEffects::add,
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
 
@@ -199,7 +199,7 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = {},
             effectObserver = observedEffects::add,
-            favoriteObserver = { _, _, _ -> },
+            favoriteObserver = { _, _, _, _ -> },
         )
         runCurrent()
 
@@ -232,37 +232,26 @@ class IosExploreControllerTest {
         val runtime = FakeIosExploreRuntime()
         val tracker = ViewerSessionScopeTracker()
         val controller = configuredController(runtime, testScheduler, tracker)
-        val favoriteChanges = mutableListOf<Triple<String, Boolean, ViewerSessionScope>>()
-        controller.observe(
-            stateObserver = {},
-            effectObserver = {},
-            favoriteObserver = { listingId, favorited, scope ->
-                favoriteChanges += Triple(listingId, favorited, scope)
-            },
-        )
+        val favoriteChanges = controller.observeFavoriteChanges()
         runCurrent()
 
         val accountAFirstScope = tracker.update("account-a", accountSetupComplete = true)
-        runtime.publishEffect(ExploreEffect.FavoriteChanged("listing-a", true, accountAFirstScope))
+        runtime.publishFavoriteChanged("listing-a", true, TEST_CLIENT_MUTATION_SEQUENCE, accountAFirstScope)
         runCurrent()
 
         val accountBScope = tracker.update("account-b", accountSetupComplete = true)
-        runtime.publishEffect(ExploreEffect.FavoriteChanged("stale-a", false, accountAFirstScope))
-        runtime.publishEffect(ExploreEffect.FavoriteChanged("listing-b", true, accountBScope))
+        runtime.publishFavoriteChanged("stale-a", false, TEST_CLIENT_MUTATION_SEQUENCE + 1L, accountAFirstScope)
+        runtime.publishFavoriteChanged("listing-b", true, TEST_CLIENT_MUTATION_SEQUENCE + 2L, accountBScope)
         runCurrent()
 
         tracker.update(null, accountSetupComplete = false)
         val accountASecondScope = tracker.update("account-a", accountSetupComplete = true)
-        runtime.publishEffect(ExploreEffect.FavoriteChanged("stale-a-epoch", false, accountAFirstScope))
-        runtime.publishEffect(ExploreEffect.FavoriteChanged("listing-a-new", false, accountASecondScope))
+        runtime.publishFavoriteChanged("stale-a-epoch", false, TEST_CLIENT_MUTATION_SEQUENCE + 3L, accountAFirstScope)
+        runtime.publishFavoriteChanged("listing-a-new", false, TEST_CLIENT_MUTATION_SEQUENCE + 4L, accountASecondScope)
         runCurrent()
 
         assertEquals(
-            listOf(
-                Triple("listing-a", true, accountAFirstScope),
-                Triple("listing-b", true, accountBScope),
-                Triple("listing-a-new", false, accountASecondScope),
-            ),
+            expectedExploreFavoriteChanges(accountAFirstScope, accountBScope, accountASecondScope),
             favoriteChanges,
         )
         controller.close()
@@ -277,7 +266,7 @@ class IosExploreControllerTest {
         controller.observe(
             stateObserver = { stateCallbacks += 1 },
             effectObserver = { effectCallbacks += 1 },
-            favoriteObserver = { _, _, _ -> effectCallbacks += 1 },
+            favoriteObserver = { _, _, _, _ -> effectCallbacks += 1 },
         )
         runCurrent()
 
@@ -305,6 +294,64 @@ class IosExploreControllerTest {
     )
 }
 
+private fun IosExploreController.observeFavoriteChanges(): MutableList<ObservedExploreFavoriteChange> {
+    val changes = mutableListOf<ObservedExploreFavoriteChange>()
+    observe(
+        stateObserver = {},
+        effectObserver = {},
+        favoriteObserver = { listingId, favorited, clientMutationSequence, scope ->
+            changes += ObservedExploreFavoriteChange(
+                listingId = listingId,
+                favorited = favorited,
+                clientMutationSequence = clientMutationSequence,
+                scope = scope,
+            )
+        },
+    )
+    return changes
+}
+
+private fun FakeIosExploreRuntime.publishFavoriteChanged(
+    listingId: String,
+    favorited: Boolean,
+    clientMutationSequence: Long,
+    scope: ViewerSessionScope,
+) {
+    publishEffect(
+        ExploreEffect.FavoriteChanged(
+            listingId = listingId,
+            favorited = favorited,
+            clientMutationSequence = clientMutationSequence,
+            scope = scope,
+        ),
+    )
+}
+
+private fun expectedExploreFavoriteChanges(
+    accountAFirstScope: ViewerSessionScope,
+    accountBScope: ViewerSessionScope,
+    accountASecondScope: ViewerSessionScope,
+): List<ObservedExploreFavoriteChange> = listOf(
+    ObservedExploreFavoriteChange(
+        "listing-a",
+        true,
+        TEST_CLIENT_MUTATION_SEQUENCE,
+        accountAFirstScope,
+    ),
+    ObservedExploreFavoriteChange(
+        "listing-b",
+        true,
+        TEST_CLIENT_MUTATION_SEQUENCE + 2L,
+        accountBScope,
+    ),
+    ObservedExploreFavoriteChange(
+        "listing-a-new",
+        false,
+        TEST_CLIENT_MUTATION_SEQUENCE + 4L,
+        accountASecondScope,
+    ),
+)
+
 private fun dispatchAllExploreActions(
     controller: IosExploreController,
     tracker: ViewerSessionScopeTracker,
@@ -329,7 +376,12 @@ private fun dispatchAllExploreActions(
     controller.interactionActions.toggleFavorite("listing-2")
     controller.interactionActions.replayPendingInteraction()
     controller.interactionActions.updateViewerContext(accountScope)
-    controller.interactionActions.applyFavoriteState("listing-2", favorited = false, scope = accountScope)
+    controller.interactionActions.applyFavoriteState(
+        listingId = "listing-2",
+        favorited = false,
+        clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+        scope = accountScope,
+    )
     val guestScope = tracker.update(null, accountSetupComplete = false)
     controller.interactionActions.updateViewerContext(guestScope)
     controller.interactionActions.clearPendingAuthentication()
@@ -359,7 +411,12 @@ private fun expectedExploreIntents(
     ExploreIntent.ToggleFavorite("listing-2"),
     ExploreIntent.ReplayPendingInteraction,
     ExploreIntent.ViewerContextChanged(accountScope),
-    ExploreIntent.FavoriteStateChanged("listing-2", favorited = false, scope = accountScope),
+    ExploreIntent.FavoriteStateChanged(
+        listingId = "listing-2",
+        favorited = false,
+        clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+        scope = accountScope,
+    ),
     ExploreIntent.ViewerContextChanged(guestScope),
     ExploreIntent.ClearPendingAuthentication,
 )
@@ -449,6 +506,13 @@ private fun assertExploreEffectKinds(effects: List<IosExploreEffect>, vararg exp
     assertEquals(expectedKinds.toList(), effects.map(IosExploreEffect::kind))
 }
 
+private data class ObservedExploreFavoriteChange(
+    val listingId: String,
+    val favorited: Boolean,
+    val clientMutationSequence: Long,
+    val scope: ViewerSessionScope,
+)
+
 private class FakeIosExploreRuntime : IosExploreRuntime {
     private val mutableState = MutableStateFlow(initialExploreUiState(stringsFor(AppLocale.French)))
     private val effectChannel = Channel<ExploreEffect>(capacity = Channel.UNLIMITED)
@@ -497,3 +561,5 @@ private fun testDispatcherProvider(scheduler: TestCoroutineScheduler): Dispatche
         override val main: CoroutineDispatcher = dispatcher
     }
 }
+
+private const val TEST_CLIENT_MUTATION_SEQUENCE = 4_294_967_297L

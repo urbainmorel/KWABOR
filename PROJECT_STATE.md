@@ -22,10 +22,11 @@ lot raccorde ses clients Android/iOS avec un runtime partagé cloisonné par ses
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
-- Sont désormais présents dans `main` : sécurité/architecture de la pile, intro Store-only,
-  authentification et onboarding compacts, paramètres de compte et de confidentialité, persistance
-  locale durcie, Explore Android/iOS offline-first, recherche lexicale Android/iOS, détail natif,
-  actions externes, découverte des guides, deep link interne de fiche et Profil → Favoris natif.
+- Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
+  intro Store-only, authentification et onboarding compacts, paramètres de compte et de
+  confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
+  Android/iOS, détail natif, actions externes, découverte des guides, deep link interne de fiche et
+  Profil → Favoris natif.
 - Ne sont pas terminés : racines Social/Ajouter/Notifications, outbox durable,
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
   classement/sponsoring final, carte, avis, partage public, signalement, claim, IA, contribution,

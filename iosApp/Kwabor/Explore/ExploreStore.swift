@@ -26,7 +26,7 @@ final class ExploreStore: ObservableObject {
     private let controller: IosExploreController
     private let locationProvider: ApproximateLocationProviding
     private let onProtectedActionReplayed: (AnalyticsEvent) -> Void
-    private var onFavoriteChanged: (String, Bool, ViewerSessionScope) -> Void
+    private var onFavoriteChanged: (String, Bool, Int64, ViewerSessionScope) -> Void
     private var paginationGuard = ExplorePaginationGuard()
     private var locationTask: Task<Void, Never>?
     private var lastAnnouncement: String?
@@ -41,7 +41,7 @@ final class ExploreStore: ObservableObject {
         controller: IosExploreController,
         locationProvider: ApproximateLocationProviding? = nil,
         onProtectedActionReplayed: @escaping (AnalyticsEvent) -> Void = { _ in },
-        onFavoriteChanged: @escaping (String, Bool, ViewerSessionScope) -> Void = { _, _, _ in }
+        onFavoriteChanged: @escaping (String, Bool, Int64, ViewerSessionScope) -> Void = { _, _, _, _ in }
     ) {
         self.controller = controller
         self.locationProvider = locationProvider ?? CoreLocationApproximateLocationProvider()
@@ -74,7 +74,7 @@ final class ExploreStore: ObservableObject {
     }
 
     func setFavoriteChangeHandler(
-        _ handler: @escaping (String, Bool, ViewerSessionScope) -> Void
+        _ handler: @escaping (String, Bool, Int64, ViewerSessionScope) -> Void
     ) {
         onFavoriteChanged = handler
     }
@@ -164,12 +164,14 @@ final class ExploreStore: ObservableObject {
     func applyFavoriteState(
         listingID: String,
         favorited: Bool,
+        clientMutationSequence: Int64,
         scope: ViewerSessionScope
     ) {
         guard matchesCurrentViewerScope(scope) else { return }
         controller.interactionActions.applyFavoriteState(
             listingId: listingID,
             favorited: favorited,
+            clientMutationSequence: clientMutationSequence,
             scope: scope
         )
     }
@@ -191,10 +193,15 @@ final class ExploreStore: ObservableObject {
                     self?.accept(effect)
                 }
             },
-            favoriteObserver: { [weak self] listingID, favorited, scope in
+            favoriteObserver: { [weak self] listingID, favorited, clientMutationSequence, scope in
                 MainActor.assumeIsolated {
                     guard let self, self.matchesCurrentViewerScope(scope) else { return }
-                    self.onFavoriteChanged(listingID, favorited.boolValue, scope)
+                    self.onFavoriteChanged(
+                        listingID,
+                        favorited.boolValue,
+                        clientMutationSequence.int64Value,
+                        scope
+                    )
                 }
             }
         )

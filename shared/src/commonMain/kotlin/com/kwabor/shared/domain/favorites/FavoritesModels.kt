@@ -34,4 +34,5 @@ data class FavoriteMutation(
     val listingId: String,
     val favorited: Boolean,
     val favoritedAtEpochMilliseconds: Long?,
+    val clientMutationSequence: Long,
 )

@@ -37,18 +37,21 @@ struct KwaborApp: App {
             controller: compositionRoot.favoritesController,
             commonStrings: exploreStore.strings,
             onListingOpen: catalogDetailStore.open,
-            onFavoriteChanged: { [weak exploreStore] listingID, favorited, scope in
+            onFavoriteChanged: { [weak exploreStore] listingID, favorited, clientMutationSequence, scope in
                 exploreStore?.applyFavoriteState(
                     listingID: listingID,
                     favorited: favorited,
+                    clientMutationSequence: clientMutationSequence,
                     scope: scope
                 )
             }
         )
-        exploreStore.setFavoriteChangeHandler { [weak favoritesStore] listingID, favorited, scope in
+        exploreStore.setFavoriteChangeHandler {
+            [weak favoritesStore] listingID, favorited, clientMutationSequence, scope in
             favoritesStore?.applyFavoriteState(
                 listingID: listingID,
                 favorited: favorited,
+                clientMutationSequence: clientMutationSequence,
                 scope: scope
             )
         }

@@ -134,7 +134,7 @@ private struct FavoritesFilters: View {
                 )
                 FavoritesFilterPill(
                     label: store.strings.hotelsRestaurantsFilter,
-                    selected: store.state.selectedFilter == .hotelsRestaurants,
+                    selected: store.state.selectedFilter == FavoritesFilter.hotelsrestaurants,
                     action: store.selectHotelsRestaurants
                 )
             }

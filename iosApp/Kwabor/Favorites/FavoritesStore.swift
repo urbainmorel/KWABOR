@@ -14,12 +14,11 @@ final class FavoritesStore: ObservableObject {
 
     private let controller: IosFavoritesController
     private let onListingOpen: (String) -> Void
-    private let onFavoriteChanged: (String, Bool, ViewerSessionScope) -> Void
+    private let onFavoriteChanged: (String, Bool, Int64, ViewerSessionScope) -> Void
     private var paginationGuard = FavoritesPaginationGuard()
     private var currentViewerID: String?
     private var currentViewerScope: ViewerSessionScope?
     private var hasAppliedViewerContext = false
-    private var removalOwnerByListingID: [String: String] = [:]
     private var lastAnnouncement: String?
 
     private(set) var latestAnnouncement: String?
@@ -28,7 +27,7 @@ final class FavoritesStore: ObservableObject {
         controller: IosFavoritesController,
         commonStrings: KwaborStrings,
         onListingOpen: @escaping (String) -> Void,
-        onFavoriteChanged: @escaping (String, Bool, ViewerSessionScope) -> Void
+        onFavoriteChanged: @escaping (String, Bool, Int64, ViewerSessionScope) -> Void
     ) {
         self.controller = controller
         self.commonStrings = commonStrings
@@ -64,7 +63,6 @@ final class FavoritesStore: ObservableObject {
         currentViewerScope = nil
         isViewerTransitionPending = shouldHide && accountID != nil
         paginationGuard.reset()
-        removalOwnerByListingID.removeAll()
     }
 
     func commitViewerScope(_ scope: ViewerSessionScope) {
@@ -100,7 +98,7 @@ final class FavoritesStore: ObservableObject {
     }
 
     func selectHotelsRestaurants() {
-        guard state.selectedFilter != .hotelsRestaurants else { return }
+        guard state.selectedFilter != FavoritesFilter.hotelsrestaurants else { return }
         selectFilter { controller.actions.selectHotelsRestaurants() }
     }
 
@@ -154,25 +152,25 @@ final class FavoritesStore: ObservableObject {
     }
 
     func removeFavorite(_ listingID: String) {
-        guard let viewerID = currentViewerID,
-              canDisplayPrivateContent,
+        guard canDisplayPrivateContent,
               state.items.contains(where: { $0.id == listingID }),
               !state.removingListingIds.contains(listingID) else {
             return
         }
-        removalOwnerByListingID[listingID] = viewerID
         controller.actions.removeFavorite(listingId: listingID)
     }
 
     func applyFavoriteState(
         listingID: String,
         favorited: Bool,
+        clientMutationSequence: Int64,
         scope: ViewerSessionScope
     ) {
         guard matchesCurrentViewerScope(scope) else { return }
         controller.actions.applyExternalFavoriteState(
             listingId: listingID,
             favorited: favorited,
+            clientMutationSequence: clientMutationSequence,
             scope: scope
         )
     }
@@ -195,11 +193,12 @@ final class FavoritesStore: ObservableObject {
                     self?.acceptListingOpen(listingID, scope: scope)
                 }
             },
-            favoriteObserver: { [weak self] listingID, favorited, scope in
+            favoriteObserver: { [weak self] listingID, favorited, clientMutationSequence, scope in
                 MainActor.assumeIsolated {
                     self?.acceptFavoriteChanged(
                         listingID: listingID,
                         favorited: favorited.boolValue,
+                        clientMutationSequence: clientMutationSequence.int64Value,
                         scope: scope
                     )
                 }
@@ -217,7 +216,6 @@ final class FavoritesStore: ObservableObject {
         if updatedState.isAccountReady == (currentViewerID != nil) {
             isViewerTransitionPending = false
         }
-        clearFailedRemovalOwnership(using: updatedState)
         publishAnnouncementIfNeeded(previousState: previousState, updatedState: updatedState)
     }
 
@@ -233,33 +231,20 @@ final class FavoritesStore: ObservableObject {
     private func acceptFavoriteChanged(
         listingID: String,
         favorited: Bool,
+        clientMutationSequence: Int64,
         scope: ViewerSessionScope
     ) {
-        guard let viewerID = currentViewerID,
-              matchesCurrentViewerScope(scope),
+        guard matchesCurrentViewerScope(scope),
               canDisplayPrivateContent else {
             return
         }
-        if !favorited {
-            guard removalOwnerByListingID[listingID] == viewerID else { return }
-            removalOwnerByListingID[listingID] = nil
-        }
-        onFavoriteChanged(listingID, favorited, scope)
+        onFavoriteChanged(listingID, favorited, clientMutationSequence, scope)
     }
 
     private func matchesCurrentViewerScope(_ scope: ViewerSessionScope) -> Bool {
         guard let currentViewerScope else { return false }
         return scope.accountId == currentViewerScope.accountId &&
             scope.epoch == currentViewerScope.epoch
-    }
-
-    private func clearFailedRemovalOwnership(using updatedState: FavoritesUiState) {
-        let visibleIDs = Set(updatedState.items.map(\.id))
-        for listingID in Array(removalOwnerByListingID.keys) where
-            visibleIDs.contains(listingID) &&
-            !updatedState.removingListingIds.contains(listingID) {
-            removalOwnerByListingID[listingID] = nil
-        }
     }
 
     private func publishAnnouncementIfNeeded(

@@ -93,6 +93,7 @@ sealed interface FavoritesIntent {
     data class ExternalFavoriteStateChanged(
         val listingId: String,
         val favorited: Boolean,
+        val clientMutationSequence: Long,
         val scope: ViewerSessionScope,
     ) : FavoritesIntent
 
@@ -120,6 +121,7 @@ sealed interface FavoritesEffect {
     data class FavoriteChanged(
         val listingId: String,
         val favorited: Boolean,
+        val clientMutationSequence: Long,
         override val scope: ViewerSessionScope,
     ) : FavoritesEffect
 }

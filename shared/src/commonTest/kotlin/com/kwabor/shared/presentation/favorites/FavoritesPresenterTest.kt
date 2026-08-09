@@ -154,10 +154,20 @@ class FavoritesPresenterTest {
         val repository = RecordingFavoritesRepository(
             mutationResults = mutableListOf(
                 DomainResult.Success(
-                    FavoriteMutation(FAVORITE_ID, favorited = false, favoritedAtEpochMilliseconds = null),
+                    FavoriteMutation(
+                        listingId = FAVORITE_ID,
+                        favorited = false,
+                        favoritedAtEpochMilliseconds = null,
+                        clientMutationSequence = 1L,
+                    ),
                 ),
                 DomainResult.Success(
-                    FavoriteMutation(FAVORITE_ID, favorited = true, favoritedAtEpochMilliseconds = 1_000L),
+                    FavoriteMutation(
+                        listingId = FAVORITE_ID,
+                        favorited = true,
+                        favoritedAtEpochMilliseconds = 1_000L,
+                        clientMutationSequence = 2L,
+                    ),
                 ),
             ),
         )
@@ -167,6 +177,7 @@ class FavoritesPresenterTest {
         val malformed = presenter.removeFavorite(FAVORITE_ID, strings)
 
         assertIs<FavoriteRemovalOutcome.Removed>(removed)
+        assertEquals(1L, removed.clientMutationSequence)
         assertIs<FavoriteRemovalOutcome.Failed>(malformed)
         assertEquals(listOf(FAVORITE_ID to false, FAVORITE_ID to false), repository.mutations)
     }
@@ -178,7 +189,12 @@ internal class RecordingFavoritesRepository(
     ),
     val mutationResults: MutableList<DomainResult<FavoriteMutation>> = mutableListOf(
         DomainResult.Success(
-            FavoriteMutation(FAVORITE_ID, favorited = false, favoritedAtEpochMilliseconds = null),
+            FavoriteMutation(
+                listingId = FAVORITE_ID,
+                favorited = false,
+                favoritedAtEpochMilliseconds = null,
+                clientMutationSequence = 1L,
+            ),
         ),
     ),
 ) : FavoritesRepository {

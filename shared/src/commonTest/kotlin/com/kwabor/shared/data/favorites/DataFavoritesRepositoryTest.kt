@@ -55,6 +55,7 @@ class DataFavoritesRepositoryTest {
         assertEquals(true, dataSource.lastFavorited)
         assertEquals(FAVORITE_LISTING_ID_ONE, mutation.listingId)
         assertEquals(true, mutation.favorited)
+        assertEquals(1L, mutation.clientMutationSequence)
     }
 
     @Test
@@ -83,9 +84,11 @@ class DataFavoritesRepositoryTest {
 
         assertEquals(listOf(false), dataSource.requestedStates)
         firstMutationGate.complete(Unit)
-        assertIs<DomainResult.Success<FavoriteMutation>>(removal.await())
-        assertIs<DomainResult.Success<FavoriteMutation>>(addition.await())
+        val removed = assertIs<DomainResult.Success<FavoriteMutation>>(removal.await()).value
+        val added = assertIs<DomainResult.Success<FavoriteMutation>>(addition.await()).value
         assertEquals(listOf(false, true), dataSource.requestedStates)
+        assertEquals(1L, removed.clientMutationSequence)
+        assertEquals(2L, added.clientMutationSequence)
         assertTrue(dataSource.serverFavorited)
     }
 
@@ -105,8 +108,9 @@ class DataFavoritesRepositoryTest {
         assertEquals(listOf(false), dataSource.requestedStates)
         firstMutationGate.complete(Unit)
         removal.join()
-        assertIs<DomainResult.Success<FavoriteMutation>>(addition.await())
+        val added = assertIs<DomainResult.Success<FavoriteMutation>>(addition.await()).value
         assertEquals(listOf(false, true), dataSource.requestedStates)
+        assertEquals(2L, added.clientMutationSequence)
         assertTrue(dataSource.serverFavorited)
     }
 

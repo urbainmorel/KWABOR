@@ -85,7 +85,11 @@ class SupabaseFavoritesDataSourceTest {
             val mutation = SupabaseFavoritesDataSource(client.postgrest).setFavorite(
                 listingId = FAVORITE_LISTING_ID_ONE,
                 favorited = true,
-            ).toDomain(FAVORITE_LISTING_ID_ONE, expectedFavorited = true)
+            ).toDomain(
+                expectedListingId = FAVORITE_LISTING_ID_ONE,
+                expectedFavorited = true,
+                clientMutationSequence = 1L,
+            )
 
             assertEquals(true, mutation.favorited)
             assertEquals(FAVORITE_LISTING_ID_ONE, mutation.listingId)

@@ -45,16 +45,20 @@ internal fun FavoritesEffectHandler(
                     CatalogDetailIntent.Open(effect.listingId),
                 )
                 is FavoritesEffect.FavoriteChanged -> exploreViewModel.onIntent(
-                    ExploreIntent.FavoriteStateChanged(
-                        listingId = effect.listingId,
-                        favorited = effect.favorited,
-                        scope = effect.scope,
-                    ),
+                    effect.toExploreIntent(),
                 )
             }
         }
     }
 }
+
+internal fun FavoritesEffect.FavoriteChanged.toExploreIntent(): ExploreIntent.FavoriteStateChanged =
+    ExploreIntent.FavoriteStateChanged(
+        listingId = listingId,
+        favorited = favorited,
+        clientMutationSequence = clientMutationSequence,
+        scope = scope,
+    )
 
 internal fun FavoritesViewModel.screenActions(onBack: () -> Unit): FavoritesScreenActions = FavoritesScreenActions(
     onBack = onBack,

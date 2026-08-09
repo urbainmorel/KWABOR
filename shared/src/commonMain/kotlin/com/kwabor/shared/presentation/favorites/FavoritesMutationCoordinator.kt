@@ -27,6 +27,7 @@ internal class FavoritesMutationCoordinator(
     private var mutationGeneration = 0L
     private val mutationJobs = mutableMapOf<String, Job>()
     private val mutationTokens = mutableMapOf<String, Long>()
+    private val lastConfirmedMutationSequences = mutableMapOf<String, Long>()
 
     init {
         runtimeScope.coroutineContext[Job]?.invokeOnCompletion { effectChannel.close() }
@@ -36,14 +37,20 @@ internal class FavoritesMutationCoordinator(
         mutationJobs.values.forEach { job -> job.cancel() }
         mutationJobs.clear()
         mutationTokens.clear()
+        lastConfirmedMutationSequences.clear()
     }
 
     suspend fun applyExternalFavoriteState(intent: FavoritesIntent.ExternalFavoriteStateChanged) {
         val action = lifecycleMutex.withLock {
             val listingId = intent.listingId.trim()
-            if (!canApplyExternalState(listingId, intent.scope)) {
+            if (!intent.canApplyTo(listingId, sessionState, stateStore)) {
                 return@withLock FavoritesPageAction.None
             }
+            val lastConfirmedSequence = lastConfirmedMutationSequences[listingId] ?: 0L
+            if (intent.clientMutationSequence <= lastConfirmedSequence) {
+                return@withLock FavoritesPageAction.None
+            }
+            lastConfirmedMutationSequences[listingId] = intent.clientMutationSequence
             if (intent.favorited) {
                 applyExternalAdditionLocked(listingId, intent.scope)
             } else {
@@ -75,15 +82,8 @@ internal class FavoritesMutationCoordinator(
         }
     }
 
-    private fun canApplyExternalState(listingId: String, scope: ViewerSessionScope): Boolean = listingId.isNotEmpty() &&
-        scope.isAuthenticated &&
-        scope == sessionState.activeViewerScope &&
-        stateStore.value.viewerScope == scope
-
     private fun applyExternalAdditionLocked(listingId: String, scope: ViewerSessionScope): FavoritesPageAction {
         sessionState.removedListingIds -= listingId
-        mutationJobs.remove(listingId)?.cancel()
-        mutationTokens.remove(listingId)
         stateStore.updateForScope(scope) { current ->
             val clearsTargetMessage = current.mutationMessageListingId == listingId
             val mutationMessageIsOffline = current.mutationMessageIsOffline && !clearsTargetMessage
@@ -106,8 +106,6 @@ internal class FavoritesMutationCoordinator(
 
     private fun applyExternalRemovalLocked(listingId: String, scope: ViewerSessionScope): FavoritesPageAction {
         sessionState.removedListingIds += listingId
-        mutationJobs.remove(listingId)?.cancel()
-        mutationTokens.remove(listingId)
         val updated = stateStore.updateForScope(scope) { current ->
             val clearsTargetMessage = current.mutationMessageListingId == listingId
             val mutationMessageIsOffline = current.mutationMessageIsOffline && !clearsTargetMessage
@@ -130,6 +128,7 @@ internal class FavoritesMutationCoordinator(
         val current = stateStore.value
         if (!canPrepareRemoval(current, listingId, sourceScope, scope)) return null
         val token = ++mutationGeneration
+        val baselineConfirmedSequence = lastConfirmedMutationSequences[listingId] ?: 0L
         mutationTokens[listingId] = token
         stateStore.updateForScope(scope) { latest ->
             val clearsTargetMessage = latest.mutationMessageListingId == listingId
@@ -143,7 +142,12 @@ internal class FavoritesMutationCoordinator(
                 viewerScope = scope,
             )
         } ?: return null
-        return FavoriteMutationLaunch(listingId = listingId, scope = scope, token = token)
+        return FavoriteMutationLaunch(
+            listingId = listingId,
+            scope = scope,
+            token = token,
+            baselineConfirmedSequence = baselineConfirmedSequence,
+        )
     }
 
     private fun canPrepareRemoval(
@@ -156,13 +160,15 @@ internal class FavoritesMutationCoordinator(
         sessionState.hasCurrentActiveAccount(stateStore) &&
         listingId.isNotEmpty() &&
         state.items.any { item -> item.id == listingId } &&
-        listingId !in state.removingListingIds
+        listingId !in mutationTokens
 
     private suspend fun launchRemoval(launch: FavoriteMutationLaunch) {
         lifecycleMutex.withLock {
-            if (!launch.isCurrent()) return@withLock
+            if (!launch.isCurrent(sessionState, stateStore, mutationTokens)) return@withLock
             val job = runtimeScope.launch(start = CoroutineStart.LAZY) {
-                val canStart = lifecycleMutex.withLock { launch.isCurrent() }
+                val canStart = lifecycleMutex.withLock {
+                    launch.isCurrent(sessionState, stateStore, mutationTokens)
+                }
                 if (!canStart) return@launch
                 val outcome = presenter.removeFavorite(listingId = launch.listingId, strings = strings)
                 completeRemoval(launch, outcome)
@@ -174,19 +180,35 @@ internal class FavoritesMutationCoordinator(
 
     private suspend fun completeRemoval(launch: FavoriteMutationLaunch, outcome: FavoriteRemovalOutcome) {
         val completion = lifecycleMutex.withLock {
-            if (!launch.isCurrent()) return@withLock null
-            mutationJobs.remove(launch.listingId)
-            mutationTokens.remove(launch.listingId)
+            val ownsMutation = mutationTokens[launch.listingId] == launch.token
+            if (ownsMutation) {
+                mutationJobs.remove(launch.listingId)
+                mutationTokens.remove(launch.listingId)
+            }
+            if (!ownsMutation || !launch.hasCurrentScope(sessionState, stateStore)) return@withLock null
             when (outcome) {
-                is FavoriteRemovalOutcome.Removed -> completeRemovedLocked(launch, outcome)
+                is FavoriteRemovalOutcome.Removed -> completeConfirmedRemovalLocked(launch, outcome)
                 is FavoriteRemovalOutcome.Failed -> {
-                    completeFailedLocked(launch, outcome)
+                    completeFailedRemovalLocked(launch, outcome)
                     null
                 }
             }
         } ?: return
         completion.autoAppend?.let { backfill -> pageCoordinator.startAppend(backfill) }
         effectChannel.send(completion.effect)
+    }
+
+    private fun completeConfirmedRemovalLocked(
+        launch: FavoriteMutationLaunch,
+        outcome: FavoriteRemovalOutcome.Removed,
+    ): FavoriteRemovalCompletion? {
+        val lastConfirmedSequence = lastConfirmedMutationSequences[launch.listingId] ?: 0L
+        if (outcome.clientMutationSequence <= lastConfirmedSequence) {
+            clearPendingRemovalLocked(launch)
+            return null
+        }
+        lastConfirmedMutationSequences[launch.listingId] = outcome.clientMutationSequence
+        return completeRemovedLocked(launch, outcome)
     }
 
     private fun completeRemovedLocked(
@@ -211,13 +233,19 @@ internal class FavoritesMutationCoordinator(
             effect = FavoritesEffect.FavoriteChanged(
                 listingId = outcome.listingId,
                 favorited = false,
+                clientMutationSequence = outcome.clientMutationSequence,
                 scope = launch.scope,
             ),
             autoAppend = pageCoordinator.registerRemovalBackfillLocked(launch.scope, updated),
         )
     }
 
-    private fun completeFailedLocked(launch: FavoriteMutationLaunch, outcome: FavoriteRemovalOutcome.Failed) {
+    private fun completeFailedRemovalLocked(launch: FavoriteMutationLaunch, outcome: FavoriteRemovalOutcome.Failed) {
+        val lastConfirmedSequence = lastConfirmedMutationSequences[launch.listingId] ?: 0L
+        if (lastConfirmedSequence > launch.baselineConfirmedSequence) {
+            clearPendingRemovalLocked(launch)
+            return
+        }
         stateStore.updateForScope(launch.scope) { latest ->
             latest.copy(
                 isOffline = latest.contentIsOffline || outcome.isOffline,
@@ -230,16 +258,43 @@ internal class FavoritesMutationCoordinator(
         }
     }
 
-    private fun FavoriteMutationLaunch.isCurrent(): Boolean = sessionState.activeViewerScope == scope &&
-        stateStore.value.viewerScope == scope &&
-        mutationTokens[listingId] == token
+    private fun clearPendingRemovalLocked(launch: FavoriteMutationLaunch) {
+        stateStore.updateForScope(launch.scope) { latest ->
+            latest.copy(
+                removingListingIds = latest.removingListingIds - launch.listingId,
+                viewerScope = launch.scope,
+            )
+        }
+    }
 }
 
 private data class FavoriteMutationLaunch(
     val listingId: String,
     val scope: ViewerSessionScope,
     val token: Long,
+    val baselineConfirmedSequence: Long,
 )
+
+private fun FavoriteMutationLaunch.isCurrent(
+    sessionState: FavoritesSessionState,
+    stateStore: FavoritesStateStore,
+    mutationTokens: Map<String, Long>,
+): Boolean = hasCurrentScope(sessionState, stateStore) && mutationTokens[listingId] == token
+
+private fun FavoriteMutationLaunch.hasCurrentScope(
+    sessionState: FavoritesSessionState,
+    stateStore: FavoritesStateStore,
+): Boolean = sessionState.activeViewerScope == scope && stateStore.value.viewerScope == scope
+
+private fun FavoritesIntent.ExternalFavoriteStateChanged.canApplyTo(
+    normalizedListingId: String,
+    sessionState: FavoritesSessionState,
+    stateStore: FavoritesStateStore,
+): Boolean {
+    if (clientMutationSequence <= 0L || normalizedListingId.isEmpty()) return false
+    if (!scope.isAuthenticated || stateStore.value.viewerScope != scope) return false
+    return scope == sessionState.activeViewerScope
+}
 
 private data class FavoriteRemovalCompletion(
     val effect: FavoritesEffect.FavoriteChanged,

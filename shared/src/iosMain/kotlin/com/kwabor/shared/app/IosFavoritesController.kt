@@ -33,8 +33,20 @@ class IosFavoritesActions internal constructor(
         dispatch(FavoritesIntent.ViewerContextChanged(scope))
     }
 
-    fun applyExternalFavoriteState(listingId: String, favorited: Boolean, scope: ViewerSessionScope) {
-        dispatch(FavoritesIntent.ExternalFavoriteStateChanged(listingId, favorited, scope))
+    fun applyExternalFavoriteState(
+        listingId: String,
+        favorited: Boolean,
+        clientMutationSequence: Long,
+        scope: ViewerSessionScope,
+    ) {
+        dispatch(
+            FavoritesIntent.ExternalFavoriteStateChanged(
+                listingId = listingId,
+                favorited = favorited,
+                clientMutationSequence = clientMutationSequence,
+                scope = scope,
+            ),
+        )
     }
 
     fun selectAll() {
@@ -143,7 +155,7 @@ class IosFavoritesController private constructor(
     private val runtime = runtimeProvider(scope, strings)
     private var stateObserver: ((FavoritesUiState) -> Unit)? = null
     private var detailObserver: ((String, ViewerSessionScope) -> Unit)? = null
-    private var favoriteObserver: ((String, Boolean, ViewerSessionScope) -> Unit)? = null
+    private var favoriteObserver: ((String, Boolean, Long, ViewerSessionScope) -> Unit)? = null
     private var observationVersion = 0L
     private var deliveredStateVersion = -1L
     private var deliveredState: FavoritesUiState? = null
@@ -182,6 +194,7 @@ class IosFavoritesController private constructor(
                             favoriteObserver?.invoke(
                                 effect.listingId,
                                 effect.favorited,
+                                effect.clientMutationSequence,
                                 effect.scope,
                             )
                         }
@@ -194,7 +207,7 @@ class IosFavoritesController private constructor(
     fun observe(
         stateObserver: (FavoritesUiState) -> Unit,
         detailObserver: (String, ViewerSessionScope) -> Unit,
-        favoriteObserver: (String, Boolean, ViewerSessionScope) -> Unit,
+        favoriteObserver: (String, Boolean, Long, ViewerSessionScope) -> Unit,
     ) {
         if (isClosed) return
         observationVersion += 1

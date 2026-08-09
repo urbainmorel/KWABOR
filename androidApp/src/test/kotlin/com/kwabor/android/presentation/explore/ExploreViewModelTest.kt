@@ -244,7 +244,18 @@ class ExploreViewModelTest {
         viewModel.onIntent(ExploreIntent.ViewerContextChanged(scope))
         advanceUntilIdle()
 
-        viewModel.onIntent(ExploreIntent.FavoriteStateChanged(TEST_LISTING_ID, favorited = true, scope = scope))
+        val intent =
+            ExploreIntent.FavoriteStateChanged(
+                listingId = TEST_LISTING_ID,
+                favorited = true,
+                clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+                scope = scope,
+            )
+        val sharedIntent = intent.toSharedIntent()
+
+        assertEquals(TEST_CLIENT_MUTATION_SEQUENCE, sharedIntent.clientMutationSequence)
+        assertEquals(scope, sharedIntent.scope)
+        viewModel.onIntent(intent)
         advanceUntilIdle()
 
         val listing = viewModel.state.value.listings.single()
@@ -268,6 +279,7 @@ class ExploreViewModelTest {
         val effect = assertIs<ExploreEffect.FavoriteChanged>(viewModel.effects.first())
         assertEquals(TEST_LISTING_ID, effect.listingId)
         assertTrue(effect.favorited)
+        assertEquals(TEST_CLIENT_MUTATION_SEQUENCE, effect.clientMutationSequence)
         assertEquals(scope, effect.scope)
     }
 
@@ -746,12 +758,15 @@ private class ViewModelCatalogRepository(
 private class ViewModelFavoritesRepository(
     private val behavior: ViewModelCatalogRepository,
 ) : FavoritesRepository {
+    private var clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE - 1L
+
     override suspend fun listFavorites(
         filter: ListingType?,
         page: ListingPageRequest,
     ): DomainResult<FavoriteListingPage> = DomainResult.Success(FavoriteListingPage(emptyList(), null))
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> {
+        val sequence = ++clientMutationSequence
         behavior.interactionGate?.also { gate ->
             behavior.interactionGate = null
             gate.await()
@@ -766,6 +781,7 @@ private class ViewModelFavoritesRepository(
                 FavoriteMutation(
                     listingId = listingId,
                     favorited = favorited,
+                    clientMutationSequence = sequence,
                     favoritedAtEpochMilliseconds = if (favorited) {
                         FixedViewModelClock.nowEpochMilliseconds()
                     } else {
@@ -804,3 +820,4 @@ private fun testListing(id: String = TEST_LISTING_ID): ListingSummary = ListingS
 
 private const val TEST_LISTING_ID = "ouidah-gate"
 private const val TEST_CITY_ID = "cotonou"
+private const val TEST_CLIENT_MUTATION_SEQUENCE = 4_294_967_297L

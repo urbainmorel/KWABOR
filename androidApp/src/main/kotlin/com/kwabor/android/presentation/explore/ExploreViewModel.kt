@@ -63,6 +63,7 @@ internal sealed interface ExploreIntent {
     data class FavoriteStateChanged(
         val listingId: String,
         val favorited: Boolean,
+        val clientMutationSequence: Long,
         val scope: ViewerSessionScope,
     ) : Viewer
 }
@@ -77,6 +78,7 @@ internal sealed interface ExploreEffect {
     data class FavoriteChanged(
         val listingId: String,
         val favorited: Boolean,
+        val clientMutationSequence: Long,
         val scope: ViewerSessionScope,
     ) : ExploreEffect
 
@@ -115,6 +117,7 @@ internal class ExploreViewModel(
                     ExploreEffect.FavoriteChanged(
                         listingId = effect.listingId,
                         favorited = effect.favorited,
+                        clientMutationSequence = effect.clientMutationSequence,
                         scope = effect.scope,
                     ),
                 )
@@ -163,13 +166,7 @@ internal class ExploreViewModel(
                 runtime.dispatch(SharedExploreIntent.ClearPendingAuthentication)
             is ExploreIntent.ViewerContextChanged ->
                 runtime.dispatch(SharedExploreIntent.ViewerContextChanged(intent.scope))
-            is ExploreIntent.FavoriteStateChanged -> runtime.dispatch(
-                SharedExploreIntent.FavoriteStateChanged(
-                    listingId = intent.listingId,
-                    favorited = intent.favorited,
-                    scope = intent.scope,
-                ),
-            )
+            is ExploreIntent.FavoriteStateChanged -> runtime.dispatch(intent.toSharedIntent())
         }
     }
 
@@ -218,3 +215,11 @@ private fun ExploreIntent.Feed.toSharedIntent(): SharedExploreIntent.Feed = when
     ExploreIntent.Refresh -> SharedExploreIntent.Refresh
     ExploreIntent.LoadNext -> SharedExploreIntent.LoadNext
 }
+
+internal fun ExploreIntent.FavoriteStateChanged.toSharedIntent(): SharedExploreIntent.FavoriteStateChanged =
+    SharedExploreIntent.FavoriteStateChanged(
+        listingId = listingId,
+        favorited = favorited,
+        clientMutationSequence = clientMutationSequence,
+        scope = scope,
+    )

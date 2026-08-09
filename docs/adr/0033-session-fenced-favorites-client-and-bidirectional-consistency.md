@@ -84,10 +84,31 @@ Explore et Favoris partagent la même instance singleton de `FavoritesRepository
 ne peut donc pas être confirmée puis dépassée côté serveur par une requête locale plus ancienne
 encore en vol. Le dernier appel entré dans cette séquence est la dernière écriture exécutée.
 
+Cette même section critique attribue à chaque tentative une `clientMutationSequence` strictement
+croissante. Seules les confirmations serveur réussies propagent cette séquence aux runtimes ; des
+trous restent donc possibles après une validation ou un transport en échec. La séquence est locale
+à l'instance singleton du client, volatile et scoped : ce n'est ni une version serveur, ni un ordre
+persistant utilisable après redémarrage.
+
+Explore et Favoris mémorisent la dernière séquence confirmée séparément pour chaque `listingId` et
+pour le scope actif. Une confirmation dont la séquence est inférieure ou égale est ignorée avant de
+modifier l'état. Ce filtrage par fiche empêche un événement inter-surface retardé de rétablir un
+ancien état, sans rejeter la confirmation d'une fiche parce qu'une autre fiche porte une séquence
+plus élevée.
+
+Une confirmation serveur est liée au scope viewer, pas au contexte courant du feed. Un changement
+d'onglet ou de ville peut empêcher le commit visuel dans un snapshot Explore devenu obsolète, mais
+il ne peut pas supprimer l'événement `FavoriteChanged` tant que le scope viewer est inchangé. La
+surface Favoris reçoit donc toujours la confirmation et sa séquence monotone après une RPC réussie.
+Les ponts plateforme relaient toute confirmation dont le scope est courant ; ils ne déduisent pas
+sa validité depuis un spinner ou la présence momentanée de la fiche dans l'écran.
+
 Explore maintient une révision par `(listingId, interactionKind)`. Un événement Favori invalide une
 ancienne mutation Favori de la même fiche, mais n'invalide pas une mutation Like en vol. Le résultat
 Like fusionne seulement `liked` et `likes_count`; le résultat Favori fusionne seulement `favorited`.
-Les entrées de file volatile sont fusionnées avec la même clé au lieu de remplacer toute la liste.
+Cette propriété reste vraie lorsqu'une réponse de feed plus ancienne est fusionnée : chaque kind ne
+protège que ses propres champs. Les entrées de file volatile sont fusionnées avec la même clé au lieu
+de remplacer toute la liste.
 
 Favoris conserve un tombstone en mémoire lorsqu'un retrait est confirmé pendant une page en vol.
 Un chargement complet ou un refresh autoritatif commencé ensuite peut le purger ; l'append ne le
@@ -149,6 +170,13 @@ bufferisé ne puisse ni ouvrir une fiche privée ni modifier l'autre runtime.
 - Like en vol pendant un changement Favori, sans restauration du Favori ni de sa file ;
 - retrait et ajout concurrents depuis les deux surfaces, avec ordre transport sérialisé et dernier
   appel conservé côté serveur ;
+- test d'intégration commun avec le vrai `DataFavoritesRepository`, un transport ordonné et les deux
+  runtimes : ordres `false → true` et `true → false`, séquences `1 → 2`, convergence serveur/Explore/
+  Favoris, puis rejet d'une confirmation obsolète rejouée pour la même fiche ;
+- confirmation Explore pendant un changement d'onglet et de ville : snapshot contextuel protégé,
+  mais effet confirmé et synchronisation Favoris conservés pour le même scope viewer ;
+- confirmation externe reçue alors que la fiche est absente du feed : séquence et état mémorisés,
+  ancienne completion locale rejetée et réponse de feed antérieure corrigée par l'overlay ;
 - retrait pendant page en vol, ajout externe visible et hors écran, réentrée autoritative ;
 - remplissage automatique après retrait, y compris réponse tardive entièrement tombstonée, avec
   arrêt terminal ou sur erreur d'append ;

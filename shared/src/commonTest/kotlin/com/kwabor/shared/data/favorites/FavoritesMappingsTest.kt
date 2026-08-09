@@ -258,21 +258,28 @@ class FavoritesMappingsTest {
     }
 
     @Test
-    fun mutation_requiresMatchingIdStateAndTimestampShape() {
+    fun mutation_mapsValidStateTimestampAndSequence() {
         val added = validFavoriteMutationRow().toDomain(
             expectedListingId = FAVORITE_LISTING_ID_ONE,
             expectedFavorited = true,
+            clientMutationSequence = 7L,
         )
         val removed = validFavoriteMutationRow(favorited = false).toDomain(
             expectedListingId = FAVORITE_LISTING_ID_ONE,
             expectedFavorited = false,
+            clientMutationSequence = 8L,
         )
 
         assertEquals(true, added.favorited)
         assertEquals(1_785_837_600_000, added.favoritedAtEpochMilliseconds)
+        assertEquals(7L, added.clientMutationSequence)
         assertEquals(false, removed.favorited)
         assertNull(removed.favoritedAtEpochMilliseconds)
+        assertEquals(8L, removed.clientMutationSequence)
+    }
 
+    @Test
+    fun mutation_rejectsMismatchedShapeAndNonPositiveSequence() {
         val invalidRows = listOf(
             validFavoriteMutationRow(listingId = FAVORITE_LISTING_ID_TWO),
             validFavoriteMutationRow().copy(favoritedByCurrentUser = false),
@@ -281,8 +288,19 @@ class FavoritesMappingsTest {
         )
         invalidRows.forEach { row ->
             assertFailsWith<FavoritesDataException.Unexpected> {
-                row.toDomain(FAVORITE_LISTING_ID_ONE, expectedFavorited = true)
+                row.toDomain(
+                    expectedListingId = FAVORITE_LISTING_ID_ONE,
+                    expectedFavorited = true,
+                    clientMutationSequence = 1L,
+                )
             }
+        }
+        assertFailsWith<FavoritesDataException.Unexpected> {
+            validFavoriteMutationRow().toDomain(
+                expectedListingId = FAVORITE_LISTING_ID_ONE,
+                expectedFavorited = true,
+                clientMutationSequence = 0L,
+            )
         }
     }
 }
