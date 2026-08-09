@@ -1,5 +1,6 @@
 package com.kwabor.android.app
 
+import android.app.Application
 import android.content.Context
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
@@ -17,7 +18,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [TEST_SDK], manifest = Config.NONE)
+@Config(application = Application::class, sdk = [TEST_SDK], manifest = Config.NONE)
 class FavoritesSavedStackNavigationTest {
     @Test
     fun coldGuestRestore_resetsHomeAndClearsRestoredPrivateProfileStack() {
@@ -63,8 +64,13 @@ class FavoritesSavedStackNavigationTest {
             navigatorProvider.addNavigator(ComposeNavigator())
             graph = createGraph(startDestination = HomeRoute) {
                 composable<HomeRoute> {}
+                composable<GuideDiscoveryRoute> {}
+                composable<SocialRoute> {}
+                composable<AddRoute> {}
+                composable<NotificationsRoute> {}
                 composable<ProfileRoute> {}
                 composable<FavoritesRoute> {}
+                composable<SettingsRoute> {}
             }
         }
     }
@@ -74,4 +80,4 @@ private inline fun <reified Route : Any> assertCurrentRoute(navController: NavHo
     assertTrue(requireNotNull(navController.currentDestination).hasRoute<Route>())
 }
 
-private const val TEST_SDK = 34
+private const val TEST_SDK = 35

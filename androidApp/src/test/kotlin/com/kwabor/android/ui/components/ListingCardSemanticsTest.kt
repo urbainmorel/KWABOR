@@ -1,5 +1,6 @@
 package com.kwabor.android.ui.components
 
+import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -26,7 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [TEST_SDK], manifest = Config.NONE)
+@Config(application = Application::class, sdk = [TEST_SDK], manifest = Config.NONE)
 class ListingCardSemanticsTest {
     @get:Rule
     val composeRule = createEmptyComposeRule()
@@ -51,7 +52,8 @@ class ListingCardSemanticsTest {
         composeRule.onAllNodesWithContentDescription(OPEN_DESCRIPTION).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription(strings.favorites.eventEndedAccessibility).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription(strings.favorites.removeFavorite).assertCountEquals(1)
-        composeRule.onAllNodesWithText(CARD_TITLE, useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CARD_TITLE).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CARD_TITLE, useUnmergedTree = true).assertCountEquals(1)
         composeRule.onNodeWithContentDescription(OPEN_DESCRIPTION).assertTraversalIndex(OPEN_TRAVERSAL_INDEX)
         composeRule.onNodeWithContentDescription(strings.favorites.eventEndedAccessibility)
             .assertTraversalIndex(ENDED_TRAVERSAL_INDEX)
@@ -99,7 +101,7 @@ private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTraversalInd
     SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, expected),
 )
 
-private const val TEST_SDK = 34
+private const val TEST_SDK = 35
 private const val OPEN_TRAVERSAL_INDEX = 0f
 private const val ENDED_TRAVERSAL_INDEX = 0.5f
 private const val REMOVE_TRAVERSAL_INDEX = 1f

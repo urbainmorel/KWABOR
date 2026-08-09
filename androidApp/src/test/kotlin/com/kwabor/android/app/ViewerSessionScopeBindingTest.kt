@@ -1,5 +1,6 @@
 package com.kwabor.android.app
 
+import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
@@ -19,7 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [TEST_SDK], manifest = Config.NONE)
+@Config(application = Application::class, sdk = [TEST_SDK], manifest = Config.NONE)
 class ViewerSessionScopeBindingTest {
     @get:Rule
     val composeRule = createEmptyComposeRule()
@@ -73,5 +74,5 @@ private data class PublishedViewerContext(
     val accountSetupComplete: Boolean,
 )
 
-private const val TEST_SDK = 34
+private const val TEST_SDK = 35
 private const val ACCOUNT_ID = "00000000-0000-4000-8000-000000000001"
