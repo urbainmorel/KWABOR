@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
@@ -34,14 +36,20 @@ import com.kwabor.shared.i18n.KwaborStrings
 
 internal data class ProfileScreenUiModel(val email: String?)
 
+internal data class ProfileScreenActions(
+    val onFavoritesRequested: () -> Unit,
+    val onSettingsRequested: () -> Unit,
+)
+
 internal object ProfileScreen {
     @Composable
     operator fun invoke(
         model: ProfileScreenUiModel,
         strings: KwaborStrings,
-        onSettingsRequested: () -> Unit,
+        actions: ProfileScreenActions,
         modifier: Modifier = Modifier,
     ) {
+        val entryLabels = profileEntryLabels(strings)
         Surface(modifier = modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -59,7 +67,17 @@ internal object ProfileScreen {
                 Spacer(Modifier.height(KwaborSpacing.Xxl))
                 ProfileEmail(email = model.email, strings = strings)
                 Spacer(Modifier.height(KwaborSpacing.Xxl))
-                SettingsEntry(strings = strings, onClick = onSettingsRequested)
+                ProfileEntry(
+                    title = entryLabels.favorites,
+                    icon = Icons.Default.Bookmark,
+                    onClick = actions.onFavoritesRequested,
+                )
+                Spacer(Modifier.height(KwaborSpacing.Lg))
+                SettingsEntry(
+                    title = entryLabels.settings,
+                    strings = strings,
+                    onClick = actions.onSettingsRequested,
+                )
             }
         }
     }
@@ -80,7 +98,7 @@ private fun ProfileEmail(email: String?, strings: KwaborStrings) {
 }
 
 @Composable
-private fun SettingsEntry(strings: KwaborStrings, onClick: () -> Unit) {
+private fun SettingsEntry(title: String, strings: KwaborStrings, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier
@@ -90,12 +108,43 @@ private fun SettingsEntry(strings: KwaborStrings, onClick: () -> Unit) {
         shape = RoundedCornerShape(KwaborRadius.Card),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        SettingsEntryContent(strings)
+        SettingsEntryContent(title = title, strings = strings)
     }
 }
 
 @Composable
-private fun SettingsEntryContent(strings: KwaborStrings) {
+private fun ProfileEntry(title: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
+            .semantics { role = Role.Button },
+        shape = RoundedCornerShape(KwaborRadius.Card),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            modifier = Modifier.padding(KwaborSpacing.Lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(imageVector = icon, contentDescription = null)
+            Spacer(Modifier.width(KwaborSpacing.Lg))
+            Text(
+                text = title,
+                modifier = Modifier.weight(WEIGHT_CONTENT),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(Modifier.width(KwaborSpacing.Lg))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsEntryContent(title: String, strings: KwaborStrings) {
     Row(
         modifier = Modifier.padding(KwaborSpacing.Lg),
         verticalAlignment = Alignment.CenterVertically,
@@ -107,7 +156,7 @@ private fun SettingsEntryContent(strings: KwaborStrings) {
         Spacer(Modifier.width(KwaborSpacing.Lg))
         Column(modifier = Modifier.weight(WEIGHT_CONTENT)) {
             Text(
-                text = strings.settings.title,
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(KwaborSpacing.Xs))
@@ -126,5 +175,15 @@ private fun SettingsEntryContent(strings: KwaborStrings) {
 }
 
 internal fun profileEmailValue(email: String?, strings: KwaborStrings): String = strings.settings.accountEmail(email)
+
+internal data class ProfileEntryLabels(
+    val favorites: String,
+    val settings: String,
+)
+
+internal fun profileEntryLabels(strings: KwaborStrings): ProfileEntryLabels = ProfileEntryLabels(
+    favorites = strings.favorites.title,
+    settings = strings.settings.title,
+)
 
 private const val WEIGHT_CONTENT = 1f

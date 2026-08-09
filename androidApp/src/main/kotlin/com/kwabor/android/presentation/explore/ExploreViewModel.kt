@@ -11,6 +11,8 @@ import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.ExploreRuntime
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
+import com.kwabor.shared.presentation.session.ViewerSessionScope
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -24,6 +26,10 @@ import com.kwabor.shared.presentation.explore.ExploreIntent as SharedExploreInte
 internal sealed interface ExploreIntent {
     sealed interface Feed : ExploreIntent
 
+    sealed interface Location : ExploreIntent
+
+    sealed interface Viewer : ExploreIntent
+
     data class SelectTab(val tab: ExploreTab) : Feed
 
     data class SelectChip(val chip: ExploreChip) : Feed
@@ -34,29 +40,46 @@ internal sealed interface ExploreIntent {
 
     data object LoadNext : Feed
 
-    data class SelectCity(val cityId: String) : ExploreIntent
+    data class SelectCity(val cityId: String) : Location
 
-    data class ToggleLike(val listingId: String) : ExploreIntent
+    data class ToggleLike(val listingId: String) : Viewer
 
-    data class ToggleFavorite(val listingId: String) : ExploreIntent
+    data class ToggleFavorite(val listingId: String) : Viewer
 
-    data class LocationPermissionResult(val granted: Boolean) : ExploreIntent
+    data class LocationPermissionResult(val granted: Boolean) : Location
 
-    data object OpenCitySelector : ExploreIntent
+    data object OpenCitySelector : Location
 
-    data object CloseCitySelector : ExploreIntent
+    data object CloseCitySelector : Location
 
-    data object RequestLocation : ExploreIntent
+    data object RequestLocation : Location
 
-    data object ReplayPendingInteraction : ExploreIntent
+    data object ReplayPendingInteraction : Viewer
 
-    data class ViewerContextChanged(val viewerId: String?) : ExploreIntent
+    data object ClearPendingAuthentication : Viewer
+
+    data class ViewerContextChanged(val scope: ViewerSessionScope) : Viewer
+
+    data class FavoriteStateChanged(
+        val listingId: String,
+        val favorited: Boolean,
+        val clientMutationSequence: Long,
+        val scope: ViewerSessionScope,
+    ) : Viewer
 }
 
 internal sealed interface ExploreEffect {
     data class AuthenticationRequired(
         val kind: ExploreInteractionKind,
         val suggestedCityId: String?,
+        val scope: ViewerSessionScope,
+    ) : ExploreEffect
+
+    data class FavoriteChanged(
+        val listingId: String,
+        val favorited: Boolean,
+        val clientMutationSequence: Long,
+        val scope: ViewerSessionScope,
     ) : ExploreEffect
 
     data object RequestLocationPermission : ExploreEffect
@@ -67,6 +90,7 @@ internal class ExploreViewModel(
     private val locationService: ApproximateLocationService,
     strings: KwaborStrings,
     private val coroutineScope: CoroutineScope,
+    private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
     private val track: (AnalyticsEvent) -> Unit = {},
 ) : ViewModel() {
     private val runtime = ExploreRuntime(
@@ -77,14 +101,33 @@ internal class ExploreViewModel(
     val state: StateFlow<ExploreUiState> = runtime.state
     val effects: Flow<ExploreEffect> = runtime.effects.transform { effect ->
         when (effect) {
-            is SharedExploreEffect.AuthenticationRequired -> emit(
-                ExploreEffect.AuthenticationRequired(
-                    kind = effect.kind,
-                    suggestedCityId = effect.suggestedCityId,
-                ),
-            )
+            is SharedExploreEffect.AuthenticationRequired -> if (
+                effect.scope == viewerSessionScopeTracker.currentScope
+            ) {
+                emit(
+                    ExploreEffect.AuthenticationRequired(
+                        kind = effect.kind,
+                        suggestedCityId = effect.suggestedCityId,
+                        scope = effect.scope,
+                    ),
+                )
+            }
+            is SharedExploreEffect.FavoriteChanged -> if (effect.scope == viewerSessionScopeTracker.currentScope) {
+                emit(
+                    ExploreEffect.FavoriteChanged(
+                        listingId = effect.listingId,
+                        favorited = effect.favorited,
+                        clientMutationSequence = effect.clientMutationSequence,
+                        scope = effect.scope,
+                    ),
+                )
+            }
             SharedExploreEffect.RequestLocation -> emit(ExploreEffect.RequestLocationPermission)
-            is SharedExploreEffect.ProtectedActionReplayed -> effect.analyticsEvent?.let(track)
+            is SharedExploreEffect.ProtectedActionReplayed -> if (
+                effect.scope == viewerSessionScopeTracker.currentScope
+            ) {
+                effect.analyticsEvent?.let(track)
+            }
         }
     }
 
@@ -93,12 +136,17 @@ internal class ExploreViewModel(
     fun onIntent(intent: ExploreIntent) {
         when (intent) {
             is ExploreIntent.Feed -> runtime.dispatch(intent.toSharedIntent())
+            is ExploreIntent.Location -> handleLocationIntent(intent)
+            is ExploreIntent.Viewer -> handleViewerIntent(intent)
+        }
+    }
+
+    private fun handleLocationIntent(intent: ExploreIntent.Location) {
+        when (intent) {
             is ExploreIntent.SelectCity -> {
                 cancelLocationRequest()
                 runtime.dispatch(SharedExploreIntent.SelectCity(intent.cityId))
             }
-            is ExploreIntent.ToggleLike -> runtime.dispatch(SharedExploreIntent.ToggleLike(intent.listingId))
-            is ExploreIntent.ToggleFavorite -> runtime.dispatch(SharedExploreIntent.ToggleFavorite(intent.listingId))
             is ExploreIntent.LocationPermissionResult -> resolveLocationPermission(intent.granted)
             ExploreIntent.OpenCitySelector -> runtime.dispatch(SharedExploreIntent.OpenCitySelector)
             ExploreIntent.CloseCitySelector -> {
@@ -106,9 +154,19 @@ internal class ExploreViewModel(
                 runtime.dispatch(SharedExploreIntent.CloseCitySelector)
             }
             ExploreIntent.RequestLocation -> runtime.dispatch(SharedExploreIntent.RequestLocation)
+        }
+    }
+
+    private fun handleViewerIntent(intent: ExploreIntent.Viewer) {
+        when (intent) {
+            is ExploreIntent.ToggleLike -> runtime.dispatch(SharedExploreIntent.ToggleLike(intent.listingId))
+            is ExploreIntent.ToggleFavorite -> runtime.dispatch(SharedExploreIntent.ToggleFavorite(intent.listingId))
             ExploreIntent.ReplayPendingInteraction -> runtime.dispatch(SharedExploreIntent.ReplayPendingInteraction)
+            ExploreIntent.ClearPendingAuthentication ->
+                runtime.dispatch(SharedExploreIntent.ClearPendingAuthentication)
             is ExploreIntent.ViewerContextChanged ->
-                runtime.dispatch(SharedExploreIntent.ViewerContextChanged(intent.viewerId))
+                runtime.dispatch(SharedExploreIntent.ViewerContextChanged(intent.scope))
+            is ExploreIntent.FavoriteStateChanged -> runtime.dispatch(intent.toSharedIntent())
         }
     }
 
@@ -157,3 +215,11 @@ private fun ExploreIntent.Feed.toSharedIntent(): SharedExploreIntent.Feed = when
     ExploreIntent.Refresh -> SharedExploreIntent.Refresh
     ExploreIntent.LoadNext -> SharedExploreIntent.LoadNext
 }
+
+internal fun ExploreIntent.FavoriteStateChanged.toSharedIntent(): SharedExploreIntent.FavoriteStateChanged =
+    SharedExploreIntent.FavoriteStateChanged(
+        listingId = listingId,
+        favorited = favorited,
+        clientMutationSequence = clientMutationSequence,
+        scope = scope,
+    )

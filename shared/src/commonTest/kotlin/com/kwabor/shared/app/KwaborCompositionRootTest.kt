@@ -4,10 +4,12 @@ import com.kwabor.shared.data.auth.DataAuthRepository
 import com.kwabor.shared.data.auth.KwaborSessionManager
 import com.kwabor.shared.data.auth.SecureStringStore
 import com.kwabor.shared.data.catalog.DataCatalogRepository
+import com.kwabor.shared.data.favorites.DataFavoritesRepository
 import com.kwabor.shared.data.guide.DataGuideDiscoveryRepository
 import com.kwabor.shared.data.organization.DataOrganizationRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.explore.ExplorePresenter
+import com.kwabor.shared.presentation.favorites.FavoritesPresenter
 import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -129,10 +131,12 @@ class KwaborCompositionRootTest {
 
         try {
             assertIs<DataCatalogRepository>(root.catalogRepository)
+            assertIs<DataFavoritesRepository>(root.favoritesRepository)
             assertIs<DefaultDispatcherProvider>(root.dispatcherProvider)
             assertIs<DataGuideDiscoveryRepository>(root.guideDiscoveryRepository)
             assertIs<DataOrganizationRepository>(root.organizationRepository)
             assertIs<ExplorePresenter>(root.explorePresenter)
+            assertIs<FavoritesPresenter>(root.favoritesPresenter)
             assertIs<GuideDiscoveryPresenter>(root.guideDiscoveryPresenter)
             assertNull(root.appPreferencesRepository)
             assertNull(root.exploreCacheStore)

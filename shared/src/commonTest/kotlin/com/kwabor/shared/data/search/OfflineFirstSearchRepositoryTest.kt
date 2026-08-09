@@ -364,10 +364,6 @@ private class FakeSearchCatalogRepository(
 
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = unused()
 
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = unused()
-
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = unused()
-
     private fun <T> unused(): DomainResult<T> = DomainResult.Failure(DomainError.Unexpected("unused"))
 }
 

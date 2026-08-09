@@ -473,6 +473,139 @@ expect(
     "A refresh or filter change must reset the cursor guard."
 )
 
+private var favoritesPaginationGuard = FavoritesPaginationGuard()
+expect(
+    !favoritesPaginationGuard.shouldLoadNext(
+        cursor: "favorites-cursor-1",
+        canLoadMore: true,
+        isNearEnd: false,
+        hasAppendError: false
+    ),
+    "Favorites pagination must wait until a card reaches the bounded end threshold."
+)
+expect(
+    favoritesPaginationGuard.shouldLoadNext(
+        cursor: "favorites-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "Favorites pagination must request the first eligible cursor once."
+)
+expect(
+    !favoritesPaginationGuard.shouldLoadNext(
+        cursor: "favorites-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "Favorites pagination must de-duplicate a cursor already requested."
+)
+expect(
+    !favoritesPaginationGuard.shouldLoadNext(
+        cursor: "favorites-cursor-2",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: true
+    ),
+    "Favorites automatic pagination must stop after an append error."
+)
+expect(
+    favoritesPaginationGuard.shouldRetry(
+        cursor: "favorites-cursor-2",
+        canLoadMore: true
+    ),
+    "Favorites must permit an explicit retry for the failed cursor."
+)
+favoritesPaginationGuard.reset()
+expect(
+    favoritesPaginationGuard.shouldLoadNext(
+        cursor: "favorites-cursor-1",
+        canLoadMore: true,
+        isNearEnd: true,
+        hasAppendError: false
+    ),
+    "A Favorites filter or refresh must reset opaque cursor de-duplication."
+)
+expect(
+    !FavoritesPaginationPolicy.isNearEnd(index: 14, itemCount: 20) &&
+        FavoritesPaginationPolicy.isNearEnd(index: 16, itemCount: 20),
+    "Favorites pagination must start only inside its four-card end threshold."
+)
+expect(
+    !FavoritesPaginationPolicy.isNearEnd(index: -1, itemCount: 20) &&
+        !FavoritesPaginationPolicy.isNearEnd(index: 20, itemCount: 20) &&
+        !FavoritesPaginationPolicy.isNearEnd(index: 0, itemCount: 0),
+    "Favorites pagination must reject invalid visible-item positions."
+)
+expect(
+    FavoritesGridPolicy.columnCount(
+        availableWidth: 390,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: false
+    ) == 2,
+    "Favorites must use two virtualized grid columns on a regular phone."
+)
+expect(
+    FavoritesGridPolicy.columnCount(
+        availableWidth: 700,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: false
+    ) == 3,
+    "Favorites must use three virtualized grid columns on a wide layout."
+)
+expect(
+    FavoritesGridPolicy.columnCount(
+        availableWidth: 700,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: true
+    ) == 1,
+    "Favorites must collapse to one column for accessibility text sizes."
+)
+expect(
+    FavoritesGridPolicy.columnCount(
+        availableWidth: .nan,
+        tabletBreakpoint: 600,
+        usesAccessibilityLayout: false
+    ) == 1,
+    "Favorites must fail closed to one column for an invalid layout width."
+)
+expect(
+    FavoritesViewerTransitionPolicy.normalizedAccountID("  account-a  ") == "account-a" &&
+        FavoritesViewerTransitionPolicy.normalizedAccountID("   ") == nil,
+    "Favorites account identity must be canonical before private-state routing."
+)
+expect(
+    FavoritesViewerTransitionPolicy.shouldHidePrivateContent(
+        currentAccountID: "account-a",
+        nextAccountID: "account-b"
+    ) &&
+        FavoritesViewerTransitionPolicy.shouldHidePrivateContent(
+            currentAccountID: "account-a",
+            nextAccountID: nil
+        ) &&
+        !FavoritesViewerTransitionPolicy.shouldHidePrivateContent(
+            currentAccountID: " account-a ",
+            nextAccountID: "account-a"
+        ),
+    "Favorites must hide owner data on account replacement or logout, but not on canonical no-op updates."
+)
+let endedFavoriteDecorations = FavoritesCardDecorationPolicy.visibility(
+    isEventEnded: true,
+    ratingLabel: "4,8"
+)
+expect(
+    endedFavoriteDecorations.showsEndedRibbon && endedFavoriteDecorations.showsRating,
+    "An ended favorite must keep both its diagonal ended ribbon and its rating."
+)
+expect(
+    !FavoritesCardDecorationPolicy.visibility(
+        isEventEnded: false,
+        ratingLabel: "  "
+    ).showsRating,
+    "Favorites must not render an empty rating decoration."
+)
+
 expect(
     ContextualAuthenticationDismissalPolicy.action(
         hasCompleteAccount: false,

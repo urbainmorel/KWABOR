@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.kwabor.android.design.KwaborAlpha
@@ -47,6 +56,10 @@ data class ListingCardActions(
     val onClick: (() -> Unit)?,
     val onLikeClick: (() -> Unit)? = null,
     val onFavoriteClick: (() -> Unit)? = null,
+    val favoriteLabel: String? = null,
+    val favoriteEnabled: Boolean = true,
+    val favoriteInProgress: Boolean = false,
+    val openAccessibilityDescription: String? = null,
 )
 
 @Composable
@@ -61,7 +74,9 @@ fun ListingCard(
         modifier = modifier
             .aspectRatio(LISTING_CARD_WIDTH_RATIO / LISTING_CARD_HEIGHT_RATIO)
             .clip(RoundedCornerShape(KwaborRadius.Card))
-            .listingClick(actions.onClick),
+            .listingClick(
+                actions.onClick.takeIf { actions.openAccessibilityDescription == null },
+            ),
         color = KwaborColors.Ink950,
         shape = RoundedCornerShape(KwaborRadius.Card),
     ) {
@@ -81,19 +96,18 @@ private fun ListingCardContent(
     mediaUrlPolicy: ListingMediaUrlPolicy,
     actions: ListingCardActions,
 ) {
-    Box(modifier = Modifier.fillMaxSize().background(placeholderGradient(state.placeholderColor))) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(placeholderGradient(state.placeholderColor))
+            .listingTraversalGroup(actions.openAccessibilityDescription != null),
+    ) {
         ListingCoverImage(
             imageUrl = state.coverImageUrl,
             mediaUrlPolicy = mediaUrlPolicy,
             modifier = Modifier.fillMaxSize(),
         )
         Box(modifier = Modifier.fillMaxSize().background(listingScrim()))
-        ListingCardTopBar(
-            state = state,
-            strings = strings,
-            actions = actions,
-            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(KwaborSpacing.Md),
-        )
         ListingCardBody(
             state = state,
             strings = strings,
@@ -102,9 +116,38 @@ private fun ListingCardContent(
                 top = KwaborSpacing.Lg,
                 end = KwaborSizing.MinimumAccessibleTouchTarget + KwaborSpacing.Md,
                 bottom = KwaborSpacing.Lg,
-            ),
+            ).clearVisualSemantics(actions.openAccessibilityDescription != null),
+        )
+        ListingCardOpenAction(
+            actions = actions,
+            modifier = Modifier.fillMaxSize(),
+        )
+        ListingCardTopBar(
+            state = state,
+            strings = strings,
+            actions = actions,
+            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(KwaborSpacing.Md),
         )
     }
+}
+
+@Composable
+private fun ListingCardOpenAction(actions: ListingCardActions, modifier: Modifier) {
+    val description = actions.openAccessibilityDescription ?: return
+    val onClick = actions.onClick ?: return
+    Box(
+        modifier = modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics {
+                role = Role.Button
+                contentDescription = description
+                traversalIndex = OPEN_ACTION_TRAVERSAL_INDEX
+                onClick(label = null) {
+                    onClick()
+                    true
+                }
+            },
+    )
 }
 
 private fun placeholderGradient(color: Color): Brush = Brush.verticalGradient(
@@ -173,6 +216,7 @@ data class ListingCardState(
     val sponsored: Boolean = false,
     val liked: Boolean = false,
     val favorited: Boolean = false,
+    val eventEnded: Boolean = false,
     val placeholderColor: Color = KwaborColors.Ink500,
 )
 
@@ -184,50 +228,109 @@ private fun ListingCardTopBar(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
-        if (state.sponsored) {
-            SponsoredBadge(
-                strings = strings,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
-        }
-        Column(
+        ListingCardBadges(
+            state = state,
+            strings = strings,
+            modifier = Modifier.align(Alignment.TopStart),
+        )
+        ListingCardActionButtons(
+            state = state,
+            strings = strings,
+            actions = actions,
             modifier = Modifier.align(Alignment.TopEnd),
-            verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            actions.onFavoriteClick?.let { onFavoriteClick ->
-                ListingActionButton(
-                    label = strings.favorite,
-                    selected = state.favorited,
-                    imageVector = Icons.Filled.Bookmark,
-                    onClick = onFavoriteClick,
-                )
-            }
-            actions.onLikeClick?.let { onLikeClick ->
-                ListingActionButton(
-                    label = strings.like,
-                    selected = state.liked,
-                    selectedColor = KwaborColors.Ticket,
-                    imageVector = Icons.Filled.Favorite,
-                    onClick = onLikeClick,
-                )
-            }
+        )
+    }
+}
+
+@Composable
+private fun ListingCardBadges(state: ListingCardState, strings: KwaborStrings, modifier: Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+    ) {
+        if (state.sponsored) {
+            SponsoredBadge(strings = strings)
+        }
+        if (state.eventEnded) {
+            EventEndedRibbon(
+                label = strings.favorites.eventEnded,
+                accessibilityLabel = strings.favorites.eventEndedAccessibility,
+                traversalOrder = EVENT_ENDED_RIBBON_TRAVERSAL_INDEX,
+            )
         }
     }
 }
 
 @Composable
-private fun ListingActionButton(
-    label: String,
-    selected: Boolean,
-    selectedColor: Color = KwaborColors.Ink950,
-    imageVector: ImageVector,
-    onClick: () -> Unit,
+private fun ListingCardActionButtons(
+    state: ListingCardState,
+    strings: KwaborStrings,
+    actions: ListingCardActions,
+    modifier: Modifier,
 ) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        actions.onFavoriteClick?.let { onFavoriteClick ->
+            ListingActionButton(
+                model = actions.favoriteButtonModel(state, strings),
+                onClick = onFavoriteClick,
+            )
+        }
+        actions.onLikeClick?.let { onLikeClick ->
+            ListingActionButton(
+                model = actions.likeButtonModel(state, strings),
+                onClick = onLikeClick,
+            )
+        }
+    }
+}
+
+private data class ListingActionButtonModel(
+    val label: String,
+    val selected: Boolean,
+    val selectedColor: Color = KwaborColors.Ink950,
+    val imageVector: ImageVector,
+    val enabled: Boolean = true,
+    val progressLabel: String? = null,
+    val traversalIndex: Float? = null,
+)
+
+private fun ListingCardActions.favoriteButtonModel(
+    state: ListingCardState,
+    strings: KwaborStrings,
+): ListingActionButtonModel = ListingActionButtonModel(
+    label = favoriteLabel ?: strings.favorite,
+    selected = state.favorited,
+    imageVector = Icons.Filled.Bookmark,
+    enabled = favoriteEnabled,
+    progressLabel = if (favoriteInProgress) strings.loading else null,
+    traversalIndex = openAccessibilityDescription?.let { FAVORITE_ACTION_TRAVERSAL_INDEX },
+)
+
+private fun ListingCardActions.likeButtonModel(
+    state: ListingCardState,
+    strings: KwaborStrings,
+): ListingActionButtonModel = ListingActionButtonModel(
+    label = strings.like,
+    selected = state.liked,
+    selectedColor = KwaborColors.Ticket,
+    imageVector = Icons.Filled.Favorite,
+    traversalIndex = openAccessibilityDescription?.let { LIKE_ACTION_TRAVERSAL_INDEX },
+)
+
+@Composable
+private fun ListingActionButton(model: ListingActionButtonModel, onClick: () -> Unit) {
+    val progressLabel = model.progressLabel
     IconToggleButton(
-        checked = selected,
+        checked = model.selected,
         onCheckedChange = { onClick() },
-        modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
+        enabled = model.enabled && progressLabel == null,
+        modifier = Modifier
+            .size(KwaborSizing.MinimumAccessibleTouchTarget)
+            .listingActionTraversal(model.traversalIndex),
     ) {
         Box(
             modifier = Modifier
@@ -238,15 +341,43 @@ private fun ListingActionButton(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = imageVector,
-                contentDescription = label,
-                modifier = Modifier.size(KwaborSpacing.Xxl),
-                tint = if (selected) selectedColor else KwaborColors.Surface0,
-            )
+            if (progressLabel != null) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(KwaborSpacing.Xxl)
+                        .semantics { contentDescription = progressLabel },
+                    color = KwaborColors.Ink950,
+                )
+            } else {
+                Icon(
+                    imageVector = model.imageVector,
+                    contentDescription = model.label,
+                    modifier = Modifier.size(KwaborSpacing.Xxl),
+                    tint = if (model.selected) model.selectedColor else KwaborColors.Surface0,
+                )
+            }
         }
     }
 }
 
 private fun Modifier.listingClick(onClick: (() -> Unit)?): Modifier =
-    if (onClick == null) this else clickable(onClick = onClick)
+    if (onClick == null) this else clickable(role = Role.Button, onClick = onClick)
+
+private fun Modifier.clearVisualSemantics(enabled: Boolean): Modifier = if (enabled) clearAndSetSemantics {} else this
+
+private fun Modifier.listingTraversalGroup(enabled: Boolean): Modifier = if (enabled) {
+    semantics { isTraversalGroup = true }
+} else {
+    this
+}
+
+private fun Modifier.listingActionTraversal(index: Float?): Modifier = if (index == null) {
+    this
+} else {
+    semantics { traversalIndex = index }
+}
+
+private const val OPEN_ACTION_TRAVERSAL_INDEX = 0f
+private const val EVENT_ENDED_RIBBON_TRAVERSAL_INDEX = 0.5f
+private const val FAVORITE_ACTION_TRAVERSAL_INDEX = 1f
+private const val LIKE_ACTION_TRAVERSAL_INDEX = 2f

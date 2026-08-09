@@ -11,6 +11,8 @@ import com.kwabor.shared.presentation.explore.ExploreRuntime
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
 import com.kwabor.shared.presentation.explore.initialExploreUiState
+import com.kwabor.shared.presentation.session.ViewerSessionScope
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -27,10 +29,21 @@ enum class IosExploreEffectKind {
 data class IosExploreEffect(
     val kind: IosExploreEffectKind,
     val replayAnalyticsEvent: AnalyticsEvent? = null,
+    val scope: ViewerSessionScope? = null,
 ) {
     init {
         require(kind == IosExploreEffectKind.ProtectedActionReplayed || replayAnalyticsEvent == null) {
             "Only protected-action replay effects may carry analytics context."
+        }
+        require(
+            when (kind) {
+                IosExploreEffectKind.RequireAuthentication,
+                IosExploreEffectKind.ProtectedActionReplayed,
+                -> scope != null
+                IosExploreEffectKind.RequestLocation -> scope == null
+            },
+        ) {
+            "Authentication effects require a viewer scope; location effects must remain unscoped."
         }
     }
 
@@ -131,8 +144,28 @@ class IosExploreInteractionActions internal constructor(
         dispatch(ExploreIntent.ReplayPendingInteraction)
     }
 
-    fun updateViewerContext(viewerId: String?) {
-        dispatch(ExploreIntent.ViewerContextChanged(viewerId))
+    fun updateViewerContext(scope: ViewerSessionScope) {
+        dispatch(ExploreIntent.ViewerContextChanged(scope))
+    }
+
+    fun clearPendingAuthentication() {
+        dispatch(ExploreIntent.ClearPendingAuthentication)
+    }
+
+    fun applyFavoriteState(
+        listingId: String,
+        favorited: Boolean,
+        clientMutationSequence: Long,
+        scope: ViewerSessionScope,
+    ) {
+        dispatch(
+            ExploreIntent.FavoriteStateChanged(
+                listingId = listingId,
+                favorited = favorited,
+                clientMutationSequence = clientMutationSequence,
+                scope = scope,
+            ),
+        )
     }
 }
 
@@ -163,10 +196,12 @@ private class DefaultIosExploreRuntime(
 class IosExploreController private constructor(
     runtimeProvider: (CoroutineScope, KwaborStrings) -> IosExploreRuntime?,
     dispatcherProvider: DispatcherProvider,
+    private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
 ) {
     internal constructor(
         presenter: ExplorePresenter?,
         dispatcherProvider: DispatcherProvider,
+        viewerSessionScopeTracker: ViewerSessionScopeTracker,
     ) : this(
         runtimeProvider = { scope, strings ->
             presenter?.let { currentPresenter ->
@@ -180,14 +215,17 @@ class IosExploreController private constructor(
             }
         },
         dispatcherProvider = dispatcherProvider,
+        viewerSessionScopeTracker = viewerSessionScopeTracker,
     )
 
     internal constructor(
         runtime: IosExploreRuntime?,
         dispatcherProvider: DispatcherProvider,
+        viewerSessionScopeTracker: ViewerSessionScopeTracker,
     ) : this(
         runtimeProvider = { _, _ -> runtime },
         dispatcherProvider = dispatcherProvider,
+        viewerSessionScopeTracker = viewerSessionScopeTracker,
     )
 
     val strings: KwaborStrings = stringsFor(AppLocale.French)
@@ -195,6 +233,7 @@ class IosExploreController private constructor(
     private val runtime = runtimeProvider(scope, strings)
     private var stateObserver: ((ExploreUiState) -> Unit)? = null
     private var effectObserver: ((IosExploreEffect) -> Unit)? = null
+    private var favoriteObserver: ((String, Boolean, Long, ViewerSessionScope) -> Unit)? = null
     private var observationVersion = 0L
     private var deliveredStateVersion = -1L
     private var deliveredState: ExploreUiState? = null
@@ -213,23 +252,56 @@ class IosExploreController private constructor(
         runtime?.let { currentRuntime ->
             scope.launch {
                 currentRuntime.state.collect { updatedState ->
-                    currentState = updatedState
-                    publishStateIfNeeded(updatedState)
+                    if (updatedState.viewerScope == viewerSessionScopeTracker.currentScope) {
+                        currentState = updatedState
+                        publishStateIfNeeded(updatedState)
+                    }
                 }
             }
             scope.launch {
                 currentRuntime.effects.collect { effect ->
-                    effectObserver?.invoke(effect.toIosEffect())
+                    when (effect) {
+                        is ExploreEffect.AuthenticationRequired -> if (
+                            effect.scope == viewerSessionScopeTracker.currentScope &&
+                            publishLatestRuntimeState(currentRuntime, effect.scope)
+                        ) {
+                            effectObserver?.invoke(effect.toIosEffect())
+                        }
+                        is ExploreEffect.ProtectedActionReplayed -> if (
+                            effect.scope == viewerSessionScopeTracker.currentScope &&
+                            publishLatestRuntimeState(currentRuntime, effect.scope)
+                        ) {
+                            effectObserver?.invoke(effect.toIosEffect())
+                        }
+                        is ExploreEffect.FavoriteChanged -> if (
+                            effect.scope == viewerSessionScopeTracker.currentScope
+                        ) {
+                            favoriteObserver?.invoke(
+                                effect.listingId,
+                                effect.favorited,
+                                effect.clientMutationSequence,
+                                effect.scope,
+                            )
+                        }
+                        ExploreEffect.RequestLocation -> effectObserver?.invoke(
+                            ExploreEffect.RequestLocation.toIosEffect(),
+                        )
+                    }
                 }
             }
         }
     }
 
-    fun observe(stateObserver: (ExploreUiState) -> Unit, effectObserver: (IosExploreEffect) -> Unit) {
+    fun observe(
+        stateObserver: (ExploreUiState) -> Unit,
+        effectObserver: (IosExploreEffect) -> Unit,
+        favoriteObserver: (String, Boolean, Long, ViewerSessionScope) -> Unit,
+    ) {
         if (isClosed) return
         observationVersion += 1
         this.stateObserver = stateObserver
         this.effectObserver = effectObserver
+        this.favoriteObserver = favoriteObserver
         deliveredStateVersion = -1L
         deliveredState = null
         val version = observationVersion
@@ -244,6 +316,7 @@ class IosExploreController private constructor(
         observationVersion += 1
         stateObserver = null
         effectObserver = null
+        favoriteObserver = null
         deliveredStateVersion = -1L
         deliveredState = null
     }
@@ -257,8 +330,11 @@ class IosExploreController private constructor(
     }
 
     private fun dispatch(intent: ExploreIntent) {
-        if (!isClosed) {
-            runtime?.dispatch(intent)
+        if (isClosed) return
+        val currentRuntime = runtime ?: return
+        currentRuntime.dispatch(intent)
+        if (intent is ExploreIntent.ViewerContextChanged) {
+            publishLatestRuntimeState(currentRuntime, intent.scope)
         }
     }
 
@@ -269,17 +345,31 @@ class IosExploreController private constructor(
         deliveredState = state
         observer(state)
     }
+
+    private fun publishLatestRuntimeState(runtime: IosExploreRuntime, expectedScope: ViewerSessionScope): Boolean {
+        if (expectedScope != viewerSessionScopeTracker.currentScope) return false
+        val latestState = runtime.state.value
+        if (latestState.viewerScope != expectedScope) return false
+        currentState = latestState
+        publishStateIfNeeded(latestState)
+        return expectedScope == viewerSessionScopeTracker.currentScope
+    }
 }
 
 private fun unavailableState(strings: KwaborStrings): ExploreUiState = initialExploreUiState(strings).copy(
     errorMessage = strings.configurationUnavailable,
 )
 
-private fun ExploreEffect.toIosEffect(): IosExploreEffect = when (this) {
-    is ExploreEffect.AuthenticationRequired -> IosExploreEffect(IosExploreEffectKind.RequireAuthentication)
-    is ExploreEffect.ProtectedActionReplayed -> IosExploreEffect(
-        kind = IosExploreEffectKind.ProtectedActionReplayed,
-        replayAnalyticsEvent = analyticsEvent,
-    )
-    ExploreEffect.RequestLocation -> IosExploreEffect(IosExploreEffectKind.RequestLocation)
-}
+private fun ExploreEffect.AuthenticationRequired.toIosEffect(): IosExploreEffect = IosExploreEffect(
+    kind = IosExploreEffectKind.RequireAuthentication,
+    scope = scope,
+)
+
+private fun ExploreEffect.ProtectedActionReplayed.toIosEffect(): IosExploreEffect = IosExploreEffect(
+    kind = IosExploreEffectKind.ProtectedActionReplayed,
+    replayAnalyticsEvent = analyticsEvent,
+    scope = scope,
+)
+
+private fun ExploreEffect.RequestLocation.toIosEffect(): IosExploreEffect =
+    IosExploreEffect(IosExploreEffectKind.RequestLocation)

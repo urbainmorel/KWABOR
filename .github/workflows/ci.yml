@@ -304,6 +304,7 @@ jobs:
             iosApp/Kwabor/Onboarding/IntroVideoPresentationStore.swift \
             iosApp/Kwabor/Onboarding/LegacyRemoteIntroCleaner.swift \
             iosApp/Kwabor/Explore/ExplorePolicies.swift \
+            iosApp/Kwabor/Favorites/FavoritesPolicies.swift \
             iosApp/Kwabor/Detail/CatalogDetailPolicies.swift \
             iosApp/Kwabor/Detail/CatalogDetailExternalURLPolicy.swift \
             iosApp/PolicyTests/main.swift \

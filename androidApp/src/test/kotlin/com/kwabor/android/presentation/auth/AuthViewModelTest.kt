@@ -2024,10 +2024,6 @@ private class RegistrationCatalogRepository : CatalogRepository {
     override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> = unexpected()
 
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = unexpected()
-
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = unexpected()
-
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = unexpected()
 }
 
 private fun <T> unexpected(): DomainResult<T> = DomainResult.Failure(DomainError.Unexpected())

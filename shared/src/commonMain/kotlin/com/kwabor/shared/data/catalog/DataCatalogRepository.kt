@@ -68,14 +68,6 @@ class DataCatalogRepository internal constructor(
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
         dataSource.unlikeListing(listingId.toRequiredListingId()).toDomain()
     }
-
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
-        dataSource.favoriteListing(listingId.toRequiredListingId()).toDomain()
-    }
-
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
-        dataSource.unfavoriteListing(listingId.toRequiredListingId()).toDomain()
-    }
 }
 
 private inline fun <T> runDataCall(block: () -> T): DomainResult<T> = try {

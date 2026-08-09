@@ -20,4 +20,12 @@ class ProfileScreenPresentationTest {
         assertEquals(strings.settings.emailUnavailable, profileEmailValue("", strings))
         assertEquals(strings.settings.emailUnavailable, profileEmailValue("   ", strings))
     }
+
+    @Test
+    fun profileEntries_exposeFavoritesBeforeSettings() {
+        val labels = profileEntryLabels(strings)
+
+        assertEquals(strings.favorites.title, labels.favorites)
+        assertEquals(strings.settings.title, labels.settings)
+    }
 }

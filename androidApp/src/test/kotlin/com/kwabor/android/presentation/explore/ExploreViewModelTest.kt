@@ -22,6 +22,9 @@ import com.kwabor.shared.domain.explore.ExploreFeedQuery
 import com.kwabor.shared.domain.explore.ExploreFeedRepository
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
+import com.kwabor.shared.domain.favorites.FavoriteListingPage
+import com.kwabor.shared.domain.favorites.FavoriteMutation
+import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.observability.AnalyticsEntityType
@@ -32,6 +35,8 @@ import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.ExploreTab
+import com.kwabor.shared.presentation.session.ViewerSessionScope
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -55,6 +60,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExploreViewModelTest {
     private val strings = stringsFor(AppLocale.French)
+    private val viewerSessionScopeTracker = ViewerSessionScopeTracker()
 
     @Test
     fun initialState_showsLoadingSkeletonBeforePreferencesResume() = runTest {
@@ -90,7 +96,7 @@ class ExploreViewModelTest {
     }
 
     @Test
-    fun authRequired_emitsEffectAndCanBeClearedForGuest() = runTest {
+    fun authRequired_duplicateGuestScopePreservesPendingUntilExplicitClear() = runTest {
         val repository = ViewModelCatalogRepository(requiresAuthentication = true)
         val viewModel = viewModel(repository)
         advanceUntilIdle()
@@ -100,9 +106,14 @@ class ExploreViewModelTest {
 
         val effect = assertIs<ExploreEffect.AuthenticationRequired>(viewModel.effects.first())
         assertEquals(TEST_CITY_ID, effect.suggestedCityId)
+        assertEquals(viewerSessionScopeTracker.currentScope, effect.scope)
         assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
 
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope(accountId = null)))
+        advanceUntilIdle()
+
+        assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
+        viewModel.onIntent(ExploreIntent.ClearPendingAuthentication)
         advanceUntilIdle()
 
         assertNull(viewModel.state.value.pendingAuthInteraction)
@@ -110,7 +121,7 @@ class ExploreViewModelTest {
     }
 
     @Test
-    fun replayPendingInteraction_appliesAuthenticatedResult() = runTest {
+    fun authenticatedViewerContext_replaysPendingInteraction() = runTest {
         val repository = ViewModelCatalogRepository(requiresAuthentication = true)
         val trackedEvents = mutableListOf<AnalyticsEvent>()
         val viewModel = viewModel(repository, track = trackedEvents::add)
@@ -123,7 +134,7 @@ class ExploreViewModelTest {
         assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
 
         repository.requiresAuthentication = false
-        viewModel.onIntent(ExploreIntent.ReplayPendingInteraction)
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
         advanceUntilIdle()
 
         assertNull(viewModel.state.value.pendingAuthInteraction)
@@ -150,7 +161,7 @@ class ExploreViewModelTest {
                 likesCount = 1,
             ),
         )
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = "viewer-a"))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
         advanceUntilIdle()
 
         repository.interactionError = DomainError.NetworkUnavailable()
@@ -162,7 +173,16 @@ class ExploreViewModelTest {
         advanceUntilIdle()
         viewModel.effects.first()
 
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope(accountId = null)))
+
+        val immediatelyPurgedState = viewModel.state.value
+        assertFalse(immediatelyPurgedState.listings.single().liked)
+        assertFalse(immediatelyPurgedState.listings.single().favorited)
+        assertTrue(immediatelyPurgedState.queuedInteractions.isEmpty())
+        assertNull(immediatelyPurgedState.pendingAuthInteraction)
+        assertNull(immediatelyPurgedState.interactionMessage)
+        assertTrue(immediatelyPurgedState.isLoading)
+
         advanceUntilIdle()
 
         val state = viewModel.state.value
@@ -187,7 +207,7 @@ class ExploreViewModelTest {
                 likesCount = 1,
             ),
         )
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = "viewer-a"))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
         advanceUntilIdle()
         assertTrue(viewModel.state.value.listings.single().liked)
         val firstViewerRequestCount = repository.viewerInteractionRequestCount
@@ -200,13 +220,135 @@ class ExploreViewModelTest {
                 likesCount = 1,
             ),
         )
-        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = "viewer-b"))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-b")))
+
+        val immediatelyPurgedState = viewModel.state.value
+        assertFalse(immediatelyPurgedState.listings.single().liked)
+        assertFalse(immediatelyPurgedState.listings.single().favorited)
+        assertTrue(immediatelyPurgedState.isLoading)
+
         advanceUntilIdle()
 
         val state = viewModel.state.value
         assertFalse(state.listings.single().liked)
         assertTrue(state.listings.single().favorited)
         assertTrue(repository.viewerInteractionRequestCount > firstViewerRequestCount)
+    }
+
+    @Test
+    fun favoriteStateChanged_appliesExternalFavoriteWithoutChangingLikeState() = runTest {
+        val repository = ViewModelCatalogRepository(requiresAuthentication = false)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+        val scope = viewerScope("viewer-a")
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(scope))
+        advanceUntilIdle()
+
+        val intent =
+            ExploreIntent.FavoriteStateChanged(
+                listingId = TEST_LISTING_ID,
+                favorited = true,
+                clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE,
+                scope = scope,
+            )
+        val sharedIntent = intent.toSharedIntent()
+
+        assertEquals(TEST_CLIENT_MUTATION_SEQUENCE, sharedIntent.clientMutationSequence)
+        assertEquals(scope, sharedIntent.scope)
+        viewModel.onIntent(intent)
+        advanceUntilIdle()
+
+        val listing = viewModel.state.value.listings.single()
+        assertTrue(listing.favorited)
+        assertFalse(listing.liked)
+        assertEquals(0, listing.likesCount)
+    }
+
+    @Test
+    fun toggleFavorite_emitsCurrentScopedChangeForFavoritesBridge() = runTest {
+        val repository = ViewModelCatalogRepository(requiresAuthentication = false)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+        val scope = viewerScope("viewer-a")
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(scope))
+        advanceUntilIdle()
+
+        viewModel.onIntent(ExploreIntent.ToggleFavorite(TEST_LISTING_ID))
+        advanceUntilIdle()
+
+        val effect = assertIs<ExploreEffect.FavoriteChanged>(viewModel.effects.first())
+        assertEquals(TEST_LISTING_ID, effect.listingId)
+        assertTrue(effect.favorited)
+        assertEquals(TEST_CLIENT_MUTATION_SEQUENCE, effect.clientMutationSequence)
+        assertEquals(scope, effect.scope)
+    }
+
+    @Test
+    fun bufferedFavoriteEffect_isDroppedAfterScopeChanges() = runTest {
+        val repository = ViewModelCatalogRepository(requiresAuthentication = false)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
+        advanceUntilIdle()
+        viewModel.onIntent(ExploreIntent.ToggleFavorite(TEST_LISTING_ID))
+        advanceUntilIdle()
+
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-b")))
+        val observed = mutableListOf<ExploreEffect>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.effects.collect(observed::add)
+        }
+        advanceUntilIdle()
+
+        assertTrue(observed.isEmpty())
+        collection.cancel()
+    }
+
+    @Test
+    fun bufferedGuestAuthenticationEffect_isDroppedAfterTrackerBecomesAuthenticated() = runTest {
+        val repository = ViewModelCatalogRepository(requiresAuthentication = true)
+        val viewModel = viewModel(repository)
+        advanceUntilIdle()
+        viewModel.onIntent(ExploreIntent.ToggleLike(TEST_LISTING_ID))
+        advanceUntilIdle()
+        assertEquals(TEST_LISTING_ID, viewModel.state.value.pendingAuthInteraction?.listingId)
+
+        viewerScope("viewer-a")
+        val observed = mutableListOf<ExploreEffect>()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.effects.collect(observed::add)
+        }
+        advanceUntilIdle()
+
+        assertTrue(observed.isEmpty())
+        collection.cancel()
+    }
+
+    @Test
+    fun bufferedReplayAnalytics_isDroppedAfterLogoutAndSameAccountRelogin() = runTest {
+        val repository = ViewModelCatalogRepository(requiresAuthentication = true)
+        val trackedEvents = mutableListOf<AnalyticsEvent>()
+        val viewModel = viewModel(repository, track = trackedEvents::add)
+        advanceUntilIdle()
+        viewModel.onIntent(ExploreIntent.ToggleLike(TEST_LISTING_ID))
+        advanceUntilIdle()
+
+        repository.requiresAuthentication = false
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.pendingAuthInteraction)
+        assertTrue(viewModel.state.value.listings.single().liked)
+
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope(accountId = null)))
+        viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerScope("viewer-a")))
+        advanceUntilIdle()
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.effects.collect()
+        }
+        advanceUntilIdle()
+
+        assertTrue(trackedEvents.isEmpty())
+        collection.cancel()
     }
 
     @Test
@@ -231,52 +373,6 @@ class ExploreViewModelTest {
         assertTrue(viewModel.state.value.listings.isEmpty())
         assertNull(viewModel.state.value.pendingAuthInteraction)
         assertNull(viewModel.state.value.interactionMessage)
-    }
-
-    @Test
-    fun locationPermission_selectsNearestCityAndReloadsItsFeed() = runTest {
-        val repository = ViewModelCatalogRepository()
-        val viewModel = viewModel(
-            repository = repository,
-            locationService = ApproximateLocationService {
-                ApproximateLocationResult.Available(latitude = 6.3631, longitude = 2.0851)
-            },
-        )
-        advanceUntilIdle()
-
-        viewModel.onIntent(ExploreIntent.OpenCitySelector)
-        viewModel.onIntent(ExploreIntent.RequestLocation)
-        advanceUntilIdle()
-
-        assertIs<ExploreEffect.RequestLocationPermission>(viewModel.effects.first())
-        viewModel.onIntent(ExploreIntent.LocationPermissionResult(granted = true))
-        advanceUntilIdle()
-
-        assertEquals("ouidah", viewModel.state.value.selectedCityId)
-        assertEquals("ouidah", repository.lastFilters?.cityId)
-        assertFalse(viewModel.state.value.isLocating)
-    }
-
-    @Test
-    fun locationDisabled_mapsPlatformResultToSharedRuntimeState() = runTest {
-        val repository = ViewModelCatalogRepository()
-        val viewModel = viewModel(
-            repository = repository,
-            locationService = ApproximateLocationService {
-                ApproximateLocationResult.LocationDisabled
-            },
-        )
-        advanceUntilIdle()
-
-        viewModel.onIntent(ExploreIntent.OpenCitySelector)
-        viewModel.onIntent(ExploreIntent.RequestLocation)
-        runCurrent()
-        viewModel.effects.first()
-        viewModel.onIntent(ExploreIntent.LocationPermissionResult(granted = true))
-        advanceUntilIdle()
-
-        assertEquals(strings.exploreLocationDisabled, viewModel.state.value.locationMessage)
-        assertFalse(viewModel.state.value.isLocating)
     }
 
     @Test
@@ -322,6 +418,90 @@ class ExploreViewModelTest {
         assertTrue(viewModel.state.value.isCitySelectorOpen)
         assertTrue(viewModel.state.value.listings.single().liked)
         assertFalse(viewModel.state.value.isRefreshing)
+    }
+
+    private fun kotlinx.coroutines.test.TestScope.viewModel(
+        repository: ViewModelCatalogRepository,
+        feedRepository: ExploreFeedRepository = ViewModelExploreFeedRepository(repository),
+        appPreferencesRepository: AppPreferencesRepository? = null,
+        locationService: ApproximateLocationService = ApproximateLocationService {
+            ApproximateLocationResult.Unavailable
+        },
+        track: (AnalyticsEvent) -> Unit = {},
+    ): ExploreViewModel {
+        val viewModelScope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
+        requireNotNull(coroutineContext[Job]).invokeOnCompletion { viewModelScope.cancel() }
+        return ExploreViewModel(
+            presenter = ExplorePresenter(
+                exploreFeedRepository = feedRepository,
+                catalogInteractionRepository = repository,
+                favoritesRepository = ViewModelFavoritesRepository(repository),
+                appPreferencesRepository = appPreferencesRepository,
+                clockProvider = FixedViewModelClock,
+            ),
+            locationService = locationService,
+            strings = strings,
+            coroutineScope = viewModelScope,
+            viewerSessionScopeTracker = viewerSessionScopeTracker,
+            track = track,
+        ).also { viewModel ->
+            viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerSessionScopeTracker.currentScope))
+        }
+    }
+
+    private fun viewerScope(accountId: String?): ViewerSessionScope =
+        viewerSessionScopeTracker.update(accountId, accountSetupComplete = accountId != null)
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ExploreViewModelLocationTest {
+    private val strings = stringsFor(AppLocale.French)
+    private val viewerSessionScopeTracker = ViewerSessionScopeTracker()
+
+    @Test
+    fun locationPermission_selectsNearestCityAndReloadsItsFeed() = runTest {
+        val repository = ViewModelCatalogRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            locationService = ApproximateLocationService {
+                ApproximateLocationResult.Available(latitude = 6.3631, longitude = 2.0851)
+            },
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(ExploreIntent.OpenCitySelector)
+        viewModel.onIntent(ExploreIntent.RequestLocation)
+        advanceUntilIdle()
+
+        assertIs<ExploreEffect.RequestLocationPermission>(viewModel.effects.first())
+        viewModel.onIntent(ExploreIntent.LocationPermissionResult(granted = true))
+        advanceUntilIdle()
+
+        assertEquals("ouidah", viewModel.state.value.selectedCityId)
+        assertEquals("ouidah", repository.lastFilters?.cityId)
+        assertFalse(viewModel.state.value.isLocating)
+    }
+
+    @Test
+    fun locationDisabled_mapsPlatformResultToSharedRuntimeState() = runTest {
+        val repository = ViewModelCatalogRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            locationService = ApproximateLocationService {
+                ApproximateLocationResult.LocationDisabled
+            },
+        )
+        advanceUntilIdle()
+
+        viewModel.onIntent(ExploreIntent.OpenCitySelector)
+        viewModel.onIntent(ExploreIntent.RequestLocation)
+        runCurrent()
+        viewModel.effects.first()
+        viewModel.onIntent(ExploreIntent.LocationPermissionResult(granted = true))
+        advanceUntilIdle()
+
+        assertEquals(strings.exploreLocationDisabled, viewModel.state.value.locationMessage)
+        assertFalse(viewModel.state.value.isLocating)
     }
 
     @Test
@@ -384,28 +564,26 @@ class ExploreViewModelTest {
 
     private fun kotlinx.coroutines.test.TestScope.viewModel(
         repository: ViewModelCatalogRepository,
-        feedRepository: ExploreFeedRepository = ViewModelExploreFeedRepository(repository),
-        appPreferencesRepository: AppPreferencesRepository? = null,
         locationService: ApproximateLocationService = ApproximateLocationService {
             ApproximateLocationResult.Unavailable
         },
-        track: (AnalyticsEvent) -> Unit = {},
     ): ExploreViewModel {
         val viewModelScope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
         requireNotNull(coroutineContext[Job]).invokeOnCompletion { viewModelScope.cancel() }
         return ExploreViewModel(
             presenter = ExplorePresenter(
-                exploreFeedRepository = feedRepository,
+                exploreFeedRepository = ViewModelExploreFeedRepository(repository),
                 catalogInteractionRepository = repository,
-                appPreferencesRepository = appPreferencesRepository,
+                favoritesRepository = ViewModelFavoritesRepository(repository),
+                appPreferencesRepository = null,
                 clockProvider = FixedViewModelClock,
             ),
             locationService = locationService,
             strings = strings,
             coroutineScope = viewModelScope,
-            track = track,
+            viewerSessionScopeTracker = viewerSessionScopeTracker,
         ).also { viewModel ->
-            viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerId = null))
+            viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerSessionScopeTracker.currentScope))
         }
     }
 }
@@ -550,19 +728,27 @@ private class ViewModelCatalogRepository(
         }
     }
 
-    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> = interaction(listingId)
+    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> =
+        updateLike(listingId, likedByViewer = true)
 
-    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = interaction(
-        listingId,
-    )
+    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
+        updateLike(listingId, likedByViewer = false)
 
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        interaction(listingId)
+    private suspend fun updateLike(listingId: String, likedByViewer: Boolean): DomainResult<ListingViewerInteraction> {
+        val result = interaction(listingId, likedByViewer)
+        return when (result) {
+            is DomainResult.Failure -> result
+            is DomainResult.Success -> result.also { success ->
+                viewerInteractions = viewerInteractions
+                    .filterNot { interaction -> interaction.listingId == listingId } + success.value
+            }
+        }
+    }
 
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        interaction(listingId)
-
-    private suspend fun interaction(listingId: String): DomainResult<ListingViewerInteraction> {
+    private suspend fun interaction(
+        listingId: String,
+        likedByViewer: Boolean = true,
+    ): DomainResult<ListingViewerInteraction> {
         interactionGate?.also { gate ->
             interactionGate = null
             gate.await()
@@ -574,9 +760,50 @@ private class ViewModelCatalogRepository(
             DomainResult.Success(
                 ListingViewerInteraction(
                     listingId = listingId,
-                    likedByViewer = true,
-                    favoritedByViewer = false,
-                    likesCount = 1,
+                    likedByViewer = likedByViewer,
+                    favoritedByViewer = viewerInteractions
+                        .firstOrNull { interaction -> interaction.listingId == listingId }
+                        ?.favoritedByViewer
+                        ?: false,
+                    likesCount = if (likedByViewer) 1 else 0,
+                ),
+            )
+        }
+    }
+}
+
+private class ViewModelFavoritesRepository(
+    private val behavior: ViewModelCatalogRepository,
+) : FavoritesRepository {
+    private var clientMutationSequence = TEST_CLIENT_MUTATION_SEQUENCE - 1L
+
+    override suspend fun listFavorites(
+        filter: ListingType?,
+        page: ListingPageRequest,
+    ): DomainResult<FavoriteListingPage> = DomainResult.Success(FavoriteListingPage(emptyList(), null))
+
+    override suspend fun setFavorite(listingId: String, favorited: Boolean): DomainResult<FavoriteMutation> {
+        val sequence = ++clientMutationSequence
+        behavior.interactionGate?.also { gate ->
+            behavior.interactionGate = null
+            gate.await()
+        }
+        val interactionError = behavior.interactionError
+        return when {
+            interactionError != null -> DomainResult.Failure(interactionError)
+            behavior.requiresAuthentication -> DomainResult.Failure(
+                DomainError.AuthenticationRequired("error.auth.required"),
+            )
+            else -> DomainResult.Success(
+                FavoriteMutation(
+                    listingId = listingId,
+                    favorited = favorited,
+                    clientMutationSequence = sequence,
+                    favoritedAtEpochMilliseconds = if (favorited) {
+                        FixedViewModelClock.nowEpochMilliseconds()
+                    } else {
+                        null
+                    },
                 ),
             )
         }
@@ -610,3 +837,4 @@ private fun testListing(id: String = TEST_LISTING_ID): ListingSummary = ListingS
 
 private const val TEST_LISTING_ID = "ouidah-gate"
 private const val TEST_CITY_ID = "cotonou"
+private const val TEST_CLIENT_MUTATION_SEQUENCE = 4_294_967_297L

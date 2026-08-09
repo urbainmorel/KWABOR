@@ -13,6 +13,8 @@ import com.kwabor.shared.domain.explore.ExploreFeedRepository
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.explore.ExploreFeedWarning
+import com.kwabor.shared.domain.favorites.FavoriteMutation
+import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.preferences.AppPreferences
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.KwaborStrings
@@ -30,6 +32,7 @@ private const val APPEND_REVALIDATION_REQUIRED_ERROR_KEY = "error.explore.revali
 class ExplorePresenter(
     private val exploreFeedRepository: ExploreFeedRepository,
     private val catalogInteractionRepository: CatalogInteractionRepository,
+    private val favoritesRepository: FavoritesRepository,
     private val appPreferencesRepository: AppPreferencesRepository?,
     private val clockProvider: ClockProvider,
 ) {
@@ -123,20 +126,26 @@ class ExplorePresenter(
     }
 
     suspend fun toggleLike(state: ExploreUiState, listingId: String, strings: KwaborStrings): ExploreUiState =
-        toggleInteraction(
+        executeInteraction(
             state = state,
             listingId = listingId,
             strings = strings,
             kind = ExploreInteractionKind.Like,
-        )
+        ).state
 
     suspend fun toggleFavorite(state: ExploreUiState, listingId: String, strings: KwaborStrings): ExploreUiState =
-        toggleInteraction(
-            state = state,
-            listingId = listingId,
-            strings = strings,
-            kind = ExploreInteractionKind.Favorite,
-        )
+        executeFavoriteToggle(state, listingId, strings).state
+
+    internal suspend fun executeFavoriteToggle(
+        state: ExploreUiState,
+        listingId: String,
+        strings: KwaborStrings,
+    ): ExploreInteractionExecution = executeInteraction(
+        state = state,
+        listingId = listingId,
+        strings = strings,
+        kind = ExploreInteractionKind.Favorite,
+    )
 
     private suspend fun refreshAfterFilterValidationOrFail(
         state: ExploreUiState,
@@ -156,7 +165,7 @@ class ExplorePresenter(
         return when (val retry = exploreFeedRepository.refresh(fallbackState.toFeedQuery())) {
             is DomainResult.Success -> {
                 val persistenceFailed = fallbackState.selectedCityId != state.selectedCityId &&
-                    persistExploreCity(fallbackState.selectedCityId)
+                    appPreferencesRepository.persistExploreCity(fallbackState.selectedCityId)
                 applyNetworkSnapshot(
                     state = fallbackState,
                     snapshot = retry.value,
@@ -188,7 +197,8 @@ class ExplorePresenter(
             isLoading = false,
             isRefreshing = false,
             isAppending = false,
-            isOffline = interactions.isOffline,
+            isOffline = interactions.isOffline || state.queuedInteractions.isNotEmpty(),
+            contentIsOffline = interactions.isOffline,
             errorMessage = null,
             refreshMessage = null,
             appendErrorMessage = null,
@@ -196,27 +206,33 @@ class ExplorePresenter(
         )
     }
 
-    private suspend fun toggleInteraction(
+    private suspend fun executeInteraction(
         state: ExploreUiState,
         listingId: String,
         strings: KwaborStrings,
         kind: ExploreInteractionKind,
-    ): ExploreUiState {
-        val listing = state.listings.firstOrNull { item -> item.id == listingId } ?: return state
+    ): ExploreInteractionExecution {
+        val listing = state.listings.firstOrNull { item -> item.id == listingId }
+            ?: return ExploreInteractionExecution(state)
         val selected = when (kind) {
             ExploreInteractionKind.Like -> !listing.liked
             ExploreInteractionKind.Favorite -> !listing.favorited
         }
         return when (val result = runInteraction(kind, listingId, selected)) {
-            is DomainResult.Success -> state.applyInteraction(kind = kind, interaction = result.value)
-            is DomainResult.Failure -> state.handleInteractionFailure(
-                strings = strings,
-                failure = ExploreInteractionFailure(
-                    listingId = listingId,
-                    kind = kind,
-                    selected = selected,
-                    error = result.error,
-                    queuedAtEpochMilliseconds = clockProvider.nowEpochMilliseconds(),
+            is DomainResult.Success -> ExploreInteractionExecution(
+                state = state.applyInteraction(result.value),
+                clientMutationSequence = result.value.clientMutationSequence,
+            )
+            is DomainResult.Failure -> ExploreInteractionExecution(
+                state = state.handleInteractionFailure(
+                    strings = strings,
+                    failure = ExploreInteractionFailure(
+                        listingId = listingId,
+                        kind = kind,
+                        selected = selected,
+                        error = result.error,
+                        queuedAtEpochMilliseconds = clockProvider.nowEpochMilliseconds(),
+                    ),
                 ),
             )
         }
@@ -226,16 +242,31 @@ class ExplorePresenter(
         kind: ExploreInteractionKind,
         listingId: String,
         selected: Boolean,
-    ): DomainResult<ListingViewerInteraction> = when (kind) {
-        ExploreInteractionKind.Like -> if (selected) {
-            catalogInteractionRepository.likeListing(listingId)
-        } else {
-            catalogInteractionRepository.unlikeListing(listingId)
+    ): DomainResult<ExploreInteractionResult> = when (kind) {
+        ExploreInteractionKind.Like -> {
+            val result = if (selected) {
+                catalogInteractionRepository.likeListing(listingId)
+            } else {
+                catalogInteractionRepository.unlikeListing(listingId)
+            }
+            when (result) {
+                is DomainResult.Success -> DomainResult.Success(ExploreInteractionResult.Like(result.value))
+                is DomainResult.Failure -> result
+            }
         }
-        ExploreInteractionKind.Favorite -> if (selected) {
-            catalogInteractionRepository.favoriteListing(listingId)
-        } else {
-            catalogInteractionRepository.unfavoriteListing(listingId)
+        ExploreInteractionKind.Favorite -> when (
+            val result = favoritesRepository.setFavorite(listingId = listingId, favorited = selected)
+        ) {
+            is DomainResult.Success -> if (
+                result.value.listingId == listingId &&
+                result.value.favorited == selected &&
+                result.value.clientMutationSequence > 0L
+            ) {
+                DomainResult.Success(ExploreInteractionResult.Favorite(result.value))
+            } else {
+                DomainResult.Failure(DomainError.Unexpected())
+            }
+            is DomainResult.Failure -> result
         }
     }
 
@@ -260,11 +291,16 @@ class ExplorePresenter(
             }
         }
     }
+}
 
-    private suspend fun persistExploreCity(cityId: String?): Boolean {
-        val repository = appPreferencesRepository ?: return true
-        return repository.setExploreCity(cityId) is DomainResult.Failure
-    }
+internal data class ExploreInteractionExecution(
+    val state: ExploreUiState,
+    val clientMutationSequence: Long? = null,
+)
+
+private suspend fun AppPreferencesRepository?.persistExploreCity(cityId: String?): Boolean {
+    val repository = this ?: return true
+    return repository.setExploreCity(cityId) is DomainResult.Failure
 }
 
 private fun ExploreUiState.applySnapshot(
@@ -294,13 +330,16 @@ private fun ExploreUiState.applySnapshot(
     )
 }
 
-private fun ExploreUiState.refreshFailure(strings: KwaborStrings, error: DomainError): ExploreUiState =
-    if (listings.isEmpty()) {
+private fun ExploreUiState.refreshFailure(strings: KwaborStrings, error: DomainError): ExploreUiState {
+    val networkUnavailable = error is DomainError.NetworkUnavailable
+    val offline = networkUnavailable || queuedInteractions.isNotEmpty()
+    return if (listings.isEmpty()) {
         copy(
             isLoading = false,
             isRefreshing = false,
             isAppending = false,
-            isOffline = error is DomainError.NetworkUnavailable,
+            isOffline = offline,
+            contentIsOffline = networkUnavailable,
             errorMessage = error.toExploreMessage(strings),
             refreshMessage = null,
         )
@@ -309,17 +348,23 @@ private fun ExploreUiState.refreshFailure(strings: KwaborStrings, error: DomainE
             isLoading = false,
             isRefreshing = false,
             isAppending = false,
-            isOffline = error is DomainError.NetworkUnavailable,
+            isOffline = offline,
+            contentIsOffline = networkUnavailable,
             errorMessage = null,
             refreshMessage = strings.exploreRefreshError,
         )
     }
+}
 
-private fun ExploreUiState.appendFailure(strings: KwaborStrings, error: DomainError): ExploreUiState = copy(
-    isAppending = false,
-    isOffline = error is DomainError.NetworkUnavailable,
-    appendErrorMessage = strings.exploreLoadMoreError,
-)
+private fun ExploreUiState.appendFailure(strings: KwaborStrings, error: DomainError): ExploreUiState {
+    val networkUnavailable = error is DomainError.NetworkUnavailable
+    return copy(
+        isAppending = false,
+        isOffline = networkUnavailable || queuedInteractions.isNotEmpty(),
+        contentIsOffline = networkUnavailable,
+        appendErrorMessage = strings.exploreLoadMoreError,
+    )
+}
 
 private fun ExploreUiState.toFeedQuery(): ExploreFeedQuery = ExploreFeedQuery(
     filters = ListingFilters(
@@ -382,28 +427,35 @@ private fun ListingSummary.toExploreListingItem(
     cityId = cityId,
 )
 
-private fun ExploreUiState.applyInteraction(
-    kind: ExploreInteractionKind,
-    interaction: ListingViewerInteraction,
-): ExploreUiState = copy(
-    isOffline = false,
-    interactionMessage = null,
-    pendingAuthInteraction = null,
-    listings = listings.map { listing ->
-        if (listing.id == interaction.listingId) {
-            listing.copy(
-                liked = interaction.likedByViewer,
-                favorited = interaction.favoritedByViewer,
-                likesCount = interaction.likesCount,
+private fun ExploreUiState.applyInteraction(result: ExploreInteractionResult): ExploreUiState {
+    val remainingQueuedInteractions = queuedInteractions.filterNot { queued ->
+        queued.listingId == result.listingId && queued.kind == result.kind
+    }
+    return copy(
+        isOffline = contentIsOffline || remainingQueuedInteractions.isNotEmpty(),
+        interactionMessage = null,
+        pendingAuthInteraction = null,
+        listings = listings.map { listing -> listing.applyInteractionResult(result) },
+        queuedInteractions = remainingQueuedInteractions,
+    )
+}
+
+private fun ExploreListingItem.applyInteractionResult(result: ExploreInteractionResult): ExploreListingItem =
+    when (result) {
+        is ExploreInteractionResult.Like -> if (id == result.interaction.listingId) {
+            copy(
+                liked = result.interaction.likedByViewer,
+                likesCount = result.interaction.likesCount,
             )
         } else {
-            listing
+            this
         }
-    },
-    queuedInteractions = queuedInteractions.filterNot { queued ->
-        queued.listingId == interaction.listingId && queued.kind == kind
-    },
-)
+        is ExploreInteractionResult.Favorite -> if (id == result.mutation.listingId) {
+            copy(favorited = result.mutation.favorited)
+        } else {
+            this
+        }
+    }
 
 private fun ExploreUiState.handleInteractionFailure(
     strings: KwaborStrings,
@@ -513,3 +565,21 @@ private data class ExploreInteractionFailure(
     val error: DomainError,
     val queuedAtEpochMilliseconds: Long,
 )
+
+private sealed interface ExploreInteractionResult {
+    val listingId: String
+    val kind: ExploreInteractionKind
+    val clientMutationSequence: Long?
+
+    data class Like(val interaction: ListingViewerInteraction) : ExploreInteractionResult {
+        override val listingId: String = interaction.listingId
+        override val kind: ExploreInteractionKind = ExploreInteractionKind.Like
+        override val clientMutationSequence: Long? = null
+    }
+
+    data class Favorite(val mutation: FavoriteMutation) : ExploreInteractionResult {
+        override val listingId: String = mutation.listingId
+        override val kind: ExploreInteractionKind = ExploreInteractionKind.Favorite
+        override val clientMutationSequence: Long = mutation.clientMutationSequence
+    }
+}

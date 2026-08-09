@@ -20,6 +20,7 @@ import com.kwabor.shared.domain.explore.ExploreFeedQuery
 import com.kwabor.shared.domain.explore.ExploreFeedRepository
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
+import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.stringsFor
@@ -35,23 +36,7 @@ class ExplorePresenterTest {
 
     @Test
     fun load_mapsPublishedCatalogListingsToReadOnlyExploreState() = runSuspendTest {
-        val repository = FakeCatalogRepository(
-            FakeCatalogScenario(
-                listings = listOf(
-                    listingSummary(
-                        ListingSummaryFixture(
-                            id = "ouidah-gate",
-                            name = "Porte du non-retour",
-                            cityId = "ouidah",
-                            coverImageUrl = "https://example.invalid/cover.jpg",
-                            ratingAverage = 4.74,
-                            sponsoredUntilEpochMilliseconds = 2_000L,
-                            isSponsoredPlacement = true,
-                        ),
-                    ),
-                ),
-            ),
-        )
+        val repository = publishedListingRepository()
         val presenter = testPresenter(repository, clockProvider)
 
         val state = presenter.load(
@@ -210,7 +195,7 @@ class ExplorePresenterTest {
                 interactionResult = ListingViewerInteraction(
                     listingId = "listing-1",
                     likedByViewer = false,
-                    favoritedByViewer = true,
+                    favoritedByViewer = false,
                     likesCount = 12,
                 ),
             ),
@@ -238,11 +223,45 @@ class ExplorePresenterTest {
     }
 
     @Test
+    fun toggleFavoriteUsesDedicatedRepositoryAndPreservesLikeState() = runSuspendTest {
+        val catalogRepository = FakeCatalogRepository()
+        val favoritesRepository = RecordingExploreFavoritesRepository()
+        val presenter = testPresenter(
+            repository = catalogRepository,
+            clockProvider = clockProvider,
+            favoritesRepository = favoritesRepository,
+        )
+        val state = stateWithListing(
+            ExploreListingItem(
+                id = "listing-1",
+                title = "Listing test",
+                cityLabel = "Cotonou",
+                coverImageUrl = null,
+                price = null,
+                liked = true,
+                likesCount = 42,
+            ),
+        )
+
+        val updatedState = presenter.toggleFavorite(state, "listing-1", strings)
+
+        assertEquals(listOf("listing-1" to true), favoritesRepository.mutations)
+        assertTrue(updatedState.listings.single().favorited)
+        assertTrue(updatedState.listings.single().liked)
+        assertEquals(42, updatedState.listings.single().likesCount)
+        assertEquals(null, catalogRepository.lastInteractionAction)
+    }
+
+    @Test
     fun toggleFavorite_authRequiredShowsSoftWallWithoutBlockingListings() = runSuspendTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.AuthenticationRequired()),
         )
-        val presenter = testPresenter(repository, clockProvider)
+        val presenter = testPresenter(
+            repository = repository,
+            clockProvider = clockProvider,
+            favoritesRepository = AuthenticationRequiredFavoritesRepository,
+        )
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -309,7 +328,11 @@ class ExplorePresenterTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(interactionError = DomainError.NetworkUnavailable()),
         )
-        val presenter = testPresenter(repository, clockProvider)
+        val presenter = testPresenter(
+            repository = repository,
+            clockProvider = clockProvider,
+            favoritesRepository = OfflineFavoritesRepository,
+        )
         val state = stateWithListing(
             ExploreListingItem(
                 id = "listing-1",
@@ -364,6 +387,24 @@ class ExplorePresenterTest {
         assertEquals(1_000L, updatedState.queuedInteractions.single().queuedAtEpochMilliseconds)
     }
 }
+
+private fun publishedListingRepository(): FakeCatalogRepository = FakeCatalogRepository(
+    FakeCatalogScenario(
+        listings = listOf(
+            listingSummary(
+                ListingSummaryFixture(
+                    id = "ouidah-gate",
+                    name = "Porte du non-retour",
+                    cityId = "ouidah",
+                    coverImageUrl = "https://example.invalid/cover.jpg",
+                    ratingAverage = 4.74,
+                    sponsoredUntilEpochMilliseconds = 2_000L,
+                    isSponsoredPlacement = true,
+                ),
+            ),
+        ),
+    ),
+)
 
 private data class FakeCatalogScenario(
     val cities: List<City> = listOf(
@@ -446,25 +487,19 @@ private class FakeCatalogRepository(
         lastInteractionAction = "unlike"
         return getListingViewerInteraction(listingId)
     }
-
-    override suspend fun favoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
-        lastInteractionAction = "favorite"
-        return getListingViewerInteraction(listingId)
-    }
-
-    override suspend fun unfavoriteListing(listingId: String): DomainResult<ListingViewerInteraction> {
-        lastInteractionAction = "unfavorite"
-        return getListingViewerInteraction(listingId)
-    }
 }
 
-private fun testPresenter(repository: CatalogRepository, clockProvider: ClockProvider): ExplorePresenter =
-    ExplorePresenter(
-        exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
-        catalogInteractionRepository = repository,
-        appPreferencesRepository = null,
-        clockProvider = clockProvider,
-    )
+private fun testPresenter(
+    repository: CatalogRepository,
+    clockProvider: ClockProvider,
+    favoritesRepository: FavoritesRepository = RecordingExploreFavoritesRepository(),
+): ExplorePresenter = ExplorePresenter(
+    exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
+    catalogInteractionRepository = repository,
+    favoritesRepository = favoritesRepository,
+    appPreferencesRepository = null,
+    clockProvider = clockProvider,
+)
 
 private class TestExploreFeedRepository(
     private val catalogRepository: CatalogRepository,

@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.ui.screens.profile.ProfileScreen
+import com.kwabor.android.ui.screens.profile.ProfileScreenActions
 import com.kwabor.android.ui.screens.profile.ProfileScreenUiModel
 import com.kwabor.android.ui.screens.settings.SettingsPrivacyActions
 import com.kwabor.android.ui.screens.settings.SettingsScreen
@@ -36,9 +37,14 @@ internal fun NavGraphBuilder.profileRoute(
         ProfileScreen(
             model = ProfileScreenUiModel(email = state.auth.currentSession?.email),
             strings = strings,
-            onSettingsRequested = {
-                navController.navigate(SettingsRoute) { launchSingleTop = true }
-            },
+            actions = ProfileScreenActions(
+                onFavoritesRequested = {
+                    navController.navigate(FavoritesRoute) { launchSingleTop = true }
+                },
+                onSettingsRequested = {
+                    navController.navigate(SettingsRoute) { launchSingleTop = true }
+                },
+            ),
             modifier = Modifier.padding(paddingValues),
         )
     }
