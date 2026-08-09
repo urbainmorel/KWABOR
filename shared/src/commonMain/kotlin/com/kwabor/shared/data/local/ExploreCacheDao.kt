@@ -20,6 +20,8 @@ internal data class ExploreCachedListingRecord(
     val position: Int,
     @ColumnInfo(name = "is_sponsored_placement")
     val isSponsoredPlacement: Boolean?,
+    @ColumnInfo(name = "is_event_ended")
+    val isEventEnded: Boolean? = null,
 )
 
 internal data class ExploreCachedListingTimestamp(
@@ -41,7 +43,7 @@ internal interface ExploreCacheStatements {
 
     @Query(
         """
-        SELECT listings.*, items.position, items.is_sponsored_placement
+        SELECT listings.*, items.position, items.is_sponsored_placement, items.is_event_ended
         FROM explore_cache_snapshot_items AS items
         INNER JOIN explore_cached_listings AS listings
             ON listings.listing_id = items.listing_id

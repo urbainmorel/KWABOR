@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -106,6 +107,9 @@ private fun ListingCardContent(
             imageUrl = state.coverImageUrl,
             mediaUrlPolicy = mediaUrlPolicy,
             modifier = Modifier.fillMaxSize(),
+            contentDescription = state.imageAccessibilityDescription(
+                exposeImageSemantics = actions.openAccessibilityDescription == null,
+            ),
         )
         Box(modifier = Modifier.fillMaxSize().background(listingScrim()))
         ListingCardBody(
@@ -180,14 +184,19 @@ private fun ListingCardBody(state: ListingCardState, strings: KwaborStrings, mod
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        state.ratingLabel?.let { rating -> ListingRating(label = rating, strings = strings) }
         PriceTag(price = state.price, strings = strings, options = state.priceOptions)
     }
 }
 
 @Composable
-private fun ListingRating(label: String, strings: KwaborStrings) {
+private fun ListingRatingBadge(label: String, strings: KwaborStrings) {
     Row(
+        modifier = Modifier
+            .background(
+                color = KwaborColors.Ink950.copy(alpha = KwaborAlpha.SCRIM_HIGH),
+                shape = RoundedCornerShape(KwaborRadius.Pill),
+            )
+            .padding(horizontal = KwaborSpacing.Md, vertical = KwaborSpacing.Xs),
         horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -210,9 +219,11 @@ data class ListingCardState(
     val title: String,
     val cityLabel: String,
     val coverImageUrl: String? = null,
+    val coverImageAlt: String? = null,
     val price: MoneyXof?,
     val priceOptions: PriceTagOptions = PriceTagOptions(mode = PriceTagMode.Compact),
     val ratingLabel: String? = null,
+    val eventDateLabel: String? = null,
     val sponsored: Boolean = false,
     val liked: Boolean = false,
     val favorited: Boolean = false,
@@ -231,8 +242,21 @@ private fun ListingCardTopBar(
         ListingCardBadges(
             state = state,
             strings = strings,
-            modifier = Modifier.align(Alignment.TopStart),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .endedRibbonClearance(state.eventEnded)
+                .clearVisualSemantics(actions.openAccessibilityDescription != null),
         )
+        if (state.eventEnded) {
+            EventEndedRibbon(
+                label = strings.favorites.eventEnded,
+                accessibilityLabel = strings.favorites.eventEndedAccessibility,
+                traversalOrder = EVENT_ENDED_RIBBON_TRAVERSAL_INDEX,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = -KwaborSpacing.Xxl, y = KwaborSpacing.Lg),
+            )
+        }
         ListingCardActionButtons(
             state = state,
             strings = strings,
@@ -250,15 +274,33 @@ private fun ListingCardBadges(state: ListingCardState, strings: KwaborStrings, m
     ) {
         if (state.sponsored) {
             SponsoredBadge(strings = strings)
+        } else {
+            state.ratingLabel
+                ?.takeIf(String::isNotBlank)
+                ?.let { rating -> ListingRatingBadge(label = rating, strings = strings) }
         }
-        if (state.eventEnded) {
-            EventEndedRibbon(
-                label = strings.favorites.eventEnded,
-                accessibilityLabel = strings.favorites.eventEndedAccessibility,
-                traversalOrder = EVENT_ENDED_RIBBON_TRAVERSAL_INDEX,
-            )
-        }
+        state.eventDateLabel
+            ?.takeIf(String::isNotBlank)
+            ?.let { eventDate -> ListingEventDateBadge(label = eventDate) }
     }
+}
+
+@Composable
+private fun ListingEventDateBadge(label: String) {
+    Text(
+        text = label,
+        modifier = Modifier
+            .background(
+                color = KwaborColors.Ink950.copy(alpha = KwaborAlpha.SCRIM_HIGH),
+                shape = RoundedCornerShape(KwaborRadius.Pill),
+            )
+            .padding(horizontal = KwaborSpacing.Md, vertical = KwaborSpacing.Xs),
+        color = KwaborColors.Surface0,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
@@ -375,6 +417,12 @@ private fun Modifier.listingActionTraversal(index: Float?): Modifier = if (index
     this
 } else {
     semantics { traversalIndex = index }
+}
+
+private fun Modifier.endedRibbonClearance(enabled: Boolean): Modifier = if (enabled) {
+    padding(top = KwaborSpacing.Xxxl + KwaborSpacing.Lg)
+} else {
+    this
 }
 
 private const val OPEN_ACTION_TRAVERSAL_INDEX = 0f

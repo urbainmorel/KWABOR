@@ -42,6 +42,36 @@ class KwaborDatabaseMigrationTest {
             context.deleteDatabase(MIGRATION_DATABASE_NAME)
         }
     }
+
+    @Test
+    fun autoMigrationFromTwoToThreePreservesLegacyCacheAndAddsNullableExploreV2Columns() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(2).use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 3, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
+
+    @Test
+    fun autoMigrationFromOneToThreeIsNonDestructive() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(1).use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 3, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
 }
 
 private fun SQLiteConnection.seedExploreCache() {
@@ -55,12 +85,48 @@ private fun SQLiteConnection.assertExploreMigrationPreservedCache() {
     assertEquals(0L, singleLong("SELECT COUNT(*) FROM explore_reference_snapshots"))
 }
 
+private fun SQLiteConnection.assertExploreV2ColumnsAreNullForLegacyRows() {
+    assertEquals(
+        1L,
+        singleLong(
+            """
+            SELECT COUNT(*)
+            FROM explore_cache_snapshots
+            WHERE server_snapshot_at_epoch_microseconds IS NULL
+            """.trimIndent(),
+        ),
+    )
+    assertEquals(
+        1L,
+        singleLong(
+            """
+            SELECT COUNT(*)
+            FROM explore_cached_listings
+            WHERE cover_image_alt IS NULL
+              AND views_count IS NULL
+              AND event_start_at_epoch_milliseconds IS NULL
+              AND event_end_at_epoch_milliseconds IS NULL
+            """.trimIndent(),
+        ),
+    )
+    assertEquals(
+        1L,
+        singleLong(
+            """
+            SELECT COUNT(*)
+            FROM explore_cache_snapshot_items
+            WHERE is_event_ended IS NULL
+            """.trimIndent(),
+        ),
+    )
+}
+
 private fun SQLiteConnection.singleLong(query: String): Long = prepare(query).use { statement ->
     check(statement.step()) { "Migration verification query returned no row." }
     statement.getLong(0)
 }
 
-private const val MIGRATION_DATABASE_NAME = "kwabor-room-migration-1-2"
+private const val MIGRATION_DATABASE_NAME = "kwabor-room-migration"
 
 private val INSERT_EXPLORE_SNAPSHOT =
     """

@@ -7,45 +7,53 @@ import com.kwabor.shared.data.local.ExploreReferenceSnapshot
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.catalog.Category
 import com.kwabor.shared.domain.catalog.City
-import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
+import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreCatalogPage
+import com.kwabor.shared.domain.explore.ExploreCatalogRepository
+import com.kwabor.shared.domain.explore.ExploreCatalogRequest
 import com.kwabor.shared.domain.explore.ExploreFeedCacheOperation
 import com.kwabor.shared.domain.explore.ExploreFeedQuery
 import com.kwabor.shared.domain.explore.ExploreFeedRepository
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.explore.ExploreFeedWarning
+import com.kwabor.shared.domain.explore.ExploreSort
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 
 internal class OfflineFirstExploreFeedRepository(
     private val catalogRepository: CatalogRepository,
+    private val exploreCatalogRepository: ExploreCatalogRepository,
     private val cache: ExploreFeedCacheDependencies,
     clockProvider: ClockProvider,
     singleFlightScope: CoroutineScope,
 ) : ExploreFeedRepository {
     private val refreshSingleFlight = ExploreFeedSingleFlight<ExploreFeedSnapshot>(singleFlightScope)
-    private val appendPageSingleFlight = ExploreFeedSingleFlight<ListingSummaryPage>(singleFlightScope)
+    private val appendPageSingleFlight = ExploreFeedSingleFlight<ExploreCatalogPage>(singleFlightScope)
     private val requestCoordinator = ExploreRequestCoordinator(clockProvider, cache.watermarkProvider)
 
     override suspend fun readCached(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot?> {
-        val cacheKey = query.toCacheKey()
-        return when (val wallResult = readCachedWall(cacheKey)) {
+        return when (val current = readCached(query, query.toCacheKey())) {
+            is DomainResult.Success -> current.value?.let { DomainResult.Success(it) }
+                ?: readCached(query, query.toLegacyCacheKey())
+            is DomainResult.Failure -> current
+        }
+    }
+
+    private suspend fun readCached(query: ExploreFeedQuery, cacheKey: String): DomainResult<ExploreFeedSnapshot?> {
+        val availableCache = cache.wall ?: return localStorageFailure()
+        return when (val wallResult = readLocal { availableCache.read(cacheKey) }) {
             is DomainResult.Success -> wallResult.value?.let { wall ->
                 readCachedReferences(query, cacheKey, wall)
             }
                 ?: DomainResult.Success(null)
             is DomainResult.Failure -> wallResult
         }
-    }
-
-    private suspend fun readCachedWall(cacheKey: String): DomainResult<ExploreCacheSnapshot?> {
-        val availableCache = cache.wall ?: return localStorageFailure()
-        return readLocal { availableCache.read(cacheKey) }
     }
 
     private suspend fun readCachedReferences(
@@ -137,10 +145,7 @@ internal class OfflineFirstExploreFeedRepository(
         val page = when (
             val result = requestCoordinator.runReservedRequest(reservation) {
                 appendPageSingleFlight.execute(query.toAppendSingleFlightKey(cursor)) {
-                    catalogRepository.listListings(
-                        filters = query.filters,
-                        page = ListingPageRequest(cursor = cursor, limit = query.pageSize),
-                    )
+                    exploreCatalogRepository.listCatalog(query.toCatalogRequest(cursor))
                 }
             }
         ) {
@@ -204,12 +209,9 @@ internal class OfflineFirstExploreFeedRepository(
     private suspend fun loadFirstRemotePage(
         query: ExploreFeedQuery,
         references: RemoteExploreReferences,
-    ): DomainResult<ListingSummaryPage> {
+    ): DomainResult<ExploreCatalogPage> {
         val page = when (
-            val result = catalogRepository.listListings(
-                filters = query.filters,
-                page = ListingPageRequest(limit = query.pageSize),
-            )
+            val result = exploreCatalogRepository.listCatalog(query.toCatalogRequest(cursor = null))
         ) {
             is DomainResult.Success -> result.value
             is DomainResult.Failure -> return result
@@ -221,7 +223,7 @@ internal class OfflineFirstExploreFeedRepository(
     }
 
     private fun RemoteExploreReferences.toNetworkSnapshot(
-        page: ListingSummaryPage,
+        page: ExploreCatalogPage,
         requestTimestamp: Long,
     ): DomainResult<ExploreFeedSnapshot> = DomainResult.Success(
         ExploreFeedSnapshot(
@@ -231,6 +233,7 @@ internal class OfflineFirstExploreFeedRepository(
             nextCursor = page.nextCursor,
             cachedAtEpochMilliseconds = requestTimestamp,
             source = ExploreFeedSource.Network,
+            serverSnapshotAtEpochMicroseconds = page.snapshotAtEpochMicroseconds,
         ),
     )
 
@@ -310,17 +313,42 @@ private fun watermarkFailureOperations(isUnavailable: Boolean): Set<ExploreFeedC
 private fun ExploreFeedSnapshot.persistenceFailureOperations(): Set<ExploreFeedCacheOperation> =
     (warning as? ExploreFeedWarning.LocalPersistenceUnavailable)?.failedOperations.orEmpty()
 
-private fun ListingSummaryPage.isProgressiveAfter(
+private fun ExploreCatalogPage.isValidFirstPage(
+    query: ExploreFeedQuery,
+    cities: List<City>,
+    categories: List<Category>,
+): Boolean = toListingSummaryPage().isValidFirstPage(query, cities, categories) &&
+    items.hasValidSponsorPlacementOrder()
+
+private fun ExploreCatalogPage.isProgressiveAfter(
     cursor: String,
     query: ExploreFeedQuery,
     currentSnapshot: ExploreFeedSnapshot,
-): Boolean = isProgressiveAfter(
+): Boolean = toListingSummaryPage().isProgressiveAfter(
     cursor = cursor,
     query = query,
     cities = currentSnapshot.cities,
     categories = currentSnapshot.categories,
     existingListingIds = currentSnapshot.items.mapTo(mutableSetOf(), ListingSummary::id),
-)
+) && (
+    items.isEmpty() || snapshotAtEpochMicroseconds == currentSnapshot.serverSnapshotAtEpochMicroseconds
+    ) && (currentSnapshot.items + items).hasValidSponsorPlacementOrder()
+
+private fun List<ListingSummary>.hasValidSponsorPlacementOrder(): Boolean {
+    var sponsorCount = 0
+    var organicSeen = false
+    forEach { listing ->
+        if (listing.isSponsoredPlacement == true) {
+            sponsorCount += 1
+            if (organicSeen || sponsorCount > MAX_EXPLORE_SPONSORED_PLACEMENTS) {
+                return false
+            }
+        } else {
+            organicSeen = true
+        }
+    }
+    return true
+}
 
 private fun Set<ExploreFeedCacheOperation>.toWarningOrNull(): ExploreFeedWarning? =
     takeIf { operations -> operations.isNotEmpty() }
@@ -353,9 +381,9 @@ private suspend fun <T> ExploreRequestCoordinator.runReservedRequest(
     }
 }
 
-private fun ExploreFeedSnapshot.append(page: ListingSummaryPage, nowEpochMilliseconds: Long): ExploreFeedSnapshot =
+private fun ExploreFeedSnapshot.append(page: ExploreCatalogPage, nowEpochMilliseconds: Long): ExploreFeedSnapshot =
     copy(
-        items = (items + page.items).distinctBy(ListingSummary::id),
+        items = items + page.items,
         nextCursor = page.nextCursor,
         cachedAtEpochMilliseconds = nowEpochMilliseconds,
         source = ExploreFeedSource.Network,
@@ -364,6 +392,29 @@ private fun ExploreFeedSnapshot.append(page: ListingSummaryPage, nowEpochMillise
             listing.id to (itemContentCapturedAtEpochMilliseconds[listing.id] ?: cachedAtEpochMilliseconds)
         },
     )
+
+private fun ExploreCatalogPage.toListingSummaryPage(): ListingSummaryPage = ListingSummaryPage(
+    items = items,
+    nextCursor = nextCursor,
+)
+
+private fun ExploreFeedQuery.toCatalogRequest(cursor: String?): ExploreCatalogRequest {
+    val listingType = requireNotNull(filters.listingType)
+    return ExploreCatalogRequest(
+        listingType = listingType,
+        cityId = filters.cityId,
+        categoryId = filters.categoryId,
+        listingClass = filters.listingClass,
+        sort = when (listingType) {
+            ListingType.Event -> ExploreSort.TemporalProximity
+            ListingType.Place,
+            ListingType.Establishment,
+            -> ExploreSort.Popularity
+        },
+        cursor = cursor,
+        limit = pageSize,
+    )
+}
 
 private suspend fun <T> readLocal(block: suspend () -> T): DomainResult<T> = try {
     DomainResult.Success(block())
@@ -411,6 +462,7 @@ private data class RemoteExploreReferences(
 )
 
 private const val MAX_PERSISTED_EXPLORE_FEED_ITEMS = 40
+private const val MAX_EXPLORE_SPONSORED_PLACEMENTS = 2
 private const val EXPLORE_STORAGE_ERROR_KEY = "error.explore.storage_unavailable"
 private const val EXPLORE_REVALIDATION_REQUIRED_ERROR_KEY = "error.explore.revalidation_required"
 private const val EXPLORE_NO_NEXT_PAGE_ERROR_KEY = "error.explore.no_next_page"

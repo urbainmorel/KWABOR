@@ -311,7 +311,10 @@ private fun LazyGridScope.searchResultItems(
             state = listing.toCardState(priceOptions = priceOptions),
             strings = strings,
             mediaUrlPolicy = mediaUrlPolicy,
-            actions = ListingCardActions(onClick = { actions.onSearchListingClick(listing.id) }),
+            actions = ListingCardActions(
+                onClick = { actions.onSearchListingClick(listing.id) },
+                openAccessibilityDescription = listing.cardAccessibilityDescription(strings),
+            ),
         )
     }
 }

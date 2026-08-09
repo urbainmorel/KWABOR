@@ -28,7 +28,7 @@ internal fun ListingSummaryPage.isProgressiveAfter(
     existingListingIds: Set<String>,
 ): Boolean = isValidFirstPage(query, cities, categories) &&
     nextCursor != cursor &&
-    (nextCursor == null || items.any { listing -> listing.id !in existingListingIds })
+    items.none { listing -> listing.id in existingListingIds }
 
 internal fun List<City>.areCitiesValidForExploreCache(): Boolean = size <= MAX_EXPLORE_CITY_COUNT &&
     map(City::id).distinct().size == size &&
@@ -77,7 +77,7 @@ private fun ExploreFeedQuery.acceptsFilters(listing: ListingSummary): Boolean =
 
 private fun String?.isValidCursor(): Boolean = this == null || (isNotBlank() && length <= MAX_EXPLORE_CURSOR_LENGTH)
 
-private fun City.isValidForExploreCache(): Boolean = id.isValidRequiredText(MAX_EXPLORE_ID_LENGTH) &&
+private fun City.isValidForExploreCache(): Boolean = id.isValidExploreIdentifier() &&
     name.isValidRequiredText(MAX_EXPLORE_CITY_NAME_LENGTH) &&
     countryCode == BENIN_COUNTRY_CODE &&
     coordinatesAreValid()
@@ -89,28 +89,39 @@ private fun City.coordinatesAreValid(): Boolean = when {
     else -> GeoPoint(latitude = latitude, longitude = longitude).isWithinBeninBounds
 }
 
-private fun Category.isValidForExploreCache(): Boolean = id.isValidRequiredText(MAX_EXPLORE_ID_LENGTH) &&
+private fun Category.isValidForExploreCache(): Boolean = id.isValidExploreIdentifier() &&
     nameKey.isValidRequiredText(MAX_EXPLORE_CATEGORY_NAME_KEY_LENGTH)
 
 private fun ListingSummary.isValidForExploreCache(): Boolean = id.isValidRequiredText(MAX_EXPLORE_ID_LENGTH) &&
     name.isValidRequiredText(MAX_EXPLORE_LISTING_NAME_LENGTH, MIN_EXPLORE_LISTING_NAME_LENGTH) &&
-    cityId.isValidRequiredText(MAX_EXPLORE_ID_LENGTH) &&
-    categoryId.isValidRequiredText(MAX_EXPLORE_ID_LENGTH) &&
+    cityId.isValidExploreIdentifier() &&
+    categoryId.isValidExploreIdentifier() &&
     coverImageUrl.isValidOptionalUrl() &&
+    coverImageAlt.isValidOptionalText() &&
     ratingAverage.isValidOptionalRating() &&
     likesCount >= 0 &&
-    (sponsoredUntilEpochMilliseconds == null || sponsoredUntilEpochMilliseconds >= 0)
+    hasValidExploreV2NetworkMetadata()
 
 private fun String.isValidRequiredText(maximumLength: Int, minimumLength: Int = 1): Boolean =
     isNotBlank() && length in minimumLength..maximumLength
 
+private fun String.isValidExploreIdentifier(): Boolean =
+    length in 1..MAX_EXPLORE_FILTER_ID_LENGTH && EXPLORE_FILTER_ID_PATTERN.matches(this)
+
 private fun String?.isValidOptionalUrl(): Boolean = this == null || (isNotBlank() && length <= MAX_EXPLORE_URL_LENGTH)
+
+private fun String?.isValidOptionalText(): Boolean = this == null || (
+    isNotBlank() &&
+        trim() == this &&
+        none(Char::isISOControl)
+    )
 
 private fun Double?.isValidOptionalRating(): Boolean = this == null || (isFinite() && this in MIN_RATING..MAX_RATING)
 
 private const val MAX_EXPLORE_CITY_COUNT = 256
 private const val MAX_EXPLORE_CATEGORY_COUNT = 512
 private const val MAX_EXPLORE_ID_LENGTH = 128
+private const val MAX_EXPLORE_FILTER_ID_LENGTH = 100
 private const val MAX_EXPLORE_CITY_NAME_LENGTH = 120
 private const val MAX_EXPLORE_CATEGORY_NAME_KEY_LENGTH = 160
 private const val MIN_EXPLORE_LISTING_NAME_LENGTH = 3
@@ -120,5 +131,6 @@ private const val MAX_EXPLORE_CURSOR_LENGTH = 4_096
 private const val MIN_RATING = 0.0
 private const val MAX_RATING = 5.0
 private const val BENIN_COUNTRY_CODE = "BJ"
+private val EXPLORE_FILTER_ID_PATTERN = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
 private const val EXPLORE_CITY_UNAVAILABLE_ERROR_KEY = "error.explore.city_unavailable"
 private const val EXPLORE_CATEGORY_UNAVAILABLE_ERROR_KEY = "error.explore.category_unavailable"

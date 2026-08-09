@@ -196,6 +196,11 @@ data class ListingSummary(
     val verified: Boolean,
     val sponsoredUntilEpochMilliseconds: Long?,
     val isSponsoredPlacement: Boolean? = null,
+    val coverImageAlt: String? = null,
+    val viewsCount: Long? = null,
+    val eventStartAtEpochMilliseconds: Long? = null,
+    val eventEndAtEpochMilliseconds: Long? = null,
+    val isEventEnded: Boolean? = null,
 )
 
 data class ListingViewerInteraction(

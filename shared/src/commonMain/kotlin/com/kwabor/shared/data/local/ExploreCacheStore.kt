@@ -1,5 +1,7 @@
 package com.kwabor.shared.data.local
 
+import com.kwabor.shared.data.explore.isExploreV2FeedCacheKey
+import com.kwabor.shared.data.explore.isValidExploreCursorValue
 import com.kwabor.shared.domain.catalog.ListingSummary
 
 internal data class ExploreCacheSnapshot(
@@ -8,6 +10,7 @@ internal data class ExploreCacheSnapshot(
     val nextCursor: String?,
     val cachedAtEpochMilliseconds: Long,
     val itemCachedAtEpochMilliseconds: Map<String, Long> = emptyMap(),
+    val serverSnapshotAtEpochMicroseconds: Long? = null,
 )
 
 internal data class ExploreCacheWrite(
@@ -29,9 +32,16 @@ internal class ExploreCacheStore(
         val record = dao.readSnapshot(snapshotKey) ?: return null
         return try {
             record.requireConsistent()
+            val items = record.listings.map(ExploreCachedListingRecord::toDomain)
+            if (record.requiresExploreV2Validation) {
+                val invalidV2Field = record.invalidExploreV2FieldOrNull(items)
+                if (invalidV2Field != null) {
+                    throw CorruptExploreCacheException(invalidV2Field)
+                }
+            }
             ExploreCacheSnapshot(
                 snapshotKey = record.snapshot.snapshotKey,
-                items = record.listings.map(ExploreCachedListingRecord::toDomain),
+                items = items,
                 nextCursor = record.snapshot.nextCursor,
                 cachedAtEpochMilliseconds = record.snapshot.cachedAtEpochMilliseconds,
                 itemCachedAtEpochMilliseconds = record.listings
@@ -42,6 +52,7 @@ internal class ExploreCacheStore(
                     .associate { listing ->
                         listing.listing.listingId to listing.listing.contentCachedAtEpochMilliseconds
                     },
+                serverSnapshotAtEpochMicroseconds = record.snapshot.serverSnapshotAtEpochMicroseconds,
             )
         } catch (_: CorruptExploreCacheException) {
             dao.clearSnapshotIfTimestampMatches(
@@ -76,6 +87,20 @@ internal class ExploreCacheStore(
     }
 }
 
+private fun ExploreCacheRecord.invalidExploreV2FieldOrNull(items: List<ListingSummary>): String? = when {
+    snapshot.snapshotKey.isExploreV2FeedCacheKey() &&
+        (items.isEmpty() != (snapshot.serverSnapshotAtEpochMicroseconds == null)) ->
+        "server_snapshot_at_epoch_microseconds"
+    items.isEmpty() && snapshot.nextCursor != null -> "next_cursor"
+    snapshot.nextCursor != null && !snapshot.nextCursor.isValidExploreCursorValue() -> "next_cursor"
+    else -> items.firstNotNullOfOrNull { listing -> listing.invalidExploreV2CacheFieldOrNull }
+        ?: items.invalidExploreV2SponsorPlacementFieldOrNull()
+}
+
+private val ExploreCacheRecord.requiresExploreV2Validation: Boolean
+    get() = snapshot.snapshotKey.isExploreV2FeedCacheKey() ||
+        snapshot.serverSnapshotAtEpochMicroseconds != null
+
 internal fun ExploreCacheSnapshot.toCacheWrite(): ExploreCacheWrite {
     requireValid()
     val listings = items.map { listing ->
@@ -88,6 +113,7 @@ internal fun ExploreCacheSnapshot.toCacheWrite(): ExploreCacheWrite {
         snapshot = ExploreCacheSnapshotEntity(
             snapshotKey = snapshotKey,
             nextCursor = nextCursor,
+            serverSnapshotAtEpochMicroseconds = serverSnapshotAtEpochMicroseconds,
             cachedAtEpochMilliseconds = cachedAtEpochMilliseconds,
             itemCount = listings.size,
         ),
@@ -108,6 +134,9 @@ private fun ExploreCacheSnapshot.requireValid() {
         "Explore cache cursor is too long."
     }
     require(cachedAtEpochMilliseconds >= 0) { "Explore cache timestamp must not be negative." }
+    require(serverSnapshotAtEpochMicroseconds == null || serverSnapshotAtEpochMicroseconds >= 0) {
+        "Explore cache server snapshot timestamp must not be negative."
+    }
     val itemIds = items.mapTo(mutableSetOf(), ListingSummary::id)
     require(itemCachedAtEpochMilliseconds.keys.all(itemIds::contains)) {
         "Explore cache item timestamps must reference snapshot listing ids."
@@ -119,8 +148,30 @@ private fun ExploreCacheSnapshot.requireValid() {
         "Explore cache snapshots must contain at most $MAX_EXPLORE_CACHE_ITEMS items."
     }
     items.forEach(ListingSummary::requireValidForCacheWrite)
+    requireValidV2IfApplicable()
     require(items.map(ListingSummary::id).distinct().size == items.size) {
         "Explore cache snapshot must not contain duplicate listing ids."
+    }
+}
+
+private fun ExploreCacheSnapshot.requireValidV2IfApplicable() {
+    val isV2Key = snapshotKey.isExploreV2FeedCacheKey()
+    if (!isV2Key && serverSnapshotAtEpochMicroseconds == null) {
+        return
+    }
+    require(!isV2Key || (items.isEmpty() == (serverSnapshotAtEpochMicroseconds == null))) {
+        "Invalid Explore v2 cache snapshot field: server_snapshot_at_epoch_microseconds"
+    }
+    require(items.isNotEmpty() || nextCursor == null) {
+        "Invalid Explore v2 cache snapshot field: next_cursor"
+    }
+    require(nextCursor == null || nextCursor.isValidExploreCursorValue()) {
+        "Invalid Explore v2 cache snapshot field: next_cursor"
+    }
+    items.forEach(ListingSummary::requireValidForV2CacheWrite)
+    val invalidSponsorPlacement = items.invalidExploreV2SponsorPlacementFieldOrNull()
+    require(invalidSponsorPlacement == null) {
+        "Invalid Explore v2 cache snapshot field: $invalidSponsorPlacement"
     }
 }
 
@@ -134,14 +185,24 @@ private fun ExploreCacheRecord.requireConsistent() {
     throw CorruptExploreCacheException(invalidField)
 }
 
-private fun ExploreCacheRecord.invalidPersistedFieldOrNull(): String? = when {
-    snapshot.cachedAtEpochMilliseconds < 0 -> "cached_at_epoch_milliseconds"
-    snapshot.nextCursor != null && snapshot.nextCursor.isBlank() -> "next_cursor"
-    snapshot.nextCursor != null && snapshot.nextCursor.length > MAX_EXPLORE_CACHE_CURSOR_LENGTH -> "next_cursor"
-    snapshot.itemCount !in 0..MAX_EXPLORE_CACHE_ITEMS -> "item_count"
-    snapshot.itemCount != listings.size -> "item_count"
-    listings.map(ExploreCachedListingRecord::position) != listings.indices.toList() -> "position"
-    listings.any { record -> record.listing.contentCachedAtEpochMilliseconds < 0 } ->
+private fun ExploreCacheRecord.invalidPersistedFieldOrNull(): String? =
+    snapshot.invalidPersistedFieldOrNull ?: listings.invalidPersistedFieldOrNull(snapshot.itemCount)
+
+private val ExploreCacheSnapshotEntity.invalidPersistedFieldOrNull: String?
+    get() = when {
+        cachedAtEpochMilliseconds < 0 -> "cached_at_epoch_milliseconds"
+        serverSnapshotAtEpochMicroseconds != null && serverSnapshotAtEpochMicroseconds < 0 ->
+            "server_snapshot_at_epoch_microseconds"
+        nextCursor != null && nextCursor.isBlank() -> "next_cursor"
+        nextCursor != null && nextCursor.length > MAX_EXPLORE_CACHE_CURSOR_LENGTH -> "next_cursor"
+        itemCount !in 0..MAX_EXPLORE_CACHE_ITEMS -> "item_count"
+        else -> null
+    }
+
+private fun List<ExploreCachedListingRecord>.invalidPersistedFieldOrNull(expectedItemCount: Int): String? = when {
+    expectedItemCount != size -> "item_count"
+    map(ExploreCachedListingRecord::position) != indices.toList() -> "position"
+    any { record -> record.listing.contentCachedAtEpochMilliseconds < 0 } ->
         "content_cached_at_epoch_milliseconds"
     else -> null
 }
@@ -149,6 +210,22 @@ private fun ExploreCacheRecord.invalidPersistedFieldOrNull(): String? = when {
 private fun ListingSummary.requireValidForCacheWrite() {
     val invalidField = invalidExploreCacheFieldOrNull()
     require(invalidField == null) { "Invalid Explore cache listing field: $invalidField" }
+}
+
+private fun ListingSummary.requireValidForV2CacheWrite() {
+    val invalidField = invalidExploreV2CacheFieldOrNull
+    require(invalidField == null) { "Invalid Explore v2 cache listing field: $invalidField" }
+}
+
+private fun List<ListingSummary>.invalidExploreV2SponsorPlacementFieldOrNull(): String? {
+    val sponsoredCount = count { listing -> listing.isSponsoredPlacement == true }
+    if (sponsoredCount > MAX_EXPLORE_V2_SPONSORED_PLACEMENTS) {
+        return "is_sponsored_placement"
+    }
+    val firstOrganicIndex = indexOfFirst { listing -> listing.isSponsoredPlacement == false }
+    val hasSponsoredAfterOrganic = firstOrganicIndex >= 0 &&
+        drop(firstOrganicIndex + 1).any { listing -> listing.isSponsoredPlacement == true }
+    return if (hasSponsoredAfterOrganic) "is_sponsored_placement" else null
 }
 
 internal const val DEFAULT_MAX_EXPLORE_CACHE_SNAPSHOTS = 64
@@ -161,3 +238,4 @@ internal const val MAX_EXPLORE_CACHE_NAME_LENGTH = 120
 internal const val MAX_EXPLORE_CACHE_URL_LENGTH = 2_048
 internal const val MIN_EXPLORE_CACHE_RATING = 0.0
 internal const val MAX_EXPLORE_CACHE_RATING = 5.0
+private const val MAX_EXPLORE_V2_SPONSORED_PLACEMENTS = 2

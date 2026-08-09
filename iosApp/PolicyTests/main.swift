@@ -1502,6 +1502,61 @@ expect(
     ) == 1,
     "Search must collapse to one column for accessibility text sizes."
 )
+
+let exploreV2Decorations = ExploreCardDecorationPolicy.presentation(
+    isSponsoredPlacement: true,
+    ratingLabel: " 4,8 ",
+    eventDateLabel: " 20 juin › ",
+    isEventEnded: true
+)
+expect(
+    exploreV2Decorations.showsSponsoredBadge &&
+        exploreV2Decorations.ratingLabel == nil &&
+        exploreV2Decorations.eventDateLabel == "20 juin ›" &&
+        exploreV2Decorations.showsEndedRibbon,
+    "Explore v2 cards must let Sponsorisé replace the rating while preserving date and ended decorations."
+)
+let organicExploreDecorations = ExploreCardDecorationPolicy.presentation(
+    isSponsoredPlacement: false,
+    ratingLabel: " 4,8 ",
+    eventDateLabel: "20 juin ›",
+    isEventEnded: false
+)
+expect(
+    organicExploreDecorations.ratingLabel == "4,8" &&
+        !organicExploreDecorations.showsSponsoredBadge,
+    "Organic Explore cards must keep the frosted rating badge."
+)
+expect(
+    !ExploreCardDecorationPolicy.presentation(
+        isSponsoredPlacement: false,
+        ratingLabel: nil,
+        eventDateLabel: nil,
+        isEventEnded: false
+    ).showsSponsoredBadge,
+    "Explore must never infer a sponsored badge for an organic server placement."
+)
+let emptyExploreDecorations = ExploreCardDecorationPolicy.presentation(
+    isSponsoredPlacement: false,
+    ratingLabel: "  ",
+    eventDateLabel: "\n",
+    isEventEnded: false
+)
+expect(
+    emptyExploreDecorations.ratingLabel == nil && emptyExploreDecorations.eventDateLabel == nil,
+    "Explore must not render empty rating or date decorations."
+)
+expect(
+    ExploreCardImageAccessibilityPolicy.description(
+        coverImageAlt: "  Danseurs masqués sur la place  ",
+        fallbackTitle: "Festival des masques"
+    ) == "Danseurs masqués sur la place" &&
+        ExploreCardImageAccessibilityPolicy.description(
+            coverImageAlt: " ",
+            fallbackTitle: "Festival des masques"
+        ) == "Festival des masques",
+    "Explore images must expose normalized alt text and fall back safely to the listing title."
+)
 expect(
     !SearchPaginationPolicy.isNearEnd(index: 14, itemCount: 20) &&
         SearchPaginationPolicy.isNearEnd(index: 16, itemCount: 20),

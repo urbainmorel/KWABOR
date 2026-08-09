@@ -97,6 +97,7 @@ internal fun ExploreCacheSnapshot.toDomain(references: ExploreReferenceSnapshot)
             listing.id to (itemCachedAtEpochMilliseconds[listing.id] ?: cachedAtEpochMilliseconds)
         },
         referencesCapturedAtEpochMilliseconds = references.cachedAtEpochMilliseconds,
+        serverSnapshotAtEpochMicroseconds = serverSnapshotAtEpochMicroseconds,
     )
 
 internal fun ExploreFeedSnapshot.toCacheSnapshot(cacheKey: String): ExploreCacheSnapshot = ExploreCacheSnapshot(
@@ -105,6 +106,7 @@ internal fun ExploreFeedSnapshot.toCacheSnapshot(cacheKey: String): ExploreCache
     nextCursor = nextCursor,
     cachedAtEpochMilliseconds = cachedAtEpochMilliseconds,
     itemCachedAtEpochMilliseconds = itemContentCapturedAtEpochMilliseconds,
+    serverSnapshotAtEpochMicroseconds = serverSnapshotAtEpochMicroseconds,
 )
 
 internal fun ExploreFeedSnapshot.toReferenceSnapshot(): ExploreReferenceSnapshot = ExploreReferenceSnapshot(

@@ -190,6 +190,7 @@ data class KwaborStrings(
     val guideDiscovery: GuideDiscoveryStrings,
     val favorites: FavoritesStrings,
     val detail: CatalogDetailStrings,
+    val exploreDate: ExploreDateStrings,
 )
 
 fun stringsFor(locale: AppLocale): KwaborStrings = when (locale) {
@@ -398,4 +399,5 @@ private val frenchStrings = KwaborStrings(
     guideDiscovery = frenchGuideDiscoveryStrings,
     favorites = frenchFavoritesStrings,
     detail = frenchCatalogDetailStrings,
+    exploreDate = frenchExploreDateStrings,
 )

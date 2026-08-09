@@ -16,6 +16,8 @@ internal data class ExploreCacheSnapshotEntity(
     val snapshotKey: String,
     @ColumnInfo(name = "next_cursor")
     val nextCursor: String?,
+    @ColumnInfo(name = "server_snapshot_at_epoch_microseconds")
+    val serverSnapshotAtEpochMicroseconds: Long? = null,
     @ColumnInfo(name = "cached_at_epoch_milliseconds")
     val cachedAtEpochMilliseconds: Long,
     @ColumnInfo(name = "item_count")
@@ -41,16 +43,24 @@ internal data class ExploreCachedListingEntity(
     val categoryId: String,
     @ColumnInfo(name = "cover_image_url")
     val coverImageUrl: String?,
+    @ColumnInfo(name = "cover_image_alt")
+    val coverImageAlt: String?,
     @ColumnInfo(name = "price_from_xof")
     val priceFromXof: Long?,
     @ColumnInfo(name = "rating_average")
     val ratingAverage: Double?,
     @ColumnInfo(name = "likes_count")
     val likesCount: Int,
+    @ColumnInfo(name = "views_count")
+    val viewsCount: Long?,
     @ColumnInfo(name = "verified")
     val verified: Boolean,
     @ColumnInfo(name = "sponsored_until_epoch_milliseconds")
     val sponsoredUntilEpochMilliseconds: Long?,
+    @ColumnInfo(name = "event_start_at_epoch_milliseconds")
+    val eventStartAtEpochMilliseconds: Long?,
+    @ColumnInfo(name = "event_end_at_epoch_milliseconds")
+    val eventEndAtEpochMilliseconds: Long?,
     @ColumnInfo(name = "content_cached_at_epoch_milliseconds")
     val contentCachedAtEpochMilliseconds: Long,
 )
@@ -89,6 +99,8 @@ internal data class ExploreCacheSnapshotItemEntity(
     val position: Int,
     @ColumnInfo(name = "is_sponsored_placement")
     val isSponsoredPlacement: Boolean?,
+    @ColumnInfo(name = "is_event_ended")
+    val isEventEnded: Boolean? = null,
 )
 
 @Entity(tableName = "explore_reference_snapshots")

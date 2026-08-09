@@ -8,6 +8,9 @@ struct ExploreCard: View {
     let onOpen: () -> Void
     let onLike: () -> Void
     let onFavorite: () -> Void
+    private let priceLabel: String
+    private let decoration: ExploreCardDecorationPresentation
+    private let imageAccessibilityDescription: String
 
     init(
         listing: ExploreListingItem,
@@ -23,17 +26,27 @@ struct ExploreCard: View {
         self.onOpen = onOpen
         self.onLike = onLike
         self.onFavorite = onFavorite
-    }
-
-    private var priceLabel: String {
-        PriceLabelFormatter.shared.compactXof(price: listing.price, freeLabel: strings.free)
+        priceLabel = PriceLabelFormatter.shared.compactXof(price: listing.price, freeLabel: strings.free)
+        decoration = ExploreCardDecorationPolicy.presentation(
+            isSponsoredPlacement: listing.sponsored,
+            ratingLabel: listing.ratingLabel,
+            eventDateLabel: listing.eventDateLabel,
+            isEventEnded: listing.isEventEnded
+        )
+        imageAccessibilityDescription = ExploreCardImageAccessibilityPolicy.description(
+            coverImageAlt: listing.coverImageAlt,
+            fallbackTitle: listing.title
+        )
     }
 
     var body: some View {
         ZStack {
             Button(action: onOpen) {
                 ZStack {
-                    ExploreRemoteImage(rawURL: listing.coverImageUrl)
+                    ExploreRemoteImage(
+                        rawURL: listing.coverImageUrl,
+                        accessibilityLabel: imageAccessibilityDescription
+                    )
                     LinearGradient(
                         colors: [
                             Color.clear,
@@ -49,13 +62,22 @@ struct ExploreCard: View {
                     )
                     VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.sm) {
                         HStack(alignment: .top, spacing: KwaborDesignTokens.Spacing.sm) {
-                            if listing.sponsored {
-                                SponsoredBadge(label: strings.sponsored)
-                            } else if let rating = listing.ratingLabel {
-                                ExploreRatingBadge(rating: rating)
+                            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.xs) {
+                                if decoration.showsSponsoredBadge {
+                                    SponsoredBadge(label: strings.sponsored)
+                                } else if let ratingLabel = decoration.ratingLabel {
+                                    ExploreRatingBadge(rating: ratingLabel)
+                                }
+                                if let eventDateLabel = decoration.eventDateLabel {
+                                    ExploreEventDateBadge(label: eventDateLabel)
+                                }
                             }
                             Spacer(minLength: KwaborDesignTokens.Sizing.touchTarget)
                         }
+                        .padding(
+                            .top,
+                            decoration.showsEndedRibbon ? exploreEndedRibbonClearance : 0
+                        )
                         Spacer(minLength: KwaborDesignTokens.Spacing.sm)
                         ExploreCardInformation(
                             listing: listing,
@@ -64,9 +86,20 @@ struct ExploreCard: View {
                     }
                     .padding(KwaborDesignTokens.Spacing.md)
                 }
+                .overlay(alignment: .topLeading) {
+                    if decoration.showsEndedRibbon {
+                        ExploreEndedRibbon(label: strings.favorites.eventEnded)
+                            .rotationEffect(.degrees(-exploreEndedRibbonAngle))
+                            .offset(
+                                x: -KwaborDesignTokens.Spacing.xxl,
+                                y: KwaborDesignTokens.Spacing.lg
+                            )
+                    }
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilitySummary)
             .accessibilitySortPriority(3)
 
@@ -104,12 +137,22 @@ struct ExploreCard: View {
     }
 
     private var accessibilitySummary: String {
-        var parts = [listing.title, listing.cityLabel]
-        if listing.sponsored {
+        var parts = [listing.title]
+        if imageAccessibilityDescription != listing.title {
+            parts.append(imageAccessibilityDescription)
+        }
+        parts.append(listing.cityLabel)
+        if decoration.showsSponsoredBadge {
             parts.append(strings.sponsored)
         }
-        if !listing.sponsored, let rating = listing.ratingLabel {
+        if let eventDateLabel = decoration.eventDateLabel {
+            parts.append(eventDateLabel)
+        }
+        if let rating = decoration.ratingLabel {
             parts.append("\(strings.rating) \(rating)")
+        }
+        if decoration.showsEndedRibbon {
+            parts.append(strings.favorites.eventEndedAccessibility)
         }
         parts.append(priceLabel)
         return parts.joined(separator: ". ")
@@ -161,9 +204,42 @@ private struct ExploreRatingBadge: View {
             .foregroundStyle(KwaborDesignTokens.ColorToken.surface0)
             .labelStyle(ExploreRatingLabelStyle())
             .padding(.horizontal, KwaborDesignTokens.Spacing.sm)
-            .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            .padding(.vertical, KwaborDesignTokens.Spacing.xs)
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
+            .accessibilityHidden(true)
+    }
+}
+
+private struct ExploreEventDateBadge: View {
+    let label: String
+
+    var body: some View {
+        Label(label, systemImage: "calendar")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(KwaborDesignTokens.ColorToken.surface0)
+            .lineLimit(1)
+            .padding(.horizontal, KwaborDesignTokens.Spacing.sm)
+            .padding(.vertical, KwaborDesignTokens.Spacing.xs)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .accessibilityHidden(true)
+    }
+}
+
+private struct ExploreEndedRibbon: View {
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(KwaborDesignTokens.ColorToken.surface0)
+            .lineLimit(1)
+            .frame(
+                width: exploreEndedRibbonWidth,
+                height: KwaborDesignTokens.Spacing.xxl
+            )
+            .background(KwaborDesignTokens.ColorToken.ink500)
             .accessibilityHidden(true)
     }
 }
@@ -239,3 +315,7 @@ struct ExploreSkeletonCard: View {
 }
 
 private let threeToFourAspectRatio: CGFloat = 3 / 4
+private let exploreEndedRibbonWidth = KwaborDesignTokens.Sizing.touchTarget * 3
+private let exploreEndedRibbonClearance =
+    KwaborDesignTokens.Spacing.xxl + KwaborDesignTokens.Spacing.lg
+private let exploreEndedRibbonAngle = 45.0

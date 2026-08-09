@@ -8,8 +8,8 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 9 août 2026 |
-| Référence Git | Base du lot : `main` au merge `878ed8f067ca129fd6156de6395004fef501d8e6` de la PR `#56` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031, `#55` autorité FAVORITES et `#56` client FAVORITES fusionnées ; EXPLORE-002B2A présent dans ce lot |
+| Référence Git | Base du lot : `main` au merge `c630ee6b0b323544d891c71e80e6ebde06672738` de la PR `#57` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031, `#55` autorité FAVORITES, `#56` client FAVORITES et `#57` EXPLORE-002B2A fusionnées ; EXPLORE-002B2B1 livré par le présent lot |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
@@ -60,9 +60,13 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - FAVORITES-001A fournit la lecture propriétaire paginée et Profil → Favoris sur Android/iOS, avec
   filtres de type, ruban « Terminé », retrait, ouverture du détail, accessibilité et synchronisation
   bidirectionnelle avec Explore cloisonnée par compte et epoch de session.
-- EXPLORE-002B2A fournit dans le présent lot un RPC v2 séparé : popularité, proximité temporelle,
+- EXPLORE-002B2A, intégré via `#57`, fournit un RPC v2 séparé : popularité, proximité temporelle,
   fenêtres événement UTC, bornes prix XOF, curseur keyset lié au snapshot et deux placements
   sponsorisés au plus en tête. Le RPC v1 reste inchangé pour les clients Store existants.
+- EXPLORE-002B2B1 livre dans le présent lot sa consommation par Explore Android/iOS : gateway KMP
+  strict séparé du catalogue/Search v1, tri serveur par onglet, pagination au snapshot exact,
+  validation cumulative des sponsors, Room v3 avec migrations `1 -> 2 -> 3` et lecture de secours
+  du cache v1, puis cartes natives accessibles avec alt, date, état « Terminé » et badge sponsorisé.
 
 ## Incomplet ou absent
 
@@ -74,8 +78,10 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - La queue offline Like/Favori reste en mémoire et ne draine pas encore durablement après
   reconnexion ; Room et l'outbox persistante restent dans SYNC-001.
 - La recherche n'a pas encore de récents durables, d'autocomplétion ni de filtres avancés.
-- Android et iOS ne consomment pas encore le RPC Explore v2 ; le serveur porte le contrat dans le
-  présent lot, mais EXPLORE-002B2B doit raccorder les filtres sans reproduire le classement côté client.
+- Le drawer Explore avancé n'est pas livré : bornes prix, presets de dates civiles, éventuel
+  multi-ville, compteur live et recherche filtrée restent dans EXPLORE-002B2B2. Produit doit
+  arbitrer l'extension du RPC ville scalaire, l'autorité/coût du compteur et le partage des filtres
+  avec SEARCH-001B ; aucun filtrage ou classement local de substitution n'est implémenté.
 - Le détail ne fournit pas encore la carte intégrée, les avis, le partage public, le signalement ni
   le claim sécurisé. Les actions externes déjà intégrées ne couvrent pas ces fonctions.
 
@@ -147,8 +153,9 @@ dérivés, ni déploiement automatique d’environnement distant.
 
 ## Prochains lots bornés
 
-1. **EXPLORE-002B2B — raccord mobile** : consommer le contrat v2 dans Android/iOS, conserver le
-   classement serveur et couvrir filtres, pagination, cache, hors-ligne et accessibilité.
+1. **EXPLORE-002B2B2 — filtres avancés** : faire arbitrer par Produit les presets de dates civiles,
+   les bornes prix, le multi-ville, le compteur live et la recherche filtrée, puis seulement livrer
+   le drawer Android/iOS sans déplacer le classement hors du serveur.
 2. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
    protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
    résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.

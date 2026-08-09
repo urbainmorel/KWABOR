@@ -11,7 +11,7 @@
 | `iosApp` | Cycle de vie, navigation et UI SwiftUI native |
 | `shared` | Domaine pur, data, états de présentation, bridges et composition Koin |
 | `supabase` | PostgreSQL, Auth, RLS, RPC et Edge Function de suppression de compte |
-| Room KMP | Cache Explore structuré partagé Android/iOS |
+| Room KMP | Cache Explore v2 structuré partagé Android/iOS, avec lecture de secours v1 |
 | DataStore KMP | Ville Explore, locale et devise d'affichage |
 
 ```mermaid
@@ -50,8 +50,12 @@ dans le domaine.
 ## Flux d'une lecture catalogue
 
 1. La vue native envoie une intention au runtime partagé.
-2. Le presenter construit une requête métier validée.
-3. Le repository tente le cache Room lorsque le flux le prévoit, puis interroge le RPC Supabase.
+2. Le presenter construit une requête métier validée. Pour Explore, le type d'onglet détermine le
+   tri v2 serveur ; l'UI renseigne la ville et la catégorie. Le contrat KMP garde un
+   `listingClass` optionnel typé, que les surfaces actuelles laissent absent.
+3. Le repository Explore tente le cache Room lorsque le flux le prévoit, puis son gateway strict
+   interroge `list_catalog_summaries_v2`. Les référentiels et Search conservent leurs contrats v1
+   séparés ; aucun classement v2 n'est reproduit côté client.
 4. La couche data mappe DTO et erreurs techniques vers le domaine.
 5. Le runtime protège les réponses obsolètes et produit un nouvel état immuable.
 6. Android Compose ou iOS SwiftUI rend cet état sans effet de bord dans la composition.
@@ -61,8 +65,15 @@ session sécurisée plateforme et les règles RLS/RPC du backend.
 
 ## Persistance locale
 
-- Room KMP version 2 stocke les snapshots Explore, fiches canoniques, positions et référentiels ville/
-  catégorie. Les schémas JSON versionnés sont contrôlés par `check`.
+- Room KMP version 3 stocke les snapshots Explore, fiches canoniques, positions et référentiels ville/
+  catégorie. Les migrations automatiques `1 -> 2` puis `2 -> 3` et les trois schémas JSON sont
+  contrôlés par `check`.
+- Le cache `explore-feed:v2` persiste le snapshot serveur en microsecondes, les métadonnées de carte
+  v2 et l'autorité sponsorisée. Toute page suivante non vide doit appartenir au même snapshot ; le
+  mur cumulé conserve au plus deux sponsors placés avant tout résultat organique.
+- Les colonnes ajoutées en v3 restent nullables pour relire les snapshots historiques v1. Le
+  repository ne consulte cette clé legacy que si aucun snapshot v2 n'existe, n'autorise jamais
+  d'append depuis ce repli offline et exige le contrat complet pour toute nouvelle écriture v2.
 - DataStore stocke uniquement des préférences légères. Il ne stocke ni token, ni outbox, ni donnée
   métier synchronisable.
 - Les tokens d'authentification utilisent le stockage sécurisé plateforme : Android Keystore/
@@ -101,7 +112,7 @@ applicatif ne doit être ajouté.
 | Capacité | État actuel | Cible suivie |
 | --- | --- | --- |
 | Auth/onboarding | Implémenté, fournisseurs réels à provisionner | Preuves staging/appareils |
-| Explore/détail | Parcours principal partiellement livré | Recherche, avis et actions restantes |
+| Explore/détail | Mur v2 et parcours principal partiellement livrés | Drawer avancé, recherche filtrée, avis et actions restantes |
 | Offline | Cache et préférences persistants | Outbox et brouillons synchronisés |
 | Social/B2B/paiement/IA | Contrats ou fondations partielles | Parcours V1 complets |
 | Distribution | Workflows d'artefacts présents | AAB/TestFlight qualifiés et rollout |
@@ -117,5 +128,6 @@ La cible détaillée appartient au [plan V1](v1-production-delivery.md), pas à 
 - [ADR-0011 — Room KMP](adr/0011-room-kmp-local-persistence.md)
 - [ADR-0015 — Navigation mobile native](adr/0015-native-mobile-navigation.md)
 - [ADR-0027 — Persistance locale liée à l’appareil](adr/0027-device-bound-local-persistence.md)
+- [ADR-0034 — Classement Explore v2 et raccord mobile](adr/0034-versioned-explore-ranking-and-sponsored-cap.md)
 
 Étape suivante : [lire le modèle de données](data-model.md).

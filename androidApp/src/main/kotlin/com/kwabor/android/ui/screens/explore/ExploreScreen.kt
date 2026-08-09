@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -285,7 +286,10 @@ private fun ExploreListingsGrid(content: ExploreGridContent, gridState: LazyGrid
             .fillMaxSize()
             .exploreLiveRegion(liveRegionStatus),
     ) {
-        val columnCount = exploreColumnCount(maxWidth)
+        val columnCount = exploreColumnCount(
+            maxWidth = maxWidth,
+            fontScale = LocalDensity.current.fontScale,
+        )
         LazyVerticalGrid(
             columns = GridCells.Fixed(count = columnCount),
             state = gridState,
@@ -335,10 +339,15 @@ private fun LazyGridScope.exploreSurfaceItems(content: ExploreGridContent, onApp
     }
 }
 
-private fun exploreColumnCount(maxWidth: Dp): Int = if (maxWidth < KwaborSizing.ExploreTabletBreakpoint) {
-    KwaborSizing.EXPLORE_MOBILE_GRID_COLUMNS
-} else {
-    KwaborSizing.EXPLORE_TABLET_GRID_COLUMNS
+internal fun exploreColumnCount(maxWidth: Dp, fontScale: Float): Int {
+    if (!fontScale.isFinite() || fontScale <= 0f || fontScale >= ACCESSIBILITY_FONT_SCALE_THRESHOLD) {
+        return 1
+    }
+    return if (maxWidth < KwaborSizing.ExploreTabletBreakpoint) {
+        KwaborSizing.EXPLORE_MOBILE_GRID_COLUMNS
+    } else {
+        KwaborSizing.EXPLORE_TABLET_GRID_COLUMNS
+    }
 }
 
 private fun LazyGridScope.exploreGridItems(
@@ -369,6 +378,7 @@ private fun LazyGridScope.exploreGridItems(
                     onClick = { actions.onListingClick(listing.id) },
                     onLikeClick = { actions.onLikeClick(listing.id) },
                     onFavoriteClick = { actions.onFavoriteClick(listing.id) },
+                    openAccessibilityDescription = listing.cardAccessibilityDescription(strings),
                 ),
             )
         }
@@ -556,10 +566,15 @@ internal fun ExploreListingItem.toCardState(priceOptions: PriceTagOptions): List
     title = title,
     cityLabel = cityLabel,
     coverImageUrl = coverImageUrl,
+    coverImageAlt = coverImageAlt,
     price = price,
     priceOptions = priceOptions,
     ratingLabel = ratingLabel,
+    eventDateLabel = eventDateLabel,
     sponsored = sponsored,
     liked = liked,
     favorited = favorited,
+    eventEnded = isEventEnded,
 )
+
+private const val ACCESSIBILITY_FONT_SCALE_THRESHOLD = 1.3f

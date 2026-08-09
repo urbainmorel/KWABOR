@@ -122,7 +122,7 @@ private fun ExploreReferenceRecord.invalidRowsFieldOrNull(): String? = when {
 }
 
 internal fun City.invalidReferenceFieldOrNull(): String? = when {
-    id.isInvalidReferenceText(MAX_EXPLORE_REFERENCE_ID_LENGTH) -> "city_id"
+    id.isInvalidReferenceIdentifier() -> "city_id"
     name.isInvalidReferenceText(MAX_EXPLORE_REFERENCE_NAME_LENGTH) -> "city_name"
     countryCode != BENIN_COUNTRY_CODE -> "country_code"
     else -> invalidCoordinateFieldOrNull()
@@ -140,12 +140,15 @@ private fun City.invalidCoordinateFieldOrNull(): String? {
 }
 
 internal fun Category.invalidReferenceFieldOrNull(): String? = when {
-    id.isInvalidReferenceText(MAX_EXPLORE_REFERENCE_ID_LENGTH) -> "category_id"
+    id.isInvalidReferenceIdentifier() -> "category_id"
     nameKey.isInvalidReferenceText(MAX_EXPLORE_REFERENCE_NAME_KEY_LENGTH) -> "name_key"
     else -> null
 }
 
 private fun String.isInvalidReferenceText(maximumLength: Int): Boolean = isBlank() || length > maximumLength
+
+private fun String.isInvalidReferenceIdentifier(): Boolean =
+    length !in 1..MAX_EXPLORE_REFERENCE_ID_LENGTH || !EXPLORE_REFERENCE_ID_PATTERN.matches(this)
 
 internal fun invalidReferenceValue(fieldName: String): Nothing = throw CorruptExploreReferenceException(fieldName)
 
@@ -156,6 +159,7 @@ internal const val EXPLORE_REFERENCE_SNAPSHOT_KEY = "explore"
 private const val BENIN_COUNTRY_CODE = "BJ"
 private const val MAX_EXPLORE_REFERENCE_CITIES = 256
 private const val MAX_EXPLORE_REFERENCE_CATEGORIES = 512
-private const val MAX_EXPLORE_REFERENCE_ID_LENGTH = 128
+private val EXPLORE_REFERENCE_ID_PATTERN = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
+private const val MAX_EXPLORE_REFERENCE_ID_LENGTH = 100
 private const val MAX_EXPLORE_REFERENCE_NAME_LENGTH = 120
 private const val MAX_EXPLORE_REFERENCE_NAME_KEY_LENGTH = 160

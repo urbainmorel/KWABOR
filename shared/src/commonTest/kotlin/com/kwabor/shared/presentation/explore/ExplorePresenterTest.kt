@@ -29,6 +29,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class ExplorePresenterTest {
     private val strings = stringsFor(AppLocale.French)
@@ -97,6 +98,14 @@ class ExplorePresenterTest {
     fun load_usesServerSponsorSnapshotDespiteDeviceClockSkew() = runSuspendTest {
         val repository = FakeCatalogRepository(
             FakeCatalogScenario(
+                categories = listOf(
+                    Category(
+                        id = "event-culture",
+                        nameKey = "category.event.culture",
+                        listingType = ListingType.Event,
+                        defaultListingClass = ListingClass.Event,
+                    ),
+                ),
                 listings = listOf(
                     listingSummary(
                         ListingSummaryFixture(
@@ -112,6 +121,35 @@ class ExplorePresenterTest {
         val state = presenter.load(request = ExploreLoadRequest(), strings = strings)
 
         assertFalse(state.listings.single().sponsored)
+    }
+
+    @Test
+    fun load_formatsEventDateAsTheCompactBeninExploreLabel() = runSuspendTest {
+        val startAt = Instant.parse("2026-06-20T23:30:00Z").toEpochMilliseconds()
+        val repository = FakeCatalogRepository(
+            FakeCatalogScenario(
+                listings = listOf(
+                    listingSummary(
+                        ListingSummaryFixture(
+                            type = ListingType.Event,
+                            listingClass = ListingClass.Event,
+                            categoryId = "event-culture",
+                            eventStartAtEpochMilliseconds = startAt,
+                            eventEndAtEpochMilliseconds = startAt,
+                            isEventEnded = false,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val presenter = testPresenter(repository, clockProvider)
+
+        val state = presenter.load(
+            request = ExploreLoadRequest(selectedTab = ExploreTab.Events),
+            strings = strings,
+        )
+
+        assertEquals("21 juin ›", state.listings.single().eventDateLabel)
     }
 
     @Test
@@ -586,18 +624,24 @@ private data class ListingSummaryFixture(
     val likesCount: Int = 12,
     val sponsoredUntilEpochMilliseconds: Long? = null,
     val isSponsoredPlacement: Boolean? = null,
+    val type: ListingType = ListingType.Place,
+    val listingClass: ListingClass = ListingClass.Heritage,
+    val categoryId: String = "heritage-historique",
+    val eventStartAtEpochMilliseconds: Long? = null,
+    val eventEndAtEpochMilliseconds: Long? = null,
+    val isEventEnded: Boolean? = null,
 )
 
 private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixture()): ListingSummary {
     val price = assertIs<DomainResult.Success<MoneyXof>>(MoneyXof.fromAmount(5_000)).value
     return ListingSummary(
         id = fixture.id,
-        type = ListingType.Place,
-        listingClass = ListingClass.Heritage,
+        type = fixture.type,
+        listingClass = fixture.listingClass,
         status = ListingStatus.Published,
         name = fixture.name,
         cityId = fixture.cityId,
-        categoryId = "heritage-historique",
+        categoryId = fixture.categoryId,
         coverImageUrl = fixture.coverImageUrl,
         priceFromXof = price,
         ratingAverage = fixture.ratingAverage,
@@ -605,6 +649,9 @@ private fun listingSummary(fixture: ListingSummaryFixture = ListingSummaryFixtur
         verified = true,
         sponsoredUntilEpochMilliseconds = fixture.sponsoredUntilEpochMilliseconds,
         isSponsoredPlacement = fixture.isSponsoredPlacement,
+        eventStartAtEpochMilliseconds = fixture.eventStartAtEpochMilliseconds,
+        eventEndAtEpochMilliseconds = fixture.eventEndAtEpochMilliseconds,
+        isEventEnded = fixture.isEventEnded,
     )
 }
 

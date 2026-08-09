@@ -213,11 +213,48 @@ class ExploreReferenceStoreTest {
             val duplicate = referenceSnapshot().copy(
                 categories = listOf(category(), category()),
             )
+            val nonCanonicalCityId = referenceSnapshot().copy(
+                cities = listOf(City(id = "Cotonou_Centre", name = "Cotonou Centre")),
+            )
+            val overlongCityId = referenceSnapshot().copy(
+                cities = listOf(City(id = "a".repeat(INVALID_REFERENCE_ID_LENGTH), name = "Ville")),
+            )
+            val nonCanonicalCategoryId = referenceSnapshot().copy(
+                categories = listOf(category(id = "Restaurants_Premium")),
+            )
 
             assertFailsWith<IllegalArgumentException> { store.replace(invalid) }
             assertFailsWith<IllegalArgumentException> { store.replace(outsideBenin) }
             assertFailsWith<IllegalArgumentException> { store.replace(duplicate) }
+            assertFailsWith<IllegalArgumentException> { store.replace(nonCanonicalCityId) }
+            assertFailsWith<IllegalArgumentException> { store.replace(overlongCityId) }
+            assertFailsWith<IllegalArgumentException> { store.replace(nonCanonicalCategoryId) }
             assertNull(store.read())
+        }
+    }
+
+    @Test
+    fun persistedNonCanonicalReferenceIdsAreEvicted() = runTest {
+        withReferenceDatabase(coroutineContext) { database ->
+            val dao = database.exploreReferenceDao()
+            val store = ExploreReferenceStore(dao)
+            dao.replaceReference(
+                snapshot = referenceSnapshotEntity(cityCount = 1),
+                cities = listOf(cityEntity(id = "Cotonou_Centre")),
+                categories = emptyList(),
+            )
+
+            assertNull(store.read())
+            assertNull(dao.findReferenceSnapshot(REFERENCE_KEY))
+
+            dao.replaceReference(
+                snapshot = referenceSnapshotEntity(cityCount = 0, categoryCount = 1),
+                cities = emptyList(),
+                categories = listOf(categoryEntity(id = "Restaurants_Premium")),
+            )
+
+            assertNull(store.read())
+            assertNull(dao.findReferenceSnapshot(REFERENCE_KEY))
         }
     }
 
@@ -360,12 +397,13 @@ private fun category(
     defaultListingClass = listingClass,
 )
 
-private fun referenceSnapshotEntity(cityCount: Int): ExploreReferenceSnapshotEntity = ExploreReferenceSnapshotEntity(
-    snapshotKey = REFERENCE_KEY,
-    cachedAtEpochMilliseconds = 2_000,
-    cityCount = cityCount,
-    categoryCount = 0,
-)
+private fun referenceSnapshotEntity(cityCount: Int, categoryCount: Int = 0): ExploreReferenceSnapshotEntity =
+    ExploreReferenceSnapshotEntity(
+        snapshotKey = REFERENCE_KEY,
+        cachedAtEpochMilliseconds = 2_000,
+        cityCount = cityCount,
+        categoryCount = categoryCount,
+    )
 
 private fun cityEntity(
     id: String = "cotonou",
@@ -382,4 +420,14 @@ private fun cityEntity(
     longitude = longitude,
 )
 
+private fun categoryEntity(id: String): ExploreReferenceCategoryEntity = ExploreReferenceCategoryEntity(
+    snapshotKey = REFERENCE_KEY,
+    categoryId = id,
+    position = 0,
+    nameKey = "category_restaurants",
+    listingType = "establishment",
+    defaultListingClass = "commercial",
+)
+
 private const val REFERENCE_KEY = "explore"
+private const val INVALID_REFERENCE_ID_LENGTH = 101
