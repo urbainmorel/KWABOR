@@ -67,11 +67,17 @@ un contrat client.
 Les lectures publiques principales sont versionnées :
 
 - `list_catalog_summaries(...)` ;
+- `list_catalog_summaries_v2(...)` ;
 - `get_catalog_detail_v1(uuid)` ;
 - `list_guide_facets_v1()` ;
 - `list_guide_services_v1(...)`.
 
 Elles sont publication-only et n'exposent pas les identifiants d'autorité ni chemins Storage privés.
+`list_catalog_summaries(...)` reste le contrat compatible avec les versions Store existantes.
+`list_catalog_summaries_v2(...)` ajoute un snapshot et un curseur keyset stricts, les tris de
+popularité ou proximité temporelle, les fenêtres événement UTC, les bornes prix XOF et au plus deux
+placements sponsorisés en tête. Le fingerprint du curseur lie la continuation aux filtres et au tri
+résolu ; un curseur v1 ou réutilisé avec une autre requête est refusé.
 
 ## Persistance locale actuelle
 

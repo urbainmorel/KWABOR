@@ -133,6 +133,30 @@ lot. Ne jamais utiliser un reset destructif sur staging ou production. Les harna
 événement, historique et favoris sont séparés de la suite pgTAP standard et exigent la stack locale
 attendue.
 
+Sur ce poste Windows, les tâches qui nécessitent Docker sont déléguées à GitHub Actions. La preuve
+EXPLORE-002B2A exige un démarrage propre depuis toutes les migrations, la suite pgTAP, le lint, les
+advisors et les autres gates protégées sur le SHA exact de la PR.
+
+### Classement catalogue EXPLORE-002B2A
+
+Le fichier `supabase/tests/explore_catalog_summaries_v2_test.sql` verrouille le nouveau contrat sans
+modifier `list_catalog_summaries(...)`. Il doit notamment prouver :
+
+- l'identité exacte de la fonction v2, `security invoker`, le `search_path` vide, les grants directs
+  `anon`/`authenticated` et l'absence d'exécution `PUBLIC` ou `service_role` ;
+- la lecture published-only sous RLS et la compatibilité inchangée du RPC v1 ;
+- le score `views_count + 5 × likes_count` calculé en `bigint`, ses tie-breakers et les tris autorisés ;
+- les phases événement ongoing/upcoming/ended, les bornes exactes et l'intersection semi-ouverte
+  `[start, end)` des fenêtres UTC ;
+- les bornes prix XOF inclusives, indépendantes et validées avant l'attribution sponsorisée ;
+- au plus deux placements sponsorisés en tête, y compris avec des tailles de page qui coupent la
+  première rangée, sans dupliquer ni supprimer les autres fiches éligibles ;
+- le curseur v2, son snapshot stable, la ligne sentinelle, les continuations sans doublon et le refus
+  des curseurs malformés, futurs, v1 ou réutilisés avec un autre filtre, tri ou prix.
+
+Ne pas figer dans cette documentation le nombre total d'assertions : la CI exacte de la PR constitue
+la preuve, et le plan pgTAP évolue avec le contrat.
+
 ## Recherche catalogue SEARCH-001A
 
 SEARCH-001A combine un RPC PostgreSQL versionné, un runtime KMP, un repli sur le cache Room Explore
