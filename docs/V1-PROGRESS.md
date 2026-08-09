@@ -8,12 +8,12 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 4 août 2026 |
-| Référence Git | `main` au merge `8571752e6febcd64d4a74d0e3b55125dce70a308` de la PR `#53` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI et `#53` autorité HISTORY fusionnées |
+| Référence Git | `main` au merge `94556a4538e3d2de643573d814718e3f0447e8f8` de la PR `#54` |
+| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY et `#54` état/ADR-0031 fusionnées |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599` et `30940684400` entièrement verts |
+| CI de la fusion | Runs post-fusion `30926418990`, `30932997743`, `30935484599`, `30940684400` et `30945274481` entièrement verts |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -144,8 +144,10 @@ dérivés, ni déploiement automatique d’environnement distant.
 1. **HISTORY-001B — synchronisation offline** : faire arbitrer ADR-0031, puis implémenter le
    protocole versionné de révisions, tombstones et watermark, le miroir Room et l’outbox sans
    résurrection après effacement ; conserver 50 requêtes distinctes par scope et appareil.
-2. **FAVORITES-001A — consultation des favoris** : lecture paginée, repository/runtime partagé et
-   écran Android/iOS minimal ouvrant le détail ; outbox persistante séparée.
+2. **FAVORITES-001A2 — consommation mobile des favoris** : l'autorité Supabase FAVORITES-001A1
+   fournit désormais lecture propriétaire keyset, mutation idempotente, retrait dépublié et purge
+   concurrente ; raccorder repository/runtime partagé et écran Android/iOS minimal ouvrant le détail,
+   avec Room et outbox persistante dans un lot séparé.
 3. **EXPLORE-002B2A — contrat de classement** : figer et tester côté serveur popularité, intervalles
    de dates et plafond sponsorisé avant de raccorder les filtres mobiles.
 

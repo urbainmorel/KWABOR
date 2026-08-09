@@ -266,6 +266,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] FAVORITES-001A — Livrer une lecture paginée propriétaire et un écran Favoris Android/iOS
     minimal ouvrant le détail ; conserver l'outbox persistante et les filtres avancés dans des lots
     séparés.
+    - [x] FAVORITES-001A1 — Livrer l'autorité Supabase : read model propriétaire keyset, filtre par
+      type, mutation idempotente, retrait d'une fiche dépubliée, purge de compte et concurrence ;
+      conserver les RPC legacy jusqu'au raccord KMP atomique.
+    - [ ] FAVORITES-001A2 — Raccorder repository/runtime partagé puis les écrans Android/iOS natifs,
+      sans inclure Room ni l'outbox persistante.
 - [ ] SETTINGS-001 — Livrer sécurité, sessions, préférences, thème, langue/devise/date, légal et Danger Zone.
   - [x] SETTINGS-001A — Séparer Profil et Paramètres sur Android/iOS, afficher l'identité et la méthode
     de connexion, puis livrer déconnexion et suppression de compte sans faux réglage.

@@ -186,6 +186,7 @@ jobs:
           supabase test db
           python3 tools/test-event-details-concurrency.py
           python3 tools/test-search-history-concurrency.py
+          python3 tools/test-favorites-concurrency.py
 
       - name: Enforce security advisors and inspect performance
         run: |

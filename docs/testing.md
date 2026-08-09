@@ -124,11 +124,14 @@ Avec Docker et Supabase CLI disponibles :
 supabase db start
 supabase test db
 python -B tools/test-event-details-concurrency.py
+python -B tools/test-search-history-concurrency.py
+python -B tools/test-favorites-concurrency.py
 ```
 
 Une modification de migration/RLS doit aussi passer un reset isolé et le lint Supabase adaptés au
-lot. Ne jamais utiliser un reset destructif sur staging ou production. Le harnais de concurrence
-événement est séparé de la suite pgTAP standard et exige la stack locale attendue.
+lot. Ne jamais utiliser un reset destructif sur staging ou production. Les harnais de concurrence
+événement, historique et favoris sont séparés de la suite pgTAP standard et exigent la stack locale
+attendue.
 
 ## Recherche catalogue SEARCH-001A
 
