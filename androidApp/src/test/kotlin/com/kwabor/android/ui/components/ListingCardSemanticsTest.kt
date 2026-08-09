@@ -99,7 +99,7 @@ private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTraversalInd
     SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, expected),
 )
 
-private const val TEST_SDK = 35
+private const val TEST_SDK = 34
 private const val OPEN_TRAVERSAL_INDEX = 0f
 private const val ENDED_TRAVERSAL_INDEX = 0.5f
 private const val REMOVE_TRAVERSAL_INDEX = 1f

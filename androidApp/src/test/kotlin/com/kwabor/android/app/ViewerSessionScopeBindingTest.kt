@@ -73,5 +73,5 @@ private data class PublishedViewerContext(
     val accountSetupComplete: Boolean,
 )
 
-private const val TEST_SDK = 35
+private const val TEST_SDK = 34
 private const val ACCOUNT_ID = "00000000-0000-4000-8000-000000000001"

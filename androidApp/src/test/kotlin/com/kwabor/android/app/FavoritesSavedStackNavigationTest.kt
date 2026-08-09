@@ -74,4 +74,4 @@ private inline fun <reified Route : Any> assertCurrentRoute(navController: NavHo
     assertTrue(requireNotNull(navController.currentDestination).hasRoute<Route>())
 }
 
-private const val TEST_SDK = 35
+private const val TEST_SDK = 34

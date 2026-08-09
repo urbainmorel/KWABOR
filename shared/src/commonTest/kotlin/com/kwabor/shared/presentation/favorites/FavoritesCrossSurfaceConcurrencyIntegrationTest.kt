@@ -65,6 +65,7 @@ class FavoritesCrossSurfaceConcurrencyIntegrationTest {
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.verifyCrossSurfaceConvergence(firstSurface: FavoriteSurface) {
     val scenario = CrossSurfaceFavoriteScenario(this)
     try {
@@ -99,6 +100,7 @@ private suspend fun TestScope.verifyCrossSurfaceConvergence(firstSurface: Favori
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.verifyExploreConfirmationSurvives(contextChange: ExploreFeedContextChange) {
     val scenario = CrossSurfaceFavoriteScenario(this, initialServerFavorited = false)
     try {
@@ -126,6 +128,7 @@ private suspend fun TestScope.verifyExploreConfirmationSurvives(contextChange: E
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 private class CrossSurfaceFavoriteScenario(
     private val testScope: TestScope,
     private val initialServerFavorited: Boolean = true,

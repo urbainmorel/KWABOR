@@ -728,13 +728,27 @@ private class ViewModelCatalogRepository(
         }
     }
 
-    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> = interaction(listingId)
+    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> =
+        updateLike(listingId, likedByViewer = true)
 
-    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = interaction(
-        listingId,
-    )
+    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
+        updateLike(listingId, likedByViewer = false)
 
-    private suspend fun interaction(listingId: String): DomainResult<ListingViewerInteraction> {
+    private suspend fun updateLike(listingId: String, likedByViewer: Boolean): DomainResult<ListingViewerInteraction> {
+        val result = interaction(listingId, likedByViewer)
+        return when (result) {
+            is DomainResult.Failure -> result
+            is DomainResult.Success -> result.also { success ->
+                viewerInteractions = viewerInteractions
+                    .filterNot { interaction -> interaction.listingId == listingId } + success.value
+            }
+        }
+    }
+
+    private suspend fun interaction(
+        listingId: String,
+        likedByViewer: Boolean = true,
+    ): DomainResult<ListingViewerInteraction> {
         interactionGate?.also { gate ->
             interactionGate = null
             gate.await()
@@ -746,9 +760,12 @@ private class ViewModelCatalogRepository(
             DomainResult.Success(
                 ListingViewerInteraction(
                     listingId = listingId,
-                    likedByViewer = true,
-                    favoritedByViewer = false,
-                    likesCount = 1,
+                    likedByViewer = likedByViewer,
+                    favoritedByViewer = viewerInteractions
+                        .firstOrNull { interaction -> interaction.listingId == listingId }
+                        ?.favoritedByViewer
+                        ?: false,
+                    likesCount = if (likedByViewer) 1 else 0,
                 ),
             )
         }
