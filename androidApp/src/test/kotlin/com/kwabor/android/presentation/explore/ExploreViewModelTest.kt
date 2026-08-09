@@ -756,17 +756,24 @@ private class ViewModelFavoritesRepository(
             behavior.interactionGate = null
             gate.await()
         }
-        behavior.interactionError?.let { error -> return DomainResult.Failure(error) }
-        if (behavior.requiresAuthentication) {
-            return DomainResult.Failure(DomainError.AuthenticationRequired("error.auth.required"))
+        val interactionError = behavior.interactionError
+        return when {
+            interactionError != null -> DomainResult.Failure(interactionError)
+            behavior.requiresAuthentication -> DomainResult.Failure(
+                DomainError.AuthenticationRequired("error.auth.required"),
+            )
+            else -> DomainResult.Success(
+                FavoriteMutation(
+                    listingId = listingId,
+                    favorited = favorited,
+                    favoritedAtEpochMilliseconds = if (favorited) {
+                        FixedViewModelClock.nowEpochMilliseconds()
+                    } else {
+                        null
+                    },
+                ),
+            )
         }
-        return DomainResult.Success(
-            FavoriteMutation(
-                listingId = listingId,
-                favorited = favorited,
-                favoritedAtEpochMilliseconds = if (favorited) FixedViewModelClock.nowEpochMilliseconds() else null,
-            ),
-        )
     }
 }
 

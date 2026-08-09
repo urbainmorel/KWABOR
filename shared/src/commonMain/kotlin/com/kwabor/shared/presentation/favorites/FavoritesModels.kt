@@ -110,14 +110,16 @@ sealed interface FavoritesIntent {
 }
 
 sealed interface FavoritesEffect {
+    val scope: ViewerSessionScope
+
     data class OpenCatalogDetail(
         val listingId: String,
-        val scope: ViewerSessionScope,
+        override val scope: ViewerSessionScope,
     ) : FavoritesEffect
 
     data class FavoriteChanged(
         val listingId: String,
         val favorited: Boolean,
-        val scope: ViewerSessionScope,
+        override val scope: ViewerSessionScope,
     ) : FavoritesEffect
 }

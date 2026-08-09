@@ -272,7 +272,9 @@ class IosExploreController private constructor(
                         ) {
                             favoriteObserver?.invoke(effect.listingId, effect.favorited, effect.scope)
                         }
-                        ExploreEffect.RequestLocation -> effectObserver?.invoke(effect.toIosEffect())
+                        ExploreEffect.RequestLocation -> effectObserver?.invoke(
+                            ExploreEffect.RequestLocation.toIosEffect(),
+                        )
                     }
                 }
             }
