@@ -315,6 +315,7 @@ private fun ExploreUiState.applySnapshot(
         listing.toExploreListingItem(
             cityNamesById = cityNamesById,
             interaction = interactionsByListingId[listing.id],
+            strings = strings,
         )
     }.applyQueuedInteractions(queuedInteractions)
     return copy(
@@ -413,6 +414,7 @@ private fun Category.toExploreChip(strings: KwaborStrings): ExploreChip? {
 private fun ListingSummary.toExploreListingItem(
     cityNamesById: Map<String, String>,
     interaction: ListingViewerInteraction?,
+    strings: KwaborStrings,
 ): ExploreListingItem = ExploreListingItem(
     id = id,
     title = name,
@@ -425,6 +427,9 @@ private fun ListingSummary.toExploreListingItem(
     liked = interaction?.likedByViewer ?: false,
     favorited = interaction?.favoritedByViewer ?: false,
     cityId = cityId,
+    coverImageAlt = coverImageAlt,
+    eventDateLabel = eventStartAtEpochMilliseconds?.toExploreDateLabel(strings.exploreDate),
+    isEventEnded = isEventEnded == true,
 )
 
 private fun ExploreUiState.applyInteraction(result: ExploreInteractionResult): ExploreUiState {

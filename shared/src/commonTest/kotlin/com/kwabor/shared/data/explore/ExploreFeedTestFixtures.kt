@@ -174,6 +174,37 @@ internal fun testCategories(): List<Category> = listOf(
 
 internal fun testListings(range: IntRange): List<ListingSummary> = range.map(::testListing)
 
+internal fun testEstablishmentListings(
+    range: IntRange,
+    sponsoredIndices: Set<Int> = emptySet(),
+): List<ListingSummary> = range.map { index ->
+    ListingSummary(
+        id = "establishment-$index",
+        type = ListingType.Establishment,
+        listingClass = ListingClass.Commercial,
+        status = ListingStatus.Published,
+        name = "Établissement $index",
+        cityId = "city-cotonou",
+        categoryId = "category-restaurant",
+        coverImageUrl = null,
+        priceFromXof = null,
+        ratingAverage = null,
+        likesCount = index,
+        verified = true,
+        sponsoredUntilEpochMilliseconds = if (index in sponsoredIndices) 2_000_000_000_000L else null,
+        isSponsoredPlacement = index in sponsoredIndices,
+        viewsCount = index.toLong(),
+        isEventEnded = false,
+    )
+}
+
+internal fun testEstablishmentCategory(): Category = Category(
+    id = "category-restaurant",
+    nameKey = "category.restaurant",
+    listingType = ListingType.Establishment,
+    defaultListingClass = ListingClass.Commercial,
+)
+
 private fun testListing(index: Int): ListingSummary = ListingSummary(
     id = "listing-$index",
     type = ListingType.Place,
@@ -188,4 +219,7 @@ private fun testListing(index: Int): ListingSummary = ListingSummary(
     likesCount = index,
     verified = true,
     sponsoredUntilEpochMilliseconds = null,
+    isSponsoredPlacement = false,
+    viewsCount = index.toLong(),
+    isEventEnded = false,
 )

@@ -11,13 +11,18 @@ import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreCatalogPage
+import com.kwabor.shared.domain.explore.ExploreCatalogRepository
+import com.kwabor.shared.domain.explore.ExploreCatalogRequest
 import kotlinx.coroutines.CompletableDeferred
 
-internal class FakeExploreCatalogRepository : CatalogRepository {
+internal class FakeExploreCatalogRepository : CatalogRepository, ExploreCatalogRepository {
     var citiesResult: DomainResult<List<City>> = DomainResult.Success(testCities())
     var categoriesResult: DomainResult<List<Category>> = DomainResult.Success(testCategories())
     val listingResults = ArrayDeque<DomainResult<ListingSummaryPage>>()
+    val exploreCatalogResults = ArrayDeque<DomainResult<ExploreCatalogPage>>()
     val listingRequests = mutableListOf<Pair<ListingFilters, ListingPageRequest>>()
+    val exploreCatalogRequests = mutableListOf<ExploreCatalogRequest>()
     var citiesGate: CompletableDeferred<Unit>? = null
     var citiesCallCount: Int = 0
     var listingsGate: CompletableDeferred<Unit>? = null
@@ -41,6 +46,37 @@ internal class FakeExploreCatalogRepository : CatalogRepository {
         return listingResults.removeFirstOrNull() ?: unused()
     }
 
+    override suspend fun listCatalog(request: ExploreCatalogRequest): DomainResult<ExploreCatalogPage> {
+        listingsCallCount += 1
+        exploreCatalogRequests += request
+        listingRequests += ListingFilters(
+            cityId = request.cityId,
+            categoryId = request.categoryId,
+            listingType = request.listingType,
+            listingClass = request.listingClass,
+        ) to ListingPageRequest(cursor = request.cursor, limit = request.limit)
+        listingsGate?.await()
+        exploreCatalogResults.removeFirstOrNull()?.let { result -> return result }
+        return when (val result = listingResults.removeFirstOrNull() ?: unused()) {
+            is DomainResult.Success -> try {
+                DomainResult.Success(
+                    ExploreCatalogPage(
+                        items = result.value.items,
+                        nextCursor = result.value.nextCursor,
+                        snapshotAtEpochMicroseconds = if (result.value.items.isEmpty()) {
+                            null
+                        } else {
+                            TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS
+                        },
+                    ),
+                )
+            } catch (_: IllegalArgumentException) {
+                DomainResult.Failure(DomainError.Unexpected("invalid fake Explore page"))
+            }
+            is DomainResult.Failure -> result
+        }
+    }
+
     override suspend fun searchListings(
         query: ListingSearchQuery,
         page: ListingPageRequest,
@@ -61,3 +97,5 @@ internal class FakeExploreCatalogRepository : CatalogRepository {
 
     private fun <T> unused(): DomainResult<T> = DomainResult.Failure(DomainError.Unexpected("unused"))
 }
+
+internal const val TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS = 1_750_000_000_000_000L

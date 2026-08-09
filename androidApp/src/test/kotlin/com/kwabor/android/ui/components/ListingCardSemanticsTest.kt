@@ -68,6 +68,18 @@ class ListingCardSemanticsTest {
         assertEquals(EXPECTED_RIBBON_ROTATION_DEGREES, EVENT_ENDED_RIBBON_ROTATION_DEGREES)
     }
 
+    @Test
+    fun exploreCard_aggregatesVisualContentWithoutDuplicatingImageOrTitleSemantics() {
+        setExploreCardContent()
+
+        composeRule.onAllNodesWithContentDescription(EXPLORE_OPEN_DESCRIPTION).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription(CARD_IMAGE_ALT).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CARD_TITLE).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CARD_TITLE, useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription(strings.favorite).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription(strings.like).assertCountEquals(1)
+    }
+
     private fun setFavoriteCardContent(onOpen: () -> Unit, onRemove: () -> Unit) {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         activityController = controller
@@ -93,6 +105,32 @@ class ListingCardSemanticsTest {
             }
         }
     }
+
+    private fun setExploreCardContent() {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        activityController = controller
+        controller.get().setContent {
+            KwaborTheme {
+                ListingCard(
+                    state = ListingCardState(
+                        title = CARD_TITLE,
+                        cityLabel = CARD_CITY,
+                        coverImageUrl = CARD_IMAGE_URL,
+                        coverImageAlt = CARD_IMAGE_ALT,
+                        price = null,
+                    ),
+                    strings = strings,
+                    mediaUrlPolicy = ListingMediaUrlPolicy { candidate -> candidate },
+                    actions = ListingCardActions(
+                        onClick = {},
+                        onLikeClick = {},
+                        onFavoriteClick = {},
+                        openAccessibilityDescription = EXPLORE_OPEN_DESCRIPTION,
+                    ),
+                )
+            }
+        }
+    }
 }
 
 private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTraversalIndex(
@@ -109,3 +147,7 @@ private const val EXPECTED_RIBBON_ROTATION_DEGREES = 45f
 private const val CARD_TITLE = "Festival des masques"
 private const val CARD_CITY = "Porto-Novo"
 private const val OPEN_DESCRIPTION = "Ouvrir la fiche. Festival des masques. Porto-Novo"
+private const val EXPLORE_OPEN_DESCRIPTION =
+    "Festival des masques. Danseurs masqués sur la place. Porto-Novo. Gratuit"
+private const val CARD_IMAGE_URL = "https://cdn.kwabor.example/festival.jpg"
+private const val CARD_IMAGE_ALT = "Danseurs masqués sur la place"

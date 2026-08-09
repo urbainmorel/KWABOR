@@ -5,7 +5,10 @@ import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.local.ExploreFeedPersistenceStore
 import com.kwabor.shared.data.local.ExplorePersistenceWatermarkStore
 import com.kwabor.shared.data.local.ExploreReferenceStore
+import com.kwabor.shared.domain.explore.ExploreCatalogRepository
 import com.kwabor.shared.domain.explore.ExploreFeedRepository
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -18,6 +21,11 @@ import org.koin.dsl.onClose
 private val exploreSingleFlightScopeQualifier = named("explore-single-flight-scope")
 
 internal fun exploreDataModule(hasPersistence: Boolean): Module = module {
+    single<ExploreCatalogDataSource> {
+        SupabaseExploreCatalogDataSource(postgrest = get<SupabaseClient>().postgrest)
+    }
+    single<ExploreCatalogRepository> { DataExploreCatalogRepository(dataSource = get()) }
+
     single<CoroutineScope>(qualifier = exploreSingleFlightScopeQualifier) {
         CoroutineScope(SupervisorJob() + get<DispatcherProvider>().io)
     } onClose { scope -> scope?.cancel() }
@@ -25,6 +33,7 @@ internal fun exploreDataModule(hasPersistence: Boolean): Module = module {
     single<ExploreFeedRepository> {
         OfflineFirstExploreFeedRepository(
             catalogRepository = get(),
+            exploreCatalogRepository = get(),
             cache = exploreFeedCacheDependencies(hasPersistence),
             clockProvider = get(),
             singleFlightScope = get(qualifier = exploreSingleFlightScopeQualifier),

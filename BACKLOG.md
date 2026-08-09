@@ -160,7 +160,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] CATALOG-002 — Ajouter un RPC de résumé catalogue paginé par curseur et supprimer le N+1 média.
 - [x] PR-CATALOG-002 — Tête de la PR `#39` intégrée dans `main` via `#50` ; PR source fermée avec
   commentaire de supersession.
-- [ ] EXPLORE-002 — Finaliser Explore Android : pagination, refresh, filtres, ville/GPS, sponsors et cache.
+- [ ] EXPLORE-002 — Finaliser Explore Android/iOS : pagination, refresh, filtres, ville/GPS, sponsors et cache.
   - [x] EXPLORE-002A — Livrer le mur offline-first, la pagination/déduplication, le refresh non destructif,
     la ville persistée/GPS, les référentiels Room v2 et les catégories serveur réelles.
   - [ ] EXPLORE-002B — Versionner les tris/filtres prix-date-événement et le plafond sponsorisé côté serveur,
@@ -173,8 +173,19 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       puis livrer le RPC/cursor v2 et les contrats mobile correspondants.
       - [x] EXPLORE-002B2A — Figer et tester côté serveur popularité, intervalles de dates, placement
         et plafond sponsorisé, sans raccorder d'UI dans ce lot.
-      - [ ] EXPLORE-002B2B — Raccorder le contrat versionné aux filtres Android/iOS sans classement
+      - [ ] EXPLORE-002B2B — Raccorder le contrat versionné aux clients Android/iOS sans classement
         client divergent.
+        - [x] EXPLORE-002B2B1 — Livrer le socle mobile v2 : gateway KMP strict séparé du catalogue
+          v1, tri serveur par onglet, pagination liée au curseur/snapshot, validation cumulative des
+          deux sponsors, cache `explore-feed:v2` dans Room v3 avec lecture de secours v1, puis cartes
+          natives Android/iOS alignées sur l'alt, la date, « Terminé » et « Sponsorisé ».
+        - [ ] EXPLORE-002B2B2 — Après arbitrage Produit, livrer le drawer avancé Android/iOS et ses
+          contrats : bornes prix, presets de dates civiles du Bénin, éventuel multi-ville, compteur
+          live et recherche filtrée coordonnée avec SEARCH-001B, sans filtrage ni reclassement local.
+          - [ ] Décider si le multi-ville étend le RPC actuel, qui accepte une seule ville, ou reste
+            hors de ce contrat versionné.
+          - [ ] Décider le coût et l'autorité du compteur live ainsi que le partage des filtres entre
+            Explore et Search avant d'ajouter une surface UI.
   - [x] PR-EXPLORE-002A — Tête de la PR `#41` intégrée dans `main` via `#50` après le run
     `30723036248` vert pour `quality`, iOS et Android API 30/31/36 ; PR source fermée avec commentaire
     de supersession.

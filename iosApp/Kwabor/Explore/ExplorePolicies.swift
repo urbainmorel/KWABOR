@@ -84,6 +84,41 @@ enum SearchGridPolicy {
     }
 }
 
+struct ExploreCardDecorationPresentation: Equatable {
+    let showsSponsoredBadge: Bool
+    let ratingLabel: String?
+    let eventDateLabel: String?
+    let showsEndedRibbon: Bool
+}
+
+enum ExploreCardDecorationPolicy {
+    static func presentation(
+        isSponsoredPlacement: Bool,
+        ratingLabel: String?,
+        eventDateLabel: String?,
+        isEventEnded: Bool
+    ) -> ExploreCardDecorationPresentation {
+        ExploreCardDecorationPresentation(
+            showsSponsoredBadge: isSponsoredPlacement,
+            ratingLabel: isSponsoredPlacement ? nil : normalizedLabel(ratingLabel),
+            eventDateLabel: normalizedLabel(eventDateLabel),
+            showsEndedRibbon: isEventEnded
+        )
+    }
+
+    private static func normalizedLabel(_ rawValue: String?) -> String? {
+        let normalized = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return normalized.isEmpty ? nil : normalized
+    }
+}
+
+enum ExploreCardImageAccessibilityPolicy {
+    static func description(coverImageAlt: String?, fallbackTitle: String) -> String {
+        let normalizedAlt = coverImageAlt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return normalizedAlt.isEmpty ? fallbackTitle : normalizedAlt
+    }
+}
+
 enum ContextualAuthenticationDismissalAction: Equatable {
     case cancel
     case keepForAuthenticatedReplay

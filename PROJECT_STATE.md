@@ -2,15 +2,16 @@
 
 ## Phase actuelle
 
-Livraison V1 incrémentale — Favoris est livré de l'autorité Supabase aux clients Android/iOS dans
-`main`. Le présent lot versionne côté serveur le classement, les fenêtres événement, les bornes prix
-et le placement sponsorisé d'Explore sans modifier le contrat consommé par les versions Store.
+Livraison V1 incrémentale — le RPC Explore v2 est intégré dans `main` et le présent lot livre son
+socle de consommation Android/iOS : gateway strict, ordre serveur, pagination/snapshot, cache Room
+v3 et cartes natives. Le drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
 
 ## Snapshot courant — 9 août 2026
 
-- La base de ce lot est le commit de fusion `878ed8f067ca129fd6156de6395004fef501d8e6` de la PR `#56`.
-  Elle inclut FAVORITES-001A de bout en bout, l'autorité HISTORY-001A, ADR-0031 proposé, la fondation
-  domaine de `#51`, l'optimisation CI de `#52` et l'intégration V1 de `#50`.
+- La base de ce lot est le commit de fusion `c630ee6b0b323544d891c71e80e6ebde06672738` de la PR `#57`.
+  Elle inclut EXPLORE-002B2A côté serveur, FAVORITES-001A de bout en bout, l'autorité HISTORY-001A,
+  ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de `#52` et l'intégration V1
+  de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
@@ -29,9 +30,9 @@ et le placement sponsorisé d'Explore sans modifier le contrat consommé par les
   Android/iOS, détail natif, actions externes, découverte des guides, deep link interne de fiche et
   Profil → Favoris natif.
 - Ne sont pas terminés : racines Social/Ajouter/Notifications, outbox durable,
-  miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion et filtres avancés,
-  raccord mobile du classement/sponsoring versionné, carte, avis, partage public, signalement, claim,
-  IA, contribution, B2B, paiement et notifications.
+  miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
+  filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
+  signalement, claim, IA, contribution, B2B, paiement et notifications.
 - La décision de release reste **no-go** : staging/production, fournisseurs réels, préflight des
   données, corpus, juridique, builds signés, appareils physiques, accessibilité, performance,
   sauvegarde et rollback ne sont pas qualifiés.
@@ -60,11 +61,21 @@ et le placement sponsorisé d'Explore sans modifier le contrat consommé par les
   legacy restent disponibles pour les anciennes versions Store. ADR-0032 borne l'usage IA aux
   favoris actifs sans journal d'activité et ADR-0033 fixe la cohérence client. Room et l'outbox
   persistante restent ouvertes dans SYNC-001.
-- EXPLORE-002B2A ajoute dans le présent lot un RPC public v2 distinct : tri de popularité en `bigint`,
-  proximité temporelle des événements, fenêtre UTC semi-ouverte, bornes prix XOF, curseur keyset lié
-  à son snapshot et au fingerprint des filtres, puis au plus deux placements sponsorisés en tête du
-  résultat. Le RPC v1 reste inchangé pour les versions Store ; le raccord Android/iOS appartient à
-  EXPLORE-002B2B. ADR-0034 documente ce contrat et reporte tout index au plan représentatif staging.
+- EXPLORE-002B2A est intégré dans `main` via `#57` avec un RPC public v2 distinct : tri de popularité
+  en `bigint`, proximité temporelle des événements, fenêtre UTC semi-ouverte, bornes prix XOF,
+  curseur keyset lié à son snapshot et au fingerprint des filtres, puis au plus deux placements
+  sponsorisés en tête du résultat. Le RPC v1 reste inchangé pour les versions Store.
+- EXPLORE-002B2B1 livre dans le présent lot un repository/gateway KMP v2 strict, utilisé par Explore
+  Android/iOS pour les trois types d'onglet et les filtres UI déjà disponibles de ville et catégorie.
+  Le contrat KMP conserve un `listingClass` optionnel et typé, mais les surfaces actuelles ne le
+  renseignent pas. Le serveur reste l'unique autorité du tri et du placement sponsorisé. Toute page
+  suivante non vide doit conserver le même snapshot en microsecondes et le mur cumulé garde au plus
+  deux sponsors dans son préfixe global. Room v3 persiste ces métadonnées via les migrations
+  `1 -> 2 -> 3`, sous une clé v2, avec lecture de secours du cache v1 seulement en l'absence de
+  snapshot v2. Les cartes natives affichent l'alt, la date événement,
+  l'état « Terminé » et « Sponsorisé » sans recalculer l'autorité serveur. ADR-0034 documente ce
+  raccord ; le drawer prix/date, le multi-ville, le compteur live et la recherche filtrée restent
+  dans EXPLORE-002B2B2 après arbitrage Produit.
 
 ## Historique des tâches terminées
 
@@ -478,9 +489,10 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-EXPLORE-002B2A versionne et teste le classement public côté Supabase sans modifier le RPC v1 ni les
-clients Store. FAVORITES-001A est livré de bout en bout ; sa persistance offline durable reste dans
-SYNC-001. HISTORY-001A conserve l'autorité serveur bornée, mais ADR-0031 et ses gates Produit,
+EXPLORE-002B2B1 livre le raccord mobile de base au RPC v2 sans modifier le contrat catalogue v1 ni
+reproduire le classement côté client. EXPLORE-002B2B2 reste ouvert pour le drawer avancé après
+arbitrage Produit. FAVORITES-001A est livré de bout en bout ; sa persistance offline durable reste
+dans SYNC-001. HISTORY-001A conserve l'autorité serveur bornée, mais ADR-0031 et ses gates Produit,
 Sécurité, Juridique/DPO et Opérations doivent être arbitrés avant Room ou l'outbox. STAB-002B reste
 suspendu à la décision structurante sur les cinq racines V1.
 
@@ -531,12 +543,16 @@ suspendu à la décision structurante sur les cinq racines V1.
 - Le RPC catalogue est mesuré uniquement sur le seed local de quatre fiches. Le choix d'un éventuel
   index de classement exige un corpus staging représentatif et un nouveau plan
   `EXPLAIN (ANALYZE, BUFFERS)` ; EXPLORE-002B2A n'ajoute donc aucun index spéculatif.
-- Explore Android consomme désormais le cache Room, le refresh et les pages suivantes, ouvre le
-  DetailSheet connecté et affiche la recherche lexicale SEARCH-001A ; iOS possède la parité SwiftUI.
-  Les récents durables, l’autocomplétion, le raccord mobile du RPC Explore v2, l’Assistant IA, la
-  carte, les avis, le partage public, le signalement et le claim restent à livrer ; le classement,
-  les bornes prix/date et le plafond sponsorisé sont définis côté serveur dans le présent lot.
-  Itinéraire, contact, menu et billetterie externe sont déjà intégrés.
+- Explore Android et iOS consomment désormais le RPC Explore v2 pour le mur courant, avec ordre
+  serveur, snapshot/cursor, cache Room v3 et plafond sponsorisé validé sur l'ensemble des pages. Ils
+  ouvrent le détail connecté et exposent la recherche lexicale SEARCH-001A. Les récents durables,
+  l’autocomplétion, le drawer prix/date, les presets civils, le multi-ville, le compteur live, la
+  recherche filtrée, l’Assistant IA, la carte, les avis, le partage public, le signalement et le
+  claim restent à livrer. Itinéraire, contact, menu et billetterie externe sont déjà intégrés.
+- Le contrat v2 courant accepte une ville scalaire et ne fournit pas de compteur dédié. Produit doit
+  arbitrer l'extension éventuelle multi-ville, l'autorité/coût du compteur live et la coordination
+  des filtres Explore/Search avant EXPLORE-002B2B2 ; aucun filtrage client de substitution n'est
+  autorisé entre-temps.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
 - Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
 - L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
@@ -569,10 +585,10 @@ suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Raccorder EXPLORE-002B2B au RPC v2 dans les clients Android/iOS, avec mapping strict du curseur et
-sans classement client divergent. En parallèle, faire arbitrer ADR-0031 avant HISTORY-001B ; les
-recherches récentes restent conservées par conception pour l'assistant IA et la pertinence du fil,
-sous les plafonds et choix de personnalisation à arbitrer. OPS-001B ne démarre qu'après
-provisionnement staging ; avant d'activer `account-delete`, les AMR réelles et la politique des
-en-têtes/journaux doivent être qualifiées. Tout changement d'octets de la vidéo embarquée exige
-toujours une nouvelle release Android/iOS dans les Stores.
+Faire arbitrer par Produit EXPLORE-002B2B2 avant tout drawer avancé : presets de dates civiles du
+Bénin, prix, multi-ville, compteur live et partage des filtres avec Search. En parallèle, faire
+arbitrer ADR-0031 avant HISTORY-001B ; les recherches récentes restent conservées par conception
+pour l'assistant IA et la pertinence du fil, sous les plafonds et choix de personnalisation à
+arbitrer. OPS-001B ne démarre qu'après provisionnement staging ; avant d'activer `account-delete`,
+les AMR réelles et la politique des en-têtes/journaux doivent être qualifiées. Tout changement
+d'octets de la vidéo embarquée exige toujours une nouvelle release Android/iOS dans les Stores.

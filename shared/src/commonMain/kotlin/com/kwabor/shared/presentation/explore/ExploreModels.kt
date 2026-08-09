@@ -45,6 +45,9 @@ data class ExploreListingItem(
     val liked: Boolean = false,
     val favorited: Boolean = false,
     val cityId: String? = null,
+    val coverImageAlt: String? = null,
+    val eventDateLabel: String? = null,
+    val isEventEnded: Boolean = false,
 )
 
 enum class ExploreInteractionKind {

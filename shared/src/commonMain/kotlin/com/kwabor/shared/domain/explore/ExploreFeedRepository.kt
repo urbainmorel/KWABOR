@@ -5,13 +5,16 @@ import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSummary
+import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.DomainResult
 
 data class ExploreFeedQuery(
-    val filters: ListingFilters = ListingFilters(),
+    val filters: ListingFilters = ListingFilters(listingType = ListingType.Place),
     val pageSize: Int = ListingPageRequest.DEFAULT_LIMIT,
 ) {
     init {
+        require(filters.onlyPublished) { "Explore only supports published listings." }
+        require(filters.listingType != null) { "Explore listing type is required." }
         filters.cityId.requireValidOptionalFilterId("city")
         filters.categoryId.requireValidOptionalFilterId("category")
         require(pageSize in 1..MAX_EXPLORE_FEED_PAGE_SIZE) {
@@ -30,6 +33,7 @@ data class ExploreFeedSnapshot(
     val warning: ExploreFeedWarning? = null,
     val itemContentCapturedAtEpochMilliseconds: Map<String, Long> = emptyMap(),
     val referencesCapturedAtEpochMilliseconds: Long = cachedAtEpochMilliseconds,
+    val serverSnapshotAtEpochMicroseconds: Long? = null,
 ) {
     init {
         require(nextCursor == null || nextCursor.isNotBlank()) { "Explore feed cursor must not be blank." }
@@ -47,6 +51,9 @@ data class ExploreFeedSnapshot(
         }
         require(referencesCapturedAtEpochMilliseconds >= 0) {
             "Explore feed reference timestamp must not be negative."
+        }
+        require(serverSnapshotAtEpochMicroseconds == null || serverSnapshotAtEpochMicroseconds >= 0) {
+            "Explore feed server snapshot timestamp must not be negative."
         }
     }
 }
@@ -84,11 +91,16 @@ interface ExploreFeedRepository {
 }
 
 private fun String?.requireValidOptionalFilterId(fieldName: String) {
-    require(this == null || isNotBlank()) { "Explore $fieldName filter id must not be blank." }
-    require(this == null || length <= MAX_EXPLORE_FEED_FILTER_ID_LENGTH) {
-        "Explore $fieldName filter id is too long."
+    require(
+        this == null || (
+            length in 1..MAX_EXPLORE_FEED_FILTER_ID_LENGTH &&
+                EXPLORE_FEED_FILTER_ID_PATTERN.matches(this)
+            ),
+    ) {
+        "Explore $fieldName filter id must be a canonical catalog identifier."
     }
 }
 
 const val MAX_EXPLORE_FEED_PAGE_SIZE = 20
-private const val MAX_EXPLORE_FEED_FILTER_ID_LENGTH = 128
+private val EXPLORE_FEED_FILTER_ID_PATTERN = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
+private const val MAX_EXPLORE_FEED_FILTER_ID_LENGTH = 100

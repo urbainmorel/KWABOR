@@ -1,5 +1,6 @@
 package com.kwabor.shared.data.catalog
 
+import com.kwabor.shared.data.core.isCanonicalPublicHttpsUrl
 import com.kwabor.shared.domain.catalog.CatalogDetailCommon
 import com.kwabor.shared.domain.catalog.CatalogPrice
 import com.kwabor.shared.domain.catalog.CatalogRoomType
@@ -8,10 +9,6 @@ import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.PriceUnit
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
-import io.ktor.http.URLDecodeException
-import io.ktor.http.URLParserException
-import io.ktor.http.URLProtocol
-import io.ktor.http.Url
 
 private const val MINIMUM_STAR_RATING = 0
 private const val MAXIMUM_STAR_RATING = 5
@@ -178,8 +175,12 @@ internal fun String.requireCatalogText(fieldName: String): String {
     return this
 }
 
-internal fun String.requireCatalogHttpsUrl(fieldName: String): String =
-    CatalogUrlValidator.requireHttps(this, fieldName)
+internal fun String.requireCatalogHttpsUrl(fieldName: String): String {
+    if (!isCanonicalPublicHttpsUrl()) {
+        invalidCatalogDetail(fieldName, this)
+    }
+    return this
+}
 
 internal fun Int.requireNonNegative(fieldName: String): Int {
     if (this < 0) {
@@ -191,107 +192,5 @@ internal fun Int.requireNonNegative(fieldName: String): Int {
 internal fun invalidCatalogDetail(fieldName: String, value: String, cause: Throwable? = null): Nothing {
     throw CatalogDataException.Unexpected(
         IllegalStateException("Invalid catalog detail value for $fieldName: $value", cause),
-    )
-}
-
-private object CatalogUrlValidator {
-    fun requireHttps(value: String, fieldName: String): String {
-        requireLexicalForm(value, fieldName)
-        val rawAuthority = value.rawAuthority()
-        if (rawAuthority != rawAuthority.lowercase()) {
-            invalidCatalogDetail(fieldName, value)
-        }
-        val parsed = parse(value, fieldName)
-        requireCanonicalAuthority(value, fieldName, rawAuthority, parsed)
-        requireCanonicalUrl(value, fieldName, parsed)
-        return value
-    }
-
-    private fun requireLexicalForm(value: String, fieldName: String) {
-        val encodedSize = value.encodeToByteArray().size
-        if (encodedSize !in MINIMUM_CATALOG_URL_UTF8_BYTES..MAXIMUM_CATALOG_URL_UTF8_BYTES) {
-            invalidCatalogDetail(fieldName, value)
-        }
-        if (value.trim() != value || value.any(Char::isWhitespace)) {
-            invalidCatalogDetail(fieldName, value)
-        }
-        if (!value.startsWith(HTTPS_PREFIX) || '\\' in value || '#' in value) {
-            invalidCatalogDetail(fieldName, value)
-        }
-    }
-
-    private fun String.rawAuthority(): String {
-        val authorityEnd = indexOfAny(charArrayOf('/', '?'), startIndex = HTTPS_PREFIX.length)
-            .takeIf { index -> index >= 0 }
-            ?: length
-        return substring(HTTPS_PREFIX.length, authorityEnd)
-    }
-
-    private fun parse(value: String, fieldName: String): Url = try {
-        Url(value)
-    } catch (exception: URLParserException) {
-        invalidCatalogDetail(fieldName, value, exception)
-    } catch (exception: URLDecodeException) {
-        invalidCatalogDetail(fieldName, value, exception)
-    }
-
-    private fun requireCanonicalAuthority(value: String, fieldName: String, rawAuthority: String, parsed: Url) {
-        val canonicalAuthority = parsed.host
-        val canonicalAuthorityWithPort = "${parsed.host}:$HTTPS_PORT"
-        if (rawAuthority != canonicalAuthority && rawAuthority != canonicalAuthorityWithPort) {
-            invalidCatalogDetail(fieldName, value)
-        }
-    }
-
-    private fun requireCanonicalUrl(value: String, fieldName: String, parsed: Url) {
-        if (parsed.protocol != URLProtocol.HTTPS || parsed.port != HTTPS_PORT) {
-            invalidCatalogDetail(fieldName, value)
-        }
-        if (parsed.user?.isNotEmpty() == true ||
-            parsed.password?.isNotEmpty() == true ||
-            parsed.fragment.isNotEmpty()
-        ) {
-            invalidCatalogDetail(fieldName, value)
-        }
-        if (!parsed.host.isCanonicalHost()) {
-            invalidCatalogDetail(fieldName, value)
-        }
-    }
-
-    private fun String.isCanonicalHost(): Boolean {
-        if (this != lowercase() || length > MAXIMUM_HOST_LENGTH) {
-            return false
-        }
-        if (!contains('.') || ':' in this) {
-            return false
-        }
-        if (all { character -> character in '0'..'9' || character == '.' }) {
-            return false
-        }
-        if (FORBIDDEN_HOST_SUFFIXES.any { suffix -> this == suffix || endsWith(".$suffix") }) {
-            return false
-        }
-        return split('.').all { label -> label.isCanonicalHostLabel() }
-    }
-
-    private fun String.isCanonicalHostLabel(): Boolean = length in 1..MAXIMUM_HOST_LABEL_LENGTH &&
-        first().isAsciiLetterOrDigit() &&
-        last().isAsciiLetterOrDigit() &&
-        all { character -> character.isAsciiLetterOrDigit() || character == '-' }
-
-    private fun Char.isAsciiLetterOrDigit(): Boolean = this in 'a'..'z' || this in '0'..'9'
-
-    private const val HTTPS_PORT = 443
-    private const val HTTPS_PREFIX = "https://"
-    private const val MINIMUM_CATALOG_URL_UTF8_BYTES = 9
-    private const val MAXIMUM_CATALOG_URL_UTF8_BYTES = 2_048
-    private const val MAXIMUM_HOST_LENGTH = 253
-    private const val MAXIMUM_HOST_LABEL_LENGTH = 63
-    private val FORBIDDEN_HOST_SUFFIXES = setOf(
-        "localhost",
-        "local",
-        "internal",
-        "lan",
-        "home.arpa",
     )
 }

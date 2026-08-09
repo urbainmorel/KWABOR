@@ -4,8 +4,14 @@ import com.kwabor.shared.domain.catalog.ListingClass
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.explore.ExploreFeedQuery
 
-internal fun ExploreFeedQuery.toCacheKey(): String = buildString {
-    append(EXPLORE_FEED_CACHE_KEY_VERSION)
+internal fun ExploreFeedQuery.toCacheKey(): String = toVersionedCacheKey(EXPLORE_FEED_CACHE_KEY_VERSION)
+
+internal fun ExploreFeedQuery.toLegacyCacheKey(): String = toVersionedCacheKey(LEGACY_EXPLORE_FEED_CACHE_KEY_VERSION)
+
+internal fun String.isExploreV2FeedCacheKey(): Boolean = startsWith("$EXPLORE_FEED_CACHE_KEY_VERSION|")
+
+private fun ExploreFeedQuery.toVersionedCacheKey(version: String): String = buildString {
+    append(version)
     append("|city=")
     append(filters.cityId.toLengthPrefixedValue())
     append("|category=")
@@ -39,4 +45,5 @@ private fun ListingClass?.toCacheKeyValue(): String = when (this) {
     ListingClass.Event -> "event"
 }
 
-private const val EXPLORE_FEED_CACHE_KEY_VERSION = "explore-feed:v1"
+private const val EXPLORE_FEED_CACHE_KEY_VERSION = "explore-feed:v2"
+private const val LEGACY_EXPLORE_FEED_CACHE_KEY_VERSION = "explore-feed:v1"

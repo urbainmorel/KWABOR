@@ -59,6 +59,7 @@ class ExploreFeedSingleFlightTest {
             nextCursor = "cursor-2",
             cachedAtEpochMilliseconds = 1_000L,
             source = ExploreFeedSource.Network,
+            serverSnapshotAtEpochMicroseconds = TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS,
         )
         val newer = older.copy(
             items = testListings(1..2) + testListings(99..99),
@@ -144,6 +145,7 @@ private fun TestScope.singleFlightRepository(
     val references = FakeExploreReferenceCache()
     return OfflineFirstExploreFeedRepository(
         catalogRepository = catalog,
+        exploreCatalogRepository = catalog,
         cache = ExploreFeedCacheDependencies(
             wall = wall,
             references = references,

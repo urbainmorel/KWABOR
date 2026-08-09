@@ -16,7 +16,7 @@ prix et de dates, première rangée sponsorisée et plafond de deux cartes spons
 Recalculer ces règles dans Android et iOS créerait deux autorités divergentes et rendrait le cache
 offline incohérent. Modifier le RPC V1 casserait en revanche les curseurs et les applications déjà
 publiées. Le contrat suivant doit donc être versionné, déterministe, compatible avec les RLS et
-consommable plus tard par les deux clients sans changement SQL immédiat.
+consommable par les deux clients sans changement SQL supplémentaire.
 
 Le schéma expose déjà `views_count`, `likes_count`, `sponsored_until` et les dates typées de
 `event_details`. Il ne possède pas encore de ledger d'impressions, de pacing publicitaire ou de
@@ -64,7 +64,8 @@ inconnue ne signifie pas « gratuit ».
 Les bornes `p_event_window_start` et `p_event_window_end` sont soit toutes deux nulles, soit toutes
 deux présentes, dans la plage temporelle mobile et strictement ordonnées. Elles sont réservées aux
 événements et représentent un intervalle UTC demi-ouvert `[début, fin)`. Le raccord mobile traduira
-les presets civils du Bénin en instants `Africa/Porto-Novo` explicites avant l'appel.
+les presets civils du Bénin en instants `Africa/Porto-Novo` explicites avant l'appel. Cette traduction
+appartient au drawer avancé EXPLORE-002B2B2 et n'est pas activée par le raccord de base B2B1.
 
 ### Snapshot public
 
@@ -150,11 +151,48 @@ instant reste identique quel que soit le fuseau d'affichage de la session Postgr
 Les curseurs V1, malformés, futurs, hors plage, forgés avec des clés incohérentes ou réutilisés avec
 un autre filtre, tri, intervalle, prix ou limite sont refusés.
 
+## Raccord mobile EXPLORE-002B2B1
+
+Android et iOS consomment le RPC V2 à travers un port domaine `ExploreCatalogRepository` et un
+gateway data dédiés. `CatalogRepository`, le RPC catalogue V1 et Search restent inchangés pour ne
+pas coupler leurs contrats ou leurs curseurs au classement Explore.
+
+Le type de fiche est toujours explicite. Le mur courant résout le tri par onglet : popularité pour
+les lieux et établissements, proximité temporelle pour les événements. Il transmet les filtres UI
+déjà livrés de ville et catégorie. Le contrat KMP conserve un `listingClass` optionnel et typé, mais
+aucune surface actuelle ne le renseigne. Les prix et fenêtres événement restent eux aussi nuls tant
+que le drawer avancé n'existe pas. Le gateway exige la projection V2 exacte et valide toutes les
+lignes, y compris la sentinelle `limit + 1`, avant de tronquer la page. Il rejette notamment les
+champs obligatoires absents, les identifiants non canoniques, les doublons, les instants hors contrat
+et un snapshot hétérogène.
+
+La première page conserve `snapshot_at` en microsecondes. Un append est accepté seulement si sa
+page non vide porte exactement le même snapshot. La validation porte sur le mur cumulé : au plus
+deux placements sponsorisés, tous en préfixe avant la première fiche organique. Les clients ne
+recalculent ni l'éligibilité, ni le rang, ni le badge à partir de l'horloge appareil.
+
+Room passe en version 3 avec migrations automatiques `1 -> 2 -> 3`. Le cache v2 persiste le snapshot
+serveur, l'alt de couverture, les vues, les dates et l'état événement ainsi que le placement
+sponsorisé. Les nouvelles colonnes restent nullables afin de conserver les snapshots v1 historiques,
+mais une nouvelle écriture v2 exige toutes les métadonnées et invariants du contrat. La lecture ne
+retombe sur la clé v1 que si aucun snapshot v2 n'existe ; un échec physique v2 reste une erreur et un
+snapshot legacy offline n'autorise pas la pagination.
+
+Les cartes Compose Android et SwiftUI iOS affichent les mêmes projections : « Sponsorisé » remplace
+la note, la date événement est visible et « Terminé » reste un état distinct. Le texte alternatif de
+couverture participe au résumé accessible sans dupliquer les éléments visuels. Ces vues font
+confiance aux champs serveur/cache validés ; elles ne reconstruisent pas la décision sponsorisée.
+
+EXPLORE-002B2B1 ne livre ni drawer avancé, ni multi-ville, ni compteur live, ni recherche filtrée.
+Le RPC actuel reçoit une seule ville. Produit doit arbitrer dans EXPLORE-002B2B2 l'éventuelle
+extension multi-ville, les presets de dates, l'autorité et le coût du compteur ainsi que le partage
+des filtres avec Search avant toute nouvelle surface ou version de contrat.
+
 ## Conséquences
 
 **Positives**
 
-- Les deux clients pourront consommer exactement le même classement et le même badge.
+- Les deux clients consomment exactement le même classement et le même badge.
 - Les versions Store utilisant V1 continuent de fonctionner sans changement.
 - Les événements, prix et sponsors sont filtrés avant classement et pagination.
 - Le plafond sponsorisé ne redémarre pas à chaque page et aucune fiche n'est dupliquée.
@@ -165,7 +203,7 @@ un autre filtre, tri, intervalle, prix ou limite sont refusés.
 - La formule et le choix des deux sponsors exigent un tri serveur global des candidats filtrés.
 - Les métriques mutables restent seulement cohérentes à terme entre pages.
 - Deux placements totaux sous-utilisent volontairement l'inventaire tant que le pacing n'existe pas.
-- La conversion des presets de dates civils sera réalisée par les contrats mobiles du lot suivant.
+- La conversion des presets de dates civils reste dans EXPLORE-002B2B2 après arbitrage Produit.
 - `views_count` ne devient utile qu'après livraison de son pipeline serveur anti-abus.
 
 **À revoir si**

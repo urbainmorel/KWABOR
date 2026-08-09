@@ -4,14 +4,18 @@ import com.kwabor.shared.data.local.ExploreCacheSnapshot
 import com.kwabor.shared.data.local.ExploreReferenceSnapshot
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
+import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.explore.ExploreCatalogPage
 import com.kwabor.shared.domain.explore.ExploreFeedCacheOperation
 import com.kwabor.shared.domain.explore.ExploreFeedQuery
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.explore.ExploreFeedSource
 import com.kwabor.shared.domain.explore.ExploreFeedWarning
+import com.kwabor.shared.domain.explore.ExploreSort
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +31,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class OfflineFirstExploreFeedRepositoryTest {
+class OfflineFirstExploreFeedRepositoryCacheAndRefreshTest {
     @Test
     fun readCachedRequiresBothWallAndReferences() = runTest {
         val query = ExploreFeedQuery()
@@ -37,6 +41,32 @@ class OfflineFirstExploreFeedRepositoryTest {
         val result = repository(wall = wall, references = references).readCached(query)
 
         assertNull(assertIs<DomainResult.Success<ExploreFeedSnapshot?>>(result).value)
+    }
+
+    @Test
+    fun readCachedFallsBackToThePreservedV1WallAfterTheRoomUpgrade() = runTest {
+        val query = ExploreFeedQuery()
+        val legacyWall = cachedWall(query, 1..2, nextCursor = null, cachedAt = 900L).copy(
+            snapshotKey = query.toLegacyCacheKey(),
+            serverSnapshotAtEpochMicroseconds = null,
+            items = testListings(1..2).map { listing ->
+                listing.copy(
+                    viewsCount = null,
+                    isSponsoredPlacement = null,
+                    isEventEnded = null,
+                )
+            },
+        )
+
+        val result = repository(
+            wall = FakeExploreWallCache(legacyWall),
+            references = FakeExploreReferenceCache(cachedReferences(900L)),
+        ).readCached(query)
+
+        val snapshot = requireNotNull(assertIs<DomainResult.Success<ExploreFeedSnapshot?>>(result).value)
+        assertEquals(ExploreFeedSource.Cache, snapshot.source)
+        assertEquals(legacyWall.items, snapshot.items)
+        assertEquals(null, snapshot.serverSnapshotAtEpochMicroseconds)
     }
 
     @Test
@@ -103,6 +133,7 @@ class OfflineFirstExploreFeedRepositoryTest {
         val snapshot = assertIs<DomainResult.Success<ExploreFeedSnapshot>>(result).value
         assertEquals(ExploreFeedSource.Network, snapshot.source)
         assertEquals(2_000L, snapshot.cachedAtEpochMilliseconds)
+        assertEquals(TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS, snapshot.serverSnapshotAtEpochMicroseconds)
         assertEquals("cursor-20", snapshot.nextCursor)
         assertNull(snapshot.warning)
         assertEquals(20, wall.writes.single().items.size)
@@ -110,6 +141,10 @@ class OfflineFirstExploreFeedRepositoryTest {
         assertEquals(testCities(), references.writes.single().cities)
         assertEquals(20, catalog.listingRequests.single().second.limit)
         assertNull(catalog.listingRequests.single().second.cursor)
+        assertEquals(
+            ExploreSort.Popularity,
+            catalog.exploreCatalogRequests.single().sort,
+        )
     }
 
     @Test
@@ -140,11 +175,15 @@ class OfflineFirstExploreFeedRepositoryTest {
     fun refreshRejectsEachObsoleteReferenceBeforeLoadingListings() = runTest {
         val unknownCityCatalog = FakeExploreCatalogRepository()
         val cityResult = repository(catalog = unknownCityCatalog).refresh(
-            ExploreFeedQuery(filters = ListingFilters(cityId = "city-retired")),
+            ExploreFeedQuery(
+                filters = ListingFilters(cityId = "city-retired", listingType = ListingType.Place),
+            ),
         )
         val unknownCategoryCatalog = FakeExploreCatalogRepository()
         val categoryResult = repository(catalog = unknownCategoryCatalog).refresh(
-            ExploreFeedQuery(filters = ListingFilters(categoryId = "category-retired")),
+            ExploreFeedQuery(
+                filters = ListingFilters(categoryId = "category-retired", listingType = ListingType.Place),
+            ),
         )
 
         assertEquals(
@@ -315,9 +354,12 @@ class OfflineFirstExploreFeedRepositoryTest {
         assertIs<DomainResult.Success<ExploreFeedSnapshot>>(repository.refresh(ExploreFeedQuery()))
         assertEquals(2, catalog.citiesCallCount)
     }
+}
 
+@OptIn(ExperimentalCoroutinesApi::class)
+class OfflineFirstExploreFeedRepositoryAppendPersistenceTest {
     @Test
-    fun appendDeduplicatesOverlapAndKeepsServerOrder() = runTest {
+    fun appendRejectsPartialOverlapWithoutAdvancingThePersistedCursor() = runTest {
         val catalog = FakeExploreCatalogRepository().apply {
             listingResults += DomainResult.Success(ListingSummaryPage(testListings(20..39), "cursor-39"))
         }
@@ -332,16 +374,11 @@ class OfflineFirstExploreFeedRepositoryTest {
             clock = MutableExploreClock(2_000L),
         ).append(ExploreFeedQuery(), current)
 
-        val snapshot = assertIs<DomainResult.Success<ExploreFeedSnapshot>>(result).value
-        assertEquals(testListings(1..39), snapshot.items)
-        assertEquals("cursor-39", snapshot.nextCursor)
-        assertEquals(2_000L, snapshot.cachedAtEpochMilliseconds)
-        val persistedWall = wall.writes.single()
-        assertEquals(39, persistedWall.items.size)
         assertEquals(
-            testListings(1..20).associate { listing -> listing.id to 1_000L },
-            persistedWall.itemCachedAtEpochMilliseconds,
+            DomainError.Unexpected("error.explore.invalid_page"),
+            assertIs<DomainResult.Failure>(result).error,
         )
+        assertTrue(wall.writes.isEmpty())
         assertTrue(references.writes.isEmpty())
         assertEquals("cursor-20", catalog.listingRequests.single().second.cursor)
     }
@@ -493,6 +530,7 @@ class OfflineFirstExploreFeedRepositoryTest {
         }
         val repository = OfflineFirstExploreFeedRepository(
             catalogRepository = catalog,
+            exploreCatalogRepository = catalog,
             cache = ExploreFeedCacheDependencies(
                 wall = wall,
                 references = references,
@@ -593,7 +631,10 @@ class OfflineFirstExploreFeedRepositoryTest {
         assertTrue(wall.writes.isEmpty())
         assertTrue(references.writes.isEmpty())
     }
+}
 
+@OptIn(ExperimentalCoroutinesApi::class)
+class OfflineFirstExploreFeedRepositoryAppendValidationTest {
     @Test
     fun appendRejectsCachedSnapshotBeforeCallingCatalogOrPersistence() = runTest {
         val catalog = FakeExploreCatalogRepository()
@@ -663,7 +704,76 @@ class OfflineFirstExploreFeedRepositoryTest {
     }
 
     @Test
-    fun appendAcceptsADeduplicatedTerminalPageToClosePagination() = runTest {
+    fun appendRejectsContentFromAnotherServerSnapshot() = runTest {
+        val catalog = FakeExploreCatalogRepository().apply {
+            exploreCatalogResults += DomainResult.Success(
+                ExploreCatalogPage(
+                    items = testListings(3..4),
+                    nextCursor = null,
+                    snapshotAtEpochMicroseconds = TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS + 1,
+                ),
+            )
+        }
+        val wall = FakeExploreWallCache()
+        val current = networkSnapshot(1..2, nextCursor = "cursor-2", cachedAt = 1_000L)
+
+        val result = repository(catalog, wall).append(ExploreFeedQuery(), current)
+
+        assertEquals(
+            DomainError.Unexpected("error.explore.invalid_page"),
+            assertIs<DomainResult.Failure>(result).error,
+        )
+        assertTrue(wall.writes.isEmpty())
+    }
+
+    @Test
+    fun appendRejectsSponsoredPlacementAfterAnOrganicListing() = runTest {
+        val catalog = FakeExploreCatalogRepository().apply {
+            exploreCatalogResults += explorePage(testEstablishmentListings(3..3, setOf(3)))
+        }
+        val current = establishmentSnapshot(
+            items = testEstablishmentListings(1..2, setOf(1)),
+            nextCursor = "cursor-2",
+        )
+
+        val result = repository(catalog = catalog).append(establishmentQuery(), current)
+
+        assertIs<DomainResult.Failure>(result)
+    }
+
+    @Test
+    fun appendRejectsAThirdSponsoredPlacementAcrossPages() = runTest {
+        val catalog = FakeExploreCatalogRepository().apply {
+            exploreCatalogResults += explorePage(testEstablishmentListings(3..3, setOf(3)))
+        }
+        val current = establishmentSnapshot(
+            items = testEstablishmentListings(1..2, setOf(1, 2)),
+            nextCursor = "cursor-2",
+        )
+
+        val result = repository(catalog = catalog).append(establishmentQuery(), current)
+
+        assertIs<DomainResult.Failure>(result)
+    }
+
+    @Test
+    fun appendAcceptsTwoSponsoredPlacementsBeforeAnyOrganicListing() = runTest {
+        val catalog = FakeExploreCatalogRepository().apply {
+            exploreCatalogResults += explorePage(testEstablishmentListings(2..3, setOf(2)))
+        }
+        val current = establishmentSnapshot(
+            items = testEstablishmentListings(1..1, setOf(1)),
+            nextCursor = "cursor-1",
+        )
+
+        val result = repository(catalog = catalog).append(establishmentQuery(), current)
+
+        val snapshot = assertIs<DomainResult.Success<ExploreFeedSnapshot>>(result).value
+        assertEquals(listOf(true, true, false), snapshot.items.map { it.isSponsoredPlacement })
+    }
+
+    @Test
+    fun appendRejectsAFullyOverlappingTerminalPageWithoutClosingPagination() = runTest {
         val catalog = FakeExploreCatalogRepository().apply {
             listingResults += DomainResult.Success(
                 ListingSummaryPage(testListings(1..2), nextCursor = null),
@@ -671,11 +781,14 @@ class OfflineFirstExploreFeedRepositoryTest {
         }
         val current = networkSnapshot(1..2, nextCursor = "cursor-2", cachedAt = 1_000L)
 
-        val result = repository(catalog = catalog).append(ExploreFeedQuery(), current)
+        val wall = FakeExploreWallCache()
+        val result = repository(catalog = catalog, wall = wall).append(ExploreFeedQuery(), current)
 
-        val snapshot = assertIs<DomainResult.Success<ExploreFeedSnapshot>>(result).value
-        assertEquals(testListings(1..2), snapshot.items)
-        assertEquals(null, snapshot.nextCursor)
+        assertEquals(
+            DomainError.Unexpected("error.explore.invalid_page"),
+            assertIs<DomainResult.Failure>(result).error,
+        )
+        assertTrue(wall.writes.isEmpty())
     }
 
     @Test
@@ -712,6 +825,7 @@ private fun TestScope.repository(
         EMPTY_EXPLORE_PERSISTENCE_WATERMARK_PROVIDER,
 ): OfflineFirstExploreFeedRepository = OfflineFirstExploreFeedRepository(
     catalogRepository = catalog,
+    exploreCatalogRepository = catalog,
     cache = ExploreFeedCacheDependencies(
         wall = wall,
         references = references,
@@ -732,6 +846,11 @@ private fun cachedWall(
     items = testListings(range),
     nextCursor = nextCursor,
     cachedAtEpochMilliseconds = cachedAt,
+    serverSnapshotAtEpochMicroseconds = if (range.isEmpty()) {
+        null
+    } else {
+        TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS
+    },
 )
 
 private fun cachedReferences(cachedAt: Long): ExploreReferenceSnapshot = ExploreReferenceSnapshot(
@@ -748,7 +867,31 @@ private fun networkSnapshot(range: IntRange, nextCursor: String?, cachedAt: Long
         nextCursor = nextCursor,
         cachedAtEpochMilliseconds = cachedAt,
         source = ExploreFeedSource.Network,
+        serverSnapshotAtEpochMicroseconds = TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS,
     )
+
+private fun establishmentQuery(): ExploreFeedQuery = ExploreFeedQuery(
+    filters = ListingFilters(listingType = ListingType.Establishment),
+)
+
+private fun establishmentSnapshot(items: List<ListingSummary>, nextCursor: String): ExploreFeedSnapshot =
+    ExploreFeedSnapshot(
+        cities = testCities(),
+        categories = listOf(testEstablishmentCategory()),
+        items = items,
+        nextCursor = nextCursor,
+        cachedAtEpochMilliseconds = 1_000L,
+        source = ExploreFeedSource.Network,
+        serverSnapshotAtEpochMicroseconds = TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS,
+    )
+
+private fun explorePage(items: List<ListingSummary>): DomainResult<ExploreCatalogPage> = DomainResult.Success(
+    ExploreCatalogPage(
+        items = items,
+        nextCursor = null,
+        snapshotAtEpochMicroseconds = TEST_EXPLORE_SERVER_SNAPSHOT_MICROSECONDS,
+    ),
+)
 
 private fun persistenceWarning(vararg operations: ExploreFeedCacheOperation): ExploreFeedWarning =
     ExploreFeedWarning.LocalPersistenceUnavailable(operations.toSet())

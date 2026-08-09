@@ -20,9 +20,12 @@ internal const val KWABOR_DATABASE_FILENAME = "kwabor.db"
         ExploreReferenceCityEntity::class,
         ExploreReferenceCategoryEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
+    ],
 )
 @ConstructedBy(KwaborDatabaseConstructor::class)
 internal abstract class KwaborDatabase : RoomDatabase() {

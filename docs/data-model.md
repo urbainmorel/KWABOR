@@ -77,13 +77,17 @@ Elles sont publication-only et n'exposent pas les identifiants d'autorité ni ch
 `list_catalog_summaries_v2(...)` ajoute un snapshot et un curseur keyset stricts, les tris de
 popularité ou proximité temporelle, les fenêtres événement UTC, les bornes prix XOF et au plus deux
 placements sponsorisés en tête. Le fingerprint du curseur lie la continuation aux filtres et au tri
-résolu ; un curseur v1 ou réutilisé avec une autre requête est refusé.
+résolu ; un curseur v1 ou réutilisé avec une autre requête est refusé. Explore Android/iOS consomme
+ce contrat v2 via un gateway KMP distinct du catalogue et de Search v1. Le mapper rejette une
+projection incomplète ou incohérente, valide aussi la ligne sentinelle `limit + 1`, puis conserve le
+snapshot serveur exact en microsecondes pour les pages suivantes et le cache.
 
 ## Persistance locale actuelle
 
 ### Room KMP
 
-La base `kwabor.db` est en version 2 avec migration automatique `1 -> 2`. Elle contient six tables :
+La base `kwabor.db` est en version 3 avec migrations automatiques `1 -> 2` puis `2 -> 3`. Elle
+contient toujours six tables :
 
 - `explore_cache_snapshots` ;
 - `explore_cached_listings` ;
@@ -95,6 +99,15 @@ La base `kwabor.db` est en version 2 avec migration automatique `1 -> 2`. Elle c
 Le contenu canonique est séparé des requêtes/snapshots et de leur ordre. Un snapshot contient au
 maximum 50 fiches et la rétention garde 64 snapshots récents. Les écritures obsolètes sont rejetées
 et une corruption logique évince seulement le snapshot concerné.
+
+La version 3 ajoute au cache Explore le snapshot serveur en microsecondes, l'alt de couverture, le
+compteur de vues, les dates événement et l'état terminé. Le placement sponsorisé reste porté par
+l'item de snapshot ; le cache v2 en durcit désormais l'ordre et le plafond. Pour un snapshot v2,
+ces métadonnées et leurs invariants sont obligatoires : même snapshot entre pages, au plus deux
+sponsors en préfixe global et cohérence des champs événement. Une page terminale vide conserve le
+snapshot courant sans introduire de nouvelle ligne. Les colonnes restent nullables afin que la
+migration conserve les lignes v1 ; ces lignes legacy ne sont lues qu'en secours lorsqu'aucun
+snapshot `explore-feed:v2` n'existe et ne peuvent pas servir de base à un append.
 
 Android place Room dans `noBackupFilesDir/KwaborRoom`, exclu de chaque mode de sauvegarde par le
 système, et conserve des règles explicites qui excluent les neuf domaines du cloud et des transferts
@@ -129,6 +142,9 @@ incomplets :
 - ledger et webhooks FedaPay ;
 - taux de change, vecteurs et données IA ;
 - caches locaux recherche, détail et guide.
+- drawer Explore avancé : prix, presets de dates, éventuel multi-ville, compteur live et recherche
+  filtrée. Le RPC v2 courant accepte une seule ville ; toute extension exige d'abord l'arbitrage
+  Produit suivi dans EXPLORE-002B2B2.
 
 Ces capacités restent suivies dans [BACKLOG.md](../BACKLOG.md).
 
