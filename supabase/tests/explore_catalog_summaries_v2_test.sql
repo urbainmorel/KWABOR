@@ -1126,9 +1126,9 @@ select ok(
 select is(
   (
     select pg_catalog.string_agg(
-      pg_catalog.coalesce(grantee.rolname, 'PUBLIC'),
+      coalesce(grantee.rolname, 'PUBLIC'),
       ','
-      order by pg_catalog.coalesce(grantee.rolname, 'PUBLIC')
+      order by coalesce(grantee.rolname, 'PUBLIC')
     )
     from pg_catalog.pg_proc as procedure_definition
     cross join lateral pg_catalog.aclexplode(procedure_definition.proacl) as privilege_definition
