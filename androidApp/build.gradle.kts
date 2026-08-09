@@ -284,7 +284,7 @@ dependencies {
     testImplementation(kotlin("test-junit"))
     testImplementation("androidx.navigation:navigation-testing:2.9.8")
     testImplementation("androidx.test:core:1.7.0")
-    testImplementation(compose.uiTestJUnit4)
+    testImplementation("org.jetbrains.compose.ui:ui-test-junit4:1.9.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.robolectric:robolectric:4.16")
 }

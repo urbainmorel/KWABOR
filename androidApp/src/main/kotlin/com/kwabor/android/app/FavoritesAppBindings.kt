@@ -95,11 +95,35 @@ internal fun NavGraphBuilder.favoritesChildRoute(
 
 internal class FavoritesAccountNavigationPolicy(initialAccountId: String?) {
     private var accountId: String? = initialAccountId
+    private var isFirstEvaluation = true
 
-    fun shouldPurgeFor(nextAccountId: String?): Boolean {
-        val shouldPurge = accountId != null && accountId != nextAccountId
+    fun decisionFor(nextAccountId: String?): FavoritesNavigationPrivacyDecision {
+        val decision = when {
+            isFirstEvaluation && nextAccountId == null ->
+                FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge
+            accountId != null && accountId != nextAccountId ->
+                FavoritesNavigationPrivacyDecision.PurgePrivateChildren
+            else -> FavoritesNavigationPrivacyDecision.None
+        }
+        isFirstEvaluation = false
         accountId = nextAccountId
-        return shouldPurge
+        return decision
+    }
+}
+
+internal enum class FavoritesNavigationPrivacyDecision {
+    None,
+    PurgePrivateChildren,
+    ResetToHomeAndPurge,
+}
+
+internal fun NavHostController.applyFavoritesNavigationPrivacy(
+    decision: FavoritesNavigationPrivacyDecision,
+) {
+    when (decision) {
+        FavoritesNavigationPrivacyDecision.None -> Unit
+        FavoritesNavigationPrivacyDecision.PurgePrivateChildren -> purgePrivateProfileChildren()
+        FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge -> resetToHomeAfterAuthenticationEnd()
     }
 }
 
@@ -110,8 +134,6 @@ internal fun FavoritesNavigationPrivacyEffect(
 ) {
     val policy = remember(navController) { FavoritesAccountNavigationPolicy(accountId) }
     LaunchedEffect(accountId, navController) {
-        if (policy.shouldPurgeFor(accountId)) {
-            navController.purgePrivateProfileChildren()
-        }
+        navController.applyFavoritesNavigationPrivacy(policy.decisionFor(accountId))
     }
 }

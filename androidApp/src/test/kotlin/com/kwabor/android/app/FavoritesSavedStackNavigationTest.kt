@@ -20,6 +20,26 @@ import kotlin.test.assertTrue
 @Config(sdk = [TEST_SDK], manifest = Config.NONE)
 class FavoritesSavedStackNavigationTest {
     @Test
+    fun coldGuestRestore_resetsHomeAndClearsRestoredPrivateProfileStack() {
+        val navController = testNavController()
+        navController.navigateToRoot(RootNavigationDestination.Profile)
+        navController.navigate(FavoritesRoute)
+        navController.navigateToRoot(RootNavigationDestination.Home)
+
+        navController.navigateToRoot(RootNavigationDestination.Profile)
+        assertCurrentRoute<FavoritesRoute>(navController)
+
+        navController.applyFavoritesNavigationPrivacy(
+            FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge,
+        )
+
+        assertCurrentRoute<HomeRoute>(navController)
+        navController.navigateToRoot(RootNavigationDestination.Profile)
+
+        assertCurrentRoute<ProfileRoute>(navController)
+    }
+
+    @Test
     fun accountChange_clearsInactiveSavedProfileStackBeforeRestore() {
         val navController = testNavController()
         navController.navigateToRoot(RootNavigationDestination.Profile)

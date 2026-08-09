@@ -3,8 +3,6 @@ package com.kwabor.android.app
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class FavoritesNavigationPolicyTest {
     @Test
@@ -17,10 +15,18 @@ class FavoritesNavigationPolicyTest {
     fun privateStack_isPurgedWhenExistingAccountChangesOrEnds() {
         val policy = FavoritesAccountNavigationPolicy(initialAccountId = ACCOUNT_A)
 
-        assertFalse(policy.shouldPurgeFor(ACCOUNT_A))
-        assertTrue(policy.shouldPurgeFor(ACCOUNT_B))
-        assertTrue(policy.shouldPurgeFor(null))
-        assertFalse(policy.shouldPurgeFor(ACCOUNT_A))
+        assertEquals(FavoritesNavigationPrivacyDecision.None, policy.decisionFor(ACCOUNT_A))
+        assertEquals(FavoritesNavigationPrivacyDecision.PurgePrivateChildren, policy.decisionFor(ACCOUNT_B))
+        assertEquals(FavoritesNavigationPrivacyDecision.PurgePrivateChildren, policy.decisionFor(null))
+        assertEquals(FavoritesNavigationPrivacyDecision.None, policy.decisionFor(ACCOUNT_A))
+    }
+
+    @Test
+    fun initialGuestState_resetsColdRestoredPrivateStackOnlyOnce() {
+        val policy = FavoritesAccountNavigationPolicy(initialAccountId = null)
+
+        assertEquals(FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge, policy.decisionFor(null))
+        assertEquals(FavoritesNavigationPrivacyDecision.None, policy.decisionFor(null))
     }
 }
 
