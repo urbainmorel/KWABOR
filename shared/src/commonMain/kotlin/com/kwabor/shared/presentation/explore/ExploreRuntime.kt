@@ -369,7 +369,7 @@ class ExploreRuntime(
         cityLifecycleMutex.withLock {
             if (generation != cityGeneration) return@withLock null
             stateStore.update { current -> current.mergeCityResult(result) }
-    }
+        }
 }
 
 private suspend fun handleViewerProtectedIntent(
@@ -741,9 +741,7 @@ private class ExploreViewerSessionCoordinator(
                     },
                 ),
             ) ?: return@withLock
-            val effectContext = ExploreInteractionEffectContext(
-                before, result, committed, request.listingId, request.kind, prepared.expectedScope,
-            )
+            val effectContext = ExploreInteractionEffectContext(prepared, request, result, committed)
             effectPublisher.publish(effectContext, completedReplay)
         }
     }
@@ -785,8 +783,7 @@ private class ExploreViewerScopeValidator(
     private val stateStore: ExploreStateStore,
     private val currentContext: () -> ExploreViewerContext,
 ) {
-    suspend fun currentViewerScope(): ViewerSessionScope? =
-        lifecycleMutex.withLock { currentContext().sessionScope }
+    suspend fun currentViewerScope(): ViewerSessionScope? = lifecycleMutex.withLock { currentContext().sessionScope }
 
     suspend fun isCurrentSourceScopeLocked(sourceScope: ViewerSessionScope): Boolean =
         lifecycleMutex.withLock { isCurrentSourceScope(sourceScope) }
@@ -818,10 +815,7 @@ private class ExplorePendingAuthenticationCoordinator(
 private class ExploreInteractionEffectPublisher(
     private val callbacks: ExploreViewerSessionCallbacks,
 ) {
-    suspend fun publish(
-        context: ExploreInteractionEffectContext,
-        completedReplay: PendingExploreAuthInteraction?,
-    ) {
+    suspend fun publish(context: ExploreInteractionEffectContext, completedReplay: PendingExploreAuthInteraction?) {
         publishAuthenticationEffect(context)
         publishReplayEffect(completedReplay, context.before, context.scope)
         publishFavoriteChangedEffect(context)
@@ -932,7 +926,21 @@ private data class ExploreInteractionEffectContext(
     val listingId: String,
     val kind: ExploreInteractionKind,
     val scope: ViewerSessionScope,
-)
+) {
+    constructor(
+        prepared: ExplorePreparedToggle,
+        request: ExploreToggleRequest,
+        result: ExploreUiState,
+        committed: ExploreUiState,
+    ) : this(
+        before = prepared.baseline.state,
+        result = result,
+        committed = committed,
+        listingId = request.listingId,
+        kind = request.kind,
+        scope = prepared.expectedScope,
+    )
+}
 
 private sealed interface ExploreViewerTransition {
     data object Ignored : ExploreViewerTransition
@@ -1014,21 +1022,19 @@ private class ExploreStateStore(initialState: ExploreUiState) {
 
     suspend fun snapshot(): ExploreUiState = mutex.withLock { mutableState.value }
 
-    suspend fun interactionBaseline(
-        listingId: String,
-        kind: ExploreInteractionKind,
-    ): ExploreInteractionBaseline = mutex.withLock {
-        val key = ExploreInteractionRevisionKey(listingId, kind)
-        val current = mutableState.value
-        ExploreInteractionBaseline(
-            state = current,
-            kindRevision = if (interactionDataScope == current.viewerScope) {
-                interactionKindRevisions[key] ?: 0L
-            } else {
-                0L
-            },
-        )
-    }
+    suspend fun interactionBaseline(listingId: String, kind: ExploreInteractionKind): ExploreInteractionBaseline =
+        mutex.withLock {
+            val key = ExploreInteractionRevisionKey(listingId, kind)
+            val current = mutableState.value
+            ExploreInteractionBaseline(
+                state = current,
+                kindRevision = if (interactionDataScope == current.viewerScope) {
+                    interactionKindRevisions[key] ?: 0L
+                } else {
+                    0L
+                },
+            )
+        }
 
     suspend fun update(transform: (ExploreUiState) -> ExploreUiState): ExploreUiState? = mutex.withLock {
         val current = mutableState.value
@@ -1046,22 +1052,20 @@ private class ExploreStateStore(initialState: ExploreUiState) {
         updated.takeIf { mutableState.compareAndSet(current, it) }
     }
 
-    suspend fun resetViewerState(
-        expectedScope: ViewerSessionScope,
-        canReset: suspend () -> Boolean,
-    ): ExploreUiState? = mutex.withLock {
-        if (!canReset()) return@withLock null
-        val current = mutableState.value
-        if (current.viewerScope != expectedScope) return@withLock null
-        val updated = current.withoutViewerState()
-        if (!mutableState.compareAndSet(current, updated)) return@withLock null
-        interactionRevision = 0L
-        interactionRevisionsByListingId.clear()
-        interactionKindRevisions.clear()
-        interactionOverridesByListingId.clear()
-        interactionDataScope = expectedScope
-        updated
-    }
+    suspend fun resetViewerState(expectedScope: ViewerSessionScope, canReset: suspend () -> Boolean): ExploreUiState? =
+        mutex.withLock {
+            if (!canReset()) return@withLock null
+            val current = mutableState.value
+            if (current.viewerScope != expectedScope) return@withLock null
+            val updated = current.withoutViewerState()
+            if (!mutableState.compareAndSet(current, updated)) return@withLock null
+            interactionRevision = 0L
+            interactionRevisionsByListingId.clear()
+            interactionKindRevisions.clear()
+            interactionOverridesByListingId.clear()
+            interactionDataScope = expectedScope
+            updated
+        }
 
     suspend fun feedBaseline(): ExploreFeedBaseline = mutex.withLock {
         val current = mutableState.value
@@ -1380,9 +1384,8 @@ private fun List<QueuedExploreInteraction>.mergeInteractionQueue(
     result: List<QueuedExploreInteraction>,
     listingId: String,
     kind: ExploreInteractionKind,
-): List<QueuedExploreInteraction> =
-    filterNot { queued -> queued.listingId == listingId && queued.kind == kind } +
-        result.filter { queued -> queued.listingId == listingId && queued.kind == kind }
+): List<QueuedExploreInteraction> = filterNot { queued -> queued.listingId == listingId && queued.kind == kind } +
+    result.filter { queued -> queued.listingId == listingId && queued.kind == kind }
 
 private fun ExploreUiState.mergeCityResult(result: ExploreUiState): ExploreUiState = copy(
     cityLabel = result.cityLabel,

@@ -29,21 +29,19 @@ private const val SET_FAVORITE = "set_listing_favorite_v1"
 internal class SupabaseFavoritesDataSource(
     private val postgrest: Postgrest,
 ) : FavoritesDataSource {
-    override suspend fun listFavorites(
-        filter: ListingType?,
-        page: ListingPageRequest,
-    ): FavoriteListingPageDto = runFavoritesPostgrest {
-        postgrest.rpc(
-            function = LIST_FAVORITES,
-            parameters = ListFavoritesRpcParametersDto(
-                listingType = filter?.toFavoriteDatabaseValue(),
-                cursor = page.cursor,
-                limit = page.limit,
-            ),
-        ).decodeList<JsonObject>()
-            .map { row -> strictFavoritesJson.decodeFromJsonElement<FavoriteListingRowDto>(row) }
-            .toFavoriteListingPageDto(limit = page.limit, expectedType = filter)
-    }
+    override suspend fun listFavorites(filter: ListingType?, page: ListingPageRequest): FavoriteListingPageDto =
+        runFavoritesPostgrest {
+            postgrest.rpc(
+                function = LIST_FAVORITES,
+                parameters = ListFavoritesRpcParametersDto(
+                    listingType = filter?.toFavoriteDatabaseValue(),
+                    cursor = page.cursor,
+                    limit = page.limit,
+                ),
+            ).decodeList<JsonObject>()
+                .map { row -> strictFavoritesJson.decodeFromJsonElement<FavoriteListingRowDto>(row) }
+                .toFavoriteListingPageDto(limit = page.limit, expectedType = filter)
+        }
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): FavoriteMutationRowDto =
         runFavoritesPostgrest {
@@ -80,10 +78,7 @@ internal fun List<FavoriteListingRowDto>.toFavoriteListingPageDto(
     return FavoriteListingPageDto(items = items, nextCursor = nextCursor)
 }
 
-private fun List<FavoriteListingRowDto>.requireFavoritePageContract(
-    limit: Int,
-    expectedType: ListingType?,
-) {
+private fun List<FavoriteListingRowDto>.requireFavoritePageContract(limit: Int, expectedType: ListingType?) {
     if (limit !in 1..ListingPageRequest.MAX_LIMIT) {
         invalidFavoriteValue("page_limit", "outside the supported contract")
     }

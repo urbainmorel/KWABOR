@@ -132,10 +132,7 @@ private fun ListingCardContent(
 }
 
 @Composable
-private fun ListingCardOpenAction(
-    actions: ListingCardActions,
-    modifier: Modifier,
-) {
+private fun ListingCardOpenAction(actions: ListingCardActions, modifier: Modifier) {
     val description = actions.openAccessibilityDescription ?: return
     val onClick = actions.onClick ?: return
     Box(
@@ -246,11 +243,7 @@ private fun ListingCardTopBar(
 }
 
 @Composable
-private fun ListingCardBadges(
-    state: ListingCardState,
-    strings: KwaborStrings,
-    modifier: Modifier,
-) {
+private fun ListingCardBadges(state: ListingCardState, strings: KwaborStrings, modifier: Modifier) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
@@ -370,8 +363,7 @@ private fun ListingActionButton(model: ListingActionButtonModel, onClick: () -> 
 private fun Modifier.listingClick(onClick: (() -> Unit)?): Modifier =
     if (onClick == null) this else clickable(role = Role.Button, onClick = onClick)
 
-private fun Modifier.clearVisualSemantics(enabled: Boolean): Modifier =
-    if (enabled) clearAndSetSemantics {} else this
+private fun Modifier.clearVisualSemantics(enabled: Boolean): Modifier = if (enabled) clearAndSetSemantics {} else this
 
 private fun Modifier.listingTraversalGroup(enabled: Boolean): Modifier = if (enabled) {
     semantics { isTraversalGroup = true }

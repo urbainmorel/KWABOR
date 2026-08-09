@@ -83,10 +83,7 @@ class FavoritesRuntime(
         }
     }
 
-    private suspend fun handleIntent(
-        intent: FavoritesIntent,
-        sourceScope: ViewerSessionScope?,
-    ) {
+    private suspend fun handleIntent(intent: FavoritesIntent, sourceScope: ViewerSessionScope?) {
         when (intent) {
             is FavoritesIntent.Lifecycle -> handleLifecycleIntent(intent)
             is FavoritesIntent.Page -> handlePageIntent(intent)
@@ -112,10 +109,7 @@ class FavoritesRuntime(
         }
     }
 
-    private suspend fun handleListingAction(
-        intent: FavoritesIntent.ListingAction,
-        sourceScope: ViewerSessionScope,
-    ) {
+    private suspend fun handleListingAction(intent: FavoritesIntent.ListingAction, sourceScope: ViewerSessionScope) {
         when (intent) {
             is FavoritesIntent.RemoveFavorite -> mutationCoordinator.removeFavorite(intent.listingId, sourceScope)
             is FavoritesIntent.OpenListing -> mutationCoordinator.openListing(intent.listingId, sourceScope)

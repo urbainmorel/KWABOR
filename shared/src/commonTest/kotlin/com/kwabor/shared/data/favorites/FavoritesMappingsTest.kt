@@ -39,19 +39,22 @@ class FavoritesMappingsTest {
     @Test
     fun listingRow_rejectsInvalidUuidEnumsAndPrivateInvariants() {
         val invalidRows = listOf(
-            validFavoriteListingRow().copy(id = "not-a-uuid"),
-            validFavoriteListingRow().copy(id = FAVORITE_LISTING_ID_ONE.uppercase()),
-            validFavoriteListingRow().copy(type = "unsupported"),
-            validFavoriteListingRow().copy(listingClass = "unsupported"),
-            validFavoriteListingRow(type = "evenement").copy(listingClass = "commercial"),
-            validFavoriteListingRow(type = "etablissement").copy(listingClass = "patrimonial"),
-            validFavoriteListingRow().copy(status = "archive"),
-            validFavoriteListingRow().copy(favoritedByCurrentUser = false),
-            validFavoriteListingRow().copy(isSponsoredPlacement = true),
+            "malformed UUID" to validFavoriteListingRow().copy(id = "not-a-uuid"),
+            "uppercase UUID" to validFavoriteListingRow()
+                .copy(id = FAVORITE_LISTING_ID_WITH_HEX_LETTERS.uppercase()),
+            "unknown type" to validFavoriteListingRow().copy(type = "unsupported"),
+            "unknown class" to validFavoriteListingRow().copy(listingClass = "unsupported"),
+            "event with commercial class" to
+                validFavoriteListingRow(type = "evenement").copy(listingClass = "commercial"),
+            "establishment with heritage class" to
+                validFavoriteListingRow(type = "etablissement").copy(listingClass = "patrimonial"),
+            "unpublished listing" to validFavoriteListingRow().copy(status = "archive"),
+            "missing viewer favorite" to validFavoriteListingRow().copy(favoritedByCurrentUser = false),
+            "sponsored placement" to validFavoriteListingRow().copy(isSponsoredPlacement = true),
         )
 
-        invalidRows.forEach { row ->
-            assertFailsWith<FavoritesDataException.Unexpected> { row.toDomain() }
+        invalidRows.forEach { (caseName, row) ->
+            assertFailsWith<FavoritesDataException.Unexpected>(message = caseName) { row.toDomain() }
         }
     }
 

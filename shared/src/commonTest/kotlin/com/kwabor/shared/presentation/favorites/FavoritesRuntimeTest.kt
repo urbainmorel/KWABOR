@@ -966,27 +966,21 @@ private data class RuntimeMutationResponse(
     suspend fun await(): DomainResult<FavoriteMutation> = awaitResponse(result, gate, nonCancellable)
 
     companion object {
-        fun success(
-            listingId: String,
-            gate: CompletableDeferred<Unit>? = null,
-        ): RuntimeMutationResponse = RuntimeMutationResponse(
-            result = DomainResult.Success(
-                FavoriteMutation(
-                    listingId = listingId,
-                    favorited = false,
-                    favoritedAtEpochMilliseconds = null,
+        fun success(listingId: String, gate: CompletableDeferred<Unit>? = null): RuntimeMutationResponse =
+            RuntimeMutationResponse(
+                result = DomainResult.Success(
+                    FavoriteMutation(
+                        listingId = listingId,
+                        favorited = false,
+                        favoritedAtEpochMilliseconds = null,
+                    ),
                 ),
-            ),
-            gate = gate,
-        )
+                gate = gate,
+            )
     }
 }
 
-private suspend fun <T> awaitResponse(
-    result: T,
-    gate: CompletableDeferred<Unit>?,
-    nonCancellable: Boolean,
-): T {
+private suspend fun <T> awaitResponse(result: T, gate: CompletableDeferred<Unit>?, nonCancellable: Boolean): T {
     if (gate == null) return result
     return if (nonCancellable) {
         withContext(NonCancellable) {

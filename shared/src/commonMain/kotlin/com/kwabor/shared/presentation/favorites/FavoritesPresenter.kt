@@ -94,13 +94,11 @@ class FavoritesPresenter(
             )
         }
 
-    private suspend fun requestPage(
-        filter: FavoritesFilter,
-        cursor: String?,
-    ): DomainResult<FavoriteListingPage> = repository.listFavorites(
-        filter = filter.toListingType(),
-        page = ListingPageRequest(cursor = cursor, limit = FAVORITES_PAGE_SIZE),
-    )
+    private suspend fun requestPage(filter: FavoritesFilter, cursor: String?): DomainResult<FavoriteListingPage> =
+        repository.listFavorites(
+            filter = filter.toListingType(),
+            page = ListingPageRequest(cursor = cursor, limit = FAVORITES_PAGE_SIZE),
+        )
 }
 
 sealed interface FavoriteRemovalOutcome {
@@ -112,10 +110,7 @@ sealed interface FavoriteRemovalOutcome {
     ) : FavoriteRemovalOutcome
 }
 
-private fun FavoriteListingPage.toLoadedState(
-    filter: FavoritesFilter,
-    strings: FavoritesStrings,
-): FavoritesUiState {
+private fun FavoriteListingPage.toLoadedState(filter: FavoritesFilter, strings: FavoritesStrings): FavoritesUiState {
     if (!isValidFor(filter)) {
         return FavoritesUiState(
             selectedFilter = filter,

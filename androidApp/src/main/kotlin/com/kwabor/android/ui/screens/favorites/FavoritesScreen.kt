@@ -205,11 +205,7 @@ private fun FavoritesGrid(
 }
 
 @Composable
-private fun FavoritesFilters(
-    state: FavoritesUiState,
-    strings: KwaborStrings,
-    actions: FavoritesScreenActions,
-) {
+private fun FavoritesFilters(state: FavoritesUiState, strings: KwaborStrings, actions: FavoritesScreenActions) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
@@ -266,11 +262,7 @@ private fun LazyGridScope.favoritesItems(
     }
 }
 
-private fun LazyGridScope.favoritesAppendFooter(
-    state: FavoritesUiState,
-    strings: KwaborStrings,
-    onRetry: () -> Unit,
-) {
+private fun LazyGridScope.favoritesAppendFooter(state: FavoritesUiState, strings: KwaborStrings, onRetry: () -> Unit) {
     when {
         state.isAppending -> item(span = { GridItemSpan(maxLineSpan) }) {
             Box(

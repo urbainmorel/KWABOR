@@ -33,12 +33,7 @@ fun SponsoredBadge(strings: KwaborStrings, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun EventEndedRibbon(
-    label: String,
-    accessibilityLabel: String,
-    traversalOrder: Float,
-    modifier: Modifier = Modifier,
-) {
+fun EventEndedRibbon(label: String, accessibilityLabel: String, traversalOrder: Float, modifier: Modifier = Modifier) {
     Text(
         text = label,
         modifier = modifier

@@ -136,10 +136,8 @@ private class SequencedFavoritesDataSource(
     var serverFavorited: Boolean = false
         private set
 
-    override suspend fun listFavorites(
-        filter: ListingType?,
-        page: ListingPageRequest,
-    ): FavoriteListingPageDto = FavoriteListingPageDto(items = emptyList(), nextCursor = null)
+    override suspend fun listFavorites(filter: ListingType?, page: ListingPageRequest): FavoriteListingPageDto =
+        FavoriteListingPageDto(items = emptyList(), nextCursor = null)
 
     override suspend fun setFavorite(listingId: String, favorited: Boolean): FavoriteMutationRowDto {
         requestedStates += favorited

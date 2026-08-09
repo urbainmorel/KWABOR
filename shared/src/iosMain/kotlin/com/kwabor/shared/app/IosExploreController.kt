@@ -335,10 +335,7 @@ class IosExploreController private constructor(
         observer(state)
     }
 
-    private fun publishLatestRuntimeState(
-        runtime: IosExploreRuntime,
-        expectedScope: ViewerSessionScope,
-    ): Boolean {
+    private fun publishLatestRuntimeState(runtime: IosExploreRuntime, expectedScope: ViewerSessionScope): Boolean {
         if (expectedScope != viewerSessionScopeTracker.currentScope) return false
         val latestState = runtime.state.value
         if (latestState.viewerScope != expectedScope) return false

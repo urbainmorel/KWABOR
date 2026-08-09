@@ -177,10 +177,7 @@ internal class FavoritesPageCoordinator(
         job.start()
     }
 
-    fun registerRemovalBackfillLocked(
-        scope: ViewerSessionScope,
-        state: FavoritesUiState,
-    ): FavoriteRemovalBackfill? {
+    fun registerRemovalBackfillLocked(scope: ViewerSessionScope, state: FavoritesUiState): FavoriteRemovalBackfill? {
         val operationInFlight = operationJob?.isActive == true
         val hasCurrentVisibleScope = sessionState.isScreenVisible &&
             sessionState.activeViewerScope == scope &&
@@ -246,10 +243,7 @@ internal class FavoritesPageCoordinator(
         return backfill.takeIf { candidate -> canStartRemovalBackfill(candidate, state) }
     }
 
-    private fun canStartRemovalBackfill(
-        backfill: FavoriteRemovalBackfill,
-        state: FavoritesUiState,
-    ): Boolean {
+    private fun canStartRemovalBackfill(backfill: FavoriteRemovalBackfill, state: FavoritesUiState): Boolean {
         if (pendingRemovalBackfill != backfill) return false
         if (!sessionState.isScreenVisible) return false
         if (sessionState.activeViewerScope != backfill.scope) return false

@@ -493,14 +493,13 @@ private fun testPresenter(
     repository: CatalogRepository,
     clockProvider: ClockProvider,
     favoritesRepository: FavoritesRepository = RecordingExploreFavoritesRepository(),
-): ExplorePresenter =
-    ExplorePresenter(
-        exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
-        catalogInteractionRepository = repository,
-        favoritesRepository = favoritesRepository,
-        appPreferencesRepository = null,
-        clockProvider = clockProvider,
-    )
+): ExplorePresenter = ExplorePresenter(
+    exploreFeedRepository = TestExploreFeedRepository(repository, clockProvider),
+    catalogInteractionRepository = repository,
+    favoritesRepository = favoritesRepository,
+    appPreferencesRepository = null,
+    clockProvider = clockProvider,
+)
 
 private class TestExploreFeedRepository(
     private val catalogRepository: CatalogRepository,

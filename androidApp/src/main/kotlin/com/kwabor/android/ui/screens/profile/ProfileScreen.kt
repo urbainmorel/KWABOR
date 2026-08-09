@@ -113,11 +113,7 @@ private fun SettingsEntry(title: String, strings: KwaborStrings, onClick: () -> 
 }
 
 @Composable
-private fun ProfileEntry(
-    title: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-) {
+private fun ProfileEntry(title: String, icon: ImageVector, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier

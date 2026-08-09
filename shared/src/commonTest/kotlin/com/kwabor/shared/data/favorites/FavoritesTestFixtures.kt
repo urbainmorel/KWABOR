@@ -3,6 +3,7 @@ package com.kwabor.shared.data.favorites
 internal const val FAVORITE_LISTING_ID_ONE = "11111111-1111-4111-8111-111111111111"
 internal const val FAVORITE_LISTING_ID_TWO = "22222222-2222-4222-8222-222222222222"
 internal const val FAVORITE_LISTING_ID_THREE = "33333333-3333-4333-8333-333333333333"
+internal const val FAVORITE_LISTING_ID_WITH_HEX_LETTERS = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 internal const val FAVORITE_CITY_ID = "cotonou"
 internal const val FAVORITE_CATEGORY_ID = "commercial-restaurant"
 
@@ -14,7 +15,13 @@ internal fun validFavoriteListingRow(
 ): FavoriteListingRowDto = FavoriteListingRowDto(
     id = id,
     type = type,
-    listingClass = if (type == "lieu") "patrimonial" else if (type == "evenement") "evenementiel" else "commercial",
+    listingClass = if (type == "lieu") {
+        "patrimonial"
+    } else if (type == "evenement") {
+        "evenementiel"
+    } else {
+        "commercial"
+    },
     status = "publie",
     name = "Maison Kwabor",
     cityId = FAVORITE_CITY_ID,

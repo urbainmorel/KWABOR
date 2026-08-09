@@ -284,10 +284,7 @@ private fun privateFavoritesState(
     viewerScope = scope,
 )
 
-private fun assertFavoritesReset(
-    scope: ViewerSessionScope,
-    actual: FavoritesUiState,
-) {
+private fun assertFavoritesReset(scope: ViewerSessionScope, actual: FavoritesUiState) {
     assertEquals(FavoritesUiState(isAccountReady = true, viewerScope = scope), actual)
 }
 

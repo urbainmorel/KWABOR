@@ -35,10 +35,7 @@ internal fun String.requireFavoriteIdentifier(fieldName: String): String {
     return this
 }
 
-internal fun String.requireFavoriteText(
-    fieldName: String,
-    allowedCodePointCount: IntRange? = null,
-): String {
+internal fun String.requireFavoriteText(fieldName: String, allowedCodePointCount: IntRange? = null): String {
     val codePointCount = validUnicodeCodePointCount()
     if (isBlank() || trim() != this) invalidFavoriteValue(fieldName, this)
     if (codePointCount == null) invalidFavoriteValue(fieldName, this)
@@ -122,22 +119,20 @@ private fun String.requireFavoriteUrlSyntax(fieldName: String) {
     if (!startsWith(HTTPS_PREFIX)) invalidFavoriteValue(fieldName, this)
 }
 
-private fun String.parseFavoriteUrl(fieldName: String): Url =
-    try {
-        Url(this)
-    } catch (exception: URLParserException) {
-        invalidFavoriteValue(fieldName, this, exception)
-    } catch (exception: URLDecodeException) {
-        invalidFavoriteValue(fieldName, this, exception)
-    }
+private fun String.parseFavoriteUrl(fieldName: String): Url = try {
+    Url(this)
+} catch (exception: URLParserException) {
+    invalidFavoriteValue(fieldName, this, exception)
+} catch (exception: URLDecodeException) {
+    invalidFavoriteValue(fieldName, this, exception)
+}
 
-private fun Url.isCanonicalPublicHttpsUrl(rawAuthority: String): Boolean =
-    protocol == URLProtocol.HTTPS &&
-        port == HTTPS_PORT &&
-        rawAuthority in setOf(host, "$host:$HTTPS_PORT") &&
-        host.isCanonicalPublicDnsHost() &&
-        user?.isNotEmpty() != true &&
-        password?.isNotEmpty() != true
+private fun Url.isCanonicalPublicHttpsUrl(rawAuthority: String): Boolean = protocol == URLProtocol.HTTPS &&
+    port == HTTPS_PORT &&
+    rawAuthority in setOf(host, "$host:$HTTPS_PORT") &&
+    host.isCanonicalPublicDnsHost() &&
+    user?.isNotEmpty() != true &&
+    password?.isNotEmpty() != true
 
 private fun String.rawAuthority(): String {
     val authorityEnd = indexOfAny(charArrayOf('/', '?'), startIndex = HTTPS_PREFIX.length)
@@ -146,20 +141,18 @@ private fun String.rawAuthority(): String {
     return substring(HTTPS_PREFIX.length, authorityEnd)
 }
 
-private fun String.isCanonicalPublicDnsHost(): Boolean =
-    this == lowercase() &&
-        length <= MAXIMUM_HOST_LENGTH &&
-        contains('.') &&
-        ':' !in this &&
-        any { character -> character !in '0'..'9' && character != '.' } &&
-        FORBIDDEN_HOST_SUFFIXES.none { suffix -> this == suffix || endsWith(".$suffix") } &&
-        split('.').all { label -> label.isCanonicalDnsLabel() }
+private fun String.isCanonicalPublicDnsHost(): Boolean = this == lowercase() &&
+    length <= MAXIMUM_HOST_LENGTH &&
+    contains('.') &&
+    ':' !in this &&
+    any { character -> character !in '0'..'9' && character != '.' } &&
+    FORBIDDEN_HOST_SUFFIXES.none { suffix -> this == suffix || endsWith(".$suffix") } &&
+    split('.').all { label -> label.isCanonicalDnsLabel() }
 
-private fun String.isCanonicalDnsLabel(): Boolean =
-    length in 1..MAXIMUM_HOST_LABEL_LENGTH &&
-        first().isAsciiLetterOrDigit() &&
-        last().isAsciiLetterOrDigit() &&
-        all { character -> character.isAsciiLetterOrDigit() || character == '-' }
+private fun String.isCanonicalDnsLabel(): Boolean = length in 1..MAXIMUM_HOST_LABEL_LENGTH &&
+    first().isAsciiLetterOrDigit() &&
+    last().isAsciiLetterOrDigit() &&
+    all { character -> character.isAsciiLetterOrDigit() || character == '-' }
 
 private fun Char.isAsciiLetterOrDigit(): Boolean = this in 'a'..'z' || this in '0'..'9'
 

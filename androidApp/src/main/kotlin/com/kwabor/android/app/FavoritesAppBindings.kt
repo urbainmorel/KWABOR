@@ -117,9 +117,7 @@ internal enum class FavoritesNavigationPrivacyDecision {
     ResetToHomeAndPurge,
 }
 
-internal fun NavHostController.applyFavoritesNavigationPrivacy(
-    decision: FavoritesNavigationPrivacyDecision,
-) {
+internal fun NavHostController.applyFavoritesNavigationPrivacy(decision: FavoritesNavigationPrivacyDecision) {
     when (decision) {
         FavoritesNavigationPrivacyDecision.None -> Unit
         FavoritesNavigationPrivacyDecision.PurgePrivateChildren -> purgePrivateProfileChildren()
@@ -128,10 +126,7 @@ internal fun NavHostController.applyFavoritesNavigationPrivacy(
 }
 
 @Composable
-internal fun FavoritesNavigationPrivacyEffect(
-    accountId: String?,
-    navController: NavHostController,
-) {
+internal fun FavoritesNavigationPrivacyEffect(accountId: String?, navController: NavHostController) {
     val policy = remember(navController) { FavoritesAccountNavigationPolicy(accountId) }
     LaunchedEffect(accountId, navController) {
         navController.applyFavoritesNavigationPrivacy(policy.decisionFor(accountId))

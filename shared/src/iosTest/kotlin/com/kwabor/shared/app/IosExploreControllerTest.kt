@@ -364,10 +364,7 @@ private fun expectedExploreIntents(
     ExploreIntent.ClearPendingAuthentication,
 )
 
-private fun privateExploreState(
-    state: ExploreUiState,
-    scope: ViewerSessionScope,
-): ExploreUiState = state.copy(
+private fun privateExploreState(state: ExploreUiState, scope: ViewerSessionScope): ExploreUiState = state.copy(
     listings = listOf(
         ExploreListingItem(
             id = "listing-private-a",
@@ -437,10 +434,7 @@ private fun FakeIosExploreRuntime.publishAuthenticationRequired(
     )
 }
 
-private fun FakeIosExploreRuntime.publishProtectedReplay(
-    listingId: String,
-    scope: ViewerSessionScope,
-) {
+private fun FakeIosExploreRuntime.publishProtectedReplay(listingId: String, scope: ViewerSessionScope) {
     publishEffect(
         ExploreEffect.ProtectedActionReplayed(
             kind = ExploreInteractionKind.Favorite,
@@ -451,10 +445,7 @@ private fun FakeIosExploreRuntime.publishProtectedReplay(
     )
 }
 
-private fun assertExploreEffectKinds(
-    effects: List<IosExploreEffect>,
-    vararg expectedKinds: IosExploreEffectKind,
-) {
+private fun assertExploreEffectKinds(effects: List<IosExploreEffect>, vararg expectedKinds: IosExploreEffectKind) {
     assertEquals(expectedKinds.toList(), effects.map(IosExploreEffect::kind))
 }
 
