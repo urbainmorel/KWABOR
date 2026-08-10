@@ -17,7 +17,7 @@ private const val KWABOR_ROOM_DIRECTORY_NAME = "KwaborRoom"
 private val IOS_DATABASE_FILE_SUFFIXES = listOf("", "-wal", "-shm", "-journal")
 
 @OptIn(ExperimentalForeignApi::class)
-internal fun createIosKwaborDatabaseBuilder(): RoomDatabase.Builder<KwaborDatabase> {
+internal fun createIosKwaborDatabaseBuilder(): KwaborDatabaseBuilderResult {
     val fileManager = NSFileManager.defaultManager
     val applicationSupportUrl = fileManager.URLForDirectory(
         directory = NSApplicationSupportDirectory,
@@ -38,7 +38,7 @@ internal fun createIosKwaborDatabaseBuilder(
     fileManager: NSFileManager,
     protectionApplicator: IosRoomFileProtectionApplicator = fileManager.iosRoomFileProtectionApplicator(),
     onPolicyFailure: () -> Unit = ::reportIosRoomStoragePolicyFailure,
-): RoomDatabase.Builder<KwaborDatabase> {
+): KwaborDatabaseBuilderResult {
     val databasePath = try {
         val roomDirectoryUrl = prepareIosRoomDirectory(
             applicationSupportUrl = requireIosRoomPolicyValue(
@@ -58,11 +58,19 @@ internal fun createIosKwaborDatabaseBuilder(
         null
     }
     return if (databasePath == null) {
-        Room.inMemoryDatabaseBuilder<KwaborDatabase>(
-            factory = KwaborDatabaseConstructor::initialize,
+        KwaborDatabaseBuilderResult(
+            storageMode = KwaborDatabaseStorageMode.MemoryOnly,
+            builderFactory = {
+                Room.inMemoryDatabaseBuilder<KwaborDatabase>(
+                    factory = KwaborDatabaseConstructor::initialize,
+                )
+            },
         )
     } else {
-        createIosKwaborDatabaseBuilder(databasePath = databasePath)
+        KwaborDatabaseBuilderResult(
+            storageMode = KwaborDatabaseStorageMode.Durable,
+            builderFactory = { createIosKwaborDatabaseBuilder(databasePath = databasePath) },
+        )
     }
 }
 

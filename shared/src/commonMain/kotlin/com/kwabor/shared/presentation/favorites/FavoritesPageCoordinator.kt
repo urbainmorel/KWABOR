@@ -13,6 +13,7 @@ internal class FavoritesPageCoordinator(
     private val presenter: FavoritesPresenter,
     private val strings: FavoritesStrings,
     context: FavoritesRuntimeContext,
+    private val durableInteractions: FavoritesDurableInteractions?,
 ) {
     private val runtimeScope: CoroutineScope = context.runtimeScope
     private val lifecycleMutex: Mutex = context.lifecycleMutex
@@ -76,19 +77,22 @@ internal class FavoritesPageCoordinator(
             operationJob?.cancel()
             val requestGeneration = ++operationGeneration
             refreshAfterOperation = false
-            sessionState.removedListingIds.clear()
+            prepareFavoritesPageRequestLocked(durableInteractions, sessionState)
             hasExternalAdditionDirty = false
             val loading = stateStore.updateForScope(scope) { current ->
                 FavoritesUiState(
                     selectedFilter = filter,
                     isAccountReady = true,
                     isLoading = true,
-                    isOffline = current.contentIsOffline || current.mutationMessageIsOffline,
+                    isOffline = current.contentIsOffline ||
+                        current.mutationMessageIsOffline ||
+                        current.durableRetryListingIds.isNotEmpty(),
                     mutationMessage = current.mutationMessage,
                     removingListingIds = current.removingListingIds,
                     mutationMessageListingId = current.mutationMessageListingId,
                     mutationMessageIsOffline = current.mutationMessageIsOffline,
                     contentIsOffline = current.contentIsOffline,
+                    durableRetryListingIds = current.durableRetryListingIds,
                     viewerScope = scope,
                 )
             } ?: return@withLock
@@ -111,7 +115,7 @@ internal class FavoritesPageCoordinator(
             operationJob?.cancel()
             val requestGeneration = ++operationGeneration
             refreshAfterOperation = false
-            sessionState.removedListingIds.clear()
+            prepareFavoritesPageRequestLocked(durableInteractions, sessionState)
             hasExternalAdditionDirty = false
             val refreshing = stateStore.updateForScope(scope) { latest ->
                 latest.copy(
@@ -166,11 +170,13 @@ internal class FavoritesPageCoordinator(
         operation: suspend () -> FavoritesUiState,
     ) {
         val job = runtimeScope.launch(start = CoroutineStart.LAZY) {
+            val result = operation()
             commitPageResult(
                 requestScope = requestScope,
                 requestGeneration = requestGeneration,
                 filter = filter,
-                result = operation(),
+                result = result,
+                hydration = durableInteractions?.hydratePage(requestScope, result),
             )
         }
         operationJob = job
@@ -195,23 +201,20 @@ internal class FavoritesPageCoordinator(
         requestGeneration: Long,
         filter: FavoritesFilter,
         result: FavoritesUiState,
+        hydration: FavoritesDurableHydration?,
     ) {
         val nextAction = lifecycleMutex.withLock {
             if (sessionState.activeViewerScope != requestScope) return@withLock null
             if (operationGeneration != requestGeneration) return@withLock null
             if (stateStore.value.viewerScope != requestScope) return@withLock null
             if (stateStore.value.selectedFilter != filter) return@withLock null
+            val projected = durableInteractions?.projectPageResultLocked(requestScope, result, hydration) ?: result
             val committed = stateStore.updateForScope(requestScope) { current ->
-                result.copy(
-                    items = result.items.filterNot { item -> item.id in sessionState.removedListingIds },
-                    isAccountReady = true,
-                    isOffline = result.contentIsOffline || current.mutationMessageIsOffline,
-                    mutationMessage = current.mutationMessage,
-                    removingListingIds = current.removingListingIds,
-                    mutationMessageListingId = current.mutationMessageListingId,
-                    mutationMessageIsOffline = current.mutationMessageIsOffline,
-                    contentIsOffline = result.contentIsOffline,
-                    viewerScope = requestScope,
+                projected.toCommittedPageState(
+                    current = current,
+                    removedListingIds = sessionState.removedListingIds,
+                    usesDurableInteractions = durableInteractions != null,
+                    scope = requestScope,
                 )
             } ?: return@withLock null
             hasLoadedForActiveScope = !committed.isLoading && !committed.isRefreshing
@@ -268,4 +271,35 @@ internal sealed interface FavoritesPageAction {
 internal data class FavoriteRemovalBackfill(
     val scope: ViewerSessionScope,
     val filter: FavoritesFilter,
+)
+
+private fun prepareFavoritesPageRequestLocked(
+    durableInteractions: FavoritesDurableInteractions?,
+    sessionState: FavoritesSessionState,
+) {
+    if (durableInteractions == null) {
+        sessionState.removedListingIds.clear()
+    } else {
+        durableInteractions.preparePageRequestLocked()
+    }
+}
+
+private fun FavoritesUiState.toCommittedPageState(
+    current: FavoritesUiState,
+    removedListingIds: Set<String>,
+    usesDurableInteractions: Boolean,
+    scope: ViewerSessionScope,
+): FavoritesUiState = copy(
+    items = items.filterNot { item -> item.id in removedListingIds },
+    isAccountReady = true,
+    isOffline = contentIsOffline ||
+        current.mutationMessageIsOffline ||
+        durableRetryListingIds.isNotEmpty(),
+    mutationMessage = current.mutationMessage,
+    removingListingIds = if (usesDurableInteractions) removingListingIds else current.removingListingIds,
+    mutationMessageListingId = current.mutationMessageListingId,
+    mutationMessageIsOffline = current.mutationMessageIsOffline,
+    contentIsOffline = contentIsOffline,
+    durableRetryListingIds = durableRetryListingIds,
+    viewerScope = scope,
 )

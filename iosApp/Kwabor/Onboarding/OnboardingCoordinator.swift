@@ -92,6 +92,7 @@ final class OnboardingCoordinator: ObservableObject {
         !sessionRestoreCompleted ||
         sessionRestoreFailed ||
         isDeletingAccount ||
+        accountDeletionPrivacyCleanupArmed ||
         !canExposeSessionDuringPromoterActivation ||
         !AuthSessionBootstrapPolicy.canExposeAuthenticatedSession(
             freshInstallCleanupCompleted: freshInstallSessionCleanupCompleted
@@ -132,7 +133,9 @@ final class OnboardingCoordinator: ObservableObject {
     private var temporaryPromoterActivationSessionCleanupRequired = false
     private var isClearingTemporaryPromoterActivationSessionAtBootstrap = false
     private var freshInstallSessionCleanupCompleted: Bool
+    @Published private var accountDeletionPrivacyCleanupArmed: Bool
     private let promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting
+    private let accountDeletionPrivacyCleanupStore: AccountDeletionPrivacyCleanupPersisting
     private var contextualAuthJourney: ContextualAuthJourney?
 
     init(
@@ -148,6 +151,8 @@ final class OnboardingCoordinator: ObservableObject {
         interruptedAuthJourneyStore: InterruptedAuthJourneyPersisting? = nil,
         promoterActivationSessionMarkerStore: PromoterActivationSessionMarkerPersisting =
             FilePromoterActivationSessionMarkerStore(),
+        accountDeletionPrivacyCleanupStore: AccountDeletionPrivacyCleanupPersisting =
+            KeychainAccountDeletionPrivacyCleanupStore(),
         bundle: Bundle = .main
     ) {
         self.bridge = bridge
@@ -162,6 +167,8 @@ final class OnboardingCoordinator: ObservableObject {
         self.interruptedAuthJourneyStore = interruptedAuthJourneyStore ??
             UserDefaultsInterruptedAuthJourneyStore(userDefaults: userDefaults)
         self.promoterActivationSessionMarkerStore = promoterActivationSessionMarkerStore
+        self.accountDeletionPrivacyCleanupStore = accountDeletionPrivacyCleanupStore
+        accountDeletionPrivacyCleanupArmed = accountDeletionPrivacyCleanupStore.state != .absent
         telemetry = bridge.onboardingTelemetry()
 
         let introStore = IntroVideoPresentationStore(userDefaults: userDefaults)
@@ -195,6 +202,7 @@ final class OnboardingCoordinator: ObservableObject {
         authController.observe { [weak self] state in
             guard let self else { return }
             authState = state
+            completeAccountDeletionPrivacyCleanupIfNeeded(state)
             if !state.isLoading {
                 handleAuthState(state)
             }
@@ -211,6 +219,9 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     func applicationBecameActive() {
+        if let authState {
+            completeAccountDeletionPrivacyCleanupIfNeeded(authState)
+        }
         guard freshInstallSessionCleanupCompleted else { return }
         observability.retryPendingMaintenance()
         observabilityConsent = observability.consent
@@ -720,22 +731,55 @@ final class OnboardingCoordinator: ObservableObject {
 
     func prepareForAccountDeletion() -> Bool {
         guard !isDeletingAccount, !isSigningOutAccount else { return false }
-        return revokeObservabilityConsent()
+        guard accountDeletionPrivacyCleanupStore.persist() else { return false }
+        guard revokeObservabilityConsent() else {
+            _ = accountDeletionPrivacyCleanupStore.clear()
+            return false
+        }
+        accountDeletionPrivacyCleanupArmed = true
+        return true
     }
 
     func accountDeletionStateChanged(isInProgress: Bool) {
         guard isDeletingAccount != isInProgress else { return }
         isDeletingAccount = isInProgress
         if isInProgress {
+            accountDeletionPrivacyCleanupArmed = true
             _ = revokeObservabilityConsent()
             pendingInternalDeepLink.clear()
             cancelPendingProtectedDestination()
             invalidatePromoterActivationCallbacksForAccountDeletion()
-        } else if temporaryPromoterActivationSessionCleanupRequired {
+        } else {
+            if let authState {
+                completeAccountDeletionPrivacyCleanupIfNeeded(authState)
+            }
+        }
+        if !isInProgress, temporaryPromoterActivationSessionCleanupRequired {
             clearTemporaryPromoterActivationSessionBeforeBootstrap()
             return
         }
         resolveRoute()
+    }
+
+    private func completeAccountDeletionPrivacyCleanupIfNeeded(_ state: AuthUiState) {
+        guard isDeletingAccount || sessionRestoreCompleted else { return }
+        guard accountDeletionPrivacyCleanupArmed, !state.isLoading else { return }
+        guard !state.hasSession else {
+            if !isDeletingAccount {
+                clearAccountDeletionPrivacyCleanupMarker()
+            }
+            return
+        }
+        let hintsCleared = federatedIdentityHintStore.clearAllHints()
+        let googleSessionCleared = GoogleSignInBootstrap.clearLocalSession()
+        guard hintsCleared, googleSessionCleared else { return }
+        clearAccountDeletionPrivacyCleanupMarker()
+    }
+
+    private func clearAccountDeletionPrivacyCleanupMarker() {
+        guard accountDeletionPrivacyCleanupStore.clear() else { return }
+        accountDeletionPrivacyCleanupArmed = false
+        processPendingPromoterActivationCallbackIfPossible()
     }
 
     func accountDeletionCompleted() {
@@ -753,10 +797,11 @@ final class OnboardingCoordinator: ObservableObject {
             sessionRestoreCompleted = false
             sessionRestoreFailed = true
         }
+        if let authState {
+            completeAccountDeletionPrivacyCleanupIfNeeded(authState)
+        }
         isDeletingAccount = false
-        federatedIdentityHintStore.clearPendingHints()
         promoterActivationDestinationStore.clear()
-        GoogleSignInBootstrap.clearLocalSession()
         completedRegistrationSession = nil
         guestAccessGranted = false
         isAuthenticationPresented = false
@@ -1157,7 +1202,9 @@ final class OnboardingCoordinator: ObservableObject {
 
     private func processPendingPromoterActivationCallbackIfPossible() {
         let bootstrapCompleted = sessionRestoreCompleted && freshInstallSessionCleanupCompleted
-        guard !sessionRestoreFailed, !isDeletingAccount else { return }
+        guard !sessionRestoreFailed,
+              !isDeletingAccount,
+              !accountDeletionPrivacyCleanupArmed else { return }
         guard let callbackURL = promoterActivationCallbackQueue.beginNextIfReady(
             sessionBootstrapCompleted: bootstrapCompleted,
             authOperationLoading: authState?.isLoading != false,
@@ -1171,7 +1218,7 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func beginPromoterActivationCallback(_ callbackURL: URL) {
-        guard !isDeletingAccount else { return }
+        guard !isDeletingAccount, !accountDeletionPrivacyCleanupArmed else { return }
         let callbackGeneration = promoterActivationCallbackGeneration
         bindObservability(to: nil)
         isHandlingPromoterActivationCallback = true
@@ -1237,7 +1284,9 @@ final class OnboardingCoordinator: ObservableObject {
         _ callbackURL: URL,
         callbackGeneration: Int
     ) {
-        authController.handlePromoterActivationCallback(callbackUrl: callbackURL.absoluteString) { [weak self] context in
+        authController.handlePromoterActivationCallback(
+            callbackUrl: callbackURL.absoluteString
+        ) { [weak self] context in
             guard let self else { return }
             guard callbackGeneration == promoterActivationCallbackGeneration,
                   !isDeletingAccount else {
@@ -1424,6 +1473,9 @@ final class OnboardingCoordinator: ObservableObject {
             }
             sessionRestoreCompleted = true
             sessionRestoreFailed = false
+            if let authState {
+                completeAccountDeletionPrivacyCleanupIfNeeded(authState)
+            }
             resolveRoute()
             presentInterruptedRegistrationSignInIfPossible()
             processPendingPromoterActivationCallbackIfPossible()

@@ -56,11 +56,13 @@ class SensitiveAuthRequestTest {
     @Test
     fun accountDeletionRequestDoesNotExposeIdempotencyOrPassword() {
         val request = AccountDeletionRequest(
+            expectedAccountId = "11111111-1111-4111-8111-111111111111",
             idempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             credential = AccountDeletionCredential.Password("password-secret"),
         )
         val representation = request.toString()
 
+        assertFalse(representation.contains(request.expectedAccountId))
         assertFalse(representation.contains(request.idempotencyKey))
         assertFalse(representation.contains("password-secret"))
     }

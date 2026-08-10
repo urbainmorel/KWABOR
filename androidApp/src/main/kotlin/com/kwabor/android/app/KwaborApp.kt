@@ -82,11 +82,17 @@ internal fun KwaborApp(dependencies: KwaborAppDependencies, runtimeState: Kwabor
             ?.userId,
         controller = dependencies.observabilityController,
     )
+    ViewerSessionScopeHandler(
+        accountId = state.auth.viewerAccountId,
+        accountSetupComplete = state.auth.isAuthenticated,
+        accountDeletionBlocksViewerSession = state.accountDeletionBlocksViewerSession,
+        dependencies = HomeShellDependencies(dependencies),
+    )
     OnboardingEffectHandler(dependencies = dependencies)
     AuthPlatformEffectHandler(dependencies = dependencies)
     SensitiveAuthDeepLinkResetHandler(
         signOutInProgress = state.authAccess.signOutInProgress,
-        accountDeletionInProgress = state.authAccess.accountDeletionInProgress,
+        accountDeletionInProgress = state.accountDeletionBlocksViewerSession,
         onReset = runtimeState.onDeepLinksReset,
     )
     KwaborTheme {
@@ -190,6 +196,8 @@ private class KwaborCollectedState(
     val promoterActivation: PromoterActivationUiState get() = authentication.promoterActivation
     val authPlatform: AuthPlatformUiState get() = authentication.platform
     val isSessionRestoreComplete: Boolean get() = authentication.isSessionRestoreComplete
+    val accountDeletionBlocksViewerSession: Boolean
+        get() = authentication.accountDeletionBlocksViewerSession
 
     val registrationScreenState: RegistrationScreenState
         get() = RegistrationScreenState(
@@ -218,6 +226,7 @@ private data class CollectedAuthenticationState(
     val promoterActivation: PromoterActivationUiState,
     val platform: AuthPlatformUiState,
     val isSessionRestoreComplete: Boolean,
+    val accountDeletionBlocksViewerSession: Boolean,
 )
 
 internal data class HomeShellDependencies(
@@ -311,6 +320,8 @@ private fun collectKwaborAppState(
     val passwordRecoveryState by dependencies.authViewModel.passwordRecoveryState.collectAsStateWithLifecycle()
     val promoterActivationState by dependencies.authViewModel.promoterActivationState.collectAsStateWithLifecycle()
     val authPlatformState by dependencies.authViewModel.platformState.collectAsStateWithLifecycle()
+    val accountDeletionBlocksViewerSession by
+        dependencies.authViewModel.accountDeletionBlocksViewerSession.collectAsStateWithLifecycle()
     val observabilityConsent by dependencies.observabilityController.consent.collectAsStateWithLifecycle()
     val observabilityPrivacyOperationFailed by
         dependencies.observabilityController.privacyOperationFailed.collectAsStateWithLifecycle()
@@ -325,6 +336,7 @@ private fun collectKwaborAppState(
             promoterActivation = promoterActivationState,
             platform = authPlatformState,
             isSessionRestoreComplete = restoreComplete,
+            accountDeletionBlocksViewerSession = accountDeletionBlocksViewerSession,
         ),
         onboarding = onboardingState,
         observabilityConsent = observabilityConsent,
@@ -451,11 +463,6 @@ private fun KwaborHomeEffectHandlers(
     actions: KwaborAppEffectActions,
 ) {
     DeepLinkEffectHandler(deepLink = state.deepLink, actions = actions.deepLink)
-    ViewerSessionScopeHandler(
-        accountId = state.auth.viewerAccountId,
-        accountSetupComplete = state.auth.isAuthenticated,
-        dependencies = dependencies,
-    )
     ExploreEffectHandler(dependencies = dependencies)
     FavoritesEffectHandler(
         favoritesViewModel = dependencies.favoritesViewModel,

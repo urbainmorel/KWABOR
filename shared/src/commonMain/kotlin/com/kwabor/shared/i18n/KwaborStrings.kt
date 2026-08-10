@@ -70,6 +70,7 @@ data class KwaborStrings(
     val authDeleteAccountConfirmationPhrase: String,
     val authDeleteAccountConfirm: String,
     val authAccountDeletionFailed: String,
+    val authAccountDeletionOutcomeUnknown: String,
     val authAccountDeleted: String,
     val authAccountDeletionOwnershipBlocked: String,
     val authAccountDeletionStorageBlocked: String,
@@ -272,6 +273,8 @@ private val frenchStrings = KwaborStrings(
     authDeleteAccountConfirmationPhrase = "SUPPRIMER",
     authDeleteAccountConfirm = "Supprimer définitivement",
     authAccountDeletionFailed = "La suppression du compte a échoué. Réessayez sans fermer cet écran.",
+    authAccountDeletionOutcomeUnknown =
+    "Le résultat de la suppression n'a pas pu être confirmé. Rouvrez Kwabor avant toute nouvelle tentative.",
     authAccountDeleted = "Votre compte a été supprimé.",
     authAccountDeletionOwnershipBlocked =
     "Transférez d'abord la propriété principale de vos organisations avant de supprimer votre compte.",

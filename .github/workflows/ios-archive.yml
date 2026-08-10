@@ -32,6 +32,8 @@ jobs:
     permissions:
       contents: read
     env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      PACKAGE_LOCK: iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
       KWABOR_ENVIRONMENT: ${{ inputs.environment }}
       KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
       KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
@@ -49,14 +51,20 @@ jobs:
           echo "Archives may only be built from main." >&2
           exit 1
 
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-java@v5.5.0
+      - name: Verify Xcode 16.4
+        shell: bash
+        run: |
+          xcodebuild -version
+          test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "16.4"
+
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v6.2.0
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Validate archive configuration
         shell: bash
@@ -174,11 +182,16 @@ jobs:
         run: ./gradlew :shared:assembleSharedReleaseXCFramework
 
       - name: Resolve pinned iOS packages
+        shell: bash
         run: |
+          set -euo pipefail
+          test -f "$PACKAGE_LOCK"
           xcodebuild \
             -resolvePackageDependencies \
             -project iosApp/Kwabor.xcodeproj \
-            -scheme Kwabor
+            -scheme Kwabor \
+            -onlyUsePackageVersionsFromResolvedFile
+          git diff --exit-code -- "$PACKAGE_LOCK"
 
       - name: Archive signed app
         shell: bash
@@ -250,7 +263,7 @@ jobs:
           echo "KWABOR_IOS_OUTPUT_DIRECTORY=$output_directory" >> "$GITHUB_ENV"
 
       - name: Upload signed archive
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kwabor-ios-${{ inputs.environment }}-${{ inputs.version_name }}-${{ inputs.build_number }}
           path: ${{ env.KWABOR_IOS_OUTPUT_DIRECTORY }}

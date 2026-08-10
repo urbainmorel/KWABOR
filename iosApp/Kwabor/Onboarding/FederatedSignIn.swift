@@ -49,7 +49,11 @@ protocol FederatedIdentityHintPersisting {
     ) throws
     func hints(provider: FederatedIdentityProviderKey, userIdentifier: String) -> FederatedIdentityHints?
     func pendingHints() -> FederatedIdentityHints?
-    func clearPendingHints()
+    @discardableResult
+    func clearPendingHints() -> Bool
+
+    @discardableResult
+    func clearAllHints() -> Bool
 }
 
 final class KeychainFederatedIdentityHintStore: FederatedIdentityHintPersisting {
@@ -114,14 +118,24 @@ final class KeychainFederatedIdentityHintStore: FederatedIdentityHintPersisting 
         return try? JSONDecoder().decode(FederatedIdentityHints.self, from: hintData)
     }
 
-    func clearPendingHints() {
+    @discardableResult
+    func clearPendingHints() -> Bool {
         guard let pendingData = read(account: pendingHintAccount),
               let pendingAccount = String(data: pendingData, encoding: .utf8) else {
-            remove(account: pendingHintAccount)
-            return
+            return remove(account: pendingHintAccount)
         }
-        remove(account: pendingAccount)
-        remove(account: pendingHintAccount)
+        guard remove(account: pendingAccount) else { return false }
+        return remove(account: pendingHintAccount)
+    }
+
+    @discardableResult
+    func clearAllHints() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 
     private func hintAccount(provider: FederatedIdentityProviderKey, userIdentifier: String) -> String {
@@ -168,8 +182,9 @@ final class KeychainFederatedIdentityHintStore: FederatedIdentityHintPersisting 
         return item as? Data
     }
 
-    private func remove(account: String) {
-        SecItemDelete(baseQuery(account: account) as CFDictionary)
+    private func remove(account: String) -> Bool {
+        let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 
     private func baseQuery(account: String) -> [String: Any] {
@@ -185,18 +200,94 @@ private enum FederatedIdentityHintStoreError: Error {
     case keychain(OSStatus)
 }
 
+enum AccountDeletionPrivacyCleanupMarkerState: Equatable {
+    case absent
+    case pending
+    case unavailable
+}
+
+protocol AccountDeletionPrivacyCleanupPersisting {
+    var state: AccountDeletionPrivacyCleanupMarkerState { get }
+
+    func persist() -> Bool
+    func clear() -> Bool
+}
+
+final class KeychainAccountDeletionPrivacyCleanupStore: AccountDeletionPrivacyCleanupPersisting {
+    private let service: String
+    private let account = "account-deletion-provider-cleanup"
+
+    init(service: String = "com.kwabor.ios.auth-deletion-privacy") {
+        self.service = service
+    }
+
+    var state: AccountDeletionPrivacyCleanupMarkerState {
+        var query = baseQuery
+        query[kSecReturnData as String] = false
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        switch SecItemCopyMatching(query as CFDictionary, nil) {
+        case errSecSuccess: return .pending
+        case errSecItemNotFound: return .absent
+        default: return .unavailable
+        }
+    }
+
+    func persist() -> Bool {
+        let payload = Data("pending:v1".utf8)
+        let updateStatus = SecItemUpdate(
+            baseQuery as CFDictionary,
+            [kSecValueData as String: payload] as CFDictionary
+        )
+        if updateStatus == errSecItemNotFound {
+            var insert = baseQuery
+            insert[kSecValueData as String] = payload
+            insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            guard SecItemAdd(insert as CFDictionary, nil) == errSecSuccess else { return false }
+        } else if updateStatus != errSecSuccess {
+            return false
+        }
+        return state == .pending
+    }
+
+    func clear() -> Bool {
+        let status = SecItemDelete(baseQuery as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    private var baseQuery: [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+    }
+}
+
 protocol PresentingViewControllerProviding {
     @MainActor
     func presentingViewController() -> UIViewController?
+
+    @MainActor
+    func bind(windowScene: UIWindowScene?)
 }
 
-struct WindowScenePresentingViewControllerProvider: PresentingViewControllerProviding {
+extension PresentingViewControllerProviding {
+    @MainActor
+    func bind(windowScene: UIWindowScene?) {}
+}
+
+final class WindowScenePresentingViewControllerProvider: PresentingViewControllerProviding {
+    private weak var windowScene: UIWindowScene?
+
+    @MainActor
+    func bind(windowScene: UIWindowScene?) {
+        self.windowScene = windowScene
+    }
+
     @MainActor
     func presentingViewController() -> UIViewController? {
-        let window = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow }
+        guard windowScene?.activationState == .foregroundActive else { return nil }
+        let window = windowScene?.windows.first { $0.isKeyWindow }
         return topViewController(from: window?.rootViewController)
     }
 
@@ -216,7 +307,7 @@ struct WindowScenePresentingViewControllerProvider: PresentingViewControllerProv
 }
 
 @MainActor
-final class FederatedSignInStore: ObservableObject {
+final class FederatedSignInStore: NSObject, ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
@@ -227,8 +318,15 @@ final class FederatedSignInStore: ObservableObject {
     private let reportsSubmissionFailure: Bool
     private let attemptPreflight: () -> Bool
     private let attemptPreflightErrorMessage: String?
+    private let attemptPreparation: ((@escaping (Bool) -> Void) -> Void)?
+    private let attemptPreparationErrorMessage: () -> String?
+    private let onPreparedAttemptAborted: ((@escaping () -> Void) -> Void)?
     private let onCredential: (FederatedAuthCredential, @escaping (Bool) -> Void) -> Void
     private var pendingAppleAttempt: NonceAttempt?
+    private var appleAuthorizationContexts: [ObjectIdentifier: AppleAuthorizationContext] = [:]
+    private let fallbackApplePresentationAnchor = UIWindow(frame: .zero)
+    private var deferredAttemptPhase = DeferredAttemptPhase.idle
+    private var deferredAttemptGeneration: UInt64 = 0
 
     init(
         strings: OnboardingStrings,
@@ -237,6 +335,9 @@ final class FederatedSignInStore: ObservableObject {
         reportsSubmissionFailure: Bool = true,
         attemptPreflight: @escaping () -> Bool = { true },
         attemptPreflightErrorMessage: String? = nil,
+        attemptPreparation: ((@escaping (Bool) -> Void) -> Void)? = nil,
+        attemptPreparationErrorMessage: @escaping () -> String? = { nil },
+        onPreparedAttemptAborted: ((@escaping () -> Void) -> Void)? = nil,
         onCredential: @escaping (FederatedAuthCredential, @escaping (Bool) -> Void) -> Void
     ) {
         self.strings = strings
@@ -245,7 +346,11 @@ final class FederatedSignInStore: ObservableObject {
         self.reportsSubmissionFailure = reportsSubmissionFailure
         self.attemptPreflight = attemptPreflight
         self.attemptPreflightErrorMessage = attemptPreflightErrorMessage
+        self.attemptPreparation = attemptPreparation
+        self.attemptPreparationErrorMessage = attemptPreparationErrorMessage
+        self.onPreparedAttemptAborted = onPreparedAttemptAborted
         self.onCredential = onCredential
+        super.init()
         GoogleSignInBootstrap.configureIfPossible()
     }
 
@@ -253,8 +358,21 @@ final class FederatedSignInStore: ObservableObject {
         GoogleOAuthConfiguration.current != nil
     }
 
-    func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+    var requiresDeferredProviderLaunch: Bool {
+        attemptPreparation != nil
+    }
+
+    func bindPresentationScene(_ windowScene: UIWindowScene?) {
+        presenterProvider.bind(windowScene: windowScene)
+    }
+
+    func clearError() {
         guard !isLoading else { return }
+        errorMessage = nil
+    }
+
+    func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+        guard !isLoading, !requiresDeferredProviderLaunch else { return }
         guard prepareAttempt() else { return }
         do {
             let attempt = try NonceAttempt.make()
@@ -270,15 +388,36 @@ final class FederatedSignInStore: ObservableObject {
         }
     }
 
+    func startAppleSignIn() {
+        guard !isLoading, requiresDeferredProviderLaunch else { return }
+        prepareDeferredAttempt { [self] generation in
+            guard let presentingViewController = presenterProvider.presentingViewController(),
+                  let presentationAnchor = presentingViewController.view.window else {
+                finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
+                return
+            }
+            launchAppleSignIn(presentationAnchor: presentationAnchor, deferredGeneration: generation)
+        }
+    }
+
     func completeAppleAuthorization(_ result: Result<ASAuthorization, Error>) {
         guard let attempt = pendingAppleAttempt else {
             if case let .failure(error) = result, !isCancellation(error) {
-                errorMessage = strings.authFederatedUnavailable
+                finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
+            } else {
+                finishProviderFailure(errorMessage: nil)
             }
-            isLoading = false
             return
         }
         pendingAppleAttempt = nil
+        completeAppleAuthorization(result, attempt: attempt, deferredGeneration: nil)
+    }
+
+    private func completeAppleAuthorization(
+        _ result: Result<ASAuthorization, Error>,
+        attempt: NonceAttempt,
+        deferredGeneration: UInt64?
+    ) {
         switch result {
         case let .success(authorization):
             guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
@@ -286,8 +425,7 @@ final class FederatedSignInStore: ObservableObject {
                   let identityToken = credential.identityToken,
                   let idToken = String(data: identityToken, encoding: .utf8),
                   !idToken.isEmpty else {
-                isLoading = false
-                errorMessage = strings.authFederatedUnavailable
+                finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
                 return
             }
             let receivedHints = FederatedIdentityHints(
@@ -310,29 +448,95 @@ final class FederatedSignInStore: ObservableObject {
                 persistedHints = nil
             }
             submit(
-                    FederatedAuthCredential(
-                        provider: .apple,
-                        idToken: idToken,
-                        rawNonce: attempt.rawNonce,
-                        suggestedFirstName: persistedHints?.firstName ?? receivedHints.firstName,
-                        suggestedLastName: persistedHints?.lastName ?? receivedHints.lastName
-                )
+                FederatedAuthCredential(
+                    provider: .apple,
+                    idToken: idToken,
+                    rawNonce: attempt.rawNonce,
+                    suggestedFirstName: persistedHints?.firstName ?? receivedHints.firstName,
+                    suggestedLastName: persistedHints?.lastName ?? receivedHints.lastName
+                ),
+                deferredGeneration: deferredGeneration
             )
         case let .failure(error):
-            isLoading = false
-            guard !isCancellation(error) else { return }
-            errorMessage = strings.authFederatedUnavailable
+            finishProviderFailure(
+                errorMessage: isCancellation(error) ? nil : strings.authFederatedUnavailable
+            )
         }
     }
 
     func startGoogleSignIn() {
         guard !isLoading else { return }
-        guard let configuration = GoogleOAuthConfiguration.current,
-              let presenter = presenterProvider.presentingViewController() else {
+        guard let configuration = GoogleOAuthConfiguration.current else {
+            errorMessage = strings.authFederatedUnavailable
+            return
+        }
+        if requiresDeferredProviderLaunch {
+            prepareDeferredAttempt { [self] generation in
+                guard let presenter = presenterProvider.presentingViewController() else {
+                    finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
+                    return
+                }
+                launchGoogleSignIn(
+                    configuration: configuration,
+                    presenter: presenter,
+                    deferredGeneration: generation
+                )
+            }
+            return
+        }
+        guard let presenter = presenterProvider.presentingViewController() else {
             errorMessage = strings.authFederatedUnavailable
             return
         }
         guard prepareAttempt() else { return }
+        launchGoogleSignIn(configuration: configuration, presenter: presenter, deferredGeneration: nil)
+    }
+
+    func abortDeferredAttemptForDisappearance() {
+        guard let generation = deferredAttemptPhase.abortableGeneration else { return }
+        deferredAttemptPhase = .aborting(generation)
+        cancelAppleAuthorizationContexts(for: generation)
+        finishDeferredAbort(generation: generation, message: nil)
+    }
+
+    private func launchAppleSignIn(
+        presentationAnchor: ASPresentationAnchor,
+        deferredGeneration: UInt64
+    ) {
+        guard deferredAttemptPhase == .providerActive(deferredGeneration) else { return }
+        do {
+            let attempt = try NonceAttempt.make()
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = attempt.hashedNonce
+            request.state = attempt.state
+            let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+            let context = AppleAuthorizationContext(
+                controller: authorizationController,
+                attempt: attempt,
+                presentationAnchor: presentationAnchor,
+                generation: deferredGeneration
+            )
+            appleAuthorizationContexts[ObjectIdentifier(authorizationController)] = context
+            errorMessage = nil
+            isLoading = true
+            authorizationController.delegate = self
+            authorizationController.presentationContextProvider = self
+            authorizationController.performRequests()
+        } catch {
+            finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
+        }
+    }
+
+    private func launchGoogleSignIn(
+        configuration: GoogleOAuthConfiguration,
+        presenter: UIViewController,
+        deferredGeneration: UInt64?
+    ) {
+        if let deferredGeneration,
+           deferredAttemptPhase != .providerActive(deferredGeneration) {
+            return
+        }
         do {
             let attempt = try NonceAttempt.make()
             errorMessage = nil
@@ -346,10 +550,13 @@ final class FederatedSignInStore: ObservableObject {
                 hint: nil,
                 additionalScopes: nil,
                 nonce: attempt.hashedNonce
-            ) { [weak self] result, error in
-                guard let self else { return }
+            ) { [self] result, error in
+                if let deferredGeneration,
+                   deferredAttemptPhase != .providerActive(deferredGeneration) {
+                    return
+                }
                 guard !isCancellation(error) else {
-                    isLoading = false
+                    finishProviderFailure(errorMessage: nil)
                     return
                 }
                 guard error == nil,
@@ -357,8 +564,7 @@ final class FederatedSignInStore: ObservableObject {
                       let userIdentifier = user.userID,
                       let idToken = user.idToken?.tokenString,
                       !idToken.isEmpty else {
-                    isLoading = false
-                    errorMessage = strings.authFederatedUnavailable
+                    finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
                     return
                 }
                 let receivedHints = FederatedIdentityHints(
@@ -387,25 +593,112 @@ final class FederatedSignInStore: ObservableObject {
                         rawNonce: attempt.rawNonce,
                         suggestedFirstName: persistedHints?.firstName ?? receivedHints.firstName,
                         suggestedLastName: persistedHints?.lastName ?? receivedHints.lastName
-                    )
+                    ),
+                    deferredGeneration: deferredGeneration
                 )
             }
         } catch {
-            isLoading = false
-            errorMessage = strings.authFederatedUnavailable
+            finishProviderFailure(errorMessage: strings.authFederatedUnavailable)
         }
     }
 
-    private func submit(_ credential: FederatedAuthCredential) {
+    private func submit(
+        _ credential: FederatedAuthCredential,
+        deferredGeneration: UInt64? = nil
+    ) {
+        if let deferredGeneration {
+            guard deferredAttemptPhase == .providerActive(deferredGeneration) else { return }
+            deferredAttemptPhase = .submitting(deferredGeneration)
+        }
         isLoading = true
         errorMessage = nil
-        onCredential(credential) { [weak self] completed in
-            guard let self else { return }
+        onCredential(credential) { [self] completed in
+            if let deferredGeneration,
+               deferredAttemptPhase == .submitting(deferredGeneration) {
+                deferredAttemptPhase = .idle
+            }
             isLoading = false
             if !completed, reportsSubmissionFailure {
                 errorMessage = strings.authReauthenticationFailed
             }
         }
+    }
+
+    private func prepareDeferredAttempt(onPrepared: @escaping (UInt64) -> Void) {
+        guard let attemptPreparation else {
+            return
+        }
+        guard deferredAttemptPhase == .idle else { return }
+        let generation = nextDeferredAttemptGeneration()
+        deferredAttemptPhase = .preparing(generation)
+        isLoading = true
+        errorMessage = nil
+        attemptPreparation { [self] prepared in
+            guard deferredAttemptPhase == .preparing(generation) else { return }
+            guard prepared else {
+                deferredAttemptPhase = .idle
+                isLoading = false
+                errorMessage = attemptPreparationErrorMessage() ?? strings.authFederatedUnavailable
+                return
+            }
+            deferredAttemptPhase = .providerActive(generation)
+            onPrepared(generation)
+        }
+    }
+
+    private func finishProviderFailure(errorMessage message: String?) {
+        pendingAppleAttempt = nil
+        guard let generation = deferredAttemptPhase.providerActiveGeneration else {
+            isLoading = false
+            errorMessage = message
+            return
+        }
+        deferredAttemptPhase = .aborting(generation)
+        finishDeferredAbort(generation: generation, message: message)
+    }
+
+    private func finishDeferredAbort(generation: UInt64, message: String?) {
+        let finish = { [self] in
+            guard deferredAttemptPhase == .aborting(generation) else { return }
+            deferredAttemptPhase = .idle
+            isLoading = false
+            errorMessage = message
+        }
+        guard let onPreparedAttemptAborted else {
+            finish()
+            return
+        }
+        onPreparedAttemptAborted(finish)
+    }
+
+    private func cancelAppleAuthorizationContexts(for generation: UInt64) {
+        appleAuthorizationContexts.values
+            .filter { $0.generation == generation }
+            .forEach { $0.controller.cancel() }
+    }
+
+    private func completeAppleAuthorization(
+        controller: ASAuthorizationController,
+        result: Result<ASAuthorization, Error>
+    ) {
+        let identifier = ObjectIdentifier(controller)
+        guard let context = appleAuthorizationContexts.removeValue(forKey: identifier) else { return }
+        guard deferredAttemptPhase == .providerActive(context.generation) else { return }
+        completeAppleAuthorization(
+            result,
+            attempt: context.attempt,
+            deferredGeneration: context.generation
+        )
+    }
+
+    private func applePresentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        appleAuthorizationContexts[ObjectIdentifier(controller)]?.presentationAnchor ??
+            fallbackApplePresentationAnchor
+    }
+
+    private func nextDeferredAttemptGeneration() -> UInt64 {
+        deferredAttemptGeneration = deferredAttemptGeneration == UInt64.max ? 1 : deferredAttemptGeneration + 1
+        return deferredAttemptGeneration
     }
 
     private func prepareAttempt() -> Bool {
@@ -441,6 +734,55 @@ final class FederatedSignInStore: ObservableObject {
     }
 }
 
+extension FederatedSignInStore: ASAuthorizationControllerDelegate {
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        completeAppleAuthorization(controller: controller, result: .success(authorization))
+    }
+
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        completeAppleAuthorization(controller: controller, result: .failure(error))
+    }
+}
+
+extension FederatedSignInStore: ASAuthorizationControllerPresentationContextProviding {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        applePresentationAnchor(for: controller)
+    }
+}
+
+private struct AppleAuthorizationContext {
+    let controller: ASAuthorizationController
+    let attempt: NonceAttempt
+    let presentationAnchor: ASPresentationAnchor
+    let generation: UInt64
+}
+
+private enum DeferredAttemptPhase: Equatable {
+    case idle
+    case preparing(UInt64)
+    case providerActive(UInt64)
+    case submitting(UInt64)
+    case aborting(UInt64)
+
+    var abortableGeneration: UInt64? {
+        switch self {
+        case let .preparing(generation), let .providerActive(generation): generation
+        case .idle, .submitting, .aborting: nil
+        }
+    }
+
+    var providerActiveGeneration: UInt64? {
+        guard case let .providerActive(generation) = self else { return nil }
+        return generation
+    }
+}
+
 struct FederatedSignInButtons: View {
     @ObservedObject var store: FederatedSignInStore
     let isDisabled: Bool
@@ -460,15 +802,7 @@ struct FederatedSignInButtons: View {
             }
             ZStack {
                 VStack(spacing: KwaborDesignTokens.Spacing.md) {
-                    SignInWithAppleButton(
-                        .continue,
-                        onRequest: store.prepareAppleRequest,
-                        onCompletion: store.completeAppleAuthorization
-                    )
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
-                    .accessibilityLabel(store.strings.authSignInWithApple)
-                    .disabled(isDisabled || store.isLoading)
+                    appleSignInButton
 
                     GoogleSignInButton(
                         scheme: .light,
@@ -506,6 +840,74 @@ struct FederatedSignInButtons: View {
                     .accessibilityLabel(errorMessage)
             }
         }
+        .background(
+            PresentationSceneReader(onSceneChanged: store.bindPresentationScene)
+        )
+    }
+
+    @ViewBuilder
+    private var appleSignInButton: some View {
+        if store.requiresDeferredProviderLaunch {
+            ZStack {
+                SignInWithAppleButton(
+                    .continue,
+                    onRequest: { _ in },
+                    onCompletion: { _ in }
+                )
+                .signInWithAppleButtonStyle(.black)
+                .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                Button(action: store.startAppleSignIn) {
+                    Color.clear
+                        .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(store.strings.authSignInWithApple)
+            }
+            .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            .disabled(isDisabled || store.isLoading)
+        } else {
+            SignInWithAppleButton(
+                .continue,
+                onRequest: store.prepareAppleRequest,
+                onCompletion: store.completeAppleAuthorization
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
+            .accessibilityLabel(store.strings.authSignInWithApple)
+            .disabled(isDisabled || store.isLoading)
+        }
+    }
+}
+
+private struct PresentationSceneReader: UIViewRepresentable {
+    let onSceneChanged: (UIWindowScene?) -> Void
+
+    func makeUIView(context: Context) -> PresentationSceneView {
+        let view = PresentationSceneView()
+        view.isUserInteractionEnabled = false
+        view.onSceneChanged = onSceneChanged
+        return view
+    }
+
+    func updateUIView(_ uiView: PresentationSceneView, context: Context) {
+        uiView.onSceneChanged = onSceneChanged
+        uiView.reportCurrentScene()
+    }
+}
+
+private final class PresentationSceneView: UIView {
+    var onSceneChanged: ((UIWindowScene?) -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        reportCurrentScene()
+    }
+
+    func reportCurrentScene() {
+        onSceneChanged?(window?.windowScene)
     }
 }
 
@@ -543,6 +945,9 @@ private struct GoogleOAuthConfiguration {
 @MainActor
 enum GoogleSignInBootstrap {
     private static var hasConfigured = false
+    // GoogleSignIn 9.0.0 uses GTMKeychainStore(item: "auth"); GTMAppAuth 5 uses account "OAuth".
+    private static let keychainService = "auth"
+    private static let keychainAccount = "OAuth"
 
     static func configureIfPossible() {
         guard !hasConfigured, let configuration = GoogleOAuthConfiguration.current else { return }
@@ -554,8 +959,22 @@ enum GoogleSignInBootstrap {
         hasConfigured = true
     }
 
-    static func clearLocalSession() {
+    @discardableResult
+    static func clearLocalSession() -> Bool {
+        guard UIApplication.shared.isProtectedDataAvailable else { return false }
         GIDSignIn.sharedInstance.signOut()
+        let persistedSessionRemoved = removePersistedAuthSession()
+        return GIDSignIn.sharedInstance.currentUser == nil && persistedSessionRemoved
+    }
+
+    private static func removePersistedAuthSession() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }
 

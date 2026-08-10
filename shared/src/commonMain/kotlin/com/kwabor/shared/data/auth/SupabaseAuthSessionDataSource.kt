@@ -14,13 +14,15 @@ internal class SupabaseAuthSessionDataSource(
     private val auth: Auth,
     private val postgrest: Postgrest,
     private val passwordRecoverySessionStore: PasswordRecoverySessionStore,
+    private val accountDeletionSessionGuard: AccountDeletionSessionGuard,
 ) : AuthSessionDataSource {
     private val passwordRecoverySessionCoordinator =
         PasswordRecoverySessionCoordinator(passwordRecoverySessionStore)
-
     override suspend fun getCurrentSession(): AuthSessionDto? = runAuthRequest {
         auth.awaitInitialization()
-        if (passwordRecoverySessionStore.isPasswordRecoveryInProgress()) {
+        if (accountDeletionSessionGuard.ensureCleanupCompleted()) {
+            null
+        } else if (passwordRecoverySessionStore.isPasswordRecoveryInProgress()) {
             passwordRecoverySessionCoordinator.restoreRecoverySessionOrNull(
                 currentSession = auth.currentSessionOrNull(),
                 loadStoredSession = auth.sessionManager::loadSessionOrNull,
@@ -38,6 +40,7 @@ internal class SupabaseAuthSessionDataSource(
     }
 
     override suspend fun signInWithEmail(email: String, password: String): AuthSessionDto = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         auth.signInWith(Email) {
             this.email = email
             this.password = password
@@ -54,6 +57,7 @@ internal class SupabaseAuthSessionDataSource(
         var sessionEstablished = false
         val signInResult = runCatching {
             runAuthRequest {
+                accountDeletionSessionGuard.ensureCleanupCompleted()
                 auth.signInWith(IDToken) {
                     idToken = request.idToken
                     nonce = request.rawNonce

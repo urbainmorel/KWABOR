@@ -1,5 +1,6 @@
 package com.kwabor.shared.presentation.auth
 
+import com.kwabor.shared.domain.auth.AccountDeletionOutcome
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -150,7 +151,8 @@ private class FakeAuthRepository(
         request: PromoterActivationRequest,
     ): DomainResult<PromoterActivationResult> = DomainResult.Failure(DomainError.Validation("error.auth.unused"))
 
-    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<Unit> = DomainResult.Success(Unit)
+    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<AccountDeletionOutcome> =
+        DomainResult.Success(AccountDeletionOutcome.Deleted)
 
     override suspend fun signOut(): DomainResult<Unit> = DomainResult.Success(Unit)
 }

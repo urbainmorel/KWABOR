@@ -39,7 +39,7 @@ interface PromoterActivationRepository {
 }
 
 interface AccountSecurityRepository {
-    suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<Unit>
+    suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<AccountDeletionOutcome>
 }
 
 interface PasswordRecoveryRepository {

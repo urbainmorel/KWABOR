@@ -23,6 +23,17 @@ class IosRoomStorageProtectionTest {
     private val fileManager = NSFileManager.defaultManager
 
     @Test
+    fun protectedBuilderReportsDurableStorage() = withTemporaryApplicationSupport { rootUrl ->
+        val builderResult = createIosKwaborDatabaseBuilder(
+            applicationSupportUrl = rootUrl,
+            fileManager = fileManager,
+        )
+
+        assertEquals(KwaborDatabaseStorageMode.Durable, builderResult.storageMode)
+        assertTrue(builderResult.supportsDurableInteractionOutbox)
+    }
+
+    @Test
     fun protectedRoomDirectoryIsBackupExcludedAndIdempotent() = withTemporaryApplicationSupport { rootUrl ->
         val firstDirectoryUrl = prepareIosRoomDirectory(rootUrl, fileManager)
         val protectionApplicator = RecordingIosRoomFileProtectionApplicator()
@@ -97,12 +108,15 @@ class IosRoomStorageProtectionTest {
             assertTrue(fileManager.createFileAtPath(collisionPath, contents = null, attributes = null))
             var failureReported = false
 
+            val builderResult = createIosKwaborDatabaseBuilder(
+                applicationSupportUrl = rootUrl,
+                fileManager = fileManager,
+                onPolicyFailure = { failureReported = true },
+            )
+            assertEquals(KwaborDatabaseStorageMode.MemoryOnly, builderResult.storageMode)
+            assertFalse(builderResult.supportsDurableInteractionOutbox)
             val database = buildKwaborDatabase(
-                builder = createIosKwaborDatabaseBuilder(
-                    applicationSupportUrl = rootUrl,
-                    fileManager = fileManager,
-                    onPolicyFailure = { failureReported = true },
-                ),
+                builder = builderResult.createBuilder(),
                 queryCoroutineContext = coroutineContext,
             )
             try {
@@ -124,13 +138,16 @@ class IosRoomStorageProtectionTest {
             val protectionApplicator = RecordingIosRoomFileProtectionApplicator { false }
             var failureReported = false
 
+            val builderResult = createIosKwaborDatabaseBuilder(
+                applicationSupportUrl = rootUrl,
+                fileManager = fileManager,
+                protectionApplicator = protectionApplicator,
+                onPolicyFailure = { failureReported = true },
+            )
+            assertEquals(KwaborDatabaseStorageMode.MemoryOnly, builderResult.storageMode)
+            assertFalse(builderResult.supportsDurableInteractionOutbox)
             val database = buildKwaborDatabase(
-                builder = createIosKwaborDatabaseBuilder(
-                    applicationSupportUrl = rootUrl,
-                    fileManager = fileManager,
-                    protectionApplicator = protectionApplicator,
-                    onPolicyFailure = { failureReported = true },
-                ),
+                builder = builderResult.createBuilder(),
                 queryCoroutineContext = coroutineContext,
             )
             try {

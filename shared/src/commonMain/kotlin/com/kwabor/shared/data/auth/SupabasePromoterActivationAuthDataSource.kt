@@ -16,9 +16,11 @@ internal class SupabasePromoterActivationAuthDataSource(
     private val auth: Auth,
     private val postgrest: Postgrest,
     private val passwordRecoverySessionStore: PasswordRecoverySessionStore,
+    private val accountDeletionSessionGuard: AccountDeletionSessionGuard,
 ) : PromoterActivationAuthDataSource {
     override suspend fun establishPromoterActivationSession(proof: PromoterActivationSessionProof): Unit =
         runAuthRequest {
+            accountDeletionSessionGuard.ensureCleanupCompleted()
             when (proof) {
                 is PromoterActivationSessionProof.PkceCode ->
                     auth.exchangeCodeForSession(code = proof.code, saveSession = true)
@@ -38,6 +40,7 @@ internal class SupabasePromoterActivationAuthDataSource(
     }
 
     override suspend fun activatePromoterInvite(inviteToken: String): PromoterActivationResultDto = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         val activation = postgrest.rpc(
             function = ACTIVATE_PROMOTER_INVITE_RPC,
             parameters = PromoterInviteTokenRpcDto(inviteToken),

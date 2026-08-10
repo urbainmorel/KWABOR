@@ -1,0 +1,551 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "07f829e54e24eb7ec41dc947571eb22e",
+    "entities": [
+      {
+        "tableName": "explore_cache_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`snapshot_key` TEXT NOT NULL, `next_cursor` TEXT, `server_snapshot_at_epoch_microseconds` INTEGER, `cached_at_epoch_milliseconds` INTEGER NOT NULL, `item_count` INTEGER NOT NULL, PRIMARY KEY(`snapshot_key`))",
+        "fields": [
+          {
+            "fieldPath": "snapshotKey",
+            "columnName": "snapshot_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextCursor",
+            "columnName": "next_cursor",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "serverSnapshotAtEpochMicroseconds",
+            "columnName": "server_snapshot_at_epoch_microseconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "cachedAtEpochMilliseconds",
+            "columnName": "cached_at_epoch_milliseconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemCount",
+            "columnName": "item_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "snapshot_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_explore_cache_snapshots_cached_at_epoch_milliseconds",
+            "unique": false,
+            "columnNames": [
+              "cached_at_epoch_milliseconds"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_explore_cache_snapshots_cached_at_epoch_milliseconds` ON `${TABLE_NAME}` (`cached_at_epoch_milliseconds`)"
+          }
+        ]
+      },
+      {
+        "tableName": "explore_cached_listings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`listing_id` TEXT NOT NULL, `listing_type` TEXT NOT NULL, `listing_class` TEXT NOT NULL, `status` TEXT NOT NULL, `name` TEXT NOT NULL, `city_id` TEXT NOT NULL, `category_id` TEXT NOT NULL, `cover_image_url` TEXT, `cover_image_alt` TEXT, `price_from_xof` INTEGER, `rating_average` REAL, `likes_count` INTEGER NOT NULL, `views_count` INTEGER, `verified` INTEGER NOT NULL, `sponsored_until_epoch_milliseconds` INTEGER, `event_start_at_epoch_milliseconds` INTEGER, `event_end_at_epoch_milliseconds` INTEGER, `content_cached_at_epoch_milliseconds` INTEGER NOT NULL, PRIMARY KEY(`listing_id`))",
+        "fields": [
+          {
+            "fieldPath": "listingId",
+            "columnName": "listing_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listingType",
+            "columnName": "listing_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listingClass",
+            "columnName": "listing_class",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cityId",
+            "columnName": "city_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "categoryId",
+            "columnName": "category_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "coverImageUrl",
+            "columnName": "cover_image_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverImageAlt",
+            "columnName": "cover_image_alt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "priceFromXof",
+            "columnName": "price_from_xof",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "ratingAverage",
+            "columnName": "rating_average",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "likesCount",
+            "columnName": "likes_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "viewsCount",
+            "columnName": "views_count",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "verified",
+            "columnName": "verified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sponsoredUntilEpochMilliseconds",
+            "columnName": "sponsored_until_epoch_milliseconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "eventStartAtEpochMilliseconds",
+            "columnName": "event_start_at_epoch_milliseconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "eventEndAtEpochMilliseconds",
+            "columnName": "event_end_at_epoch_milliseconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "contentCachedAtEpochMilliseconds",
+            "columnName": "content_cached_at_epoch_milliseconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "listing_id"
+          ]
+        }
+      },
+      {
+        "tableName": "explore_cache_snapshot_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`snapshot_key` TEXT NOT NULL, `listing_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `is_sponsored_placement` INTEGER, `is_event_ended` INTEGER, PRIMARY KEY(`snapshot_key`, `listing_id`), FOREIGN KEY(`snapshot_key`) REFERENCES `explore_cache_snapshots`(`snapshot_key`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`listing_id`) REFERENCES `explore_cached_listings`(`listing_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "snapshotKey",
+            "columnName": "snapshot_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listingId",
+            "columnName": "listing_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSponsoredPlacement",
+            "columnName": "is_sponsored_placement",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isEventEnded",
+            "columnName": "is_event_ended",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "snapshot_key",
+            "listing_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_explore_cache_snapshot_items_listing_id",
+            "unique": false,
+            "columnNames": [
+              "listing_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_explore_cache_snapshot_items_listing_id` ON `${TABLE_NAME}` (`listing_id`)"
+          },
+          {
+            "name": "index_explore_cache_snapshot_items_snapshot_key_position",
+            "unique": true,
+            "columnNames": [
+              "snapshot_key",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_explore_cache_snapshot_items_snapshot_key_position` ON `${TABLE_NAME}` (`snapshot_key`, `position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "explore_cache_snapshots",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "snapshot_key"
+            ],
+            "referencedColumns": [
+              "snapshot_key"
+            ]
+          },
+          {
+            "table": "explore_cached_listings",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listing_id"
+            ],
+            "referencedColumns": [
+              "listing_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "explore_reference_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`snapshot_key` TEXT NOT NULL, `cached_at_epoch_milliseconds` INTEGER NOT NULL, `city_count` INTEGER NOT NULL, `category_count` INTEGER NOT NULL, PRIMARY KEY(`snapshot_key`))",
+        "fields": [
+          {
+            "fieldPath": "snapshotKey",
+            "columnName": "snapshot_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cachedAtEpochMilliseconds",
+            "columnName": "cached_at_epoch_milliseconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cityCount",
+            "columnName": "city_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "categoryCount",
+            "columnName": "category_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "snapshot_key"
+          ]
+        }
+      },
+      {
+        "tableName": "explore_reference_cities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`snapshot_key` TEXT NOT NULL, `city_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `name` TEXT NOT NULL, `country_code` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, PRIMARY KEY(`snapshot_key`, `city_id`), FOREIGN KEY(`snapshot_key`) REFERENCES `explore_reference_snapshots`(`snapshot_key`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "snapshotKey",
+            "columnName": "snapshot_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cityId",
+            "columnName": "city_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "countryCode",
+            "columnName": "country_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "snapshot_key",
+            "city_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_explore_reference_cities_snapshot_key_position",
+            "unique": true,
+            "columnNames": [
+              "snapshot_key",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_explore_reference_cities_snapshot_key_position` ON `${TABLE_NAME}` (`snapshot_key`, `position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "explore_reference_snapshots",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "snapshot_key"
+            ],
+            "referencedColumns": [
+              "snapshot_key"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "explore_reference_categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`snapshot_key` TEXT NOT NULL, `category_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `name_key` TEXT NOT NULL, `listing_type` TEXT NOT NULL, `default_listing_class` TEXT NOT NULL, PRIMARY KEY(`snapshot_key`, `category_id`), FOREIGN KEY(`snapshot_key`) REFERENCES `explore_reference_snapshots`(`snapshot_key`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "snapshotKey",
+            "columnName": "snapshot_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "categoryId",
+            "columnName": "category_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameKey",
+            "columnName": "name_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listingType",
+            "columnName": "listing_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultListingClass",
+            "columnName": "default_listing_class",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "snapshot_key",
+            "category_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_explore_reference_categories_snapshot_key_position",
+            "unique": true,
+            "columnNames": [
+              "snapshot_key",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_explore_reference_categories_snapshot_key_position` ON `${TABLE_NAME}` (`snapshot_key`, `position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "explore_reference_snapshots",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "snapshot_key"
+            ],
+            "referencedColumns": [
+              "snapshot_key"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "interaction_outbox_operations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`operation_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `account_id` TEXT NOT NULL, `listing_id` TEXT NOT NULL, `kind` TEXT NOT NULL, `desired_selected` INTEGER NOT NULL, `enqueued_at_epoch_milliseconds` INTEGER NOT NULL, `attempt_count` INTEGER NOT NULL, `next_attempt_at_epoch_milliseconds` INTEGER NOT NULL, `terminal_error_code` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "operationId",
+            "columnName": "operation_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listingId",
+            "columnName": "listing_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desiredSelectedRaw",
+            "columnName": "desired_selected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enqueuedAtEpochMilliseconds",
+            "columnName": "enqueued_at_epoch_milliseconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attempt_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptAtEpochMilliseconds",
+            "columnName": "next_attempt_at_epoch_milliseconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terminalErrorCode",
+            "columnName": "terminal_error_code",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "operation_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_interaction_outbox_operations_account_id_listing_id_kind",
+            "unique": true,
+            "columnNames": [
+              "account_id",
+              "listing_id",
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_interaction_outbox_operations_account_id_listing_id_kind` ON `${TABLE_NAME}` (`account_id`, `listing_id`, `kind`)"
+          },
+          {
+            "name": "index_interaction_outbox_operations_account_id_terminal_error_code_next_attempt_at_epoch_milliseconds_enqueued_at_epoch_milliseconds",
+            "unique": false,
+            "columnNames": [
+              "account_id",
+              "terminal_error_code",
+              "next_attempt_at_epoch_milliseconds",
+              "enqueued_at_epoch_milliseconds"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_interaction_outbox_operations_account_id_terminal_error_code_next_attempt_at_epoch_milliseconds_enqueued_at_epoch_milliseconds` ON `${TABLE_NAME}` (`account_id`, `terminal_error_code`, `next_attempt_at_epoch_milliseconds`, `enqueued_at_epoch_milliseconds`)"
+          },
+          {
+            "name": "index_interaction_outbox_operations_account_id_enqueued_at_epoch_milliseconds_operation_id",
+            "unique": false,
+            "columnNames": [
+              "account_id",
+              "enqueued_at_epoch_milliseconds",
+              "operation_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_interaction_outbox_operations_account_id_enqueued_at_epoch_milliseconds_operation_id` ON `${TABLE_NAME}` (`account_id`, `enqueued_at_epoch_milliseconds`, `operation_id`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '07f829e54e24eb7ec41dc947571eb22e')"
+    ]
+  }
+}

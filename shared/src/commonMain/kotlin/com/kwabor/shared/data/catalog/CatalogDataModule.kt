@@ -1,6 +1,7 @@
 package com.kwabor.shared.data.catalog
 
 import com.kwabor.shared.domain.catalog.CatalogRepository
+import com.kwabor.shared.domain.interaction.AccountScopedListingLikeRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -23,5 +24,7 @@ internal fun catalogDataModule(hasAuthentication: Boolean): Module = module {
             sessionState = get(),
         )
     }
-    single<CatalogRepository> { DataCatalogRepository(dataSource = get()) }
+    single { DataCatalogRepository(dataSource = get()) }
+    single<CatalogRepository> { get<DataCatalogRepository>() }
+    single<AccountScopedListingLikeRepository> { get<DataCatalogRepository>() }
 }

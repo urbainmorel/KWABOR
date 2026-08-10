@@ -67,6 +67,105 @@ class ViewerSessionScopeBindingTest {
             publications,
         )
     }
+
+    @Test
+    fun rejectedAccountDeletion_detachesThenRebindsTheAuthenticatedScope() {
+        var accountDeletionBlocksViewerSession by mutableStateOf(false)
+        val publications = mutableListOf<PublishedViewerContext>()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        activityController = controller
+        controller.get().setContent {
+            ViewerSessionScopeHandler(
+                accountId = ACCOUNT_ID,
+                accountSetupComplete = true,
+                accountDeletionBlocksViewerSession = accountDeletionBlocksViewerSession,
+            ) { publishedAccountId, setupComplete ->
+                publications += PublishedViewerContext(publishedAccountId, setupComplete)
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { accountDeletionBlocksViewerSession = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { accountDeletionBlocksViewerSession = false }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            listOf(
+                PublishedViewerContext(ACCOUNT_ID, accountSetupComplete = true),
+                PublishedViewerContext(null, accountSetupComplete = false),
+                PublishedViewerContext(ACCOUNT_ID, accountSetupComplete = true),
+            ),
+            publications,
+        )
+    }
+
+    @Test
+    fun deletedAccountDeletion_neverRebindsTheDeletedAccount() {
+        var accountId by mutableStateOf<String?>(ACCOUNT_ID)
+        var accountDeletionBlocksViewerSession by mutableStateOf(false)
+        val publications = mutableListOf<PublishedViewerContext>()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        activityController = controller
+        controller.get().setContent {
+            ViewerSessionScopeHandler(
+                accountId = accountId,
+                accountSetupComplete = accountId != null,
+                accountDeletionBlocksViewerSession = accountDeletionBlocksViewerSession,
+            ) { publishedAccountId, setupComplete ->
+                publications += PublishedViewerContext(publishedAccountId, setupComplete)
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { accountDeletionBlocksViewerSession = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            accountId = null
+            accountDeletionBlocksViewerSession = false
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            listOf(
+                PublishedViewerContext(ACCOUNT_ID, accountSetupComplete = true),
+                PublishedViewerContext(null, accountSetupComplete = false),
+            ),
+            publications,
+        )
+    }
+
+    @Test
+    fun unknownAccountDeletionOutcome_keepsTheViewerScopeDetached() {
+        var accountId by mutableStateOf<String?>(ACCOUNT_ID)
+        var accountDeletionBlocksViewerSession by mutableStateOf(false)
+        val publications = mutableListOf<PublishedViewerContext>()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        activityController = controller
+        controller.get().setContent {
+            ViewerSessionScopeHandler(
+                accountId = accountId,
+                accountSetupComplete = accountId != null,
+                accountDeletionBlocksViewerSession = accountDeletionBlocksViewerSession,
+            ) { publishedAccountId, setupComplete ->
+                publications += PublishedViewerContext(publishedAccountId, setupComplete)
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { accountDeletionBlocksViewerSession = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { accountId = null }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            listOf(
+                PublishedViewerContext(ACCOUNT_ID, accountSetupComplete = true),
+                PublishedViewerContext(null, accountSetupComplete = false),
+            ),
+            publications,
+        )
+    }
 }
 
 private data class PublishedViewerContext(

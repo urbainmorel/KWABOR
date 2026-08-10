@@ -439,11 +439,13 @@ class ExploreViewModelTest {
                 appPreferencesRepository = appPreferencesRepository,
                 clockProvider = FixedViewModelClock,
             ),
-            locationService = locationService,
+            platformDependencies = ExploreViewModelPlatformDependencies(
+                locationService = locationService,
+                track = track,
+            ),
             strings = strings,
             coroutineScope = viewModelScope,
             viewerSessionScopeTracker = viewerSessionScopeTracker,
-            track = track,
         ).also { viewModel ->
             viewModel.onIntent(ExploreIntent.ViewerContextChanged(viewerSessionScopeTracker.currentScope))
         }
@@ -578,7 +580,7 @@ class ExploreViewModelLocationTest {
                 appPreferencesRepository = null,
                 clockProvider = FixedViewModelClock,
             ),
-            locationService = locationService,
+            platformDependencies = ExploreViewModelPlatformDependencies(locationService = locationService),
             strings = strings,
             coroutineScope = viewModelScope,
             viewerSessionScopeTracker = viewerSessionScopeTracker,

@@ -1,5 +1,6 @@
 package com.kwabor.shared.app
 
+import com.kwabor.shared.domain.auth.AccountDeletionOutcome
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
@@ -141,7 +142,7 @@ private class IosRecoveryAuthRepository(
         request: PromoterActivationRequest,
     ): DomainResult<PromoterActivationResult> = unused()
 
-    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<Unit> = unused()
+    override suspend fun deleteAccount(request: AccountDeletionRequest): DomainResult<AccountDeletionOutcome> = unused()
 
     override suspend fun signOut(): DomainResult<Unit> = unused()
 

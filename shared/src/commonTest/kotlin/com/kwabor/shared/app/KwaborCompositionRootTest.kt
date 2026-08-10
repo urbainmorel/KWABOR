@@ -115,6 +115,7 @@ class KwaborCompositionRootTest {
             assertEquals(1, persistenceConfigurationRequests)
             assertEquals(0, databaseBuilderRequests)
             assertEquals(0, preferencesStorageRequests)
+            assertNull(root.interactionCoordinator)
         } finally {
             root.close()
         }
@@ -142,6 +143,7 @@ class KwaborCompositionRootTest {
             assertNull(root.exploreCacheStore)
             assertNull(root.authRepository)
             assertNull(root.authPresenter)
+            assertNull(root.interactionCoordinator)
             assertTrue(root.clockProvider.nowEpochMilliseconds() > 0L)
         } finally {
             root.close()
@@ -161,6 +163,7 @@ class KwaborCompositionRootTest {
         try {
             assertIs<DataAuthRepository>(root.authRepository)
             assertIs<AuthPresenter>(root.authPresenter)
+            assertNull(root.interactionCoordinator)
         } finally {
             root.close()
         }

@@ -13,11 +13,13 @@ internal class SupabasePasswordRecoveryAuthDataSource(
     private val auth: Auth,
     private val postgrest: Postgrest,
     passwordRecoverySessionStore: PasswordRecoverySessionStore,
+    private val accountDeletionSessionGuard: AccountDeletionSessionGuard,
 ) : PasswordRecoveryAuthDataSource {
     private val passwordRecoverySessionCoordinator =
         PasswordRecoverySessionCoordinator(passwordRecoverySessionStore)
 
     override suspend fun requestPasswordRecovery(email: String): Unit = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         try {
             auth.resetPasswordForEmail(email = email, redirectUrl = null)
         } catch (exception: AuthRestException) {
@@ -26,6 +28,7 @@ internal class SupabasePasswordRecoveryAuthDataSource(
     }
 
     override suspend fun verifyPasswordRecoveryOtp(email: String, otpCode: String): AuthSessionDto = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         val session = passwordRecoverySessionCoordinator.establishRecoverySession(
             clearCurrentSession = auth::clearSession,
         ) {
@@ -38,6 +41,7 @@ internal class SupabasePasswordRecoveryAuthDataSource(
     }
 
     override suspend fun completePasswordRecovery(newPassword: String): Unit = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         passwordRecoverySessionCoordinator.completeRecoverySession(
             hasCurrentSession = { auth.currentSessionOrNull() != null },
             missingSessionError = {

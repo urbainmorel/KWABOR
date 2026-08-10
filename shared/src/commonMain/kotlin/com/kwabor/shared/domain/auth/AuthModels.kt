@@ -4,6 +4,7 @@ import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
+import kotlin.coroutines.cancellation.CancellationException
 
 const val MAX_ONBOARDING_NAME_LENGTH = 80
 const val AUTH_OTP_EXPIRED_ERROR_KEY = "error.auth.otp_expired"
@@ -178,9 +179,43 @@ sealed interface AccountDeletionCredential {
     }
 }
 
+sealed interface AccountDeletionOutcome {
+    data object Deleted : AccountDeletionOutcome
+
+    data object OutcomeUnknown : AccountDeletionOutcome
+
+    data object LocalCleanupPending : AccountDeletionOutcome
+
+    data class RejectedCleanupPending(val error: DomainError) : AccountDeletionOutcome
+}
+
+class AccountDeletionPreTransportCancellation(
+    val original: CancellationException,
+) : CancellationException(original.message)
+
+class AccountDeletionPreTransportCleanupPendingCancellation(
+    val original: CancellationException,
+) : CancellationException(original.message)
+
+class AccountDeletionOutcomeUnknownCancellation(
+    val original: CancellationException,
+) : CancellationException(original.message)
+
+class AccountDeletionOutcomeUnknownCleanupPendingCancellation(
+    val original: CancellationException,
+) : CancellationException(original.message)
+
 class AccountDeletionRequest(
+    val expectedAccountId: String,
     val idempotencyKey: String,
     val credential: AccountDeletionCredential,
 ) {
-    override fun toString(): String = "AccountDeletionRequest(idempotencyKey=<redacted>, credential=<redacted>)"
+    init {
+        require(expectedAccountId.isNotEmpty() && expectedAccountId == expectedAccountId.trim()) {
+            "Expected account id must be normalized."
+        }
+    }
+
+    override fun toString(): String =
+        "AccountDeletionRequest(expectedAccountId=<redacted>, idempotencyKey=<redacted>, credential=<redacted>)"
 }

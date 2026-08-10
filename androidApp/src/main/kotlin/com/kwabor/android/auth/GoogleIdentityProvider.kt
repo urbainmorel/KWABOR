@@ -62,7 +62,7 @@ internal interface GoogleIdentityProvider {
 
     suspend fun acquireIdToken(): GoogleIdentityResult
 
-    suspend fun clearCredentialState()
+    suspend fun clearCredentialState(): Boolean
 }
 
 internal class AndroidGoogleIdentityProvider(
@@ -102,13 +102,12 @@ internal class AndroidGoogleIdentityProvider(
         return credential.toGoogleIdentityResult(rawNonce)
     }
 
-    override suspend fun clearCredentialState() {
-        try {
-            CredentialManager.create(applicationContext)
-                .clearCredentialState(ClearCredentialStateRequest())
-        } catch (_: ClearCredentialException) {
-            // The Kwabor session is already revoked. A provider-state refresh is best effort only.
-        }
+    override suspend fun clearCredentialState(): Boolean = try {
+        CredentialManager.create(applicationContext)
+            .clearCredentialState(ClearCredentialStateRequest())
+        true
+    } catch (_: ClearCredentialException) {
+        false
     }
 }
 

@@ -32,11 +32,13 @@ class IosKwaborCompositionRoot(
         presenter = sharedRoot?.explorePresenter,
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
+        interactionCoordinator = sharedRoot?.interactionCoordinator,
     )
     val favoritesController = IosFavoritesController(
         presenter = sharedRoot?.favoritesPresenter,
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
+        interactionCoordinator = sharedRoot?.interactionCoordinator,
     )
     val searchController = IosSearchController(
         presenter = sharedRoot?.searchPresenter,
@@ -53,6 +55,7 @@ class IosKwaborCompositionRoot(
     val authController = IosAuthController(
         presenter = sharedRoot?.authPresenter,
         dispatcherProvider = dispatcherProvider,
+        interactionCoordinator = sharedRoot?.interactionCoordinator,
     )
     val registrationController = IosRegistrationController(
         presenter = sharedRoot?.registrationPresenter,
@@ -68,6 +71,13 @@ class IosKwaborCompositionRoot(
         exploreController.interactionActions.updateViewerContext(scope)
         favoritesController.actions.updateViewerContext(scope)
         return scope
+    }
+
+    fun applicationBecameActive() {
+        if (authController.hasPendingAccountDeletionCleanup) {
+            authController.restoreSession { }
+        }
+        sharedRoot?.interactionCoordinator?.onForeground()
     }
 
     fun close() {

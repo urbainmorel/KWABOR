@@ -2,16 +2,17 @@
 
 ## Phase actuelle
 
-Livraison V1 incrémentale — le RPC Explore v2 est intégré dans `main` et le présent lot livre son
-socle de consommation Android/iOS : gateway strict, ordre serveur, pagination/snapshot, cache Room
-v3 et cartes natives. Le drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
+Livraison V1 incrémentale — le raccord mobile Explore v2 est intégré dans `main` et le présent lot
+termine SYNC-001 : outbox Room v4 Like/Favori, drain partagé Android/iOS, RPC account-fenced et
+suppression de compte coordonnée. La PR `#59` est validée exact-head et attend sa revue/fusion. Le
+drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
 
-## Snapshot courant — 9 août 2026
+## Snapshot courant — 10 août 2026
 
-- La base de ce lot est le commit de fusion `c630ee6b0b323544d891c71e80e6ebde06672738` de la PR `#57`.
-  Elle inclut EXPLORE-002B2A côté serveur, FAVORITES-001A de bout en bout, l'autorité HISTORY-001A,
-  ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de `#52` et l'intégration V1
-  de `#50`.
+- La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
+  Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
+  l'autorité HISTORY-001A, ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de
+  `#52` et l'intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
@@ -19,17 +20,21 @@ v3 et cartes natives. Le drawer de filtres avancés reste séparé et soumis à 
   de `main`. Son parcours a été remplacé fonctionnellement par AUTH-UX-001 intégré, sans portage
   manuel de l'ancienne branche.
 - Les runs post-fusion `30926418990` (`#50`), `30932997743` (`#51`), `30935484599` (`#52`),
-  `30940684400` (`#53`), `30945274481` (`#54`), `31298370818` (`#55`) et `31316774201` (`#56`)
-  sont verts pour
+  `30940684400` (`#53`), `30945274481` (`#54`), `31298370818` (`#55`), `31316774201` (`#56`),
+  `31321372761` (`#57`) et `31330170535` (`#58`) sont verts pour
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
+- La PR `#59` porte SYNC-001 au commit exact `a81ea8f0cc65be8d4e785040b97569999e6f7324`.
+  Le run `31370227545` passe ses 16 jobs : intégrité, Gradle, Supabase/pgTAP et concurrence,
+  Edge Function, Android API 30/31/36, Swift policies, XCFrameworks et Xcode 16.4 simulateur
+  Debug/Staging/Release. La PR est `CLEAN` et reste ouverte jusqu'à revue/fusion.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
   Android/iOS, détail natif, actions externes, découverte des guides, deep link interne de fiche et
   Profil → Favoris natif.
-- Ne sont pas terminés : racines Social/Ajouter/Notifications, outbox durable,
+- Ne sont pas terminés : racines Social/Ajouter/Notifications,
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
@@ -59,19 +64,20 @@ v3 et cartes natives. Le drawer de filtres avancés reste séparé et soumis à 
   effets et piles privées par scope de session, synchronise Explore dans les deux sens et conserve
   Like indépendant de Favori. Une fiche dépubliée reste liée mais masquée et retirable ; les RPC
   legacy restent disponibles pour les anciennes versions Store. ADR-0032 borne l'usage IA aux
-  favoris actifs sans journal d'activité et ADR-0033 fixe la cohérence client. Room et l'outbox
-  persistante restent ouvertes dans SYNC-001.
+  favoris actifs sans journal d'activité et ADR-0033 fixe la cohérence client. SYNC-001 ajoute dans
+  le présent lot l'écriture Room avant transport, le coalescing, le drain account-scoped et la
+  reprise après redémarrage sans modifier ce contrat de données.
 - EXPLORE-002B2A est intégré dans `main` via `#57` avec un RPC public v2 distinct : tri de popularité
   en `bigint`, proximité temporelle des événements, fenêtre UTC semi-ouverte, bornes prix XOF,
   curseur keyset lié à son snapshot et au fingerprint des filtres, puis au plus deux placements
   sponsorisés en tête du résultat. Le RPC v1 reste inchangé pour les versions Store.
-- EXPLORE-002B2B1 livre dans le présent lot un repository/gateway KMP v2 strict, utilisé par Explore
+- EXPLORE-002B2B1 est intégré dans `main` via `#58` avec un repository/gateway KMP v2 strict, utilisé par Explore
   Android/iOS pour les trois types d'onglet et les filtres UI déjà disponibles de ville et catégorie.
   Le contrat KMP conserve un `listingClass` optionnel et typé, mais les surfaces actuelles ne le
   renseignent pas. Le serveur reste l'unique autorité du tri et du placement sponsorisé. Toute page
   suivante non vide doit conserver le même snapshot en microsecondes et le mur cumulé garde au plus
-  deux sponsors dans son préfixe global. Room v3 persiste ces métadonnées via les migrations
-  `1 -> 2 -> 3`, sous une clé v2, avec lecture de secours du cache v1 seulement en l'absence de
+  deux sponsors dans son préfixe global. Le cache introduit en Room v3 persiste ces métadonnées ;
+  Room v4 conserve les migrations `1 -> 2 -> 3 -> 4`, sous une clé v2, avec lecture de secours du cache v1 seulement en l'absence de
   snapshot v2. Les cartes natives affichent l'alt, la date événement,
   l'état « Terminé » et « Sponsorisé » sans recalculer l'autorité serveur. ADR-0034 documente ce
   raccord ; le drawer prix/date, le multi-ville, le compteur live et la recherche filtrée restent
@@ -489,12 +495,11 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-EXPLORE-002B2B1 livre le raccord mobile de base au RPC v2 sans modifier le contrat catalogue v1 ni
-reproduire le classement côté client. EXPLORE-002B2B2 reste ouvert pour le drawer avancé après
-arbitrage Produit. FAVORITES-001A est livré de bout en bout ; sa persistance offline durable reste
-dans SYNC-001. HISTORY-001A conserve l'autorité serveur bornée, mais ADR-0031 et ses gates Produit,
-Sécurité, Juridique/DPO et Opérations doivent être arbitrés avant Room ou l'outbox. STAB-002B reste
-suspendu à la décision structurante sur les cinq racines V1.
+SYNC-001 est terminé et validé exact-head dans la PR `#59` ; seule sa revue/fusion reste ouverte. Il
+n'ajoute ni moniteur réseau plateforme ni ordre global multi-appareils. Aucun nouveau lot fonctionnel
+n'est engagé silencieusement : EXPLORE-002B2B2 attend l'arbitrage Produit du drawer avancé,
+HISTORY-001B attend les gates d'ADR-0031, et STAB-002B reste suspendu à la décision structurante sur
+les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de bout en bout.
 
 ## Blocages / limites
 
@@ -560,7 +565,10 @@ suspendu à la décision structurante sur les cinq racines V1.
   observés concernent les processus système de l'AVD, pas KWABOR.
 - L'écran Explore iOS SwiftUI natif compile dans les trois configurations simulateur et son smoke
   test de persistance est vert ; la validation VoiceOver/appareil physique reste à prouver avant release.
-- La queue offline Like/Favori est préparée en mémoire uniquement ; persistance locale, drain/retry automatique et reprise après login restent à livrer dans une tranche dédiée.
+- L'outbox Like/Favori du présent lot est conçue pour survivre au redémarrage et reprendre le même
+  compte après login ; cette propriété attend encore la preuve finale du snapshot exact.
+  Sans moniteur réseau natif, un retour réseau silencieux peut toutefois attendre jusqu'à cinq
+  minutes en premier plan ; foreground, retour d'écran et retry manuel réveillent le drain plus tôt.
 - AUTH-005 est validée localement et par la CI macOS native ; les preuves fournisseur réelles restent dépendantes du provisionnement propriétaire décrit ci-dessous.
 - Google/Apple restent inopérants hors tests tant que le propriétaire n'a pas créé les clients OAuth par tier, activé les fournisseurs dans les deux projets Supabase, activé Sign in with Apple sur l'App ID et régénéré les profils signés.
 - Le correctif SEC-001F retire les credentials du body, mais l'ouverture d'`account-delete` aux
@@ -585,7 +593,8 @@ suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Faire arbitrer par Produit EXPLORE-002B2B2 avant tout drawer avancé : presets de dates civiles du
+Faire relire puis fusionner la PR `#59`. Faire ensuite arbitrer par Produit EXPLORE-002B2B2 avant
+tout drawer avancé : presets de dates civiles du
 Bénin, prix, multi-ville, compteur live et partage des filtres avec Search. En parallèle, faire
 arbitrer ADR-0031 avant HISTORY-001B ; les recherches récentes restent conservées par conception
 pour l'assistant IA et la pertinence du fil, sous les plafonds et choix de personnalisation à

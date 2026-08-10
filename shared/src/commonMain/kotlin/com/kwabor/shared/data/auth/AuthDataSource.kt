@@ -50,7 +50,19 @@ internal interface PromoterActivationAuthDataSource {
 }
 
 internal interface AccountSecurityAuthDataSource {
-    suspend fun deleteAccount(request: AccountDeletionRequest)
+    suspend fun deleteAccount(request: AccountDeletionRequest): AccountDeletionDataOutcome
+}
+
+internal sealed interface AccountDeletionDataOutcome {
+    data object Deleted : AccountDeletionDataOutcome
+
+    data object OutcomeUnknown : AccountDeletionDataOutcome
+
+    data object LocalCleanupPending : AccountDeletionDataOutcome
+
+    data class RejectedCleanupPending(
+        val rejection: AuthDataException,
+    ) : AccountDeletionDataOutcome
 }
 
 internal interface PasswordRecoveryAuthDataSource {

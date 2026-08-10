@@ -86,15 +86,16 @@ snapshot serveur exact en microsecondes pour les pages suivantes et le cache.
 
 ### Room KMP
 
-La base `kwabor.db` est en version 3 avec migrations automatiques `1 -> 2` puis `2 -> 3`. Elle
-contient toujours six tables :
+La base `kwabor.db` est en version 4 avec migrations automatiques `1 -> 2`, `2 -> 3` puis `3 -> 4`.
+Elle contient sept tables :
 
 - `explore_cache_snapshots` ;
 - `explore_cached_listings` ;
 - `explore_cache_snapshot_items` ;
 - `explore_reference_snapshots` ;
 - `explore_reference_cities` ;
-- `explore_reference_categories`.
+- `explore_reference_categories` ;
+- `interaction_outbox_operations`.
 
 Le contenu canonique est séparé des requêtes/snapshots et de leur ordre. Un snapshot contient au
 maximum 50 fiches et la rétention garde 64 snapshots récents. Les écritures obsolètes sont rejetées
@@ -109,13 +110,23 @@ snapshot courant sans introduire de nouvelle ligne. Les colonnes restent nullabl
 migration conserve les lignes v1 ; ces lignes legacy ne sont lues qu'en secours lorsqu'aucun
 snapshot `explore-feed:v2` n'existe et ne peuvent pas servir de base à un append.
 
+La version 4 ajoute uniquement l'outbox Like/Favori. Une ligne porte l'UUID du compte et de la
+fiche, le type d'interaction, le dernier état booléen souhaité, son identifiant d'opération SQLite,
+son instant d'enqueue, son nombre de tentatives, sa prochaine échéance et un éventuel code de
+suspension terminal sans message technique. La clé `(account_id, listing_id, kind)` est unique ;
+un changement d'état remplace l'opération tandis qu'une répétition conserve son identifiant. Le
+stockage est borné à 1 000 lignes par compte, exclu des sauvegardes avec le reste de Room et purgé
+avant toute suppression distante du compte.
+
 Android place Room dans `noBackupFilesDir/KwaborRoom`, exclu de chaque mode de sauvegarde par le
 système, et conserve des règles explicites qui excluent les neuf domaines du cloud et des transferts
 appareil-à-appareil. iOS utilise le sous-dossier dédié `Application Support/KwaborRoom`, exclu des
 sauvegardes et protégé avec `CompleteUntilFirstUserAuthentication`. Les anciennes bases v2,
 composées uniquement de cache régénérable, sont supprimées lors du changement de chemin. Si une
 plateforme ne peut pas appliquer sa politique, Room reste en mémoire pour la session au lieu
-d’ouvrir une base disque non conforme. Les schémas exportés sont versionnés et vérifiés par `check`.
+d’ouvrir une base disque non conforme. Ce repli sert uniquement les caches régénérables : il expose
+explicitement une capacité d'outbox non durable, qui refuse submit, hydratation, drain et purge avant
+tout optimisme ou transport. Les schémas exportés sont versionnés et vérifiés par `check`.
 Une donnée de compte durable, comme le futur historique de recherche connecté, garde son autorité
 côté Supabase/RLS ; Room n’en conserve qu’un miroir local régénérable.
 
@@ -136,7 +147,7 @@ Le schéma cible du DESIGN ne doit pas être confondu avec l'état livré. Sont 
 incomplets :
 
 - avis, réponses et signalements de fiches/avis ;
-- outbox persistante Like/Favori et brouillons conflictuels ;
+- brouillons conflictuels ;
 - préférences/tokens push complets ;
 - buckets, uploads temporaires et finalisation média ;
 - ledger et webhooks FedaPay ;

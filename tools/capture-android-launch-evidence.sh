@@ -199,6 +199,7 @@ if [[ ! -f "${apk_path}" ]]; then
   exit 1
 fi
 
+timeout "${adb_general_timeout_seconds}" adb wait-for-device
 actual_api="$(
   timeout "${adb_general_timeout_seconds}" adb shell getprop ro.build.version.sdk |
     tr -d '\r'
@@ -212,6 +213,7 @@ rm -rf -- "${evidence_root}"
 mkdir -p "${evidence_root}"
 
 adb_root_output="not-requested"
+adb_root_status=0
 adb_shell_uid=""
 launch_surface_mode=""
 if [[ "${api_level}" == "31" ]]; then
@@ -219,12 +221,23 @@ if [[ "${api_level}" == "31" ]]; then
   # CI lane therefore runs a standard AOSP image as UID 0: Android 12 classifies
   # ROOT_UID as a system launch surface and selects the icon splash, just as it
   # does for a HOME/launcher source. Fail closed if the image is not rootable.
-  if ! adb_root_output="$(
+  if adb_root_output="$(
     timeout "${adb_general_timeout_seconds}" adb root 2>&1 |
       tr -d '\r'
   )"; then
+    :
+  else
+    adb_root_status=$?
     printf '%s\n' "${adb_root_output}" >"${evidence_root}/adb-root.txt"
     echo "Unable to restart the API 31 AOSP emulator adbd as root" >&2
+    if ((adb_root_status == 124)); then
+      exit "${adb_root_status}"
+    fi
+    if grep -Eiq \
+      'unable to connect.*closed|device offline|connection reset' \
+      <<<"${adb_root_output}"; then
+      exit "${screencap_retryable_gap_exit_status}"
+    fi
     exit 1
   fi
   printf '%s\n' "${adb_root_output}" >"${evidence_root}/adb-root.txt"

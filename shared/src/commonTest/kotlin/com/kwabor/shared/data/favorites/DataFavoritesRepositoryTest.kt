@@ -59,6 +59,24 @@ class DataFavoritesRepositoryTest {
     }
 
     @Test
+    fun accountScopedSetFavorite_canonicalizesExpectedAccountAndUsesDedicatedTransport() = runTest {
+        val dataSource = FakeFavoritesDataSource()
+        val repository = DataFavoritesRepository(dataSource)
+
+        val result = repository.setFavorite(
+            expectedAccountId = " ${FAVORITE_ACCOUNT_ID.uppercase()} ",
+            listingId = " ${FAVORITE_LISTING_ID_ONE.uppercase()} ",
+            favorited = true,
+        )
+
+        val mutation = assertIs<DomainResult.Success<FavoriteMutation>>(result).value
+        assertEquals(FAVORITE_ACCOUNT_ID, dataSource.lastExpectedAccountId)
+        assertEquals(FAVORITE_LISTING_ID_ONE, dataSource.lastListingId)
+        assertEquals(true, mutation.favorited)
+        assertEquals(1L, mutation.clientMutationSequence)
+    }
+
+    @Test
     fun setFavorite_rejectsMalformedIdWithoutCallingTransport() = runTest {
         val dataSource = FakeFavoritesDataSource()
         val repository = DataFavoritesRepository(dataSource)
@@ -152,6 +170,12 @@ private class SequencedFavoritesDataSource(
         serverFavorited = favorited
         return validFavoriteMutationRow(listingId = listingId, favorited = favorited)
     }
+
+    override suspend fun setFavoriteForAccount(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): FavoriteMutationRowDto = setFavorite(listingId = listingId, favorited = favorited)
 }
 
 private class FakeFavoritesDataSource(
@@ -162,6 +186,8 @@ private class FakeFavoritesDataSource(
     var lastPage: ListingPageRequest? = null
         private set
     var lastListingId: String? = null
+        private set
+    var lastExpectedAccountId: String? = null
         private set
     var lastFavorited: Boolean? = null
         private set
@@ -188,4 +214,15 @@ private class FakeFavoritesDataSource(
         lastFavorited = favorited
         return validFavoriteMutationRow(listingId = listingId, favorited = favorited)
     }
+
+    override suspend fun setFavoriteForAccount(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): FavoriteMutationRowDto {
+        lastExpectedAccountId = expectedAccountId
+        return setFavorite(listingId = listingId, favorited = favorited)
+    }
 }
+
+private const val FAVORITE_ACCOUNT_ID = "99999999-9999-4999-8999-999999999999"

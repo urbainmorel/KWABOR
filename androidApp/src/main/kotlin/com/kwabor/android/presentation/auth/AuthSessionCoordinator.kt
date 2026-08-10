@@ -17,8 +17,16 @@ import kotlinx.coroutines.launch
 internal class AuthSessionCoordinator(
     private val runtime: AuthViewModelRuntime,
     private val dependencies: AuthViewModelDependencies,
+    accountDeletionProviderCleanup: AccountDeletionProviderCleanupCoordinator,
+    onSessionRestoreReady: () -> Unit,
 ) {
-    private val sessionRestorer = AuthSessionRestorer(runtime, dependencies, this::redirectExistingAccountToSignIn)
+    private val sessionRestorer = AuthSessionRestorer(
+        runtime = runtime,
+        dependencies = dependencies,
+        accountDeletionProviderCleanup = accountDeletionProviderCleanup,
+        onExistingAccount = this::redirectExistingAccountToSignIn,
+        onSessionRestoreReady = onSessionRestoreReady,
+    )
     private val signOutCoordinator = AuthSignOutCoordinator(runtime, dependencies)
 
     fun handle(intent: AuthIntent.Journey) {
@@ -45,7 +53,11 @@ internal class AuthSessionCoordinator(
     }
 
     fun retrySessionRestore() {
-        sessionRestorer.retry()
+        if (runtime.accountDeletionOutcomeUnknown.value) {
+            sessionRestorer.retryProviderCleanupWithoutRestore()
+        } else {
+            sessionRestorer.retry()
+        }
     }
 
     private fun openSoftWall(context: AuthSoftWallContext) {
@@ -229,7 +241,9 @@ internal class AuthSessionCoordinator(
 private class AuthSessionRestorer(
     private val runtime: AuthViewModelRuntime,
     private val dependencies: AuthViewModelDependencies,
+    private val accountDeletionProviderCleanup: AccountDeletionProviderCleanupCoordinator,
     private val onExistingAccount: suspend (String) -> Unit,
+    private val onSessionRestoreReady: () -> Unit,
 ) {
     private var passwordRecoverySessionHandler: (suspend (AuthSession) -> Unit)? = null
 
@@ -261,6 +275,29 @@ private class AuthSessionRestorer(
         start(handler)
     }
 
+    fun retryProviderCleanupWithoutRestore() {
+        if (!accountDeletionProviderCleanup.pending.value) return
+        if (runtime.sessionRestoreJob?.isActive == true) return
+        runtime.sessionRestoreStatus.value = AuthSessionRestoreStatus.InProgress
+        runtime.sessionRestoreComplete.value = false
+        runtime.sessionRestoreJob = runtime.coroutineScope.launch {
+            try {
+                val cleanupCompleted = accountDeletionProviderCleanup.clearAfterRemoteBoundary()
+                if (!cleanupCompleted) {
+                    runtime.authState.value = initialAuthUiState().copy(
+                        errorMessage = runtime.strings.settings.privacyPersistenceError,
+                    )
+                }
+            } finally {
+                runtime.sessionRestoreStatus.value = AuthSessionRestoreStatus.Failed
+                runtime.sessionRestoreComplete.value = true
+                runtime.platformState.value = AuthPlatformUiState(
+                    surface = AuthSurface.SessionRestoreFailure,
+                )
+            }
+        }
+    }
+
     private fun start(onPasswordRecoverySession: suspend (AuthSession) -> Unit) {
         if (runtime.sessionRestoreJob?.isActive == true) return
         runtime.sessionRestoreStatus.value = AuthSessionRestoreStatus.InProgress
@@ -274,6 +311,7 @@ private class AuthSessionRestorer(
                     runtime.authState.value = state
                     return@launch
                 }
+                if (!clearPendingAccountDeletionProviderState(state.hasSession)) return@launch
                 route(state, onPasswordRecoverySession)
                 restoreSucceeded = true
             } catch (exception: CancellationException) {
@@ -290,8 +328,23 @@ private class AuthSessionRestorer(
                 }
                 publishRestoreSurface(restoreSucceeded)
                 runtime.sessionRestoreComplete.value = true
+                if (restoreSucceeded) onSessionRestoreReady()
             }
         }
+    }
+
+    private suspend fun clearPendingAccountDeletionProviderState(hasRestoredSession: Boolean): Boolean {
+        if (!accountDeletionProviderCleanup.pending.value) return true
+        val cleanupCompleted = if (hasRestoredSession) {
+            accountDeletionProviderCleanup.clearAfterResolvedPreTransport()
+        } else {
+            accountDeletionProviderCleanup.clearAfterRemoteBoundary()
+        }
+        if (cleanupCompleted) return true
+        runtime.authState.value = initialAuthUiState().copy(
+            errorMessage = runtime.strings.settings.privacyPersistenceError,
+        )
+        return false
     }
 
     private fun publishRestoreSurface(restoreSucceeded: Boolean) {
@@ -320,7 +373,12 @@ private class AuthSessionRestorer(
             return false
         }
         runtime.authState.value = signedOutState
-        dependencies.googleIdentityProvider.clearCredentialState()
+        if (!dependencies.googleIdentityProvider.clearCredentialState()) {
+            runtime.authState.value = signedOutState.copy(
+                errorMessage = runtime.strings.authFederatedUnavailable,
+            )
+            return false
+        }
         if (!dependencies.promoterActivationSessionStore.clear()) {
             runtime.authState.value = signedOutState.copy(
                 errorMessage = runtime.strings.authFederatedUnavailable,

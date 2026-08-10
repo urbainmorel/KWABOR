@@ -8,7 +8,9 @@ final class AccountDeletionStore: ObservableObject {
     @Published var password = ""
     @Published var confirmation = ""
     @Published private(set) var isLoading = false
+    @Published private(set) var isFederatedAttemptInProgress = false
     @Published private(set) var errorMessage: String?
+    private(set) var federatedPreparationErrorMessage: String?
 
     let strings: OnboardingStrings
 
@@ -45,7 +47,7 @@ final class AccountDeletionStore: ObservableObject {
     }
 
     func deleteWithPassword() {
-        guard hasConfirmedDeletion, !password.isEmpty, !isLoading else { return }
+        guard hasConfirmedDeletion, !password.isEmpty, !isLoading, !isFederatedAttemptInProgress else { return }
         guard onDeletionWillStart() else {
             errorMessage = strings.settings.privacyPersistenceError
             return
@@ -67,18 +69,19 @@ final class AccountDeletionStore: ObservableObject {
         _ credential: FederatedAuthCredential,
         onCompleted: @escaping (Bool) -> Void
     ) {
-        guard hasConfirmedDeletion, !isLoading else {
+        guard hasConfirmedDeletion, !isLoading, isFederatedAttemptInProgress else {
+            if isFederatedAttemptInProgress {
+                cancelPreparedFederatedDeletion {
+                    onCompleted(false)
+                }
+                return
+            }
             onCompleted(false)
             return
         }
-        guard onDeletionWillStart() else {
-            errorMessage = strings.settings.privacyPersistenceError
-            onCompleted(false)
-            return
-        }
+        isFederatedAttemptInProgress = false
         isLoading = true
         errorMessage = nil
-        onDeletionStateChanged(true)
         controller.deleteAccountWithSocial(
             request: credential.sharedRequest,
             idempotencyKey: idempotencyKey
@@ -89,18 +92,44 @@ final class AccountDeletionStore: ObservableObject {
         }
     }
 
-    func prepareFederatedDeletion() -> Bool {
-        guard hasConfirmedDeletion, !isLoading else { return false }
+    func prepareFederatedDeletion(onCompleted: @escaping (Bool) -> Void) {
+        federatedPreparationErrorMessage = nil
+        guard hasConfirmedDeletion, !isLoading, !isFederatedAttemptInProgress else {
+            onCompleted(false)
+            return
+        }
         guard onDeletionWillStart() else {
-            errorMessage = strings.settings.privacyPersistenceError
-            return false
+            federatedPreparationErrorMessage = strings.settings.privacyPersistenceError
+            onCompleted(false)
+            return
         }
         errorMessage = nil
-        return true
+        isFederatedAttemptInProgress = true
+        onDeletionStateChanged(true)
+        controller.prepareAccountDeletion { [weak self] prepared in
+            let didPrepare = prepared.boolValue
+            if !didPrepare {
+                self?.isFederatedAttemptInProgress = false
+                if let self {
+                    federatedPreparationErrorMessage = latestAuthError() ?? strings.authAccountDeletionFailed
+                    onDeletionStateChanged(false)
+                }
+            }
+            onCompleted(didPrepare)
+        }
+    }
+
+    func cancelPreparedFederatedDeletion(onCompleted: @escaping () -> Void) {
+        controller.cancelPreparedAccountDeletion { [weak self] _ in
+            self?.isFederatedAttemptInProgress = false
+            self?.federatedPreparationErrorMessage = nil
+            self?.onDeletionStateChanged(false)
+            onCompleted()
+        }
     }
 
     func reset() {
-        guard !isLoading else { return }
+        guard !isLoading, !isFederatedAttemptInProgress else { return }
         password = ""
         confirmation = ""
         errorMessage = nil
@@ -235,8 +264,12 @@ private struct AccountDeletionConfirmationView: View {
                 presenterProvider: WindowScenePresentingViewControllerProvider(),
                 identityHintStore: identityHintStore,
                 reportsSubmissionFailure: false,
-                attemptPreflight: deletionStore.prepareFederatedDeletion,
-                attemptPreflightErrorMessage: strings.settings.privacyPersistenceError,
+                attemptPreparation: deletionStore.prepareFederatedDeletion,
+                attemptPreparationErrorMessage: {
+                    deletionStore.federatedPreparationErrorMessage ?? latestAuthError() ??
+                        strings.authAccountDeletionFailed
+                },
+                onPreparedAttemptAborted: deletionStore.cancelPreparedFederatedDeletion,
                 onCredential: deletionStore.deleteWithFederatedCredential
             )
         )
@@ -267,6 +300,7 @@ private struct AccountDeletionConfirmationView: View {
                         .textContentType(.password)
                         .kwaborAuthenticationField()
                     Button(store.strings.authDeleteAccountConfirm, role: .destructive) {
+                        federatedStore.clearError()
                         store.deleteWithPassword()
                     }
                     .buttonStyle(.borderedProminent)
@@ -274,12 +308,13 @@ private struct AccountDeletionConfirmationView: View {
                     .frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)
                     .disabled(
                         !store.hasConfirmedDeletion || store.password.isEmpty ||
-                            store.isLoading || !store.isConfigured
+                            store.isLoading || store.isFederatedAttemptInProgress || !store.isConfigured
                     )
 
                     FederatedSignInButtons(
                         store: federatedStore,
-                        isDisabled: !store.hasConfirmedDeletion || store.isLoading || !store.isConfigured
+                        isDisabled: !store.hasConfirmedDeletion || store.isLoading ||
+                            store.isFederatedAttemptInProgress || !store.isConfigured
                     )
 
                     if let errorMessage = store.errorMessage {
@@ -303,7 +338,10 @@ private struct AccountDeletionConfirmationView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(store.isLoading || federatedStore.isLoading)
+        .interactiveDismissDisabled(
+            store.isLoading || store.isFederatedAttemptInProgress || federatedStore.isLoading
+        )
+        .onDisappear(perform: federatedStore.abortDeferredAttemptForDisappearance)
     }
 }
 

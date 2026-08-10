@@ -17,8 +17,10 @@ internal class SupabaseAuthRegistrationDataSource(
     private val auth: Auth,
     private val postgrest: Postgrest,
     private val passwordRecoverySessionStore: PasswordRecoverySessionStore,
+    private val accountDeletionSessionGuard: AccountDeletionSessionGuard,
 ) : AuthRegistrationDataSource {
     override suspend fun requestEmailOtp(email: String): Unit = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         auth.signInWith(OTP) {
             this.email = email
             createUser = true
@@ -26,6 +28,7 @@ internal class SupabaseAuthRegistrationDataSource(
     }
 
     override suspend fun verifyEmailOtp(email: String, otpCode: String): AuthSessionDto = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         val session = verifyEmailOtpForSession(email = email, otpCode = otpCode)
         passwordRecoverySessionStore.clearPasswordRecovery()
         session.toDtoWithServerStatus(
@@ -35,6 +38,7 @@ internal class SupabaseAuthRegistrationDataSource(
     }
 
     override suspend fun setInitialPassword(password: String): Unit = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         auth.updateUser(updateCurrentUser = true) {
             this.password = password
         }
@@ -54,6 +58,7 @@ internal class SupabaseAuthRegistrationDataSource(
     }
 
     override suspend fun completeOnboarding(request: CompleteOnboardingRequest): AuthSessionDto = runAuthRequest {
+        accountDeletionSessionGuard.ensureCleanupCompleted()
         val completedProfile = postgrest.rpc(
             function = COMPLETE_ONBOARDING_RPC,
             parameters = request.toRpcDto(),

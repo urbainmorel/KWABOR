@@ -9,6 +9,33 @@ private func expect(
     }
 }
 
+private func repositorySource(_ path: String) -> String {
+    guard let source = try? String(contentsOfFile: path, encoding: .utf8) else {
+        fatalError("Unable to read repository source: \(path)")
+    }
+    return source
+}
+
+private func sourceSection(
+    _ source: String,
+    from startMarker: String,
+    until endMarker: String
+) -> String {
+    guard let start = source.range(of: startMarker),
+          let end = source.range(of: endMarker, range: start.upperBound..<source.endIndex) else {
+        fatalError("Unable to locate source section from \(startMarker) to \(endMarker).")
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
+}
+
+private func sourceContains(_ first: String, before second: String, in source: String) -> Bool {
+    guard let firstRange = source.range(of: first),
+          let secondRange = source.range(of: second) else {
+        return false
+    }
+    return firstRange.lowerBound < secondRange.lowerBound
+}
+
 private func callbackURL(tokenCharacter: String, includesPkceCode: Bool) -> URL {
     let token = String(repeating: tokenCharacter, count: 64)
     let suffix = includesPkceCode ? "&code=pkce-code-value" : ""
@@ -1600,4 +1627,237 @@ expect(
 expect(
     searchPaginationGuard.shouldRetry(cursor: "search-cursor-2", canLoadMore: true),
     "Search pagination permits an explicit retry after an append error."
+)
+
+private let iosRootSource = repositorySource(
+    "shared/src/iosMain/kotlin/com/kwabor/shared/app/IosKwaborCompositionRoot.kt"
+)
+private let iosAuthSource = repositorySource(
+    "shared/src/iosMain/kotlin/com/kwabor/shared/app/IosAccountDeletionCoordinator.kt"
+)
+private let kwaborAppSource = repositorySource("iosApp/Kwabor/App/KwaborApp.swift")
+private let accountDeletionSource = repositorySource(
+    "iosApp/Kwabor/Onboarding/AccountDeletionView.swift"
+)
+private let federatedSignInSource = repositorySource(
+    "iosApp/Kwabor/Onboarding/FederatedSignIn.swift"
+)
+private let onboardingCoordinatorSource = repositorySource(
+    "iosApp/Kwabor/Onboarding/OnboardingCoordinator.swift"
+)
+private let iosPackageLockSource = repositorySource(
+    "iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+)
+
+expect(
+    iosRootSource.components(
+        separatedBy: "interactionCoordinator = sharedRoot?.interactionCoordinator"
+    ).count - 1 == 3,
+    "The iOS root must inject the one durable coordinator into Explore, Favorites, and Auth."
+)
+expect(
+    iosRootSource.contains("fun applicationBecameActive()") &&
+        iosRootSource.contains("sharedRoot?.interactionCoordinator?.onForeground()"),
+    "The iOS root foreground hook must wake the durable interaction coordinator."
+)
+private let activeSceneSection = sourceSection(
+    kwaborAppSource,
+    from: "if phase == .active",
+    until: "                }\n        }"
+)
+expect(
+    activeSceneSection.contains("coordinator.applicationBecameActive()") &&
+        activeSceneSection.contains("compositionRoot.applicationBecameActive()"),
+    "An active iOS scene must wake both onboarding maintenance and the durable interaction root."
+)
+expect(
+    iosAuthSource.contains("IosAccountDeletionPurgeAttempt(accountId, interactionLifecycle, host)") &&
+        iosAuthSource.contains("lifecycle.purge(accountId) {") &&
+        iosAuthSource.contains("expectedAccountId = accountId"),
+    "Account deletion must purge locally and fence the remote request with the captured account."
+)
+expect(
+    accountDeletionSource.contains("attemptPreparation: deletionStore.prepareFederatedDeletion") &&
+        accountDeletionSource.contains(
+            "onPreparedAttemptAborted: deletionStore.cancelPreparedFederatedDeletion"
+        ),
+    "Federated account deletion must prepare before provider launch and resume after provider abort."
+)
+
+private let appleStartSection = sourceSection(
+    federatedSignInSource,
+    from: "func startAppleSignIn()",
+    until: "func completeAppleAuthorization"
+)
+expect(
+    sourceContains("prepareDeferredAttempt", before: "launchAppleSignIn", in: appleStartSection),
+    "The Apple authorization controller must never launch before deferred deletion preparation."
+)
+expect(
+    federatedSignInSource.contains(
+        "appleAuthorizationContexts[ObjectIdentifier(authorizationController)] = context"
+    ) && federatedSignInSource.contains(
+        "appleAuthorizationContexts.removeValue(forKey: identifier)"
+    ) && federatedSignInSource.contains(
+        "completeAppleAuthorization(controller: controller, result:"
+    ) && !federatedSignInSource.contains(
+        "preconditionFailure(\"Apple authorization requires its captured presentation anchor.\")"
+    ),
+    "Late Apple callbacks must resolve only their controller-scoped nonce, generation, and anchor."
+)
+expect(
+    federatedSignInSource.contains("cancelAppleAuthorizationContexts(for: generation)") &&
+        federatedSignInSource.contains(".forEach { $0.controller.cancel() }") &&
+        !federatedSignInSource.contains("private func clearPendingProviderState()"),
+    "Aborting one Apple picker must preserve its controller context until its own terminal callback."
+)
+expect(
+    sourceContains(
+        "prepareDeferredAttempt",
+        before: "presenterProvider.presentingViewController()",
+        in: appleStartSection
+    ) && federatedSignInSource.contains("guard windowScene?.activationState == .foregroundActive") &&
+        federatedSignInSource.contains("PresentationSceneReader(onSceneChanged: store.bindPresentationScene)") &&
+        !federatedSignInSource.contains("UIApplication.shared.connectedScenes"),
+    "Deferred Apple deletion must resolve its presenter from an active scene after local preparation."
+)
+expect(
+    federatedSignInSource.contains(".allowsHitTesting(false)") &&
+        federatedSignInSource.contains(".accessibilityHidden(true)") &&
+        federatedSignInSource.contains(
+            ".frame(maxWidth: .infinity, minHeight: KwaborDesignTokens.Sizing.touchTarget)"
+        ),
+    "The decorative native Apple button must not expose a second path around deferred preparation."
+)
+private let googleStartSection = sourceSection(
+    federatedSignInSource,
+    from: "func startGoogleSignIn()",
+    until: "private func launchAppleSignIn"
+)
+expect(
+    googleStartSection.contains("prepareDeferredAttempt") &&
+        !googleStartSection.contains("GIDSignIn.sharedInstance.signIn") &&
+        sourceContains(
+            "prepareDeferredAttempt",
+            before: "presenterProvider.presentingViewController()",
+            in: googleStartSection
+        ),
+    "Google account deletion must finish deferred preparation before entering the SDK picker."
+)
+private let providerFailureSection = sourceSection(
+    federatedSignInSource,
+    from: "private func finishProviderFailure",
+    until: "private func prepareAttempt"
+)
+expect(
+    providerFailureSection.contains("onPreparedAttemptAborted") &&
+        providerFailureSection.contains("deferredAttemptPhase = .aborting(generation)"),
+    "A cancelled or unavailable federated provider must release its prepared deletion block."
+)
+expect(
+    accountDeletionSource.contains(
+        ".onDisappear(perform: federatedStore.abortDeferredAttemptForDisappearance)"
+    ) &&
+        federatedSignInSource.contains("case preparing(UInt64)") &&
+        federatedSignInSource.contains("case providerActive(UInt64)") &&
+        federatedSignInSource.contains("case submitting(UInt64)"),
+    "Federated deletion disappearance must abort only tokenized pre-transport phases."
+)
+private let federatedPreparationSection = sourceSection(
+    accountDeletionSource,
+    from: "func prepareFederatedDeletion",
+    until: "func cancelPreparedFederatedDeletion"
+)
+expect(
+    federatedPreparationSection.contains("federatedPreparationErrorMessage =") &&
+        !federatedPreparationSection.contains("errorMessage = strings.settings.privacyPersistenceError") &&
+        !federatedPreparationSection.contains("errorMessage = latestAuthError()"),
+    "A federated preparation failure must be rendered only by the federated provider store."
+)
+expect(
+    accountDeletionSource.contains("federatedStore.clearError()") &&
+        federatedSignInSource.contains("func clearError()"),
+    "Starting password deletion must clear any stale federated preparation error."
+)
+private let federatedSubmitSection = sourceSection(
+    federatedSignInSource,
+    from: "private func submit(",
+    until: "private func prepareDeferredAttempt"
+)
+expect(
+    sourceContains(
+        "deferredAttemptPhase = .submitting(deferredGeneration)",
+        before: "onCredential(credential)",
+        in: federatedSubmitSection
+    ),
+    "Federated deletion must cross the ambiguous transport boundary before credential submission."
+)
+private let accountDeletionPrivacyCleanupSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "private func completeAccountDeletionPrivacyCleanupIfNeeded",
+    until: "func accountDeletionCompleted"
+)
+private let promoterCallbackProcessingSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "private func processPendingPromoterActivationCallbackIfPossible",
+    until: "private func persistPromoterActivationMarkerThenCallShared"
+)
+expect(
+    federatedSignInSource.contains("protocol AccountDeletionPrivacyCleanupPersisting") &&
+        onboardingCoordinatorSource.contains("accountDeletionPrivacyCleanupStore.persist()") &&
+        onboardingCoordinatorSource.contains("@Published private var accountDeletionPrivacyCleanupArmed") &&
+        onboardingCoordinatorSource.contains("accountDeletionPrivacyCleanupArmed ||") &&
+        onboardingCoordinatorSource.contains(
+            "accountDeletionPrivacyCleanupStore.state != .absent"
+        ) &&
+        onboardingCoordinatorSource.contains("accountDeletionPrivacyCleanupArmed = true") &&
+        onboardingCoordinatorSource.contains("completeAccountDeletionPrivacyCleanupIfNeeded(state)") &&
+        accountDeletionPrivacyCleanupSection.contains(
+            "guard isDeletingAccount || sessionRestoreCompleted"
+        ) &&
+        accountDeletionPrivacyCleanupSection.contains("guard !state.hasSession") &&
+        accountDeletionPrivacyCleanupSection.contains(
+            "let hintsCleared = federatedIdentityHintStore.clearAllHints()"
+        ) &&
+        accountDeletionPrivacyCleanupSection.contains(
+            "let googleSessionCleared = GoogleSignInBootstrap.clearLocalSession()"
+        ) &&
+        accountDeletionPrivacyCleanupSection.contains("guard hintsCleared, googleSessionCleared") &&
+        sourceContains(
+            "accountDeletionPrivacyCleanupArmed = false",
+            before: "processPendingPromoterActivationCallbackIfPossible()",
+            in: accountDeletionPrivacyCleanupSection
+        ) &&
+        promoterCallbackProcessingSection.components(
+            separatedBy: "!accountDeletionPrivacyCleanupArmed"
+        ).count - 1 == 2,
+    "Deletion without a session must clear provider tokens and identity hints for unknown outcomes."
+)
+private let googleDeletionCleanupSection = sourceSection(
+    federatedSignInSource,
+    from: "enum GoogleSignInBootstrap",
+    until: "private struct NonceAttempt"
+)
+private let googleSignInPackageSection = sourceSection(
+    iosPackageLockSource,
+    from: "\"identity\" : \"googlesignin-ios\"",
+    until: "\"identity\" : \"googleutilities\""
+)
+private let gtmAppAuthPackageSection = sourceSection(
+    iosPackageLockSource,
+    from: "\"identity\" : \"gtmappauth\"",
+    until: "\"identity\" : \"interop-ios-for-google-sdks\""
+)
+expect(
+    googleDeletionCleanupSection.contains(
+        "guard UIApplication.shared.isProtectedDataAvailable else { return false }"
+    ) && googleDeletionCleanupSection.contains("keychainService = \"auth\"") &&
+        googleDeletionCleanupSection.contains("keychainAccount = \"OAuth\"") &&
+        googleDeletionCleanupSection.contains("kSecAttrService as String: keychainService") &&
+        googleDeletionCleanupSection.contains("kSecAttrAccount as String: keychainAccount") &&
+        googleDeletionCleanupSection.contains("status == errSecSuccess || status == errSecItemNotFound") &&
+        googleDeletionCleanupSection.contains("currentUser == nil && persistedSessionRemoved") &&
+        googleSignInPackageSection.contains("\"version\" : \"9.0.0\"") &&
+        gtmAppAuthPackageSection.contains("\"version\" : \"5.0.0\""),
+    "Google deletion cleanup must verify the pinned SDK Keychain entry before clearing its retry marker."
 )

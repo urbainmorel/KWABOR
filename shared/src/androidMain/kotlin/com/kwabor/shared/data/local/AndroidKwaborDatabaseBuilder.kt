@@ -3,7 +3,6 @@ package com.kwabor.shared.data.local
 import android.content.Context
 import android.util.Log
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import java.io.File
 import java.io.IOException
 
@@ -11,7 +10,7 @@ private const val ANDROID_ROOM_DIRECTORY_NAME = "KwaborRoom"
 private const val ANDROID_ROOM_STORAGE_LOG_TAG = "KwaborRoomStorage"
 private val ANDROID_DATABASE_FILE_SUFFIXES = listOf("", "-wal", "-shm", "-journal")
 
-internal fun createAndroidKwaborDatabaseBuilder(context: Context): RoomDatabase.Builder<KwaborDatabase> {
+internal fun createAndroidKwaborDatabaseBuilder(context: Context): KwaborDatabaseBuilderResult {
     val applicationContext = context.applicationContext
     val databasePath = prepareAndroidRoomDatabasePath(applicationContext)
     if (databasePath == null) {
@@ -19,15 +18,25 @@ internal fun createAndroidKwaborDatabaseBuilder(context: Context): RoomDatabase.
             ANDROID_ROOM_STORAGE_LOG_TAG,
             "Local persistence policy is unavailable; using memory-only storage.",
         )
-        return Room.inMemoryDatabaseBuilder<KwaborDatabase>(
-            context = applicationContext,
-            factory = KwaborDatabaseConstructor::initialize,
+        return KwaborDatabaseBuilderResult(
+            storageMode = KwaborDatabaseStorageMode.MemoryOnly,
+            builderFactory = {
+                Room.inMemoryDatabaseBuilder<KwaborDatabase>(
+                    context = applicationContext,
+                    factory = KwaborDatabaseConstructor::initialize,
+                )
+            },
         )
     }
-    return Room.databaseBuilder<KwaborDatabase>(
-        context = applicationContext,
-        name = databasePath,
-        factory = KwaborDatabaseConstructor::initialize,
+    return KwaborDatabaseBuilderResult(
+        storageMode = KwaborDatabaseStorageMode.Durable,
+        builderFactory = {
+            Room.databaseBuilder<KwaborDatabase>(
+                context = applicationContext,
+                name = databasePath,
+                factory = KwaborDatabaseConstructor::initialize,
+            )
+        },
     )
 }
 

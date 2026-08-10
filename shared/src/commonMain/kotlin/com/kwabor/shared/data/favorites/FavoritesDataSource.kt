@@ -8,6 +8,12 @@ internal interface FavoritesDataSource {
     suspend fun listFavorites(filter: ListingType?, page: ListingPageRequest): FavoriteListingPageDto
 
     suspend fun setFavorite(listingId: String, favorited: Boolean): FavoriteMutationRowDto
+
+    suspend fun setFavoriteForAccount(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): FavoriteMutationRowDto
 }
 
 internal sealed class FavoritesDataException(

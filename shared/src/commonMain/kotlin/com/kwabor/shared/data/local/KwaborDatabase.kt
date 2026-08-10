@@ -11,6 +11,21 @@ import kotlin.coroutines.CoroutineContext
 
 internal const val KWABOR_DATABASE_FILENAME = "kwabor.db"
 
+internal enum class KwaborDatabaseStorageMode {
+    Durable,
+    MemoryOnly,
+}
+
+internal data class KwaborDatabaseBuilderResult(
+    val storageMode: KwaborDatabaseStorageMode,
+    val builderFactory: () -> RoomDatabase.Builder<KwaborDatabase>,
+) {
+    val supportsDurableInteractionOutbox: Boolean
+        get() = storageMode == KwaborDatabaseStorageMode.Durable
+
+    fun createBuilder(): RoomDatabase.Builder<KwaborDatabase> = builderFactory()
+}
+
 @Database(
     entities = [
         ExploreCacheSnapshotEntity::class,
@@ -19,12 +34,14 @@ internal const val KWABOR_DATABASE_FILENAME = "kwabor.db"
         ExploreReferenceSnapshotEntity::class,
         ExploreReferenceCityEntity::class,
         ExploreReferenceCategoryEntity::class,
+        InteractionOutboxEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 3, to = 4),
     ],
 )
 @ConstructedBy(KwaborDatabaseConstructor::class)
@@ -38,6 +55,8 @@ internal abstract class KwaborDatabase : RoomDatabase() {
     internal abstract fun explorePersistenceWatermarkDao(): ExplorePersistenceWatermarkDao
 
     internal abstract fun searchCacheDao(): SearchCacheDao
+
+    internal abstract fun interactionOutboxDao(): InteractionOutboxDao
 }
 
 internal expect object KwaborDatabaseConstructor : RoomDatabaseConstructor<KwaborDatabase>

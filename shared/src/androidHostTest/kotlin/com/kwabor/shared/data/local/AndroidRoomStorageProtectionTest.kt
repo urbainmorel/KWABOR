@@ -11,6 +11,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -47,8 +48,11 @@ class AndroidRoomStorageProtectionTest {
             assertFalse(File("$legacyBasePath$suffix").exists())
         }
 
+        val builderResult = createAndroidKwaborDatabaseBuilder(context)
+        assertEquals(KwaborDatabaseStorageMode.Durable, builderResult.storageMode)
+        assertTrue(builderResult.supportsDurableInteractionOutbox)
         val database = buildKwaborDatabase(
-            builder = createAndroidKwaborDatabaseBuilder(context),
+            builder = builderResult.createBuilder(),
             queryCoroutineContext = coroutineContext,
             driver = AndroidSQLiteDriver(),
         )
@@ -70,8 +74,11 @@ class AndroidRoomStorageProtectionTest {
             assertFalse(File("$legacyBasePath$suffix").exists())
         }
 
+        val builderResult = createAndroidKwaborDatabaseBuilder(context)
+        assertEquals(KwaborDatabaseStorageMode.MemoryOnly, builderResult.storageMode)
+        assertFalse(builderResult.supportsDurableInteractionOutbox)
         val database = buildKwaborDatabase(
-            builder = createAndroidKwaborDatabaseBuilder(context),
+            builder = builderResult.createBuilder(),
             queryCoroutineContext = coroutineContext,
             driver = AndroidSQLiteDriver(),
         )
