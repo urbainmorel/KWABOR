@@ -780,6 +780,16 @@ select ok(
   'a legacy direct write cannot resurrect data after account cleanup'
 );
 
+insert into favorites_concurrency_observations (
+  observation_key,
+  bigint_value
+)
+select
+  'like-direct-first-baseline-count',
+  listing.likes_count
+from public.listings as listing
+where listing.id = '00000000-0000-4000-8000-000000000101';
+
 do $like_direct_first_setup$
 declare
   inserted_listing_id uuid;
@@ -887,12 +897,10 @@ select ok(
     where user_id = 'fc100000-0000-4000-8000-000000000006'
   )
   and (
-    select listing.likes_count = (
-      select count(*)
-      from public.likes as counted_like
-      where counted_like.listing_id = listing.id
-    )
+    select listing.likes_count = observation.bigint_value
     from public.listings as listing
+    join favorites_concurrency_observations as observation
+      on observation.observation_key = 'like-direct-first-baseline-count'
     where listing.id = '00000000-0000-4000-8000-000000000101'
   ),
   'deletion purges the earlier direct Like and restores its aggregate counter'
