@@ -226,9 +226,9 @@ final class KeychainAccountDeletionPrivacyCleanupStore: AccountDeletionPrivacyCl
         query[kSecReturnData as String] = false
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         switch SecItemCopyMatching(query as CFDictionary, nil) {
-        case errSecSuccess: .pending
-        case errSecItemNotFound: .absent
-        default: .unavailable
+        case errSecSuccess: return .pending
+        case errSecItemNotFound: return .absent
+        default: return .unavailable
         }
     }
 
