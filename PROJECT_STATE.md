@@ -3,11 +3,11 @@
 ## Phase actuelle
 
 Livraison V1 incrémentale — le raccord mobile Explore v2 est intégré dans `main` et le présent lot
-implémente SYNC-001, encore en validation : outbox Room v4 Like/Favori, drain partagé Android/iOS,
-RPC account-fenced et suppression de compte coordonnée. Le drawer de filtres avancés reste séparé
-et soumis à arbitrage Produit.
+termine SYNC-001 : outbox Room v4 Like/Favori, drain partagé Android/iOS, RPC account-fenced et
+suppression de compte coordonnée. La PR `#59` est validée exact-head et attend sa revue/fusion. Le
+drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
 
-## Snapshot courant — 9 août 2026
+## Snapshot courant — 10 août 2026
 
 - La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
   Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
@@ -25,6 +25,10 @@ et soumis à arbitrage Produit.
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
+- La PR `#59` porte SYNC-001 au commit exact `a81ea8f0cc65be8d4e785040b97569999e6f7324`.
+  Le run `31370227545` passe ses 16 jobs : intégrité, Gradle, Supabase/pgTAP et concurrence,
+  Edge Function, Android API 30/31/36, Swift policies, XCFrameworks et Xcode 16.4 simulateur
+  Debug/Staging/Release. La PR est `CLEAN` et reste ouverte jusqu'à revue/fusion.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -491,12 +495,11 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-SYNC-001 implémente localement l'outbox Like/Favori et son drain partagé, mais reste ouvert jusqu'aux
-gates Gradle, Supabase et iOS exact-head. Il n'ajoute ni moniteur réseau plateforme ni ordre global
-multi-appareils. EXPLORE-002B2B2 reste ouvert pour le drawer avancé après arbitrage
-Produit. FAVORITES-001A est livré de bout en bout et réutilise désormais cette persistance. HISTORY-001A conserve l'autorité serveur bornée, mais ADR-0031 et ses gates Produit,
-Sécurité, Juridique/DPO et Opérations doivent être arbitrés avant Room ou l'outbox. STAB-002B reste
-suspendu à la décision structurante sur les cinq racines V1.
+SYNC-001 est terminé et validé exact-head dans la PR `#59` ; seule sa revue/fusion reste ouverte. Il
+n'ajoute ni moniteur réseau plateforme ni ordre global multi-appareils. Aucun nouveau lot fonctionnel
+n'est engagé silencieusement : EXPLORE-002B2B2 attend l'arbitrage Produit du drawer avancé,
+HISTORY-001B attend les gates d'ADR-0031, et STAB-002B reste suspendu à la décision structurante sur
+les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de bout en bout.
 
 ## Blocages / limites
 
@@ -590,7 +593,8 @@ suspendu à la décision structurante sur les cinq racines V1.
 
 ## Prochaine tâche logique
 
-Faire arbitrer par Produit EXPLORE-002B2B2 avant tout drawer avancé : presets de dates civiles du
+Faire relire puis fusionner la PR `#59`. Faire ensuite arbitrer par Produit EXPLORE-002B2B2 avant
+tout drawer avancé : presets de dates civiles du
 Bénin, prix, multi-ville, compteur live et partage des filtres avec Search. En parallèle, faire
 arbitrer ADR-0031 avant HISTORY-001B ; les recherches récentes restent conservées par conception
 pour l'assistant IA et la pertinence du fil, sous les plafonds et choix de personnalisation à

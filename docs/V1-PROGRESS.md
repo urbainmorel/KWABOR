@@ -7,13 +7,13 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 
 | Élément | État vérifié |
 | --- | --- |
-| Date du snapshot | 9 août 2026 |
-| Référence Git | Base du lot : `main` au merge `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58` |
-| Intégration | PR `#50` V1 à `#58` EXPLORE-002B2B1 fusionnées ; SYNC-001 implémenté localement et encore en validation |
+| Date du snapshot | 10 août 2026 |
+| Référence Git | Base : `main` au merge `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58` ; lot courant : `a81ea8f0cc65be8d4e785040b97569999e6f7324` |
+| Intégration | PR `#50` V1 à `#58` EXPLORE-002B2B1 fusionnées ; SYNC-001 validé dans la PR ouverte `#59`, en attente de revue/fusion |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Run post-fusion `31330170535` entièrement vert sur `main`, dont Supabase, Gradle et iOS Debug/Staging/Release |
+| CI exacte | Run `31370227545` entièrement vert sur la PR `#59` (16/16), dont Supabase, Gradle, Android API 30/31/36 et iOS Debug/Staging/Release |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -72,8 +72,8 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
   transport, coalescence du dernier état souhaité, CAS par opération, reprise après redémarrage,
   backoff borné, hydratation et drain exact-scope dans Explore/Favoris. Les setters RPC v2 refusent
   toute mutation si le compte attendu diffère du JWT ; Android et iOS bloquent puis purgent cette
-  outbox avant la réauthentification de suppression de compte. Le lot reste ouvert jusqu'aux gates
-  Gradle, Supabase, Kotlin/Native et Xcode exact-head.
+  outbox avant la réauthentification de suppression de compte. Les gates Gradle, Supabase,
+  Kotlin/Native et Xcode exact-head sont vertes ; seule la revue/fusion de la PR `#59` reste ouverte.
 
 ## Incomplet ou absent
 
