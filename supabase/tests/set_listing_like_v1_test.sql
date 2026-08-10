@@ -1097,17 +1097,14 @@ select is(
   0::bigint,
   'RLS hides another account Like relation'
 );
+with deleted_like as (
+  delete from public.likes as viewer_like
+  where viewer_like.user_id = '1a1e0000-0000-4000-8000-000000000001'
+    and viewer_like.listing_id = '00000000-0000-4000-8000-000000000101'
+  returning viewer_like.listing_id
+)
 select is(
-  (
-    with deleted_like as (
-      delete from public.likes as viewer_like
-      where viewer_like.user_id = '1a1e0000-0000-4000-8000-000000000001'
-        and viewer_like.listing_id = '00000000-0000-4000-8000-000000000101'
-      returning viewer_like.listing_id
-    )
-    select count(*)
-    from deleted_like
-  ),
+  (select count(*) from deleted_like),
   0::bigint,
   'RLS prevents a direct cross-account Like deletion'
 );
