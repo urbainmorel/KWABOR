@@ -12,6 +12,7 @@ import com.kwabor.shared.domain.auth.AUTH_PROMOTER_INVITE_EXPIRED_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_PROMOTER_INVITE_INVALID_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_PROMOTER_INVITE_USED_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_RATE_LIMITED_ERROR_KEY
+import com.kwabor.shared.domain.auth.AccountDeletionOutcome
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.PromoterActivationContext
@@ -99,8 +100,30 @@ class AuthPresenter(
         .activatePromoterInvite(request)
         .toAuthActionResult(strings)
 
-    suspend fun deleteAccount(request: AccountDeletionRequest, strings: KwaborStrings): AuthActionResult<Unit> =
-        authRepository.deleteAccount(request).toAuthActionResult(strings)
+    suspend fun deleteAccount(request: AccountDeletionRequest, strings: KwaborStrings): AccountDeletionActionResult =
+        when (val result = authRepository.deleteAccount(request)) {
+            is DomainResult.Failure -> AccountDeletionActionResult.Rejected(result.error.toAuthMessage(strings))
+            is DomainResult.Success -> when (val outcome = result.value) {
+                AccountDeletionOutcome.Deleted -> AccountDeletionActionResult.Deleted
+                AccountDeletionOutcome.OutcomeUnknown -> AccountDeletionActionResult.OutcomeUnknown
+                AccountDeletionOutcome.LocalCleanupPending -> AccountDeletionActionResult.LocalCleanupPending
+                is AccountDeletionOutcome.RejectedCleanupPending -> AccountDeletionActionResult.RejectedCleanupPending(
+                    errorMessage = outcome.error.toAuthMessage(strings),
+                )
+            }
+        }
+}
+
+sealed interface AccountDeletionActionResult {
+    data object Deleted : AccountDeletionActionResult
+
+    data object OutcomeUnknown : AccountDeletionActionResult
+
+    data object LocalCleanupPending : AccountDeletionActionResult
+
+    data class RejectedCleanupPending(val errorMessage: String) : AccountDeletionActionResult
+
+    data class Rejected(val errorMessage: String) : AccountDeletionActionResult
 }
 
 data class AuthActionResult<out T>(

@@ -99,6 +99,49 @@ class SupabaseFavoritesDataSourceTest {
     }
 
     @Test
+    fun accountScopedSetFavorite_callsV2WithExpectedAccountAndDoesNotFallBackToV1() = runTest {
+        val client = createFavoritesTestClient { request ->
+            assertEquals("/rest/v1/rpc/set_listing_favorite_v2", request.url.encodedPath)
+            val parameters = Json.parseToJsonElement(assertByteArrayBody(request.body)).jsonObject
+            assertEquals(FAVORITE_ACCOUNT_ID, parameters.getValue("p_expected_account_id").jsonPrimitive.content)
+            assertEquals(FAVORITE_LISTING_ID_ONE, parameters.getValue("p_listing_id").jsonPrimitive.content)
+            assertEquals(true, parameters.getValue("p_favorited").jsonPrimitive.boolean)
+            FAVORITE_MUTATION_RESPONSE
+        }
+
+        try {
+            val mutation = SupabaseFavoritesDataSource(client.postgrest).setFavoriteForAccount(
+                expectedAccountId = FAVORITE_ACCOUNT_ID,
+                listingId = FAVORITE_LISTING_ID_ONE,
+                favorited = true,
+            )
+
+            assertEquals(true, mutation.favoritedByCurrentUser)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun accountScopedSetFavorite_mapsExpectedAccountMismatchToAuthenticationRequired() = runTest {
+        val client = createFavoritesTestClient(status = HttpStatusCode.Forbidden) {
+            EXPECTED_ACCOUNT_MISMATCH_RESPONSE
+        }
+
+        try {
+            assertFailsWith<FavoritesDataException.AuthenticationRequired> {
+                SupabaseFavoritesDataSource(client.postgrest).setFavoriteForAccount(
+                    expectedAccountId = FAVORITE_ACCOUNT_ID,
+                    listingId = FAVORITE_LISTING_ID_ONE,
+                    favorited = true,
+                )
+            }
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun rpcRows_rejectUnknownFieldsInsteadOfSilentlyAcceptingContractDrift() = runTest {
         val client = createFavoritesTestClient {
             FAVORITE_MUTATION_RESPONSE.replace(
@@ -204,3 +247,6 @@ private const val FAVORITE_REMOVAL_OBJECT = """
 """
 
 private const val FAVORITE_MUTATION_RESPONSE = "[$FAVORITE_MUTATION_OBJECT]"
+private const val FAVORITE_ACCOUNT_ID = "99999999-9999-4999-8999-999999999999"
+private const val EXPECTED_ACCOUNT_MISMATCH_RESPONSE =
+    """{"code":"42501","details":null,"hint":null,"message":"expected account mismatch"}"""

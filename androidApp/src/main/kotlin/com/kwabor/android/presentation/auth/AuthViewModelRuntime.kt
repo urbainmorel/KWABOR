@@ -1,6 +1,7 @@
 package com.kwabor.android.presentation.auth
 
 import com.kwabor.shared.domain.auth.AccountSetupStatus
+import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationIntent
@@ -8,6 +9,7 @@ import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialPasswordRecoveryUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
+import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -28,6 +30,8 @@ internal class AuthViewModelRuntime(
     val platformState = MutableStateFlow(AuthPlatformUiState())
     val sessionRestoreComplete = MutableStateFlow(false)
     val sessionRestoreStatus = MutableStateFlow(AuthSessionRestoreStatus.InProgress)
+    val accountDeletionNavigationPending = MutableStateFlow(false)
+    val accountDeletionOutcomeUnknown = MutableStateFlow(false)
     val effectChannel = Channel<AuthEffect>(capacity = Channel.BUFFERED)
     val platformEffectChannel = Channel<AuthPlatformEffect>(capacity = Channel.BUFFERED)
 
@@ -64,10 +68,17 @@ internal data class AuthViewModelDependencies(
     val passwordRecoveryPresenter: PasswordRecoveryPresenter,
     val authJourneyStore: com.kwabor.android.auth.AuthJourneyStore,
     val promoterActivationSessionStore: com.kwabor.android.auth.PromoterActivationSessionStore,
+    val accountDeletionProviderCleanupStore: com.kwabor.android.auth.AccountDeletionProviderCleanupStore,
     val googleIdentityProvider: com.kwabor.android.auth.GoogleIdentityProvider,
     val googleIdentityUnavailableMessage: String,
     val idempotencyKeyProvider: com.kwabor.android.auth.IdempotencyKeyProvider,
     val clockProvider: com.kwabor.shared.domain.core.ClockProvider,
+    val accountDeletionIoDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    val accountDeletionWorkerScope: CoroutineScope,
+    val accountDeletionPurgeRegistry: AccountDeletionPurgeRegistry,
     val track: (com.kwabor.shared.domain.observability.AnalyticsEvent) -> Unit,
     val revokeObservabilityConsent: () -> Boolean,
+    val purgeInteractionsForAccountDeletion:
+    suspend (String) -> DomainResult<InteractionAccountDeletionPurgeOutcome>,
+    val resumeInteractionsAfterAccountDeletionFailure: suspend (String) -> Unit,
 )

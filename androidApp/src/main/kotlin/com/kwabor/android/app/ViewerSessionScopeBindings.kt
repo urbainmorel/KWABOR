@@ -12,11 +12,13 @@ import com.kwabor.shared.presentation.session.ViewerSessionScope
 internal fun ViewerSessionScopeHandler(
     accountId: String?,
     accountSetupComplete: Boolean,
+    accountDeletionBlocksViewerSession: Boolean = false,
     dependencies: HomeShellDependencies,
 ) {
     ViewerSessionScopeHandler(
         accountId = accountId,
         accountSetupComplete = accountSetupComplete,
+        accountDeletionBlocksViewerSession = accountDeletionBlocksViewerSession,
         publishScope = { publishedAccountId, setupComplete ->
             dependencies.publishViewerSessionScope(publishedAccountId, setupComplete)
         },
@@ -27,11 +29,14 @@ internal fun ViewerSessionScopeHandler(
 internal fun ViewerSessionScopeHandler(
     accountId: String?,
     accountSetupComplete: Boolean,
+    accountDeletionBlocksViewerSession: Boolean = false,
     publishScope: (String?, Boolean) -> Unit,
 ) {
     val currentPublisher by rememberUpdatedState(publishScope)
-    LaunchedEffect(accountId, accountSetupComplete) {
-        currentPublisher(accountId, accountSetupComplete)
+    val publishedAccountId = accountId.takeUnless { accountDeletionBlocksViewerSession }
+    val publishedSetupComplete = accountSetupComplete && !accountDeletionBlocksViewerSession
+    LaunchedEffect(publishedAccountId, publishedSetupComplete) {
+        currentPublisher(publishedAccountId, publishedSetupComplete)
     }
 }
 

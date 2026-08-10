@@ -8,7 +8,9 @@ import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.local.ExploreFeedPersistenceStore
 import com.kwabor.shared.data.local.ExplorePersistenceWatermarkStore
 import com.kwabor.shared.data.local.ExploreReferenceStore
+import com.kwabor.shared.data.local.InteractionOutboxStore
 import com.kwabor.shared.data.local.KwaborDatabase
+import com.kwabor.shared.data.local.KwaborDatabaseBuilderResult
 import com.kwabor.shared.data.local.SearchCacheStore
 import com.kwabor.shared.data.local.buildKwaborDatabase
 import com.kwabor.shared.data.preferences.DataStoreAppPreferencesRepository
@@ -23,14 +25,15 @@ import org.koin.dsl.module
 import org.koin.dsl.onClose
 
 internal class KwaborPersistenceConfiguration(
-    val databaseBuilderFactory: () -> RoomDatabase.Builder<KwaborDatabase>,
+    val databaseBuilderFactory: () -> KwaborDatabaseBuilderResult,
     val preferencesStorageFactory: () -> Storage<Preferences>,
 )
 
 private val appPreferencesDataStoreScopeQualifier = named("app-preferences-data-store-scope")
 
 internal fun persistenceModule(configuration: KwaborPersistenceConfiguration): Module = module {
-    single<RoomDatabase.Builder<KwaborDatabase>> { configuration.databaseBuilderFactory() }
+    single<KwaborDatabaseBuilderResult> { configuration.databaseBuilderFactory() }
+    single<RoomDatabase.Builder<KwaborDatabase>> { get<KwaborDatabaseBuilderResult>().createBuilder() }
     single<Storage<Preferences>> { configuration.preferencesStorageFactory() }
 
     single<KwaborDatabase> {
@@ -41,6 +44,7 @@ internal fun persistenceModule(configuration: KwaborPersistenceConfiguration): M
     } onClose { database -> database?.close() }
 
     registerExplorePersistenceStores()
+    single { InteractionOutboxStore(dao = get<KwaborDatabase>().interactionOutboxDao()) }
 
     single<CoroutineScope>(qualifier = appPreferencesDataStoreScopeQualifier) {
         CoroutineScope(SupervisorJob() + get<DispatcherProvider>().io)

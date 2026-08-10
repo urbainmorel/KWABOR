@@ -7,6 +7,7 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.favorites.FavoriteListingPage
 import com.kwabor.shared.domain.favorites.FavoriteMutation
 import com.kwabor.shared.domain.favorites.FavoritesRepository
+import com.kwabor.shared.domain.interaction.AccountScopedFavoriteMutationRepository
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -14,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 class DataFavoritesRepository internal constructor(
     private val dataSource: FavoritesDataSource,
-) : FavoritesRepository {
+) : FavoritesRepository, AccountScopedFavoriteMutationRepository {
     private val favoriteMutationMutex = Mutex()
     private var clientMutationSequence = 0L
 
@@ -43,6 +44,29 @@ class DataFavoritesRepository internal constructor(
                 }
             }
         }
+
+    override suspend fun setFavorite(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): DomainResult<FavoriteMutation> = favoriteMutationMutex.withLock {
+        val sequence = ++clientMutationSequence
+        withContext(NonCancellable) {
+            runFavoritesCall {
+                val requiredAccountId = expectedAccountId.toRequiredFavoriteAccountId()
+                val requiredListingId = listingId.toRequiredFavoriteListingId()
+                dataSource.setFavoriteForAccount(
+                    expectedAccountId = requiredAccountId,
+                    listingId = requiredListingId,
+                    favorited = favorited,
+                ).toDomain(
+                    expectedListingId = requiredListingId,
+                    expectedFavorited = favorited,
+                    clientMutationSequence = sequence,
+                )
+            }
+        }
+    }
 }
 
 private inline fun <T> runFavoritesCall(block: () -> T): DomainResult<T> = try {
@@ -55,6 +79,14 @@ private fun String.toRequiredFavoriteListingId(): String {
     val canonical = trim().lowercase()
     if (!canonical.isValidUuid()) {
         throw FavoritesDataException.Validation("error.favorites.listing_id_invalid")
+    }
+    return canonical
+}
+
+private fun String.toRequiredFavoriteAccountId(): String {
+    val canonical = trim().lowercase()
+    if (!canonical.isValidUuid()) {
+        throw FavoritesDataException.Validation("error.favorites.account_id_invalid")
     }
     return canonical
 }

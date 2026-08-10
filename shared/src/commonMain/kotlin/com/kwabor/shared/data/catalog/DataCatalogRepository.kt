@@ -11,10 +11,12 @@ import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.interaction.AccountScopedListingLikeRepository
+import com.kwabor.shared.domain.interaction.ListingLikeMutation
 
 class DataCatalogRepository internal constructor(
     private val dataSource: CatalogDataSource,
-) : CatalogRepository {
+) : CatalogRepository, AccountScopedListingLikeRepository {
     override suspend fun listCities(): DomainResult<List<City>> = runDataCall {
         dataSource.listCities().map { item -> item.toDomain() }
     }
@@ -68,6 +70,21 @@ class DataCatalogRepository internal constructor(
     override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> = runDataCall {
         dataSource.unlikeListing(listingId.toRequiredListingId()).toDomain()
     }
+
+    override suspend fun setListingLike(
+        expectedAccountId: String,
+        listingId: String,
+        liked: Boolean,
+    ): DomainResult<ListingLikeMutation> = runDataCall {
+        val requiredAccountId = expectedAccountId.toRequiredCanonicalAccountId()
+        val requiredListingId = listingId.toRequiredCanonicalListingId()
+        dataSource.setListingLike(
+            expectedAccountId = requiredAccountId,
+            listingId = requiredListingId,
+            liked = liked,
+        )
+            .toDomain(expectedListingId = requiredListingId, expectedLiked = liked)
+    }
 }
 
 private inline fun <T> runDataCall(block: () -> T): DomainResult<T> = try {
@@ -83,6 +100,18 @@ private fun String.toRequiredListingId(): String {
     }
 
     return value
+}
+
+private fun String.toRequiredCanonicalListingId(): String = trim().lowercase().also { value ->
+    if (!value.isValidUuid()) {
+        throw CatalogDataException.Validation("error.catalog.listing_id_invalid")
+    }
+}
+
+private fun String.toRequiredCanonicalAccountId(): String = trim().lowercase().also { value ->
+    if (!value.isValidUuid()) {
+        throw CatalogDataException.Validation("error.catalog.account_id_invalid")
+    }
 }
 
 private fun List<String>.toRequiredListingIds(): List<String> = map { listingId -> listingId.toRequiredListingId() }

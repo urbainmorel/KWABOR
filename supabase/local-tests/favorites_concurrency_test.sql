@@ -51,7 +51,9 @@ where user_id in (
   'fc100000-0000-4000-8000-000000000002',
   'fc100000-0000-4000-8000-000000000003',
   'fc100000-0000-4000-8000-000000000004',
-  'fc100000-0000-4000-8000-000000000005'
+  'fc100000-0000-4000-8000-000000000005',
+  'fc100000-0000-4000-8000-000000000006',
+  'fc100000-0000-4000-8000-000000000007'
 );
 
 delete from auth.users
@@ -60,7 +62,9 @@ where id in (
   'fc100000-0000-4000-8000-000000000002',
   'fc100000-0000-4000-8000-000000000003',
   'fc100000-0000-4000-8000-000000000004',
-  'fc100000-0000-4000-8000-000000000005'
+  'fc100000-0000-4000-8000-000000000005',
+  'fc100000-0000-4000-8000-000000000006',
+  'fc100000-0000-4000-8000-000000000007'
 );
 
 insert into auth.users (
@@ -123,6 +127,26 @@ values
     now(),
     now(),
     now()
+  ),
+  (
+    'fc100000-0000-4000-8000-000000000006',
+    'authenticated',
+    'authenticated',
+    'likes-concurrency-direct-first@kwabor.test',
+    '',
+    now(),
+    now(),
+    now()
+  ),
+  (
+    'fc100000-0000-4000-8000-000000000007',
+    'authenticated',
+    'authenticated',
+    'likes-concurrency-deletion-first@kwabor.test',
+    '',
+    now(),
+    now(),
+    now()
   );
 
 insert into public.profiles (
@@ -167,6 +191,20 @@ values
     'EcritureDirecte',
     'cotonou',
     now()
+  ),
+  (
+    'fc100000-0000-4000-8000-000000000006',
+    'Concurrence',
+    'LikeAvantSuppression',
+    'cotonou',
+    now()
+  ),
+  (
+    'fc100000-0000-4000-8000-000000000007',
+    'Concurrence',
+    'SuppressionAvantLike',
+    'cotonou',
+    now()
   );
 
 insert into public.favorites (user_id, listing_id)
@@ -179,7 +217,7 @@ begin;
 
 create extension if not exists dblink with schema extensions;
 
-select plan(16);
+select plan(23);
 
 create temporary table favorites_concurrency_observations (
   observation_key text primary key,
@@ -203,6 +241,26 @@ begin
   perform extensions.dblink_connect('favorites_first', connection_info);
   perform extensions.dblink_connect('favorites_second', connection_info);
   perform extensions.dblink_connect('favorites_check', connection_info);
+  perform extensions.dblink_exec(
+    'favorites_first',
+    'set statement_timeout = ''30s'''
+  );
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'set statement_timeout = ''30s'''
+  );
+  perform extensions.dblink_exec(
+    'favorites_check',
+    'set statement_timeout = ''30s'''
+  );
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'create temporary table like_transition_result (sqlstate text, message text) on commit preserve rows'
+  );
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'grant select, insert on table pg_temp.like_transition_result to authenticated'
+  );
 end;
 $connect$;
 
@@ -722,6 +780,269 @@ select ok(
   'a legacy direct write cannot resurrect data after account cleanup'
 );
 
+do $like_direct_first_setup$
+declare
+  inserted_listing_id uuid;
+begin
+  perform extensions.dblink_exec('favorites_first', 'begin');
+  perform extensions.dblink_exec(
+    'favorites_first',
+    'set local statement_timeout = ''5s'''
+  );
+  perform extensions.dblink_exec('favorites_first', 'set local role authenticated');
+  perform extensions.dblink_exec(
+    'favorites_first',
+    'set local request.jwt.claim.role = ''authenticated'''
+  );
+  perform extensions.dblink_exec(
+    'favorites_first',
+    'set local request.jwt.claim.sub = ''fc100000-0000-4000-8000-000000000006'''
+  );
+
+  select result.listing_id
+  into strict inserted_listing_id
+  from extensions.dblink(
+    'favorites_first',
+    $query$
+      insert into public.likes (user_id, listing_id)
+      values (
+        'fc100000-0000-4000-8000-000000000006',
+        '00000000-0000-4000-8000-000000000101'
+      )
+      returning listing_id
+    $query$
+  ) as result(listing_id uuid);
+
+  insert into favorites_concurrency_observations (
+    observation_key,
+    boolean_value
+  ) values (
+    'like-direct-first-inserted',
+    inserted_listing_id = '00000000-0000-4000-8000-000000000101'::uuid
+  );
+
+  perform extensions.dblink_exec('favorites_second', 'begin');
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'set local statement_timeout = ''5s'''
+  );
+  perform extensions.dblink_exec('favorites_second', 'set local role service_role');
+
+  if extensions.dblink_send_query(
+    'favorites_second',
+    $query$
+      select status, effective_idempotency_key
+      from public.prepare_account_deletion(
+        'fc100000-0000-4000-8000-000000000006',
+        'fc1d0000-0000-4000-8000-000000000006'
+      )
+    $query$
+  ) <> 1 then
+    raise exception 'Unable to start deletion after the direct Like write';
+  end if;
+end;
+$like_direct_first_setup$;
+
+select ok(
+  (
+    select boolean_value
+    from favorites_concurrency_observations
+    where observation_key = 'like-direct-first-inserted'
+  ),
+  'the direct Like INSERT completes before its transaction retains the account lock'
+);
+
+do $like_direct_first_wait$
+begin
+  perform pg_catalog.pg_sleep(0.25);
+end;
+$like_direct_first_wait$;
+
+select is(
+  extensions.dblink_is_busy('favorites_second'),
+  1,
+  'account deletion waits for an earlier direct Like INSERT transaction'
+);
+
+do $finish_like_direct_first$
+begin
+  perform extensions.dblink_exec('favorites_first', 'commit');
+  perform result.status
+  from extensions.dblink_get_result('favorites_second', false) as result(
+    status text,
+    effective_idempotency_key uuid
+  );
+  perform result.command_status
+  from extensions.dblink_get_result('favorites_second', false) as result(
+    command_status text
+  );
+  perform extensions.dblink_exec('favorites_second', 'commit');
+end;
+$finish_like_direct_first$;
+
+select ok(
+  not exists (
+    select 1
+    from public.likes
+    where user_id = 'fc100000-0000-4000-8000-000000000006'
+  )
+  and (
+    select listing.likes_count = (
+      select count(*)
+      from public.likes as counted_like
+      where counted_like.listing_id = listing.id
+    )
+    from public.listings as listing
+    where listing.id = '00000000-0000-4000-8000-000000000101'
+  ),
+  'deletion purges the earlier direct Like and restores its aggregate counter'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.account_deletion_requests
+    where user_id = 'fc100000-0000-4000-8000-000000000006'
+  ),
+  'the mutation-first Like ordering finishes with a deletion tombstone'
+);
+
+do $like_deletion_first_setup$
+begin
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'truncate table pg_temp.like_transition_result'
+  );
+
+  perform extensions.dblink_exec('favorites_first', 'begin');
+  perform extensions.dblink_exec(
+    'favorites_first',
+    'set local statement_timeout = ''5s'''
+  );
+  perform extensions.dblink_exec('favorites_first', 'set local role service_role');
+  perform result.status
+  from extensions.dblink(
+    'favorites_first',
+    $query$
+      select status, effective_idempotency_key
+      from public.prepare_account_deletion(
+        'fc100000-0000-4000-8000-000000000007',
+        'fc1d0000-0000-4000-8000-000000000007'
+      )
+    $query$
+  ) as result(status text, effective_idempotency_key uuid);
+
+  perform extensions.dblink_exec('favorites_second', 'begin');
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'set local statement_timeout = ''5s'''
+  );
+  perform extensions.dblink_exec('favorites_second', 'set local role authenticated');
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'set local request.jwt.claim.role = ''authenticated'''
+  );
+  perform extensions.dblink_exec(
+    'favorites_second',
+    'set local request.jwt.claim.sub = ''fc100000-0000-4000-8000-000000000007'''
+  );
+
+  if extensions.dblink_send_query(
+    'favorites_second',
+    $query$
+      do $remote$
+      begin
+        begin
+          insert into public.likes (user_id, listing_id)
+          values (
+            'fc100000-0000-4000-8000-000000000007',
+            '00000000-0000-4000-8000-000000000101'
+          );
+
+          insert into pg_temp.like_transition_result (sqlstate, message)
+          values ('00000', 'unexpected success');
+        exception
+          when others then
+            insert into pg_temp.like_transition_result (sqlstate, message)
+            values (sqlstate, sqlerrm);
+        end;
+      end;
+      $remote$
+    $query$
+  ) <> 1 then
+    raise exception 'Unable to start the direct Like INSERT after account deletion';
+  end if;
+end;
+$like_deletion_first_setup$;
+
+do $like_deletion_first_wait$
+begin
+  perform pg_catalog.pg_sleep(0.25);
+end;
+$like_deletion_first_wait$;
+
+select is(
+  extensions.dblink_is_busy('favorites_second'),
+  1,
+  'a direct Like INSERT already in flight waits for the deletion transaction'
+);
+
+do $finish_like_deletion_first$
+declare
+  transition_result text;
+begin
+  perform extensions.dblink_exec('favorites_first', 'commit');
+  perform result.command_status
+  from extensions.dblink_get_result('favorites_second', false) as result(
+    command_status text
+  );
+  perform result.command_status
+  from extensions.dblink_get_result('favorites_second', false) as result(
+    command_status text
+  );
+
+  select transition.sqlstate || '|' || transition.message
+  into strict transition_result
+  from extensions.dblink(
+    'favorites_second',
+    'select sqlstate, message from pg_temp.like_transition_result'
+  ) as transition(sqlstate text, message text);
+
+  insert into favorites_concurrency_observations (
+    observation_key,
+    text_value
+  ) values (
+    'like-deletion-first-result',
+    transition_result
+  );
+
+  perform extensions.dblink_exec('favorites_second', 'commit');
+end;
+$finish_like_deletion_first$;
+
+select ok(
+  (
+    select text_value
+    from favorites_concurrency_observations
+    where observation_key = 'like-deletion-first-result'
+  ) like '42501|%row-level security policy%',
+  'the waiting direct Like INSERT rechecks the tombstone and fails with SQLSTATE 42501'
+);
+
+select ok(
+  not exists (
+    select 1
+    from public.likes
+    where user_id = 'fc100000-0000-4000-8000-000000000007'
+  )
+  and exists (
+    select 1
+    from public.account_deletion_requests
+    where user_id = 'fc100000-0000-4000-8000-000000000007'
+  ),
+  'the committed tombstone and failed late direct Like INSERT leave no resurrected account data'
+);
+
 do $$
 begin
   perform extensions.dblink_disconnect('favorites_check');
@@ -739,7 +1060,9 @@ where user_id in (
   'fc100000-0000-4000-8000-000000000002',
   'fc100000-0000-4000-8000-000000000003',
   'fc100000-0000-4000-8000-000000000004',
-  'fc100000-0000-4000-8000-000000000005'
+  'fc100000-0000-4000-8000-000000000005',
+  'fc100000-0000-4000-8000-000000000006',
+  'fc100000-0000-4000-8000-000000000007'
 );
 
 delete from auth.users
@@ -748,7 +1071,9 @@ where id in (
   'fc100000-0000-4000-8000-000000000002',
   'fc100000-0000-4000-8000-000000000003',
   'fc100000-0000-4000-8000-000000000004',
-  'fc100000-0000-4000-8000-000000000005'
+  'fc100000-0000-4000-8000-000000000005',
+  'fc100000-0000-4000-8000-000000000006',
+  'fc100000-0000-4000-8000-000000000007'
 );
 
 revoke service_role from kwabor_favorites_concurrency_test;

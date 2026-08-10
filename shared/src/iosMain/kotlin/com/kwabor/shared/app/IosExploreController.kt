@@ -11,6 +11,7 @@ import com.kwabor.shared.presentation.explore.ExploreRuntime
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
 import com.kwabor.shared.presentation.explore.initialExploreUiState
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
@@ -193,29 +194,33 @@ private class DefaultIosExploreRuntime(
     }
 }
 
-class IosExploreController private constructor(
-    runtimeProvider: (CoroutineScope, KwaborStrings) -> IosExploreRuntime?,
+class IosExploreController internal constructor(
+    runtimeProvider: (CoroutineScope, KwaborStrings, InteractionCoordinator?) -> IosExploreRuntime?,
     dispatcherProvider: DispatcherProvider,
     private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
+    interactionCoordinator: InteractionCoordinator? = null,
 ) {
     internal constructor(
         presenter: ExplorePresenter?,
         dispatcherProvider: DispatcherProvider,
         viewerSessionScopeTracker: ViewerSessionScopeTracker,
+        interactionCoordinator: InteractionCoordinator? = null,
     ) : this(
-        runtimeProvider = { scope, strings ->
+        runtimeProvider = { scope, strings, coordinator ->
             presenter?.let { currentPresenter ->
                 DefaultIosExploreRuntime(
                     ExploreRuntime(
                         presenter = currentPresenter,
                         strings = strings,
                         coroutineScope = scope,
+                        interactionCoordinator = coordinator,
                     ),
                 )
             }
         },
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
+        interactionCoordinator = interactionCoordinator,
     )
 
     internal constructor(
@@ -223,14 +228,14 @@ class IosExploreController private constructor(
         dispatcherProvider: DispatcherProvider,
         viewerSessionScopeTracker: ViewerSessionScopeTracker,
     ) : this(
-        runtimeProvider = { _, _ -> runtime },
+        runtimeProvider = { _, _, _ -> runtime },
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
     )
 
     val strings: KwaborStrings = stringsFor(AppLocale.French)
     private val scope = CoroutineScope(SupervisorJob() + dispatcherProvider.main)
-    private val runtime = runtimeProvider(scope, strings)
+    private val runtime = runtimeProvider(scope, strings, interactionCoordinator)
     private var stateObserver: ((ExploreUiState) -> Unit)? = null
     private var effectObserver: ((IosExploreEffect) -> Unit)? = null
     private var favoriteObserver: ((String, Boolean, Long, ViewerSessionScope) -> Unit)? = null

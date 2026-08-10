@@ -73,6 +73,39 @@ class KwaborSessionManagerTest {
     }
 
     @Test
+    fun accountDeletionCleanupMarkerSurvivesRestartAndBlocksUntilCleanupSucceeds() = runTest {
+        val store = MemorySecureStringStore()
+        val firstManager = KwaborSessionManager(store)
+        firstManager.markAccountDeletionCleanupPending()
+        val restoredManager = KwaborSessionManager(store)
+        val coordinator = AccountDeletionSessionCoordinator(restoredManager, restoredManager)
+        val blockedGuard = AccountDeletionSessionGuard(
+            coordinator = coordinator,
+            clearCurrentSession = { throw IllegalStateException("secure cleanup failed") },
+        )
+
+        assertFailsWith<IllegalStateException> { blockedGuard.ensureCleanupCompleted() }
+        assertTrue(restoredManager.isAccountDeletionCleanupPending())
+
+        val retryGuard = AccountDeletionSessionGuard(coordinator, restoredManager::deleteSession)
+        assertTrue(retryGuard.ensureCleanupCompleted())
+        assertFalse(restoredManager.isAccountDeletionCleanupPending())
+    }
+
+    @Test
+    fun pendingAccountDeletionCleanupRejectsEveryNewPersistedSession() = runTest {
+        val manager = KwaborSessionManager(MemorySecureStringStore())
+        manager.markAccountDeletionCleanupPending()
+
+        assertFailsWith<IllegalStateException> {
+            manager.saveSession(recoverySession("must-not-be-persisted"))
+        }
+
+        assertNull(manager.loadSessionOrNull())
+        assertTrue(manager.isAccountDeletionCleanupPending())
+    }
+
+    @Test
     fun invalidRecoveryOtp_clearsExistingStandardSessionAndRecoveryMarker() = runTest {
         val store = MemorySecureStringStore()
         val manager = KwaborSessionManager(store)

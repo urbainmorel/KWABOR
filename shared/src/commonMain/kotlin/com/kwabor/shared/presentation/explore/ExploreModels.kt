@@ -60,7 +60,20 @@ data class QueuedExploreInteraction(
     val kind: ExploreInteractionKind,
     val selected: Boolean,
     val queuedAtEpochMilliseconds: Long,
-)
+    val operationId: Long? = null,
+    val attemptCount: Int = 1,
+    val isNetworkRetry: Boolean = attemptCount > 0,
+) {
+    init {
+        require(operationId == null || operationId > 0L) {
+            "Explore interaction operation id must be positive when present."
+        }
+        require(attemptCount >= 0) { "Explore interaction attempt count must be non-negative." }
+        require(!isNetworkRetry || attemptCount > 0) {
+            "Explore network retry requires at least one transport attempt."
+        }
+    }
+}
 
 data class PendingExploreAuthInteraction(
     val listingId: String,
@@ -113,6 +126,9 @@ data class ExploreUiState(
 
     val hasQueuedInteractions: Boolean
         get() = queuedInteractions.isNotEmpty()
+
+    val hasNetworkRetryingInteractions: Boolean
+        get() = queuedInteractions.any(QueuedExploreInteraction::isNetworkRetry)
 
     val canLoadMore: Boolean
         get() = nextCursor != null && !isLoading && !isRefreshing && !isAppending && !isOffline

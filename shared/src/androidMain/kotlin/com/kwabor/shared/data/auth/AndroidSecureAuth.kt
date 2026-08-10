@@ -25,13 +25,17 @@ private class AndroidSecureStringStore(
     )
 
     override suspend fun putString(key: String, value: String) {
-        preferences.edit().putString(key, value).apply()
+        check(preferences.edit().putString(key, value).commit()) {
+            "Unable to durably save secure item"
+        }
     }
 
     override suspend fun getStringOrNull(key: String): String? = preferences.getString(key, null)
 
     override suspend fun remove(key: String) {
-        preferences.edit().remove(key).apply()
+        check(preferences.edit().remove(key).commit()) {
+            "Unable to durably delete secure item"
+        }
     }
 
     private companion object {

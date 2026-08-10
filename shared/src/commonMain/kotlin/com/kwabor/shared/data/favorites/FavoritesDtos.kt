@@ -83,3 +83,13 @@ internal data class SetFavoriteRpcParametersDto(
     @SerialName("p_favorited")
     val favorited: Boolean,
 )
+
+@Serializable
+internal data class SetAccountScopedFavoriteRpcParametersDto(
+    @SerialName("p_expected_account_id")
+    val expectedAccountId: String,
+    @SerialName("p_listing_id")
+    val listingId: String,
+    @SerialName("p_favorited")
+    val favorited: Boolean,
+)

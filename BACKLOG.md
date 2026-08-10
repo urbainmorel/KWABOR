@@ -152,6 +152,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     notamment qu’aucune donnée privée n’entre dans le nouveau transfert Android↔iOS.
   - [ ] Exécuter le test filesystem sur simulateur macOS puis qualifier exclusion/protection sur appareil iOS.
 - [ ] SYNC-001 — Persister l'outbox, coalescer Like/Favori, appliquer idempotence, backoff et drain réseau/session.
+  - [ ] Ajouter Room v4 et les migrations non destructives `1/2/3 -> 4`, avec capacité bornée,
+    coalescence, CAS et éviction fail-closed des lignes corrompues.
+  - [ ] Ajouter les setters Supabase idempotents et account-fenced, puis couvrir ACL, RLS,
+    dépublication, retry et concurrence avec la suppression de compte.
+  - [ ] Intégrer hydratation, drain/backoff, foreground et retry à Explore/Favoris Android/iOS,
+    cloisonnés par compte et epoch de session.
+  - [ ] Bloquer et purger l'outbox avant toute suppression de compte, y compris avant le sélecteur
+    d'identité sociale, sans pouvoir cibler un autre compte après une course de session.
 - [ ] DRAFT-001 — Synchroniser les brouillons avec version optimiste et conservation des deux versions en conflit.
 - [ ] MEDIA-001 — Créer buckets/RLS, uploads temporaires, validation, downsampling, dérivés et Edge Function `media-finalize`.
 

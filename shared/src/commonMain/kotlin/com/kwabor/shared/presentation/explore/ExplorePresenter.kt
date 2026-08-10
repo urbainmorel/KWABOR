@@ -197,7 +197,7 @@ class ExplorePresenter(
             isLoading = false,
             isRefreshing = false,
             isAppending = false,
-            isOffline = interactions.isOffline || state.queuedInteractions.isNotEmpty(),
+            isOffline = interactions.isOffline || state.queuedInteractions.hasNetworkRetry(),
             contentIsOffline = interactions.isOffline,
             errorMessage = null,
             refreshMessage = null,
@@ -333,7 +333,7 @@ private fun ExploreUiState.applySnapshot(
 
 private fun ExploreUiState.refreshFailure(strings: KwaborStrings, error: DomainError): ExploreUiState {
     val networkUnavailable = error is DomainError.NetworkUnavailable
-    val offline = networkUnavailable || queuedInteractions.isNotEmpty()
+    val offline = networkUnavailable || queuedInteractions.hasNetworkRetry()
     return if (listings.isEmpty()) {
         copy(
             isLoading = false,
@@ -361,7 +361,7 @@ private fun ExploreUiState.appendFailure(strings: KwaborStrings, error: DomainEr
     val networkUnavailable = error is DomainError.NetworkUnavailable
     return copy(
         isAppending = false,
-        isOffline = networkUnavailable || queuedInteractions.isNotEmpty(),
+        isOffline = networkUnavailable || queuedInteractions.hasNetworkRetry(),
         contentIsOffline = networkUnavailable,
         appendErrorMessage = strings.exploreLoadMoreError,
     )
@@ -437,7 +437,7 @@ private fun ExploreUiState.applyInteraction(result: ExploreInteractionResult): E
         queued.listingId == result.listingId && queued.kind == result.kind
     }
     return copy(
-        isOffline = contentIsOffline || remainingQueuedInteractions.isNotEmpty(),
+        isOffline = contentIsOffline || remainingQueuedInteractions.hasNetworkRetry(),
         interactionMessage = null,
         pendingAuthInteraction = null,
         listings = listings.map { listing -> listing.applyInteractionResult(result) },

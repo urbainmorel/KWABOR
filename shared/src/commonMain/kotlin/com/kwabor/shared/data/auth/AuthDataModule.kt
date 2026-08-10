@@ -13,13 +13,25 @@ internal val authDataModule: Module = module {
     }
     single<AuthDataSource> {
         val auth = get<SupabaseClient>().auth
-        val passwordRecoverySessionStore = auth.sessionManager as? PasswordRecoverySessionStore
+        val sessionManager = auth.sessionManager
+        val passwordRecoverySessionStore = sessionManager as? PasswordRecoverySessionStore
             ?: error("Secure password recovery session storage is unavailable")
+        val accountDeletionSessionStore = sessionManager as? AccountDeletionSessionStore
+            ?: error("Secure account deletion session storage is unavailable")
+        val accountDeletionSessionGuard = AccountDeletionSessionGuard(
+            coordinator = AccountDeletionSessionCoordinator(
+                accountDeletionStore = accountDeletionSessionStore,
+                passwordRecoveryStore = passwordRecoverySessionStore,
+            ),
+            clearCurrentSession = auth::clearSession,
+        )
         SupabaseAuthDataSource(
             auth = auth,
             postgrest = get<SupabaseClient>().postgrest,
             accountDeletionStepUpSessionFactory = get(),
             passwordRecoverySessionStore = passwordRecoverySessionStore,
+            accountDeletionSessionStore = accountDeletionSessionStore,
+            accountDeletionSessionGuard = accountDeletionSessionGuard,
         )
     }
     single<AuthRepository> { DataAuthRepository(dataSource = get()) }

@@ -231,7 +231,10 @@ internal class PromoterActivationCleanupCoordinator(
                 return@launch
             }
             runtime.authState.value = signedOutState
-            dependencies.googleIdentityProvider.clearCredentialState()
+            if (!dependencies.googleIdentityProvider.clearCredentialState()) {
+                publishCleanupError(runtime.strings.authFederatedUnavailable)
+                return@launch
+            }
             if (!dependencies.promoterActivationSessionStore.clear()) {
                 publishCleanupError(runtime.strings.authFederatedUnavailable)
                 return@launch

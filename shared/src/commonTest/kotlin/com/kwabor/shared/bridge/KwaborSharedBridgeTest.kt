@@ -46,6 +46,10 @@ class KwaborSharedBridgeTest {
             "La suppression du compte a échoué. Réessayez sans fermer cet écran.",
             onboardingStrings.authAccountDeletionFailed,
         )
+        assertEquals(
+            "Le résultat de la suppression n'a pas pu être confirmé. Rouvrez Kwabor avant toute nouvelle tentative.",
+            onboardingStrings.authAccountDeletionOutcomeUnknown,
+        )
         assertEquals("authentication", bridge.onboardingEntryKey(true, true, false, false))
         val telemetry = bridge.onboardingTelemetry()
         assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)

@@ -25,6 +25,7 @@ private const val HTTP_GATEWAY_TIMEOUT = 504
 private const val POSTGREST_SCHEMA_CACHE_ERROR_PREFIX = "PGRST2"
 private const val LIST_FAVORITES = "list_favorite_listing_summaries_v1"
 private const val SET_FAVORITE = "set_listing_favorite_v1"
+private const val SET_ACCOUNT_SCOPED_FAVORITE = "set_listing_favorite_v2"
 
 internal class SupabaseFavoritesDataSource(
     private val postgrest: Postgrest,
@@ -66,6 +67,34 @@ internal class SupabaseFavoritesDataSource(
                 )
             }
         }
+
+    override suspend fun setFavoriteForAccount(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): FavoriteMutationRowDto = runFavoritesPostgrest {
+        val rows = postgrest.rpc(
+            function = SET_ACCOUNT_SCOPED_FAVORITE,
+            parameters = SetAccountScopedFavoriteRpcParametersDto(
+                expectedAccountId = expectedAccountId,
+                listingId = listingId,
+                favorited = favorited,
+            ),
+        ).decodeList<JsonObject>()
+            .map { row -> strictFavoritesJson.decodeFromJsonElement<FavoriteMutationRowDto>(row) }
+        if (rows.size != 1) {
+            throw FavoritesDataException.Unexpected(
+                IllegalStateException("Account-scoped favorite mutation RPC must return exactly one row."),
+            )
+        }
+        rows.single().also { row ->
+            row.toDomain(
+                expectedListingId = listingId,
+                expectedFavorited = favorited,
+                clientMutationSequence = 1L,
+            )
+        }
+    }
 }
 
 internal fun List<FavoriteListingRowDto>.toFavoriteListingPageDto(

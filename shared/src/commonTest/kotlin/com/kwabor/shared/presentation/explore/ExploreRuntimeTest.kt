@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.kwabor.shared.presentation.explore
 
 import app.cash.turbine.test
@@ -21,15 +23,37 @@ import com.kwabor.shared.domain.favorites.FavoriteListingPage
 import com.kwabor.shared.domain.favorites.FavoriteMutation
 import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.i18n.AppLocale
+import com.kwabor.shared.domain.interaction.InteractionAccountScope
+import com.kwabor.shared.domain.interaction.InteractionCommand
+import com.kwabor.shared.domain.interaction.InteractionConfirmation
+import com.kwabor.shared.domain.interaction.InteractionDrainOutcome
+import com.kwabor.shared.domain.interaction.InteractionKind
+import com.kwabor.shared.domain.interaction.InteractionOperationOutcome
+import com.kwabor.shared.domain.interaction.InteractionRejectionReason
+import com.kwabor.shared.domain.interaction.InteractionRepository
+import com.kwabor.shared.domain.interaction.InteractionSubmitOutcome
+import com.kwabor.shared.domain.interaction.PendingInteraction
+import com.kwabor.shared.domain.interaction.PendingInteractionStatus
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.observability.AnalyticsEntityType
 import com.kwabor.shared.domain.observability.AnalyticsSessionSource
 import com.kwabor.shared.domain.preferences.AppPreferences
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
+import com.kwabor.shared.presentation.interaction.InteractionReconciliationConsumer
+import com.kwabor.shared.presentation.interaction.terminalWatermark
 import com.kwabor.shared.presentation.session.ViewerSessionScope
+import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -977,6 +1001,788 @@ class ExploreRuntimeReplayAndLocationTest {
         assertFalse(runtime.state.value.isLocating)
         runtime.close()
     }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ExploreRuntimeDurableInteractionTest {
+    @Test
+    fun durableWriteFailureDoesNotApplyOptimismOrCallLegacyTransport() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository().apply {
+            submitFailure = DomainError.LocalStorageUnavailable()
+        }
+        val legacyInteractions = RuntimeInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(
+            interactions = legacyInteractions,
+            interactionCoordinator = coordinator,
+        )
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+
+        assertFalse(runtime.state.value.listings.single().favorited)
+        assertEquals(emptyList(), runtime.state.value.queuedInteractions)
+        assertEquals(strings.interactionFailed, runtime.state.value.interactionMessage)
+        assertEquals(0, legacyInteractions.favoriteCalls)
+        assertEquals(0, legacyInteractions.likeCalls)
+        runtime.close()
+    }
+
+    @Test
+    fun freshDurableEnqueueIsOptimisticWithoutClaimingOffline() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val legacyInteractions = RuntimeInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(
+            interactions = legacyInteractions,
+            interactionCoordinator = coordinator,
+        )
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+
+        val queued = runtime.state.value.queuedInteractions.single()
+        assertTrue(runtime.state.value.listings.single().liked)
+        assertEquals(1, runtime.state.value.listings.single().likesCount)
+        assertEquals(0, queued.attemptCount)
+        assertFalse(runtime.state.value.isOffline)
+        assertNull(runtime.state.value.interactionMessage)
+        assertEquals(0, legacyInteractions.likeCalls)
+        runtime.close()
+    }
+
+    @Test
+    fun directFreshDurableCommitStaysOnlineWithoutDependingOnQueuedEventDelivery() = runTest {
+        val initial = runtimeExploreUiState(
+            nextCursor = "cursor-1",
+            viewerScope = AUTHENTICATED_SCOPE,
+        )
+        val stateStore = ExploreStateStore(initial)
+        val baseline = stateStore.interactionBaseline(RUNTIME_LISTING_ID, ExploreInteractionKind.Like)
+        val pending = runtimeLikePending()
+        val result = initial.applyDurablePending(pending, strings)
+
+        val committed = requireNotNull(
+            stateStore.commitInteraction(
+                ExploreInteractionCommitRequest(
+                    result = result,
+                    baseline = baseline,
+                    listingId = RUNTIME_LISTING_ID,
+                    kind = ExploreInteractionKind.Like,
+                    clientMutationSequence = null,
+                    canCommit = { true },
+                ),
+            ),
+        )
+
+        assertTrue(committed.listings.single().liked)
+        assertEquals(0, committed.queuedInteractions.single().attemptCount)
+        assertFalse(committed.isOffline)
+        assertTrue(committed.canLoadMore)
+    }
+
+    @Test
+    fun directSubmitResultCapturedBeforePurgeCannotCommitAfterSameScopeResumeAndSignalAck() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val initial = runtimeExploreUiState(viewerScope = tracker.currentScope)
+        val stateStore = ExploreStateStore(initial)
+        val fence = coordinator.captureExploreCommitFence(tracker.currentScope)
+        assertIs<ExploreDirectCommitFence.Captured>(fence)
+        val queued = submitQueuedLike(
+            coordinator = coordinator,
+            scope = tracker.currentScope.toInteractionAccountScope(),
+            listingId = RUNTIME_LISTING_ID,
+        )
+        val toggle = ExploreToggleRequest(
+            listingId = RUNTIME_LISTING_ID,
+            kind = ExploreInteractionKind.Like,
+            viewerScopeAtRequest = tracker.currentScope,
+            viewerAtRequest = 1L,
+            contextAtRequest = 1L,
+            replay = null,
+        )
+        val prepared = ExplorePreparedToggle(
+            expectedScope = tracker.currentScope,
+            baseline = stateStore.interactionBaseline(RUNTIME_LISTING_ID, ExploreInteractionKind.Like),
+        )
+        val staleExecution = ExploreInteractionExecution(initial.applyDurablePending(queued.pending, strings))
+
+        coordinator.purgeResumeAndAcknowledge(RUNTIME_ACCOUNT_ID)
+
+        val committed = commitExploreExecutionIfCurrent(
+            coordinator = coordinator,
+            fence = fence,
+            interactionMutex = Mutex(),
+            stateStore = stateStore,
+            request = ExploreDirectCommitRequest(toggle, prepared, staleExecution) { _, _ -> true },
+        )
+
+        assertNull(committed)
+        assertFalse(stateStore.value.listings.single().liked)
+        assertTrue(stateStore.value.queuedInteractions.isEmpty())
+    }
+
+    @Test
+    fun networkRetrySurvivesRuntimeRecreationAndSameAccountEpochChange() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val firstRuntime = runtime(interactionCoordinator = coordinator)
+        firstRuntime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        firstRuntime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val pending = durableRepository.pending.single().copy(
+            attemptCount = 1,
+            status = PendingInteractionStatus.Scheduled(RUNTIME_NOW_EPOCH_MILLISECONDS + 1_000L),
+        )
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Retrying(command = command, pending = pending),
+        )
+        coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+        assertTrue(firstRuntime.state.value.isOffline)
+        firstRuntime.close()
+
+        tracker.update(accountId = null, accountSetupComplete = false)
+        val restoredScope = tracker.update(accountId = RUNTIME_ACCOUNT_ID, accountSetupComplete = true)
+        val restoredRuntime = runtime(interactionCoordinator = coordinator)
+        restoredRuntime.dispatch(ExploreIntent.ViewerContextChanged(restoredScope))
+        advanceUntilIdle()
+
+        val restored = restoredRuntime.state.value
+        assertTrue(restored.listings.single().favorited)
+        assertTrue(restored.isOffline)
+        assertEquals(1, restored.queuedInteractions.single().attemptCount)
+        assertEquals(strings.interactionQueuedOffline, restored.interactionMessage)
+        restoredRuntime.close()
+    }
+
+    @Test
+    fun sessionSuspensionKeepsOptimismWithoutClaimingNetworkOffline() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val suspended = durableRepository.pending.single().copy(
+            attemptCount = 1,
+            status = PendingInteractionStatus.SuspendedForSession,
+        )
+
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Retrying(command = command, pending = suspended),
+        )
+        coordinator.onForeground()
+        advanceUntilIdle()
+
+        assertTrue(runtime.state.value.listings.single().liked)
+        assertEquals(suspended.operationId, runtime.state.value.queuedInteractions.single().operationId)
+        assertFalse(runtime.state.value.queuedInteractions.single().isNetworkRetry)
+        assertFalse(runtime.state.value.isOffline)
+        assertNull(runtime.state.value.interactionMessage)
+        runtime.close()
+    }
+
+    @Test
+    fun sessionSuspensionIsMaskedForAnotherAccountAndRestoredForANewEpoch() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val suspended = durableRepository.pending.single().copy(
+            attemptCount = 1,
+            status = PendingInteractionStatus.SuspendedForSession,
+        )
+        durableRepository.enqueueDrain(InteractionOperationOutcome.Retrying(command, suspended))
+        coordinator.onForeground()
+        advanceUntilIdle()
+
+        val otherAccount = tracker.update(accountId = "viewer-2", accountSetupComplete = true)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(otherAccount))
+        advanceUntilIdle()
+        assertFalse(runtime.state.value.listings.single().favorited)
+        assertEquals(emptyList(), runtime.state.value.queuedInteractions)
+
+        val restoredScope = tracker.update(accountId = RUNTIME_ACCOUNT_ID, accountSetupComplete = true)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(restoredScope))
+        advanceUntilIdle()
+        assertTrue(runtime.state.value.listings.single().favorited)
+        assertFalse(runtime.state.value.isOffline)
+        assertEquals(suspended.operationId, runtime.state.value.queuedInteractions.single().operationId)
+        runtime.close()
+    }
+
+    @Test
+    fun durableLikeConfirmationWithNullCountPreservesOptimisticCounter() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val operationId = durableRepository.pending.single().operationId
+
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Confirmed(
+                command = command,
+                confirmation = InteractionConfirmation.Like(
+                    operationId = operationId,
+                    scope = command.scope,
+                    listingId = command.listingId,
+                    liked = true,
+                    likesCount = null,
+                    mutatedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+                ),
+            ),
+        )
+        coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        assertTrue(runtime.state.value.listings.single().liked)
+        assertEquals(1, runtime.state.value.listings.single().likesCount)
+        assertEquals(emptyList(), runtime.state.value.queuedInteractions)
+        runtime.close()
+    }
+}
+
+class ExploreRuntimeDurableReconciliationTest {
+    @Test
+    fun overflowedLastRejectionRetriesFailedHydrationThenReloadsAuthoritativeFeed() = runTest {
+        val harness = durableExploreHarness()
+        harness.runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = harness.durableRepository.submittedCommands.single()
+        val operationId = harness.durableRepository.pending.single().operationId
+        val refreshCallsBeforeOverflow = harness.feedRepository.refreshCalls
+        harness.durableRepository.loadPendingFailuresRemaining = 1
+        val slowCollector = blockExploreEventCollector(harness.coordinator)
+        val targetRejection = InteractionOperationOutcome.Rejected(
+            command = command,
+            operationId = operationId,
+            reason = InteractionRejectionReason.PermissionDenied,
+        )
+        harness.durableRepository.enqueueDrain(
+            *(overflowExploreConfirmations(command.scope, count = 101) + targetRejection).toTypedArray(),
+        )
+
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        assertEquals(emptyList(), harness.runtime.state.value.queuedInteractions)
+        assertTrue(harness.runtime.state.value.listings.single().liked)
+        assertEquals(refreshCallsBeforeOverflow, harness.feedRepository.refreshCalls)
+
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        assertFalse(harness.runtime.state.value.listings.single().liked)
+        assertEquals(0, harness.runtime.state.value.listings.single().likesCount)
+        assertTrue(harness.feedRepository.refreshCalls > refreshCallsBeforeOverflow)
+        slowCollector.close()
+        harness.close()
+    }
+
+    @Test
+    fun overflowSignalOvertakesBufferedQueuedButWatermarkPreventsStaleOverlay() = runTest {
+        val authoritativeItems = listOf(
+            runtimeListing(),
+            runtimeListing(RUNTIME_OVERTAKE_LISTING_ID),
+        )
+        val feedRepository = RuntimeFeedRepository(
+            refreshSnapshot = runtimeSnapshot(items = authoritativeItems),
+        )
+        val harness = durableExploreHarness(feedRepository = feedRepository)
+        val slowCollector = blockExploreEventCollector(harness.coordinator)
+        val blocker = blockExploreHydration(harness)
+        val refreshCallsBeforeOverflow = triggerDroppedExploreRejection(harness, blocker.command.scope)
+
+        slowCollector.release()
+        runCurrent()
+        blocker.gate.complete(Unit)
+        settleCoordinatorBackgroundWork()
+
+        assertTrue(harness.coordinator.reconciliationSignals.value != null)
+        harness.assertNoQueuedInteraction(RUNTIME_OVERTAKE_LISTING_ID)
+        val refreshCallsAfterRelease = feedRepository.refreshCalls
+        assertTrue(refreshCallsAfterRelease >= refreshCallsBeforeOverflow)
+
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        val target = harness.runtime.state.value.listings.first { listing ->
+            listing.id == RUNTIME_OVERTAKE_LISTING_ID
+        }
+        assertFalse(target.liked)
+        assertEquals(0, target.likesCount)
+        harness.assertNoQueuedInteraction(RUNTIME_OVERTAKE_LISTING_ID)
+        assertTrue(feedRepository.refreshCalls >= refreshCallsAfterRelease)
+        assertTrue(feedRepository.refreshCalls > refreshCallsBeforeOverflow)
+        slowCollector.close()
+        harness.close()
+    }
+
+    @Test
+    fun queuedAfterAcknowledgedDeliveryWatermarkDoesNotHydrateOrGetLost() = runTest {
+        val harness = durableExploreHarness()
+        val slowCollector = blockExploreEventCollector(harness.coordinator)
+        harness.durableRepository.enqueueDrain(
+            *overflowExploreConfirmations(harness.interactionScope, count = 102)
+                .toTypedArray(),
+        )
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+        harness.coordinator.deliveryCommitGate.acknowledgeReconciliation(
+            requireNotNull(harness.coordinator.reconciliationSignals.value),
+            InteractionReconciliationConsumer.Favorites,
+        )
+        advanceUntilIdle()
+        assertNull(harness.coordinator.reconciliationSignals.value)
+        slowCollector.release()
+        settleCoordinatorBackgroundWork()
+
+        harness.durableRepository.loadPendingFailuresRemaining = 1
+        submitQueuedLike(
+            coordinator = harness.coordinator,
+            scope = harness.interactionScope,
+            listingId = RUNTIME_LISTING_ID,
+        )
+        advanceUntilIdle()
+
+        assertTrue(harness.runtime.state.value.listings.single().liked)
+        assertTrue(
+            harness.runtime.state.value.queuedInteractions.any { queued ->
+                queued.listingId == RUNTIME_LISTING_ID
+            },
+        )
+        assertEquals(1, harness.durableRepository.loadPendingFailuresRemaining)
+        slowCollector.close()
+        harness.close()
+    }
+
+    @Test
+    fun staleEmptyHydrationCannotRemoveQueuedOperationCommittedWhileRoomReadWasBlocked() = runTest {
+        val harness = durableExploreHarness()
+        val gate = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        harness.durableRepository.captureLoadPendingBeforeGate = true
+        harness.durableRepository.loadPendingGate = gate
+        harness.durableRepository.loadPendingStarted = started
+
+        harness.runtime.dispatch(ExploreIntent.Refresh)
+        runCurrent()
+        assertTrue(started.isCompleted)
+        harness.runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        runCurrent()
+        val queued = harness.durableRepository.pending.single()
+        assertEquals(queued.operationId, harness.runtime.state.value.queuedInteractions.single().operationId)
+
+        gate.complete(Unit)
+        settleCoordinatorBackgroundWork()
+
+        assertTrue(harness.runtime.state.value.listings.single().liked)
+        assertEquals(queued.operationId, harness.runtime.state.value.queuedInteractions.single().operationId)
+        harness.durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Retrying(
+                command = harness.durableRepository.lastSubmittedOutcome.command,
+                pending = queued.copy(attemptCount = 1),
+            ),
+        )
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+        assertEquals(1, harness.runtime.state.value.queuedInteractions.single().attemptCount)
+        harness.close()
+    }
+}
+
+class ExploreRuntimeDurablePurgeTest {
+    @Test
+    fun terminalBeyondWatermarkCapacityForcesAuthoritativeVisibleReload() = runTest {
+        val feedRepository = RuntimeFeedRepository()
+        val viewerInteractions = RuntimeInteractionRepository()
+        val harness = durableExploreHarness(feedRepository, viewerInteractions)
+        feedRepository.refreshSnapshot = runtimeSnapshot(items = listOf(runtimeListing(likesCount = 7)))
+        viewerInteractions.viewerInteractions = listOf(
+            runtimeViewerInteraction(liked = true, favorited = false, likes = 7),
+        )
+        val slowCollector = blockExploreEventCollector(harness.coordinator)
+        val targetCommand = runtimeLikeCommand(harness.interactionScope)
+        val targetConfirmation = likeConfirmationOutcome(
+            command = targetCommand,
+            operationId = 10_000L,
+            liked = true,
+            likesCount = 7,
+        )
+        val refreshCallsBeforeOverflow = feedRepository.refreshCalls
+        harness.durableRepository.enqueueDrain(
+            *(overflowExploreConfirmations(targetCommand.scope, count = 1_101) + targetConfirmation).toTypedArray(),
+        )
+
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        val signal = requireNotNull(harness.coordinator.reconciliationSignals.value)
+        assertEquals(1_000, signal.terminalWatermarks.size)
+        assertTrue(signal.requiresPendingValidation)
+        assertNull(signal.terminalWatermark(RUNTIME_LISTING_ID, InteractionKind.Like))
+        assertTrue(harness.runtime.state.value.listings.single().liked)
+        assertEquals(7, harness.runtime.state.value.listings.single().likesCount)
+        assertTrue(feedRepository.refreshCalls > refreshCallsBeforeOverflow)
+        slowCollector.close()
+        harness.close()
+    }
+
+    @Test
+    fun bufferedQueuedBeforePurgeIsIgnoredAfterResumeOfTheSameScope() = runTest {
+        val feedRepository = RuntimeFeedRepository(
+            refreshSnapshot = runtimeSnapshot(
+                items = listOf(runtimeListing(), runtimeListing(RUNTIME_OVERTAKE_LISTING_ID)),
+            ),
+        )
+        val harness = durableExploreHarness(feedRepository = feedRepository)
+        val originalScope = harness.tracker.currentScope
+        val blocker = blockExploreHydration(harness)
+        submitQueuedLike(
+            coordinator = harness.coordinator,
+            scope = originalScope.toInteractionAccountScope(),
+            listingId = RUNTIME_OVERTAKE_LISTING_ID,
+        )
+        runCurrent()
+        val refreshCallsBeforePurge = feedRepository.refreshCalls
+
+        val purge = async { harness.coordinator.purgeForAccountDeletion(RUNTIME_ACCOUNT_ID) }
+        runCurrent()
+        assertTrue(purge.isCompleted)
+        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
+            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
+        )
+        assertEquals(originalScope, harness.tracker.currentScope)
+        harness.durableRepository.loadPendingFailuresRemaining = 1
+        harness.coordinator.resumeAfterAccountDeletionFailure(RUNTIME_ACCOUNT_ID)
+        runCurrent()
+        blocker.gate.complete(Unit)
+        settleCoordinatorBackgroundWork()
+
+        assertTrue(harness.coordinator.reconciliationSignals.value != null)
+        harness.coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        assertEquals(originalScope, harness.runtime.state.value.viewerScope)
+        assertTrue(harness.runtime.state.value.queuedInteractions.isEmpty())
+        assertTrue(harness.runtime.state.value.listings.none(ExploreListingItem::liked))
+        assertTrue(feedRepository.refreshCalls > refreshCallsBeforePurge)
+        harness.close()
+    }
+
+    @Test
+    fun hydrationWindowsOneThousandAndOneVisibleListingsAndAppliesTheLastPendingLike() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val listingIds = (1..1_001).map { index -> "windowed-listing-$index" }
+        val lastListingId = listingIds.last()
+        val durableRepository = RuntimeDurableInteractionRepository().apply {
+            putPending(
+                PendingInteraction(
+                    operationId = 1L,
+                    accountId = RUNTIME_ACCOUNT_ID,
+                    listingId = lastListingId,
+                    kind = InteractionKind.Like,
+                    desiredSelected = true,
+                    enqueuedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+                    attemptCount = 0,
+                    status = PendingInteractionStatus.Scheduled(RUNTIME_NOW_EPOCH_MILLISECONDS),
+                ),
+            )
+        }
+        val feedRepository = RuntimeFeedRepository(
+            refreshSnapshot = runtimeSnapshot(items = listingIds.map { listingId -> runtimeListing(listingId) }),
+        )
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(
+            feedRepository = feedRepository,
+            interactionCoordinator = coordinator,
+        )
+
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+
+        assertTrue(durableRepository.loadPendingRequests.all { request -> request.size <= 1_000 })
+        assertTrue(durableRepository.loadPendingRequests.flatten().contains(lastListingId))
+        assertTrue(runtime.state.value.listings.first { listing -> listing.id == lastListingId }.liked)
+        assertTrue(runtime.state.value.queuedInteractions.any { queued -> queued.listingId == lastListingId })
+        runtime.close()
+    }
+
+    @Test
+    fun durableFavoriteConfirmationsUseSequenceAndDoNotPublishLegacyBridgeEffects() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        val scope = tracker.currentScope.toInteractionAccountScope()
+
+        runtime.effects.test {
+            durableRepository.enqueueDrain(
+                favoriteConfirmationOutcome(
+                    scope = scope,
+                    operationId = 10L,
+                    favorited = true,
+                    clientMutationSequence = 2L,
+                ),
+            )
+            coordinator.onForeground()
+            settleCoordinatorBackgroundWork()
+            assertTrue(runtime.state.value.listings.single().favorited)
+            expectNoEvents()
+
+            durableRepository.enqueueDrain(
+                favoriteConfirmationOutcome(
+                    scope = scope,
+                    operationId = 11L,
+                    favorited = false,
+                    clientMutationSequence = 1L,
+                ),
+            )
+            coordinator.onForeground()
+            settleCoordinatorBackgroundWork()
+            assertTrue(runtime.state.value.listings.single().favorited)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+        runtime.close()
+    }
+
+    @Test
+    fun durableRejectionRemovesOptimismAndReloadsAuthority() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val feedRepository = RuntimeFeedRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(
+            feedRepository = feedRepository,
+            interactionCoordinator = coordinator,
+        )
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val operationId = durableRepository.pending.single().operationId
+        val refreshCountBeforeRejection = feedRepository.refreshCalls
+
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Rejected(
+                command = command,
+                operationId = operationId,
+                reason = InteractionRejectionReason.PermissionDenied,
+            ),
+        )
+        coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        assertFalse(runtime.state.value.listings.single().favorited)
+        assertEquals(emptyList(), runtime.state.value.queuedInteractions)
+        assertEquals(strings.interactionFailed, runtime.state.value.interactionMessage)
+        assertTrue(feedRepository.refreshCalls > refreshCountBeforeRejection)
+        runtime.close()
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ExploreRuntimeDurableConcurrencyTest {
+    @Test
+    fun staleAccountCompletionCannotCrossViewerScope() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val command = durableRepository.submittedCommands.single()
+        val operationId = durableRepository.pending.single().operationId
+
+        val nextScope = tracker.update(accountId = "viewer-2", accountSetupComplete = true)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(nextScope))
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Confirmed(
+                command = command,
+                confirmation = InteractionConfirmation.Like(
+                    operationId = operationId,
+                    scope = command.scope,
+                    listingId = command.listingId,
+                    liked = true,
+                    likesCount = 99,
+                    mutatedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+                ),
+            ),
+        )
+        coordinator.onForeground()
+        advanceUntilIdle()
+
+        assertEquals(nextScope, runtime.state.value.viewerScope)
+        assertFalse(runtime.state.value.listings.single().liked)
+        assertEquals(0, runtime.state.value.listings.single().likesCount)
+        assertEquals(emptyList(), runtime.state.value.queuedInteractions)
+        runtime.close()
+    }
+
+    @Test
+    fun feedRetryUsesItsCapturedScopeAndCannotRetryAnotherAccountOutbox() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        durableRepository.retryCalls.clear()
+
+        runtime.dispatch(ExploreIntent.Retry)
+        val nextScope = tracker.update(accountId = "viewer-2", accountSetupComplete = true)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(nextScope))
+        advanceUntilIdle()
+
+        assertFalse(durableRepository.retryCalls.any { (_, includeManual) -> includeManual })
+        durableRepository.retryCalls.clear()
+        runtime.dispatch(ExploreIntent.Retry)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(nextScope.toInteractionAccountScope() to true),
+            durableRepository.retryCalls.filter { (_, includeManual) -> includeManual },
+        )
+        runtime.close()
+    }
+
+    @Test
+    fun gatedFeedCannotOverwriteIndependentDurableLikeAndFavoriteOverlays() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val feedRepository = RuntimeFeedRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(
+            feedRepository = feedRepository,
+            interactionCoordinator = coordinator,
+        )
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        val refreshGate = CompletableDeferred<Unit>()
+        feedRepository.refreshGate = refreshGate
+        runtime.dispatch(ExploreIntent.Refresh)
+        runCurrent()
+
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        runCurrent()
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        val listing = runtime.state.value.listings.single()
+        assertTrue(listing.liked)
+        assertTrue(listing.favorited)
+        assertEquals(
+            setOf(ExploreInteractionKind.Like, ExploreInteractionKind.Favorite),
+            runtime.state.value.queuedInteractions.map(QueuedExploreInteraction::kind).toSet(),
+        )
+        runtime.close()
+    }
+
+    @Test
+    fun supersededRapidToggleCannotRemoveTheNewerDurableIntent() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val firstCommand = durableRepository.submittedCommands.single()
+        val firstOperationId = durableRepository.lastSubmittedOutcome.pending.operationId
+
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val latest = durableRepository.pending.single()
+        assertTrue(latest.operationId > firstOperationId)
+        assertFalse(latest.desiredSelected)
+
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Superseded(
+                command = firstCommand,
+                operationId = firstOperationId,
+            ),
+        )
+        coordinator.onForeground()
+        advanceUntilIdle()
+
+        val queued = runtime.state.value.queuedInteractions.single()
+        assertEquals(latest.operationId, queued.operationId)
+        assertFalse(queued.selected)
+        assertFalse(runtime.state.value.listings.single().liked)
+        runtime.close()
+    }
+
+    @Test
+    fun lateConfirmationCannotOverwriteANewerRetryingIntent() = runTest {
+        val tracker = authenticatedRuntimeTracker()
+        val durableRepository = RuntimeDurableInteractionRepository()
+        val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+        val runtime = runtime(interactionCoordinator = coordinator)
+        runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+        advanceUntilIdle()
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val firstCommand = durableRepository.submittedCommands.single()
+        val firstOperationId = durableRepository.lastSubmittedOutcome.pending.operationId
+
+        runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+        advanceUntilIdle()
+        val secondCommand = durableRepository.submittedCommands.last()
+        val secondPending = durableRepository.pending.single().copy(
+            attemptCount = 1,
+            status = PendingInteractionStatus.Scheduled(RUNTIME_NOW_EPOCH_MILLISECONDS + 1_000L),
+        )
+        durableRepository.enqueueDrain(
+            InteractionOperationOutcome.Retrying(command = secondCommand, pending = secondPending),
+        )
+        coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        durableRepository.enqueueDrain(likeConfirmationOutcome(firstCommand, firstOperationId, true, 99))
+        coordinator.onForeground()
+        settleCoordinatorBackgroundWork()
+
+        val queued = runtime.state.value.queuedInteractions.single()
+        assertEquals(secondPending.operationId, queued.operationId)
+        assertEquals(1, queued.attemptCount)
+        assertFalse(runtime.state.value.listings.single().liked)
+        assertEquals(0, runtime.state.value.listings.single().likesCount)
+        assertTrue(runtime.state.value.isOffline)
+        runtime.close()
+    }
 
     @Test
     fun close_isIdempotentAndRejectsFurtherIntents() = runTest {
@@ -996,10 +1802,177 @@ class ExploreRuntimeReplayAndLocationTest {
     }
 }
 
-private fun kotlinx.coroutines.test.TestScope.runtime(
+private data class DurableExploreHarness(
+    val tracker: ViewerSessionScopeTracker,
+    val durableRepository: RuntimeDurableInteractionRepository,
+    val feedRepository: RuntimeFeedRepository,
+    val coordinator: InteractionCoordinator,
+    val runtime: ExploreRuntime,
+) {
+    val interactionScope: InteractionAccountScope
+        get() = tracker.currentScope.toInteractionAccountScope()
+
+    fun close() = runtime.close()
+
+    fun assertNoQueuedInteraction(listingId: String) {
+        assertTrue(runtime.state.value.queuedInteractions.none { queued -> queued.listingId == listingId })
+    }
+}
+
+private fun TestScope.settleCoordinatorBackgroundWork() {
+    runCurrent()
+    advanceUntilIdle()
+}
+
+private suspend fun TestScope.durableExploreHarness(
+    feedRepository: RuntimeFeedRepository = RuntimeFeedRepository(),
+    interactions: RuntimeInteractionRepository = RuntimeInteractionRepository(),
+): DurableExploreHarness {
+    val tracker = authenticatedRuntimeTracker()
+    val durableRepository = RuntimeDurableInteractionRepository()
+    val coordinator = InteractionCoordinator(durableRepository, tracker, RuntimeClock, backgroundScope)
+    val runtime = runtime(feedRepository, interactions, interactionCoordinator = coordinator)
+    runtime.dispatch(ExploreIntent.ViewerContextChanged(tracker.currentScope))
+    advanceUntilIdle()
+    return DurableExploreHarness(tracker, durableRepository, feedRepository, coordinator, runtime)
+}
+
+private data class BlockedExploreEventCollector(
+    private val releaseGate: CompletableDeferred<Unit>,
+    private val job: Job,
+) {
+    fun release() {
+        releaseGate.complete(Unit)
+    }
+
+    fun close() {
+        release()
+        job.cancel()
+    }
+}
+
+private suspend fun TestScope.blockExploreEventCollector(
+    coordinator: InteractionCoordinator,
+): BlockedExploreEventCollector {
+    val release = CompletableDeferred<Unit>()
+    val job = backgroundScope.launch {
+        coordinator.events.collect { release.await() }
+    }
+    runCurrent()
+    return BlockedExploreEventCollector(release, job)
+}
+
+private data class BlockedExploreHydration(
+    val command: InteractionCommand,
+    val gate: CompletableDeferred<Unit>,
+)
+
+private suspend fun TestScope.blockExploreHydration(harness: DurableExploreHarness): BlockedExploreHydration {
+    harness.runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_LISTING_ID))
+    advanceUntilIdle()
+    val command = harness.durableRepository.submittedCommands.single()
+    val operationId = harness.durableRepository.pending.single().operationId
+    val gate = CompletableDeferred<Unit>()
+    val started = CompletableDeferred<Unit>()
+    harness.durableRepository.loadPendingGate = gate
+    harness.durableRepository.loadPendingStarted = started
+    harness.durableRepository.enqueueDrain(
+        InteractionOperationOutcome.Superseded(command, operationId),
+    )
+    harness.coordinator.onForeground()
+    runCurrent()
+    assertTrue(started.isCompleted)
+    return BlockedExploreHydration(command, gate)
+}
+
+private suspend fun TestScope.triggerDroppedExploreRejection(
+    harness: DurableExploreHarness,
+    scope: InteractionAccountScope,
+): Int {
+    val target = submitQueuedLike(harness.coordinator, scope, RUNTIME_OVERTAKE_LISTING_ID)
+    runCurrent()
+    val rejection = InteractionOperationOutcome.Rejected(
+        command = target.command,
+        operationId = target.pending.operationId,
+        reason = InteractionRejectionReason.PermissionDenied,
+    )
+    harness.durableRepository.enqueueDrain(
+        *(overflowExploreConfirmations(scope, count = 101) + rejection).toTypedArray(),
+    )
+    val refreshCalls = harness.feedRepository.refreshCalls
+    harness.durableRepository.loadPendingFailuresRemaining = 3
+    harness.coordinator.onForeground()
+    runCurrent()
+    assertTrue(harness.coordinator.reconciliationSignals.value != null)
+    return refreshCalls
+}
+
+private suspend fun submitQueuedLike(
+    coordinator: InteractionCoordinator,
+    scope: InteractionAccountScope,
+    listingId: String,
+): InteractionSubmitOutcome.Queued = assertIs(
+    assertIs<DomainResult.Success<InteractionSubmitOutcome>>(
+        coordinator.submit(scope, listingId, InteractionKind.Like, desiredSelected = true),
+    ).value,
+)
+
+private suspend fun InteractionCoordinator.purgeResumeAndAcknowledge(accountId: String) {
+    assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
+        assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
+            purgeForAccountDeletion(accountId),
+        ).value,
+    )
+    resumeAfterAccountDeletionFailure(accountId)
+    deliveryCommitGate.acknowledgeReconciliation(
+        requireNotNull(reconciliationSignals.value),
+        InteractionReconciliationConsumer.Explore,
+    )
+    deliveryCommitGate.acknowledgeReconciliation(
+        requireNotNull(reconciliationSignals.value),
+        InteractionReconciliationConsumer.Favorites,
+    )
+    assertNull(reconciliationSignals.value)
+}
+
+private fun runtimeExploreUiState(viewerScope: ViewerSessionScope, nextCursor: String? = null): ExploreUiState =
+    initialExploreUiState(strings).copy(
+        listings = listOf(runtimeExploreItem()),
+        nextCursor = nextCursor,
+        viewerScope = viewerScope,
+    )
+
+private fun runtimeExploreItem(id: String = RUNTIME_LISTING_ID): ExploreListingItem = ExploreListingItem(
+    id = id,
+    title = "Porte du non-retour",
+    cityLabel = "Ouidah",
+    coverImageUrl = null,
+    price = null,
+)
+
+private fun runtimeLikePending(): PendingInteraction = PendingInteraction(
+    operationId = 1L,
+    accountId = RUNTIME_ACCOUNT_ID,
+    listingId = RUNTIME_LISTING_ID,
+    kind = InteractionKind.Like,
+    desiredSelected = true,
+    enqueuedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+    attemptCount = 0,
+    status = PendingInteractionStatus.Scheduled(RUNTIME_NOW_EPOCH_MILLISECONDS),
+)
+
+private fun runtimeLikeCommand(scope: InteractionAccountScope): InteractionCommand = InteractionCommand(
+    scope = scope,
+    listingId = RUNTIME_LISTING_ID,
+    kind = InteractionKind.Like,
+    desiredSelected = true,
+)
+
+private fun TestScope.runtime(
     feedRepository: RuntimeFeedRepository = RuntimeFeedRepository(),
     interactions: RuntimeInteractionRepository = RuntimeInteractionRepository(),
     preferences: AppPreferencesRepository? = null,
+    interactionCoordinator: InteractionCoordinator? = null,
 ): ExploreRuntime = ExploreRuntime(
     presenter = ExplorePresenter(
         exploreFeedRepository = feedRepository,
@@ -1010,6 +1983,7 @@ private fun kotlinx.coroutines.test.TestScope.runtime(
     ),
     strings = strings,
     coroutineScope = this,
+    interactionCoordinator = interactionCoordinator,
 )
 
 private fun favoriteStateChanged(
@@ -1057,11 +2031,14 @@ private class RuntimeFeedRepository(
 ) : ExploreFeedRepository {
     var refreshGate: CompletableDeferred<Unit>? = null
     var appendGate: CompletableDeferred<Unit>? = null
+    var refreshCalls: Int = 0
+        private set
 
     override suspend fun readCached(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot?> =
         DomainResult.Success(null)
 
     override suspend fun refresh(query: ExploreFeedQuery): DomainResult<ExploreFeedSnapshot> {
+        refreshCalls += 1
         refreshGate?.also { gate ->
             refreshGate = null
             gate.await()
@@ -1091,6 +2068,8 @@ private class RuntimeInteractionRepository(
     var viewerInteractions: List<ListingViewerInteraction> = emptyList()
     var favoriteCalls: Int = 0
         private set
+    var likeCalls: Int = 0
+        private set
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =
         selectedInteraction(listingId = listingId, liked = true, favorited = false)
@@ -1103,11 +2082,15 @@ private class RuntimeInteractionRepository(
         else -> DomainResult.Success(viewerInteractions.filter { interaction -> interaction.listingId in listingIds })
     }
 
-    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = true, favorited = false, persist = true)
+    override suspend fun likeListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        likeCalls += 1
+        return selectedInteraction(listingId = listingId, liked = true, favorited = false, persist = true)
+    }
 
-    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> =
-        selectedInteraction(listingId = listingId, liked = false, favorited = false, persist = true)
+    override suspend fun unlikeListing(listingId: String): DomainResult<ListingViewerInteraction> {
+        likeCalls += 1
+        return selectedInteraction(listingId = listingId, liked = false, favorited = false, persist = true)
+    }
 
     override suspend fun listFavorites(
         filter: ListingType?,
@@ -1175,6 +2158,230 @@ private class RuntimeInteractionRepository(
         DomainResult.Failure(DomainError.AuthenticationRequired("error.auth.required"))
 }
 
+private class RuntimeDurableInteractionRepository : InteractionRepository {
+    val submittedCommands = mutableListOf<InteractionCommand>()
+    val retryCalls = mutableListOf<Pair<InteractionAccountScope, Boolean>>()
+    val loadPendingRequests = mutableListOf<List<String>>()
+    var pending: List<PendingInteraction> = emptyList()
+        private set
+    var submitFailure: DomainError? = null
+    var loadPendingFailuresRemaining: Int = 0
+    var loadPendingGate: CompletableDeferred<Unit>? = null
+    var loadPendingStarted: CompletableDeferred<Unit>? = null
+    var captureLoadPendingBeforeGate: Boolean = false
+    lateinit var lastSubmittedOutcome: InteractionSubmitOutcome.Queued
+        private set
+    private val drainOutcomes = ArrayDeque<List<InteractionOperationOutcome>>()
+    private var nextOperationId = 0L
+
+    override suspend fun submit(command: InteractionCommand): DomainResult<InteractionSubmitOutcome> {
+        submittedCommands += command
+        submitFailure?.let { error -> return DomainResult.Failure(error) }
+        val existing = pending.firstOrNull { interaction ->
+            interaction.accountId == command.scope.accountId &&
+                interaction.listingId == command.listingId &&
+                interaction.kind == command.kind
+        }
+        val operationId = if (existing?.desiredSelected == command.desiredSelected) {
+            existing.operationId
+        } else {
+            ++nextOperationId
+        }
+        val queued = PendingInteraction(
+            operationId = operationId,
+            accountId = command.scope.accountId,
+            listingId = command.listingId,
+            kind = command.kind,
+            desiredSelected = command.desiredSelected,
+            enqueuedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+            attemptCount = 0,
+            status = PendingInteractionStatus.Scheduled(RUNTIME_NOW_EPOCH_MILLISECONDS),
+        )
+        pending = pending.filterNot { interaction ->
+            interaction.accountId == command.scope.accountId &&
+                interaction.listingId == command.listingId &&
+                interaction.kind == command.kind
+        } + queued
+        lastSubmittedOutcome = InteractionSubmitOutcome.Queued(command = command, pending = queued)
+        return DomainResult.Success(lastSubmittedOutcome)
+    }
+
+    override suspend fun loadPending(
+        accountId: String,
+        listingIds: List<String>,
+    ): DomainResult<List<PendingInteraction>> {
+        loadPendingRequests += listingIds
+        val captured = pendingFor(accountId, listingIds).takeIf { captureLoadPendingBeforeGate }
+        loadPendingGate?.also { gate ->
+            loadPendingGate = null
+            loadPendingStarted?.complete(Unit)
+            loadPendingStarted = null
+            gate.await()
+        }
+        if (loadPendingFailuresRemaining > 0) {
+            loadPendingFailuresRemaining -= 1
+            return DomainResult.Failure(DomainError.LocalStorageUnavailable())
+        }
+        return DomainResult.Success(captured ?: pendingFor(accountId, listingIds))
+    }
+
+    private fun pendingFor(accountId: String, listingIds: List<String>): List<PendingInteraction> =
+        pending.filter { interaction ->
+            interaction.accountId == accountId &&
+                (listingIds.isEmpty() || interaction.listingId in listingIds)
+        }
+
+    override suspend fun drainDue(scope: InteractionAccountScope): DomainResult<InteractionDrainOutcome> {
+        val outcomes = drainOutcomes.removeFirstOrNull().orEmpty()
+        outcomes.forEach(::applyOutcome)
+        return DomainResult.Success(InteractionDrainOutcome(scope = scope, operations = outcomes))
+    }
+
+    override suspend fun nextAttemptAt(accountId: String): DomainResult<Long?> = DomainResult.Success(null)
+
+    override suspend fun retryAccount(
+        scope: InteractionAccountScope,
+        includeManualFailures: Boolean,
+    ): DomainResult<Int> {
+        retryCalls += scope to includeManualFailures
+        return DomainResult.Success(0)
+    }
+
+    override suspend fun purge(accountId: String): DomainResult<Int> {
+        val retained = pending.filterNot { interaction -> interaction.accountId == accountId }
+        val removed = pending.size - retained.size
+        pending = retained
+        return DomainResult.Success(removed)
+    }
+
+    fun enqueueDrain(vararg outcomes: InteractionOperationOutcome) {
+        drainOutcomes += outcomes.toList()
+    }
+
+    fun putPending(interaction: PendingInteraction) {
+        nextOperationId = maxOf(nextOperationId, interaction.operationId)
+        pending = pending.filterNot { current ->
+            current.accountId == interaction.accountId &&
+                current.listingId == interaction.listingId &&
+                current.kind == interaction.kind
+        } + interaction
+    }
+
+    private fun applyOutcome(outcome: InteractionOperationOutcome) {
+        when (outcome) {
+            is InteractionOperationOutcome.Retrying -> replacePending(outcome.pending)
+            is InteractionOperationOutcome.Confirmed -> removePending(
+                listingId = outcome.command.listingId,
+                kind = outcome.command.kind,
+                operationId = outcome.confirmation.operationId,
+            )
+            is InteractionOperationOutcome.Rejected -> removePending(
+                listingId = outcome.command.listingId,
+                kind = outcome.command.kind,
+                operationId = outcome.operationId,
+            )
+            is InteractionOperationOutcome.Superseded -> removePending(
+                listingId = outcome.command.listingId,
+                kind = outcome.command.kind,
+                operationId = outcome.operationId,
+            )
+        }
+    }
+
+    private fun replacePending(replacement: PendingInteraction) {
+        val hasMatchingOperation = pending.any { interaction ->
+            interaction.operationId == replacement.operationId
+        }
+        if (!hasMatchingOperation) return
+        pending = pending.map { interaction ->
+            if (interaction.operationId == replacement.operationId) replacement else interaction
+        }
+    }
+
+    private fun removePending(listingId: String, kind: InteractionKind, operationId: Long) {
+        pending = pending.filterNot { interaction ->
+            interaction.listingId == listingId &&
+                interaction.kind == kind &&
+                interaction.operationId == operationId
+        }
+    }
+}
+
+private fun authenticatedRuntimeTracker(): ViewerSessionScopeTracker = ViewerSessionScopeTracker().apply {
+    update(accountId = RUNTIME_ACCOUNT_ID, accountSetupComplete = true)
+}
+
+private fun ViewerSessionScope.toInteractionAccountScope(): InteractionAccountScope = InteractionAccountScope(
+    accountId = accountId ?: error("Authenticated scope required by test fixture."),
+    epoch = epoch,
+)
+
+private fun favoriteConfirmationOutcome(
+    scope: InteractionAccountScope,
+    operationId: Long,
+    favorited: Boolean,
+    clientMutationSequence: Long,
+): InteractionOperationOutcome.Confirmed {
+    val command = InteractionCommand(
+        scope = scope,
+        listingId = RUNTIME_LISTING_ID,
+        kind = InteractionKind.Favorite,
+        desiredSelected = favorited,
+    )
+    return InteractionOperationOutcome.Confirmed(
+        command = command,
+        confirmation = InteractionConfirmation.Favorite(
+            operationId = operationId,
+            scope = scope,
+            listingId = RUNTIME_LISTING_ID,
+            favorited = favorited,
+            favoritedAtEpochMilliseconds = if (favorited) RUNTIME_NOW_EPOCH_MILLISECONDS else null,
+            clientMutationSequence = clientMutationSequence,
+        ),
+    )
+}
+
+private fun likeConfirmationOutcome(
+    command: InteractionCommand,
+    operationId: Long,
+    liked: Boolean,
+    likesCount: Int?,
+): InteractionOperationOutcome.Confirmed = InteractionOperationOutcome.Confirmed(
+    command = command,
+    confirmation = InteractionConfirmation.Like(
+        operationId = operationId,
+        scope = command.scope,
+        listingId = command.listingId,
+        liked = liked,
+        likesCount = likesCount,
+        mutatedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+    ),
+)
+
+private fun overflowExploreConfirmations(
+    scope: InteractionAccountScope,
+    count: Int,
+): List<InteractionOperationOutcome> = (1..count).map { index ->
+    val listingId = "overflow-explore-$index"
+    val command = InteractionCommand(
+        scope = scope,
+        listingId = listingId,
+        kind = InteractionKind.Like,
+        desiredSelected = true,
+    )
+    InteractionOperationOutcome.Confirmed(
+        command = command,
+        confirmation = InteractionConfirmation.Like(
+            operationId = 1_000L + index,
+            scope = scope,
+            listingId = listingId,
+            liked = true,
+            likesCount = index,
+            mutatedAtEpochMilliseconds = RUNTIME_NOW_EPOCH_MILLISECONDS,
+        ),
+    )
+}
+
 private object RuntimeClock : ClockProvider {
     override fun nowEpochMilliseconds(): Long = RUNTIME_NOW_EPOCH_MILLISECONDS
 }
@@ -1205,7 +2412,7 @@ private fun runtimeSnapshot(
     source = ExploreFeedSource.Network,
 )
 
-private fun runtimeListing(id: String = RUNTIME_LISTING_ID): ListingSummary = ListingSummary(
+private fun runtimeListing(id: String = RUNTIME_LISTING_ID, likesCount: Int = 0): ListingSummary = ListingSummary(
     id = id,
     type = ListingType.Place,
     listingClass = ListingClass.Heritage,
@@ -1216,12 +2423,13 @@ private fun runtimeListing(id: String = RUNTIME_LISTING_ID): ListingSummary = Li
     coverImageUrl = null,
     priceFromXof = null,
     ratingAverage = null,
-    likesCount = 0,
+    likesCount = likesCount,
     verified = true,
     sponsoredUntilEpochMilliseconds = null,
 )
 
 private const val RUNTIME_LISTING_ID = "ouidah-gate"
+private const val RUNTIME_OVERTAKE_LISTING_ID = "overtake-listing"
 private const val RUNTIME_NOW_EPOCH_MILLISECONDS = 1_000L
 private const val RUNTIME_COTONOU_LATITUDE = 6.3703
 private const val RUNTIME_COTONOU_LONGITUDE = 2.3912
@@ -1230,4 +2438,5 @@ private const val RUNTIME_OUIDAH_LONGITUDE = 2.0851
 private const val RUNTIME_OUTSIDE_BENIN_LATITUDE = 48.8566
 private const val RUNTIME_OUTSIDE_BENIN_LONGITUDE = 2.3522
 
-private val AUTHENTICATED_SCOPE = ViewerSessionScope(accountId = "viewer-1", epoch = 1L)
+private const val RUNTIME_ACCOUNT_ID = "viewer-1"
+private val AUTHENTICATED_SCOPE = ViewerSessionScope(accountId = RUNTIME_ACCOUNT_ID, epoch = 1L)

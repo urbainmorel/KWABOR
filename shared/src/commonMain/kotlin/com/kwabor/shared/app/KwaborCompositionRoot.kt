@@ -8,6 +8,7 @@ import com.kwabor.shared.data.core.coreDataModule
 import com.kwabor.shared.data.explore.exploreDataModule
 import com.kwabor.shared.data.favorites.favoritesDataModule
 import com.kwabor.shared.data.guide.guideDiscoveryDataModule
+import com.kwabor.shared.data.interaction.interactionDataModule
 import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.data.search.searchDataModule
@@ -30,6 +31,8 @@ import com.kwabor.shared.presentation.favorites.FavoritesPresenter
 import com.kwabor.shared.presentation.favorites.favoritesPresentationModule
 import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
 import com.kwabor.shared.presentation.guide.guideDiscoveryPresentationModule
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
+import com.kwabor.shared.presentation.interaction.interactionPresentationModule
 import com.kwabor.shared.presentation.search.SearchPresenter
 import com.kwabor.shared.presentation.search.searchPresentationModule
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
@@ -60,6 +63,8 @@ class KwaborCompositionRoot internal constructor(
     val authPresenter: AuthPresenter? = if (hasAuthentication) application.koin.get() else null
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
     val registrationPresenter: RegistrationPresenter? = if (hasAuthentication) application.koin.get() else null
+    val interactionCoordinator: InteractionCoordinator? =
+        if (hasAuthentication && hasPersistence) application.koin.get() else null
     val appPreferencesRepository: AppPreferencesRepository?
         get() = if (hasPersistence) application.koin.get() else null
 
@@ -131,6 +136,9 @@ private fun createRootModule(
     }
     if (persistenceConfiguration != null) {
         includes(persistenceModule(persistenceConfiguration))
+    }
+    if (authSessionManager != null && persistenceConfiguration != null) {
+        includes(interactionDataModule, interactionPresentationModule)
     }
 }
 

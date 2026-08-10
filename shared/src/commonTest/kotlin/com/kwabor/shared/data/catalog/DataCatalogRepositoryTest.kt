@@ -12,6 +12,7 @@ import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
+import com.kwabor.shared.domain.interaction.ListingLikeMutation
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -290,6 +291,28 @@ class DataCatalogRepositoryTest {
     }
 
     @Test
+    fun setListingLike_canonicalizesTargetAndMapsVersionedConfirmation() = runTest {
+        val dataSource = FakeCatalogDataSource(
+            interaction = listingViewerInteractionDto(likesCount = 14),
+        )
+        val repository = DataCatalogRepository(dataSource)
+
+        val result = repository.setListingLike(
+            expectedAccountId = CATALOG_ACCOUNT_ID.uppercase(),
+            listingId = CATALOG_LISTING_ID_ONE.uppercase(),
+            liked = true,
+        )
+
+        val mutation = assertIs<DomainResult.Success<ListingLikeMutation>>(result).value
+        assertEquals(CATALOG_ACCOUNT_ID, dataSource.lastExpectedAccountId)
+        assertEquals(CATALOG_LISTING_ID_ONE, dataSource.lastInteractionListingId)
+        assertEquals(CATALOG_LISTING_ID_ONE, mutation.listingId)
+        assertEquals(true, mutation.liked)
+        assertEquals(14, mutation.likesCount)
+        assertEquals(1_786_305_600_000L, mutation.mutatedAtEpochMilliseconds)
+    }
+
+    @Test
     fun blankListingInteractionId_mapsToValidationFailure() = runTest {
         val repository = DataCatalogRepository(FakeCatalogDataSource())
 
@@ -337,6 +360,8 @@ private class FakeCatalogDataSource(
     var detailCallCount: Int = 0
         private set
     var lastInteractionListingId: String? = null
+        private set
+    var lastExpectedAccountId: String? = null
         private set
     var lastInteractionBatchIds: List<String>? = null
         private set
@@ -396,6 +421,23 @@ private class FakeCatalogDataSource(
 
     override suspend fun unlikeListing(listingId: String): ListingViewerInteractionDto = runInteraction(listingId)
 
+    override suspend fun setListingLike(
+        expectedAccountId: String,
+        listingId: String,
+        liked: Boolean,
+    ): ListingLikeMutationDto {
+        interactionException?.let { exception -> throw exception }
+        interactionCallCount += 1
+        lastExpectedAccountId = expectedAccountId
+        lastInteractionListingId = listingId
+        return ListingLikeMutationDto(
+            listingId = listingId,
+            liked = liked,
+            likesCount = interaction.likesCount,
+            mutatedAt = "2026-08-09T20:00:00Z",
+        )
+    }
+
     private fun runInteraction(listingId: String): ListingViewerInteractionDto {
         interactionException?.let { exception -> throw exception }
         interactionCallCount += 1
@@ -403,6 +445,8 @@ private class FakeCatalogDataSource(
         return interaction.copy(listingId = listingId)
     }
 }
+
+private const val CATALOG_ACCOUNT_ID = "99999999-9999-4999-8999-999999999999"
 
 private fun listingSummaryDto(id: String = CATALOG_LISTING_ID_ONE, type: String = "etablissement"): ListingSummaryDto =
     ListingSummaryDto(

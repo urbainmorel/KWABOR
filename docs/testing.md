@@ -157,6 +157,63 @@ modifier `list_catalog_summaries(...)`. Il doit notamment prouver :
 Ne pas figer dans cette documentation le nombre total d'assertions : la CI exacte de la PR constitue
 la preuve, et le plan pgTAP évolue avec le contrat.
 
+## Interactions durables SYNC-001
+
+La porte locale vérifie d'abord le stockage Room, le moteur partagé et les deux surfaces mobiles :
+
+```powershell
+.\gradlew.bat :shared:testAndroidHostTest :androidApp:testDebugUnitTest --no-daemon --console=plain
+```
+
+Les tests doivent couvrir les migrations Room `1/2/3 -> 4`, la coalescence du dernier état,
+l'identifiant d'opération stable sur retry, le CAS face à une intention plus récente, le backoff,
+la reprise après redémarrage et l'isolation A/B. Explore et Favoris doivent réhydrater le scope
+exact, conserver l'indépendance Like/Favori et refuser toute confirmation ancienne. Les tests de
+convergence saturent aussi le vrai buffer mémoire : un terminal perdu doit produire des watermarks
+d'opération et de séquence de livraison, devancer sans danger un événement `Queued` retardé, survivre
+à une première hydratation en échec et réconcilier la dernière fiche d'une liste de 1 001 éléments au
+retry suivant. Un nouvel événement postérieur au watermark doit rester immédiatement applicable. Une
+révision n'est acquittée qu'après le succès de toutes les fenêtres Explore et Favoris ; aucune preuve
+exactly-once du flux mémoire n'est supposée.
+
+Le test de rafale Favoris bloque le vrai handler, offre plusieurs milliers d'événements et vérifie
+séparément la capacité fixe de sa file durable et la dette confluent O(1). Aucun I/O de
+réconciliation ne doit partir avant le drainage ; une première hydratation en échec garde la dette
+sans boucle chaude, puis un foreground réussi acquitte exactement le scope/watermark et republie au
+plus l'événement refusé plus récent.
+
+Les tests de suppression vérifient que la purge précède aussi le sélecteur social, qu'un changement
+A vers B
+interdit le transport, que seul le propriétaire d'un fence peut le libérer et qu'une annulation
+pré-transport reprend A. Un succès ou une issue distante inconnue conserve le fence ; un rejet
+explicite le libère même si son nettoyage sécurisé doit encore être repris. Les policies Swift
+verrouillent structurellement la disparition d'écran et l'isolation des callbacks Apple tardifs ;
+les tests Kotlin iOS couvrent les leases et la reprise du nettoyage partagé. La qualification
+Keychain et SDK fournisseur sur appareil reste une preuve release séparée.
+
+Le même gate central doit invalider une hydratation qui a capturé Room avant la purge puis reprend
+après réactivation du même scope, ainsi qu'un événement `Queued` déjà tamponné avant purge mais livré
+après le rejet distant. Les tests bloquent réellement les deux continuations, reprennent le compte,
+puis exigent une outbox/overlay vide et une relecture autoritaire.
+
+Les commits directs Explore/Favoris sont soumis à la même génération : un résultat `Queued` obtenu
+avant purge ne peut pas être appliqué après reprise, même si son événement a déjà été acquitté. Une
+annulation injectée après le `DELETE` Room mais avant le retour `Acquired` doit laisser le worker
+terminer le watermark, puis libérer le fence tardif exactement une fois sans appeler le transport.
+
+Les tests Android de suppression couvrent aussi le marqueur fournisseur device-bound : écriture
+synchrone vérifiée avant la frontière destructive, désarmement sans appel Credential Manager après
+rejet explicite, conservation après échec fournisseur, reprise après recréation du processus une fois
+la session résolue mais avant son exposition, retry au foreground et blocage avec mise en attente d'un
+callback promoteur. Le test JVM
+du store prouve la persistance entre deux instances et le repli fail-closed d'une valeur malformée ;
+la qualification release sur appareil doit encore confirmer le comportement du fournisseur réel.
+
+La CI Supabase doit en plus exécuter `set_listing_like_v1_test.sql` et le harnais de concurrence
+Favoris. Sont exigés : setter d'état idempotent, retrait après dépublication, wrappers v2 liés au
+compte JWT, ACL/RLS négatives, écriture directe protégée par le même verrou et absence de résurrection
+pendant une suppression de compte. Docker reste délégué à GitHub sur ce poste.
+
 ## Recherche catalogue SEARCH-001A
 
 SEARCH-001A combine un RPC PostgreSQL versionné, un runtime KMP, un repli sur le cache Room Explore
@@ -299,7 +356,7 @@ python -B tools/verify-brand-assets.py
 python -B tools/verify-onboarding-media.py
 ```
 
-Les 119 tests de régression actuels verrouillent le contrat exact du Privacy Manifest iOS, notamment la
+La suite de régression verrouille le contrat exact du Privacy Manifest iOS, notamment la
 Required Reason API `UserDefaults` et `CA92.1`, ainsi que les invariants Firebase Android/iOS :
 initialisation Android différée, collecte Crashlytics automatique interdite, instrumentation
 Performance automatique interdite, envoi manuel, purges durables, transactions Firebase Installations,

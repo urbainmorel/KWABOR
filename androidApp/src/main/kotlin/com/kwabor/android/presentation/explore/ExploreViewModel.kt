@@ -11,6 +11,7 @@ import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.explore.ExploreRuntime
 import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.explore.ExploreUiState
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
@@ -85,18 +86,24 @@ internal sealed interface ExploreEffect {
     data object RequestLocationPermission : ExploreEffect
 }
 
+internal data class ExploreViewModelPlatformDependencies(
+    val locationService: ApproximateLocationService,
+    val track: (AnalyticsEvent) -> Unit = {},
+)
+
 internal class ExploreViewModel(
     presenter: ExplorePresenter,
-    private val locationService: ApproximateLocationService,
+    private val platformDependencies: ExploreViewModelPlatformDependencies,
     strings: KwaborStrings,
     private val coroutineScope: CoroutineScope,
     private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
-    private val track: (AnalyticsEvent) -> Unit = {},
+    interactionCoordinator: InteractionCoordinator? = null,
 ) : ViewModel() {
     private val runtime = ExploreRuntime(
         presenter = presenter,
         strings = strings,
         coroutineScope = coroutineScope,
+        interactionCoordinator = interactionCoordinator,
     )
     val state: StateFlow<ExploreUiState> = runtime.state
     val effects: Flow<ExploreEffect> = runtime.effects.transform { effect ->
@@ -126,7 +133,7 @@ internal class ExploreViewModel(
             is SharedExploreEffect.ProtectedActionReplayed -> if (
                 effect.scope == viewerSessionScopeTracker.currentScope
             ) {
-                effect.analyticsEvent?.let(track)
+                effect.analyticsEvent?.let(platformDependencies.track)
             }
         }
     }
@@ -185,7 +192,7 @@ internal class ExploreViewModel(
         }
         cancelLocationRequest()
         locationJob = coroutineScope.launch {
-            val intent = when (val result = locationService.currentApproximateLocation()) {
+            val intent = when (val result = platformDependencies.locationService.currentApproximateLocation()) {
                 is ApproximateLocationResult.Available -> SharedExploreIntent.LocationCoordinates(
                     latitude = result.latitude,
                     longitude = result.longitude,

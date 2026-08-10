@@ -6,6 +6,7 @@ import com.kwabor.android.observability.createAndroidObservabilityController
 import com.kwabor.android.onboarding.FirstLaunchStore
 import com.kwabor.android.onboarding.SharedPreferencesFirstLaunchStore
 import com.kwabor.android.onboarding.createLegacyRemoteIntroCleanup
+import com.kwabor.android.presentation.auth.AccountDeletionPurgeRegistry
 import com.kwabor.shared.app.DefaultDispatcherProvider
 import com.kwabor.shared.app.createAndroidKwaborCompositionRootOrNull
 import com.kwabor.shared.domain.observability.DiagnosticCode
@@ -22,12 +23,16 @@ class KwaborApplication : Application() {
     internal lateinit var firstLaunchStore: FirstLaunchStore
         private set
     private var legacyCleanupScope: CoroutineScope? = null
+    internal lateinit var accountDeletionWorkerScope: CoroutineScope
+        private set
+    internal val accountDeletionPurgeRegistry = AccountDeletionPurgeRegistry()
 
     override fun onCreate() {
         super.onCreate()
         observability = createAndroidObservabilityController(applicationContext)
         observability.start()
         val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
+        accountDeletionWorkerScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io)
         firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)
         legacyCleanupScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io).also { scope ->
             scope.launch {
@@ -44,6 +49,7 @@ class KwaborApplication : Application() {
     override fun onTerminate() {
         legacyCleanupScope?.cancel()
         legacyCleanupScope = null
+        if (::accountDeletionWorkerScope.isInitialized) accountDeletionWorkerScope.cancel()
         observability.close()
         compositionRoot?.close()
         super.onTerminate()

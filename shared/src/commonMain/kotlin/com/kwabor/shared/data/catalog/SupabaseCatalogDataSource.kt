@@ -95,6 +95,29 @@ internal class SupabaseCatalogDataSource(
         ).decodeSingle()
     }
 
+    override suspend fun setListingLike(
+        expectedAccountId: String,
+        listingId: String,
+        liked: Boolean,
+    ): ListingLikeMutationDto = runPostgrest {
+        val rows = postgrest.rpc(
+            function = SET_LISTING_LIKE,
+            parameters = SetListingLikeRpcDto(
+                expectedAccountId = expectedAccountId,
+                listingId = listingId,
+                liked = liked,
+            ),
+        ).decodeList<ListingLikeMutationDto>()
+        if (rows.size != 1) {
+            throw CatalogDataException.Unexpected(
+                IllegalStateException("Catalog like mutation RPC must return exactly one row."),
+            )
+        }
+        rows.single().also { row ->
+            row.toDomain(expectedListingId = listingId, expectedLiked = liked)
+        }
+    }
+
     private suspend fun loadListingSummaryPage(
         filters: ListingFilters,
         page: ListingPageRequest,
@@ -112,6 +135,7 @@ private const val CATEGORIES = "categories"
 private const val LIST_CATALOG_SUMMARIES = "list_catalog_summaries"
 private const val SEARCH_CATALOG_SUMMARIES = "search_catalog_summaries_v1"
 private const val GET_CATALOG_DETAIL = "get_catalog_detail_v1"
+private const val SET_LISTING_LIKE = "set_listing_like_v2"
 
 private fun ListingFilters.toSummaryPageRpcDto(page: ListingPageRequest): ListingSummaryPageRpcDto =
     ListingSummaryPageRpcDto(

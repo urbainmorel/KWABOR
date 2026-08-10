@@ -324,6 +324,38 @@ class CatalogDtoMappingTest {
     }
 
     @Test
+    fun listingLikeMutationDto_preservesNullableCountAndMapsServerClock() {
+        val mutation = ListingLikeMutationDto(
+            listingId = CATALOG_LISTING_ID_ONE,
+            liked = false,
+            likesCount = null,
+            mutatedAt = "2026-08-09T20:00:00Z",
+        ).toDomain(expectedListingId = CATALOG_LISTING_ID_ONE, expectedLiked = false)
+
+        assertEquals(false, mutation.liked)
+        assertEquals(null, mutation.likesCount)
+        assertEquals(1_786_305_600_000L, mutation.mutatedAtEpochMilliseconds)
+    }
+
+    @Test
+    fun listingLikeMutationDto_rejectsMismatchedTargetAndInvalidCount() {
+        val mismatched = ListingLikeMutationDto(
+            listingId = CATALOG_LISTING_ID_ONE,
+            liked = false,
+            likesCount = 1,
+            mutatedAt = "2026-08-09T20:00:00Z",
+        )
+        val invalidCount = mismatched.copy(liked = true, likesCount = -1)
+
+        assertFailsWith<CatalogDataException.Unexpected> {
+            mismatched.toDomain(expectedListingId = CATALOG_LISTING_ID_ONE, expectedLiked = true)
+        }
+        assertFailsWith<CatalogDataException.Unexpected> {
+            invalidCount.toDomain(expectedListingId = CATALOG_LISTING_ID_ONE, expectedLiked = true)
+        }
+    }
+
+    @Test
     fun listingTypeAndClass_serializeToDatabaseValues() {
         assertEquals("lieu", ListingType.Place.toDatabaseValue())
         assertEquals("etablissement", ListingType.Establishment.toDatabaseValue())

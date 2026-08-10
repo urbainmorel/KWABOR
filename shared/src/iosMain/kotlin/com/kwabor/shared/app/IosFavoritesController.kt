@@ -9,6 +9,7 @@ import com.kwabor.shared.presentation.favorites.FavoritesIntent
 import com.kwabor.shared.presentation.favorites.FavoritesPresenter
 import com.kwabor.shared.presentation.favorites.FavoritesRuntime
 import com.kwabor.shared.presentation.favorites.FavoritesUiState
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
@@ -114,29 +115,33 @@ private class DefaultIosFavoritesRuntime(
     }
 }
 
-class IosFavoritesController private constructor(
-    runtimeProvider: (CoroutineScope, FavoritesStrings) -> IosFavoritesRuntime?,
+class IosFavoritesController internal constructor(
+    runtimeProvider: (CoroutineScope, FavoritesStrings, InteractionCoordinator?) -> IosFavoritesRuntime?,
     dispatcherProvider: DispatcherProvider,
     private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
+    interactionCoordinator: InteractionCoordinator? = null,
 ) {
     internal constructor(
         presenter: FavoritesPresenter?,
         dispatcherProvider: DispatcherProvider,
         viewerSessionScopeTracker: ViewerSessionScopeTracker,
+        interactionCoordinator: InteractionCoordinator? = null,
     ) : this(
-        runtimeProvider = { scope, strings ->
+        runtimeProvider = { scope, strings, coordinator ->
             presenter?.let { currentPresenter ->
                 DefaultIosFavoritesRuntime(
                     FavoritesRuntime(
                         presenter = currentPresenter,
                         strings = strings,
                         coroutineScope = scope,
+                        interactionCoordinator = coordinator,
                     ),
                 )
             }
         },
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
+        interactionCoordinator = interactionCoordinator,
     )
 
     internal constructor(
@@ -144,7 +149,7 @@ class IosFavoritesController private constructor(
         dispatcherProvider: DispatcherProvider,
         viewerSessionScopeTracker: ViewerSessionScopeTracker,
     ) : this(
-        runtimeProvider = { _, _ -> runtime },
+        runtimeProvider = { _, _, _ -> runtime },
         dispatcherProvider = dispatcherProvider,
         viewerSessionScopeTracker = viewerSessionScopeTracker,
     )
@@ -152,7 +157,7 @@ class IosFavoritesController private constructor(
     val strings: FavoritesStrings = stringsFor(AppLocale.French).favorites
     val actions = IosFavoritesActions(::dispatch)
     private val scope = CoroutineScope(SupervisorJob() + dispatcherProvider.main)
-    private val runtime = runtimeProvider(scope, strings)
+    private val runtime = runtimeProvider(scope, strings, interactionCoordinator)
     private var stateObserver: ((FavoritesUiState) -> Unit)? = null
     private var detailObserver: ((String, ViewerSessionScope) -> Unit)? = null
     private var favoriteObserver: ((String, Boolean, Long, ViewerSessionScope) -> Unit)? = null

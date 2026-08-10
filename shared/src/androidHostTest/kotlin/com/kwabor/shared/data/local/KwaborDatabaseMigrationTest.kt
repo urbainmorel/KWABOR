@@ -72,6 +72,55 @@ class KwaborDatabaseMigrationTest {
             context.deleteDatabase(MIGRATION_DATABASE_NAME)
         }
     }
+
+    @Test
+    fun autoMigrationFromThreeToFourPreservesCacheAndCreatesEmptyInteractionOutbox() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(INTERACTION_OUTBOX_PREVIOUS_DATABASE_VERSION)
+                .use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 4, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+                database.assertInteractionOutboxIsEmpty()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
+
+    @Test
+    fun autoMigrationFromTwoToFourIsNonDestructive() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(2).use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 4, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+                database.assertInteractionOutboxIsEmpty()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
+
+    @Test
+    fun autoMigrationFromOneToFourIsNonDestructive() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(1).use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 4, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+                database.assertInteractionOutboxIsEmpty()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
 }
 
 private fun SQLiteConnection.seedExploreCache() {
@@ -121,12 +170,17 @@ private fun SQLiteConnection.assertExploreV2ColumnsAreNullForLegacyRows() {
     )
 }
 
+private fun SQLiteConnection.assertInteractionOutboxIsEmpty() {
+    assertEquals(0L, singleLong("SELECT COUNT(*) FROM interaction_outbox_operations"))
+}
+
 private fun SQLiteConnection.singleLong(query: String): Long = prepare(query).use { statement ->
     check(statement.step()) { "Migration verification query returned no row." }
     statement.getLong(0)
 }
 
 private const val MIGRATION_DATABASE_NAME = "kwabor-room-migration"
+private const val INTERACTION_OUTBOX_PREVIOUS_DATABASE_VERSION = 3
 
 private val INSERT_EXPLORE_SNAPSHOT =
     """

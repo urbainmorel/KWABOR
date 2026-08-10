@@ -27,9 +27,73 @@ internal interface PasswordRecoverySessionStore {
     suspend fun clearPasswordRecovery()
 }
 
+internal interface AccountDeletionSessionStore {
+    suspend fun markAccountDeletionCleanupPending()
+
+    suspend fun isAccountDeletionCleanupPending(): Boolean
+
+    suspend fun clearAccountDeletionCleanupPending()
+}
+
 internal enum class PasswordRecoverySessionPhase {
     PasswordUpdateRequired,
     PasswordUpdatedPendingCleanup,
+}
+
+internal class AccountDeletionSessionCoordinator(
+    private val accountDeletionStore: AccountDeletionSessionStore,
+    private val passwordRecoveryStore: PasswordRecoverySessionStore,
+) {
+    suspend fun isCleanupPending(): Boolean = accountDeletionStore.isAccountDeletionCleanupPending()
+
+    suspend fun markCleanupPending() {
+        accountDeletionStore.markAccountDeletionCleanupPending()
+    }
+
+    suspend fun clearAfterExplicitRejection() {
+        withContext(NonCancellable) {
+            accountDeletionStore.clearAccountDeletionCleanupPending()
+        }
+    }
+
+    suspend fun clearLocalSessionKeepingMarker(clearCurrentSession: suspend () -> Unit) {
+        withContext(NonCancellable) {
+            clearLocalSession(clearCurrentSession)
+        }
+    }
+
+    suspend fun completeCleanup(clearCurrentSession: suspend () -> Unit) {
+        withContext(NonCancellable) {
+            clearLocalSession(clearCurrentSession)
+            accountDeletionStore.clearAccountDeletionCleanupPending()
+        }
+    }
+
+    suspend fun cleanupBeforeSessionRestoreIfPending(clearCurrentSession: suspend () -> Unit): Boolean {
+        if (!accountDeletionStore.isAccountDeletionCleanupPending()) return false
+        completeCleanup(clearCurrentSession)
+        return true
+    }
+
+    private suspend fun clearLocalSession(clearCurrentSession: suspend () -> Unit) {
+        var failure = runCatching { clearCurrentSession() }.exceptionOrNull()
+        runCatching { passwordRecoveryStore.clearPasswordRecovery() }
+            .exceptionOrNull()
+            ?.let { cleanupFailure ->
+                failure = failure.mergeAccountDeletionCleanupFailure(cleanupFailure)
+            }
+        failure?.let { cleanupFailure -> throw cleanupFailure }
+    }
+}
+
+internal class AccountDeletionSessionGuard(
+    private val coordinator: AccountDeletionSessionCoordinator,
+    private val clearCurrentSession: suspend () -> Unit,
+) {
+    suspend fun isCleanupPending(): Boolean = coordinator.isCleanupPending()
+
+    suspend fun ensureCleanupCompleted(): Boolean =
+        coordinator.cleanupBeforeSessionRestoreIfPending(clearCurrentSession)
 }
 
 internal class PasswordRecoverySessionCoordinator(
@@ -120,12 +184,19 @@ internal class PasswordRecoverySessionCoordinator(
     }
 }
 
+private fun Throwable?.mergeAccountDeletionCleanupFailure(additionalFailure: Throwable): Throwable =
+    this?.also { failure -> failure.addSuppressed(additionalFailure) } ?: additionalFailure
+
 internal class KwaborSessionManager(
     private val store: SecureStringStore,
     private val key: String = SESSION_KEY,
     private val json: Json = sessionJson,
-) : SessionManager, PasswordRecoverySessionStore {
+) : SessionManager, PasswordRecoverySessionStore, AccountDeletionSessionStore {
     override suspend fun saveSession(session: UserSession) {
+        if (isAccountDeletionCleanupPending()) {
+            store.remove(key)
+            error("Account deletion cleanup must complete before saving a session")
+        }
         store.putString(key = key, value = json.encodeToString(session))
     }
 
@@ -168,11 +239,24 @@ internal class KwaborSessionManager(
         store.remove(PASSWORD_RECOVERY_KEY)
     }
 
+    override suspend fun markAccountDeletionCleanupPending() {
+        store.putString(ACCOUNT_DELETION_CLEANUP_KEY, ACCOUNT_DELETION_CLEANUP_PENDING_VALUE)
+    }
+
+    override suspend fun isAccountDeletionCleanupPending(): Boolean =
+        store.getStringOrNull(ACCOUNT_DELETION_CLEANUP_KEY) != null
+
+    override suspend fun clearAccountDeletionCleanupPending() {
+        store.remove(ACCOUNT_DELETION_CLEANUP_KEY)
+    }
+
     private companion object {
         const val SESSION_KEY = "kwabor.auth.session"
         const val PASSWORD_RECOVERY_KEY = "kwabor.auth.password_recovery"
         const val PASSWORD_RECOVERY_IN_PROGRESS_VALUE = "in_progress"
         const val PASSWORD_UPDATED_PENDING_CLEANUP_VALUE = "password_updated_pending_cleanup"
+        const val ACCOUNT_DELETION_CLEANUP_KEY = "kwabor.auth.account_deletion_cleanup"
+        const val ACCOUNT_DELETION_CLEANUP_PENDING_VALUE = "pending"
 
         val sessionJson = Json {
             encodeDefaults = true

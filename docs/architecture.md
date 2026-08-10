@@ -11,7 +11,7 @@
 | `iosApp` | Cycle de vie, navigation et UI SwiftUI native |
 | `shared` | Domaine pur, data, états de présentation, bridges et composition Koin |
 | `supabase` | PostgreSQL, Auth, RLS, RPC et Edge Function de suppression de compte |
-| Room KMP | Cache Explore v2 structuré partagé Android/iOS, avec lecture de secours v1 |
+| Room KMP | Cache Explore v2 et outbox Like/Favori partagés Android/iOS |
 | DataStore KMP | Ville Explore, locale et devise d'affichage |
 
 ```mermaid
@@ -65,21 +65,35 @@ session sécurisée plateforme et les règles RLS/RPC du backend.
 
 ## Persistance locale
 
-- Room KMP version 3 stocke les snapshots Explore, fiches canoniques, positions et référentiels ville/
-  catégorie. Les migrations automatiques `1 -> 2` puis `2 -> 3` et les trois schémas JSON sont
-  contrôlés par `check`.
+- Room KMP version 4 stocke les snapshots Explore, fiches canoniques, positions, référentiels ville/
+  catégorie et l'outbox Like/Favori liée au compte. Les migrations automatiques `1 -> 2`, `2 -> 3`
+  puis `3 -> 4` et les quatre schémas JSON sont contrôlés par `check`.
 - Le cache `explore-feed:v2` persiste le snapshot serveur en microsecondes, les métadonnées de carte
   v2 et l'autorité sponsorisée. Toute page suivante non vide doit appartenir au même snapshot ; le
   mur cumulé conserve au plus deux sponsors placés avant tout résultat organique.
 - Les colonnes ajoutées en v3 restent nullables pour relire les snapshots historiques v1. Le
   repository ne consulte cette clé legacy que si aucun snapshot v2 n'existe, n'autorise jamais
   d'append depuis ce repli offline et exige le contrat complet pour toute nouvelle écriture v2.
+- Si la politique device-bound interdit le disque et force Room en mémoire, les caches publics
+  restent utilisables pour la session mais la capacité d'outbox durable est désactivée. Toute
+  mutation Like/Favori ou purge de suppression échoue alors comme stockage local indisponible,
+  avant optimisme ou transport.
+- L'outbox applique l'écriture locale avant transport, coalesce le dernier état souhaité par
+  compte/fiche/type et conditionne chaque confirmation ou retry à l'identifiant d'opération. Le
+  coordinateur partagé draine uniquement le compte et le scope de session attendus ; les RPC v2
+  vérifient aussi cet identifiant de compte contre le JWT avant toute mutation.
+- Le flux mémoire de confirmations est borné, sans garantie exactly-once. Un overflow produit des
+  watermarks confluents d'opération terminale et de séquence de livraison par scope ; Explore et
+  Favoris réhydratent leurs fiches par fenêtres, revalident seulement les événements retardés couverts
+  et n'acquittent la réconciliation qu'après lecture locale réussie. La file durable Favoris est
+  bornée séparément ; ses refus sont coalescés en une dette O(1), publiée après drainage et conservée
+  jusqu'à l'acquittement exact du scope et du watermark.
 - DataStore stocke uniquement des préférences légères. Il ne stocke ni token, ni outbox, ni donnée
   métier synchronisable.
 - Les tokens d'authentification utilisent le stockage sécurisé plateforme : Android Keystore/
   EncryptedSharedPreferences et iOS Keychain derrière des adaptateurs minces.
-- La future outbox Like/Favori reste planifiée dans `SYNC-001` ; la queue courante en mémoire n'est
-  pas une garantie de synchronisation après arrêt du processus.
+- Sans moniteur réseau natif, le drain est réveillé par l'enqueue, la session, le foreground, le
+  retour d'écran, le retry manuel et sa prochaine échéance bornée à cinq minutes.
 
 ## Backend et sécurité
 
@@ -113,7 +127,7 @@ applicatif ne doit être ajouté.
 | --- | --- | --- |
 | Auth/onboarding | Implémenté, fournisseurs réels à provisionner | Preuves staging/appareils |
 | Explore/détail | Mur v2 et parcours principal partiellement livrés | Drawer avancé, recherche filtrée, avis et actions restantes |
-| Offline | Cache et préférences persistants | Outbox et brouillons synchronisés |
+| Offline | Cache/préférences et outbox Like/Favori locale, validation SYNC-001 en cours | Brouillons synchronisés et preuves exact-head |
 | Social/B2B/paiement/IA | Contrats ou fondations partielles | Parcours V1 complets |
 | Distribution | Workflows d'artefacts présents | AAB/TestFlight qualifiés et rollout |
 
@@ -129,5 +143,6 @@ La cible détaillée appartient au [plan V1](v1-production-delivery.md), pas à 
 - [ADR-0015 — Navigation mobile native](adr/0015-native-mobile-navigation.md)
 - [ADR-0027 — Persistance locale liée à l’appareil](adr/0027-device-bound-local-persistence.md)
 - [ADR-0034 — Classement Explore v2 et raccord mobile](adr/0034-versioned-explore-ranking-and-sponsored-cap.md)
+- [ADR-0035 — Outbox durable Like/Favori](adr/0035-durable-viewer-interaction-outbox.md)
 
 Étape suivante : [lire le modèle de données](data-model.md).

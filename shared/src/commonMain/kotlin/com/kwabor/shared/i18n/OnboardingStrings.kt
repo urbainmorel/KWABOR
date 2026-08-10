@@ -61,6 +61,7 @@ class OnboardingStrings internal constructor(
     val authDeleteAccountConfirmationPhrase: String = security.authDeleteAccountConfirmationPhrase
     val authDeleteAccountConfirm: String = security.authDeleteAccountConfirm
     val authAccountDeletionFailed: String = security.authAccountDeletionFailed
+    val authAccountDeletionOutcomeUnknown: String = security.authAccountDeletionOutcomeUnknown
     val promoterActivationTitle: String = security.promoterActivationTitle
     val promoterActivationBusinessName: String = security.promoterActivationBusinessName
     val promoterActivationInvitePrompt: String = security.promoterActivationInvitePrompt
@@ -201,6 +202,7 @@ internal data class OnboardingSecurityStrings(
     val authDeleteAccountConfirmationPhrase: String,
     val authDeleteAccountConfirm: String,
     val authAccountDeletionFailed: String,
+    val authAccountDeletionOutcomeUnknown: String,
     val promoterActivationTitle: String,
     val promoterActivationBusinessName: String,
     val promoterActivationInvitePrompt: String,
@@ -345,6 +347,7 @@ private fun KwaborStrings.toOnboardingSecurityStrings(): OnboardingSecurityStrin
     authDeleteAccountConfirmationPhrase = authDeleteAccountConfirmationPhrase,
     authDeleteAccountConfirm = authDeleteAccountConfirm,
     authAccountDeletionFailed = authAccountDeletionFailed,
+    authAccountDeletionOutcomeUnknown = authAccountDeletionOutcomeUnknown,
     promoterActivationTitle = promoterActivationTitle,
     promoterActivationBusinessName = promoterActivationBusinessName,
     promoterActivationInvitePrompt = promoterActivationInvitePrompt,

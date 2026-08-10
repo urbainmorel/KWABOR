@@ -3,6 +3,9 @@ package com.kwabor.shared.data.auth
 import com.kwabor.shared.domain.auth.AUTH_INVALID_CREDENTIALS_ERROR_KEY
 import com.kwabor.shared.domain.auth.AUTH_PROMOTER_INVITE_INVALID_ERROR_KEY
 import com.kwabor.shared.domain.auth.AccountDeletionCredential
+import com.kwabor.shared.domain.auth.AccountDeletionOutcome
+import com.kwabor.shared.domain.auth.AccountDeletionOutcomeUnknownCancellation
+import com.kwabor.shared.domain.auth.AccountDeletionPreTransportCancellation
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
@@ -121,7 +124,8 @@ class DataAuthRepositoryTest {
 
     @Test
     fun listActiveLegalDocuments_returnsTypedNotFoundWhenEnvironmentHasNone() = runTest {
-        val repository = DataAuthRepository(FakeAuthDataSource(legalDocuments = emptyList()))
+        val dataSource = FakeAuthDataSource().apply { activeLegalDocuments = emptyList() }
+        val repository = DataAuthRepository(dataSource)
 
         val result = repository.listActiveLegalDocuments(AppLocale.French)
 
@@ -396,6 +400,7 @@ class DataAuthRepositoryTest {
 
         val result = repository.deleteAccount(
             AccountDeletionRequest(
+                expectedAccountId = "user-1",
                 idempotencyKey = "not-a-uuid",
                 credential = AccountDeletionCredential.Password("password123"),
             ),
@@ -404,14 +409,55 @@ class DataAuthRepositoryTest {
         assertIs<DomainResult.Failure>(result)
         assertNull(dataSource.lastDeletionRequest)
     }
+
+    @Test
+    fun deleteAccount_typesRawDataSourceCancellationAsPreTransport() = runTest {
+        val repository = DataAuthRepository(
+            FakeAuthDataSource(deletionException = CancellationException("cancelled before data boundary")),
+        )
+
+        assertFailsWith<AccountDeletionPreTransportCancellation> {
+            repository.deleteAccount(validDeletionRequest())
+        }
+    }
+
+    @Test
+    fun deleteAccount_preservesOutcomeUnknownCancellationFromDataSource() = runTest {
+        val expected = AccountDeletionOutcomeUnknownCancellation(CancellationException("cancelled after invoke"))
+        val repository = DataAuthRepository(FakeAuthDataSource(deletionException = expected))
+
+        val actual = assertFailsWith<AccountDeletionOutcomeUnknownCancellation> {
+            repository.deleteAccount(validDeletionRequest())
+        }
+
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun deleteAccount_mapsExplicitRejectionWhoseCleanupRemainsPending() = runTest {
+        val rejection = AuthDataException.Validation("error.auth.account_deletion_reauthentication_failed")
+        val dataSource = FakeAuthDataSource().apply {
+            deletionOutcome = AccountDeletionDataOutcome.RejectedCleanupPending(rejection)
+        }
+        val repository = DataAuthRepository(dataSource)
+
+        val outcome = assertIs<DomainResult.Success<AccountDeletionOutcome>>(
+            repository.deleteAccount(validDeletionRequest()),
+        ).value
+
+        assertEquals(
+            rejection.domainError,
+            assertIs<AccountDeletionOutcome.RejectedCleanupPending>(outcome).error,
+        )
+    }
 }
 
 private class FakeAuthDataSource(
     private val session: AuthSessionDto? = null,
-    private val legalDocuments: List<LegalDocumentRevision> = legalDocuments(),
     private val activationException: Throwable? = null,
     private val previewException: Throwable? = null,
     private val discardException: Throwable? = null,
+    private val deletionException: Throwable? = null,
     private val promoterSignInSessions: PromoterSignInSessions = PromoterSignInSessions(),
 ) : AuthDataSource {
     var emailOtpVerifications: Int = 0
@@ -442,6 +488,8 @@ private class FakeAuthDataSource(
         private set
     var lastDeletionRequest: AccountDeletionRequest? = null
         private set
+    var deletionOutcome: AccountDeletionDataOutcome = AccountDeletionDataOutcome.Deleted
+    var activeLegalDocuments: List<LegalDocumentRevision> = legalDocuments()
 
     override suspend fun getCurrentSession(): AuthSessionDto? = session
 
@@ -458,7 +506,7 @@ private class FakeAuthDataSource(
         lastInitialPassword = password
     }
 
-    override suspend fun listActiveLegalDocuments(locale: AppLocale): List<LegalDocumentRevision> = legalDocuments
+    override suspend fun listActiveLegalDocuments(locale: AppLocale): List<LegalDocumentRevision> = activeLegalDocuments
 
     override suspend fun completeOnboarding(request: CompleteOnboardingRequest): AuthSessionDto {
         lastCompleteRequest = request
@@ -518,8 +566,10 @@ private class FakeAuthDataSource(
         )
     }
 
-    override suspend fun deleteAccount(request: AccountDeletionRequest) {
+    override suspend fun deleteAccount(request: AccountDeletionRequest): AccountDeletionDataOutcome {
         lastDeletionRequest = request
+        deletionException?.let { exception -> throw exception }
+        return deletionOutcome
     }
 
     override suspend fun discardTemporarySession() {
@@ -544,6 +594,12 @@ private fun validSocialRequest(): SocialSignInRequest = SocialSignInRequest(
     provider = SocialAuthProvider.Google,
     idToken = VALID_ID_TOKEN,
     rawNonce = VALID_NONCE,
+)
+
+private fun validDeletionRequest(): AccountDeletionRequest = AccountDeletionRequest(
+    expectedAccountId = "user-1",
+    idempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    credential = AccountDeletionCredential.Password("password123"),
 )
 
 private fun authSessionDto(

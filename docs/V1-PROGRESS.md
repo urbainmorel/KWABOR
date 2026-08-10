@@ -8,12 +8,12 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 | Élément | État vérifié |
 | --- | --- |
 | Date du snapshot | 9 août 2026 |
-| Référence Git | Base du lot : `main` au merge `c630ee6b0b323544d891c71e80e6ebde06672738` de la PR `#57` |
-| Intégration | PR `#50` V1, `#51` fondation HISTORY, `#52` CI, `#53` autorité HISTORY, `#54` état/ADR-0031, `#55` autorité FAVORITES, `#56` client FAVORITES et `#57` EXPLORE-002B2A fusionnées ; EXPLORE-002B2B1 livré par le présent lot |
+| Référence Git | Base du lot : `main` au merge `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58` |
+| Intégration | PR `#50` V1 à `#58` EXPLORE-002B2B1 fusionnées ; SYNC-001 implémenté localement et encore en validation |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI de la fusion | Runs post-fusion jusqu'à `31316774201` entièrement verts, dont Supabase, Gradle et iOS Debug/Staging/Release sur la fusion de `#56` |
+| CI de la fusion | Run post-fusion `31330170535` entièrement vert sur `main`, dont Supabase, Gradle et iOS Debug/Staging/Release |
 | Décision de release | **No-go** |
 | Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
 
@@ -63,10 +63,17 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - EXPLORE-002B2A, intégré via `#57`, fournit un RPC v2 séparé : popularité, proximité temporelle,
   fenêtres événement UTC, bornes prix XOF, curseur keyset lié au snapshot et deux placements
   sponsorisés au plus en tête. Le RPC v1 reste inchangé pour les clients Store existants.
-- EXPLORE-002B2B1 livre dans le présent lot sa consommation par Explore Android/iOS : gateway KMP
+- EXPLORE-002B2B1, intégré via `#58`, livre sa consommation par Explore Android/iOS : gateway KMP
   strict séparé du catalogue/Search v1, tri serveur par onglet, pagination au snapshot exact,
-  validation cumulative des sponsors, Room v3 avec migrations `1 -> 2 -> 3` et lecture de secours
-  du cache v1, puis cartes natives accessibles avec alt, date, état « Terminé » et badge sponsorisé.
+  validation cumulative des sponsors, cache introduit en Room v3 et conservé par la chaîne
+  `1 -> 2 -> 3 -> 4`, lecture de secours du cache v1, puis cartes natives accessibles avec alt,
+  date, état « Terminé » et badge sponsorisé.
+- SYNC-001 implémente dans le présent lot une outbox Room v4 par compte pour Like/Favori : écriture avant
+  transport, coalescence du dernier état souhaité, CAS par opération, reprise après redémarrage,
+  backoff borné, hydratation et drain exact-scope dans Explore/Favoris. Les setters RPC v2 refusent
+  toute mutation si le compte attendu diffère du JWT ; Android et iOS bloquent puis purgent cette
+  outbox avant la réauthentification de suppression de compte. Le lot reste ouvert jusqu'aux gates
+  Gradle, Supabase, Kotlin/Native et Xcode exact-head.
 
 ## Incomplet ou absent
 
@@ -75,8 +82,8 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - Les racines Social, Ajouter et Notifications affichent encore le placeholder
   `Socle applicatif en place` sur Android et iOS. Le Profil reste limité à l'identité, aux Favoris et
   à l'accès aux Paramètres. Ces surfaces interdisent une release publique.
-- La queue offline Like/Favori reste en mémoire et ne draine pas encore durablement après
-  reconnexion ; Room et l'outbox persistante restent dans SYNC-001.
+- Le drain Like/Favori n'utilise volontairement aucun moniteur réseau natif : sans retour d'écran,
+  foreground ou retry manuel, une reprise silencieuse peut attendre jusqu'à cinq minutes.
 - La recherche n'a pas encore de récents durables, d'autocomplétion ni de filtres avancés.
 - Le drawer Explore avancé n'est pas livré : bornes prix, presets de dates civiles, éventuel
   multi-ville, compteur live et recherche filtrée restent dans EXPLORE-002B2B2. Produit doit

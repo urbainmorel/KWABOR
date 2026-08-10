@@ -369,6 +369,12 @@ private class OrderedFavoritesTransport(
         return validFavoriteMutationRow(listingId = listingId, favorited = favorited)
     }
 
+    override suspend fun setFavoriteForAccount(
+        expectedAccountId: String,
+        listingId: String,
+        favorited: Boolean,
+    ): FavoriteMutationRowDto = setFavorite(listingId = listingId, favorited = favorited)
+
     suspend fun awaitNextMutation(): Boolean = mutationStarts.receive()
 
     fun hasStartedMutation(): Boolean = mutationStarts.tryReceive().isSuccess

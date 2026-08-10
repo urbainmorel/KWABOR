@@ -5,6 +5,7 @@ import com.kwabor.shared.i18n.FavoritesStrings
 import com.kwabor.shared.presentation.favorites.FavoritesPresenter
 import com.kwabor.shared.presentation.favorites.FavoritesRuntime
 import com.kwabor.shared.presentation.favorites.FavoritesUiState
+import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CoroutineScope
@@ -36,11 +37,13 @@ internal class FavoritesViewModel(
     strings: FavoritesStrings,
     private val coroutineScope: CoroutineScope,
     private val viewerSessionScopeTracker: ViewerSessionScopeTracker,
+    interactionCoordinator: InteractionCoordinator? = null,
 ) : ViewModel() {
     private val runtime = FavoritesRuntime(
         presenter = presenter,
         strings = strings,
         coroutineScope = coroutineScope,
+        interactionCoordinator = interactionCoordinator,
     )
     val state: StateFlow<FavoritesUiState> = runtime.state
     val effects: Flow<FavoritesEffect> = runtime.effects.transform { effect ->

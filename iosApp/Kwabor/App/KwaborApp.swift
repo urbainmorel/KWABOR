@@ -110,6 +110,7 @@ struct KwaborApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         coordinator.applicationBecameActive()
+                        compositionRoot.applicationBecameActive()
                     }
                 }
         }

@@ -55,7 +55,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        (application as KwaborApplication).observability.retryPendingMaintenance()
+        val applicationState = application as KwaborApplication
+        applicationState.observability.retryPendingMaintenance()
+        notifyAuthenticationForeground(authViewModel?.let { it::onForeground })
+        notifyInteractionForeground(applicationState.compositionRoot?.interactionCoordinator?.let { it::onForeground })
     }
 
     private fun configuredAppOrNull(): ConfiguredApp? {
@@ -144,4 +147,12 @@ class MainActivity : ComponentActivity() {
         pendingAuthCallback = null
         viewModel.onIntent(AuthIntent.OpenPromoterActivation(callbackUrl))
     }
+}
+
+internal fun notifyInteractionForeground(onForeground: (() -> Unit)?) {
+    onForeground?.invoke()
+}
+
+internal fun notifyAuthenticationForeground(onForeground: (() -> Unit)?) {
+    onForeground?.invoke()
 }

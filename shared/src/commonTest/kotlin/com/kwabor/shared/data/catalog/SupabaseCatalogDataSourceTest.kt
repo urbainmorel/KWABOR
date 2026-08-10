@@ -152,6 +152,74 @@ class SupabaseCatalogDataSourceTest {
     }
 
     @Test
+    fun setListingLike_callsVersionedTargetStateRpcAndKeepsNullableCount() = runTest {
+        val client = createCatalogLikeTestClient { request ->
+            assertEquals("/rest/v1/rpc/set_listing_like_v2", request.url.encodedPath)
+            val body = assertIs<OutgoingContent.ByteArrayContent>(request.body).bytes().decodeToString()
+            val parameters = Json.parseToJsonElement(body).jsonObject
+            assertEquals(VALID_ACCOUNT_ID, parameters.getValue("p_expected_account_id").jsonPrimitive.content)
+            assertEquals(VALID_LISTING_ID, parameters.getValue("p_listing_id").jsonPrimitive.content)
+            assertEquals("false", parameters.getValue("p_liked").jsonPrimitive.content)
+            CATALOG_LIKE_RPC_RESPONSE
+        }
+
+        try {
+            val mutation = SupabaseCatalogDataSource(client.postgrest)
+                .setListingLike(
+                    expectedAccountId = VALID_ACCOUNT_ID,
+                    listingId = VALID_LISTING_ID,
+                    liked = false,
+                )
+                .toDomain(expectedListingId = VALID_LISTING_ID, expectedLiked = false)
+
+            assertEquals(false, mutation.liked)
+            assertEquals(null, mutation.likesCount)
+            assertEquals(1_786_305_600_000L, mutation.mutatedAtEpochMilliseconds)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun setListingLike_rejectsMissingOrDuplicateConfirmationRows() = runTest {
+        listOf("[]", "[$CATALOG_LIKE_RPC_ROW,$CATALOG_LIKE_RPC_ROW]").forEach { response ->
+            val client = createCatalogLikeTestClient { response }
+            try {
+                assertFailsWith<CatalogDataException.Unexpected> {
+                    SupabaseCatalogDataSource(client.postgrest)
+                        .setListingLike(
+                            expectedAccountId = VALID_ACCOUNT_ID,
+                            listingId = VALID_LISTING_ID,
+                            liked = false,
+                        )
+                }
+            } finally {
+                client.close()
+            }
+        }
+    }
+
+    @Test
+    fun setListingLike_mapsExpectedAccountMismatchToAuthenticationRequiredWithoutV1Fallback() = runTest {
+        val client = createCatalogLikeTestClient(status = HttpStatusCode.Forbidden) { request ->
+            assertEquals("/rest/v1/rpc/set_listing_like_v2", request.url.encodedPath)
+            EXPECTED_ACCOUNT_MISMATCH_RESPONSE
+        }
+
+        try {
+            assertFailsWith<CatalogDataException.AuthenticationRequired> {
+                SupabaseCatalogDataSource(client.postgrest).setListingLike(
+                    expectedAccountId = VALID_ACCOUNT_ID,
+                    listingId = VALID_LISTING_ID,
+                    liked = true,
+                )
+            }
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun toSummaryPage_usesLastRetainedRowCursorWhenSentinelExists() {
         val rows = listOf(
             summaryRow(id = "listing-1", rowCursor = "cursor-1"),
@@ -224,7 +292,25 @@ private fun createCatalogSearchTestClient(
     install(Postgrest)
 }
 
+private fun createCatalogLikeTestClient(
+    status: HttpStatusCode = HttpStatusCode.OK,
+    responseProvider: (io.ktor.client.request.HttpRequestData) -> String,
+) = createSupabaseClient(
+    supabaseUrl = "https://example.invalid",
+    supabaseKey = "publishable-test-key",
+) {
+    httpEngine = MockEngine { request ->
+        respond(
+            content = responseProvider(request),
+            status = status,
+            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+        )
+    }
+    install(Postgrest)
+}
+
 private const val VALID_LISTING_ID = "11111111-1111-4111-8111-111111111111"
+private const val VALID_ACCOUNT_ID = "99999999-9999-4999-8999-999999999999"
 private const val MISSING_RPC_RESPONSE = """
 {
   "code": "PGRST202",
@@ -233,6 +319,19 @@ private const val MISSING_RPC_RESPONSE = """
   "message": "Could not find the function public.get_catalog_detail_v1 in the schema cache"
 }
 """
+
+private const val CATALOG_LIKE_RPC_ROW = """
+{
+  "listing_id":"11111111-1111-4111-8111-111111111111",
+  "liked":false,
+  "likes_count":null,
+  "mutated_at":"2026-08-09T20:00:00Z"
+}
+"""
+
+private const val CATALOG_LIKE_RPC_RESPONSE = "[$CATALOG_LIKE_RPC_ROW]"
+private const val EXPECTED_ACCOUNT_MISMATCH_RESPONSE =
+    """{"code":"42501","details":null,"hint":null,"message":"expected account mismatch"}"""
 
 private const val CATALOG_DETAIL_RPC_RESPONSE = """
 [

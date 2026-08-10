@@ -63,6 +63,7 @@ data class FavoritesUiState(
     internal val mutationMessageListingId: String? = null,
     internal val mutationMessageIsOffline: Boolean = false,
     internal val contentIsOffline: Boolean = false,
+    internal val durableRetryListingIds: Set<String> = emptySet(),
     internal val viewerScope: ViewerSessionScope = ViewerSessionScope.InitialGuest,
 ) {
     val isEmpty: Boolean
