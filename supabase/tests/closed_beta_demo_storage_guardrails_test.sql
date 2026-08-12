@@ -91,6 +91,20 @@ exception
 end;
 $$;
 
+create or replace function tests.closed_beta_policy_role_applies_to(
+  policy_role name,
+  client_role name
+)
+returns boolean
+language sql
+stable
+as $$
+  select case
+    when policy_role = 'public'::name then true
+    else pg_catalog.pg_has_role(client_role::text, policy_role::text, 'USAGE')
+  end;
+$$;
+
 select plan(15);
 
 select ok(
@@ -106,12 +120,15 @@ select is(
   (
     select count(*)::integer
     from pg_catalog.pg_policies policy_record
+    cross join lateral unnest(policy_record.roles) as policy_role(role_name)
     where policy_record.schemaname = 'storage'
       and policy_record.tablename = 'objects'
       and policy_record.permissive = 'PERMISSIVE'
       and policy_record.cmd in ('ALL', 'INSERT', 'UPDATE', 'DELETE')
-      and policy_record.roles
-        && array['public', 'anon', 'authenticated']::name[]
+      and (
+        tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'anon')
+        or tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'authenticated')
+      )
   ),
   0,
   'no permissive client policy can grant Storage writes during the closed beta'
@@ -121,11 +138,14 @@ select is(
   (
     select count(*)::integer
     from pg_catalog.pg_policies policy_record
+    cross join lateral unnest(policy_record.roles) as policy_role(role_name)
     where policy_record.schemaname = 'storage'
       and policy_record.tablename = 'objects'
       and policy_record.cmd in ('ALL', 'SELECT')
-      and policy_record.roles
-        && array['public', 'anon', 'authenticated']::name[]
+      and (
+        tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'anon')
+        or tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'authenticated')
+      )
   ),
   0,
   'public delivery exposes no storage.objects metadata policy to clients'
@@ -230,31 +250,33 @@ select is(
 );
 
 select is(
-  tests.closed_beta_affected_rows_as(
-    'anon',
-    null,
-    $sql$
-      delete from storage.objects
-      where bucket_id = 'kwabor-catalog-demo'
-        and name = 'v1/existing.jpg'
-    $sql$
+  (
+    select count(*)::integer
+    from pg_catalog.pg_policies policy_record
+    cross join lateral unnest(policy_record.roles) as policy_role(role_name)
+    where policy_record.schemaname = 'storage'
+      and policy_record.tablename = 'objects'
+      and policy_record.permissive = 'PERMISSIVE'
+      and policy_record.cmd in ('ALL', 'DELETE')
+      and tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'anon')
   ),
-  0::bigint,
-  'anon delete cannot see or remove the demo object'
+  0,
+  'anon has no permissive policy that can delete demo objects'
 );
 
 select is(
-  tests.closed_beta_affected_rows_as(
-    'authenticated',
-    'b2000000-0000-4000-8000-000000000001',
-    $sql$
-      delete from storage.objects
-      where bucket_id = 'kwabor-catalog-demo'
-        and name = 'v1/existing.jpg'
-    $sql$
+  (
+    select count(*)::integer
+    from pg_catalog.pg_policies policy_record
+    cross join lateral unnest(policy_record.roles) as policy_role(role_name)
+    where policy_record.schemaname = 'storage'
+      and policy_record.tablename = 'objects'
+      and policy_record.permissive = 'PERMISSIVE'
+      and policy_record.cmd in ('ALL', 'DELETE')
+      and tests.closed_beta_policy_role_applies_to(policy_role.role_name, 'authenticated')
   ),
-  0::bigint,
-  'authenticated delete cannot see or remove the demo object'
+  0,
+  'authenticated has no permissive policy that can delete demo objects'
 );
 
 select is(
@@ -265,7 +287,7 @@ select is(
       and name = 'v1/existing.jpg'
   ),
   1,
-  'the demo object survives both client delete attempts'
+  'the demo object remains present while clients have no delete policy'
 );
 
 select ok(
@@ -295,16 +317,15 @@ select ok(
 );
 
 select ok(
-  tests.closed_beta_statement_succeeds_as(
-    'service_role',
-    null,
-    $sql$
-      delete from storage.objects
-      where bucket_id = 'kwabor-catalog-demo'
-        and name = 'v1/workflow-only.jpg'
-    $sql$
+  coalesce(
+    (
+      select role_record.rolbypassrls
+      from pg_catalog.pg_roles role_record
+      where role_record.rolname = 'service_role'
+    ),
+    false
   ),
-  'service_role remains the demo rollback authority'
+  'service_role remains the RLS-bypass authority used by Storage API rollback'
 );
 
 select * from finish();

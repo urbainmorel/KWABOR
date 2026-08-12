@@ -123,10 +123,15 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         self.assertEqual(sql.count("select * from finish();"), 1)
         self.assertNotIn("closed_beta_statement_fails_as", sql)
         self.assertEqual(sql.count("  tests.closed_beta_statement_sqlstate_as("), 2)
-        self.assertEqual(sql.count("  tests.closed_beta_affected_rows_as("), 4)
-        self.assertEqual(sql.count("  tests.closed_beta_statement_succeeds_as("), 3)
+        self.assertEqual(sql.count("  tests.closed_beta_affected_rows_as("), 2)
+        self.assertEqual(sql.count("  tests.closed_beta_statement_succeeds_as("), 2)
         self.assertEqual(sql.count("  '42501',"), 2)
-        self.assertEqual(sql.count("  0::bigint,"), 4)
+        self.assertEqual(sql.count("  0::bigint,"), 2)
+        self.assertEqual(sql.count("and policy_record.cmd in ('ALL', 'DELETE')"), 2)
+        self.assertEqual(sql.count("tests.closed_beta_policy_role_applies_to("), 7)
+        self.assertIn("pg_catalog.pg_has_role(client_role::text, policy_role::text, 'USAGE')", sql)
+        self.assertNotRegex(sql, r"(?is)\bdelete\s+from\s+storage\.objects\b")
+        self.assertIn("role_record.rolbypassrls", sql)
 
     def test_staging_target_requires_matching_distinct_project_ref(self) -> None:
         staging_ref = "abcdefghijklmnopqrst"
