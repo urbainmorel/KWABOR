@@ -52,6 +52,7 @@ def main() -> int:
     harness = HARNESS.read_text(encoding="utf-8")
     WRAPPER.parent.mkdir(parents=True, exist_ok=True)
     WRAPPER.write_text(
+        "\\set ON_ERROR_STOP on\n"
         "set kwabor.local_demo_catalog_harness = 'explicit-local-wrapper';\n"
         "set app.kwabor_environment = 'local';\n"
         "set app.kwabor_demo_catalog_enabled = 'true';\n"
@@ -69,7 +70,10 @@ def main() -> int:
         "-- Rollback is logical: it must hide the demo corpus without deleting parents or children.\n"
         f"{rollback}\n"
         "select pg_temp.assert_closed_beta_demo_logically_rolled_back();\n"
-        "select pg_temp.assert_closed_beta_outside_state_unchanged('outside-before');\n",
+        "select pg_temp.assert_closed_beta_outside_state_unchanged('outside-before');\n"
+        "select plan(1);\n"
+        "select pass('closed-beta demo seed import, replay, RPC and logical rollback completed');\n"
+        "select * from finish();\n",
         encoding="utf-8",
         newline="\n",
     )
