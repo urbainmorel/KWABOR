@@ -2,8 +2,8 @@
 -- Kind: rollback
 -- Catalog version: v1
 -- Catalog anchor: 2026-08-12 (Africa/Porto-Novo)
--- Source SHA-256: 4fc2a03924497ea6eea56c6bbf89f20e91d718001b3358b3616955d9a19b8421
--- Catalog marker: demo-catalog:4fc2a039244
+-- Source SHA-256: 2d0affd1fe5dacf9175b9c2a47750c62d65d3daf51684c4cd7a2949715615bc8
+-- Catalog marker: demo-catalog:2d0affd1fe5
 -- Operational guard only: these GUC checks are not a security boundary.
 -- Execution is permitted only through the protected local/staging Environment workflow.
 -- Required session settings:
@@ -85,7 +85,7 @@ insert into kwabor_demo_expected_listings (id, slug, category_id, detail_variant
   ('00000000-0000-4000-8000-000000000312'::uuid, 'concert-cours-illuminees-porto-novo-demo', 'event-culture', 'event'),
   ('00000000-0000-4000-8000-000000000313'::uuid, 'atelier-indigo-papier-porto-novo-demo', 'event-culture', 'event'),
   ('00000000-0000-4000-8000-000000000314'::uuid, 'semaine-histoires-lagune-porto-novo-demo', 'event-culture', 'event'),
-  ('00000000-0000-4000-8000-000000000315'::uuid, 'festival-culturel-ouidah-test', 'event-culture', 'event'),
+  ('00000000-0000-4000-8000-000000000315'::uuid, 'festival-culturel-ouidah-demo', 'event-culture', 'event'),
   ('00000000-0000-4000-8000-000000000401'::uuid, 'azur-des-cocotiers-demo-cotonou', 'commercial-hotel', 'lodging'),
   ('00000000-0000-4000-8000-000000000402'::uuid, 'patio-indigo-demo-cotonou', 'commercial-hotel', 'lodging'),
   ('00000000-0000-4000-8000-000000000403'::uuid, 'lagune-sereine-demo-cotonou', 'commercial-hotel', 'lodging'),
@@ -140,7 +140,7 @@ begin
   select count(*) into matched
   from public.listings listing
   join kwabor_demo_expected_listings expected on expected.id = listing.id
-  where listing.tags @> array['demo-catalog:4fc2a039244', 'demo-anchor:20260812']::text[];
+  where listing.tags @> array['demo-catalog:2d0affd1fe5', 'demo-anchor:20260812']::text[];
   if matched <> 60 then
     raise exception 'Rollback catalog identity mismatch: %/60', matched;
   end if;
@@ -243,7 +243,7 @@ begin
   join kwabor_demo_expected_listings expected on expected.id = listing.id
   where listing.status = 'archive'
     and listing.published_at is null
-    and listing.tags @> array['demo-catalog:4fc2a039244', 'demo-anchor:20260812']::text[];
+    and listing.tags @> array['demo-catalog:2d0affd1fe5', 'demo-anchor:20260812']::text[];
   if neutralized <> 60 then
     raise exception 'Rollback neutralization proof failed: %/60', neutralized;
   end if;

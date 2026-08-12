@@ -24,9 +24,14 @@ SEED_OUTPUT = GENERATED_ROOT / "seed.sql"
 ROLLBACK_OUTPUT = GENERATED_ROOT / "rollback.sql"
 FAMILIES = ("places", "events", "hotels", "restaurants")
 EXPECTED_FAMILY_COUNTS = {family: 15 for family in FAMILIES}
-CANONICAL_FIXTURE_IDS = frozenset(
-    f"00000000-0000-4000-8000-{suffix:012d}" for suffix in range(101, 105)
-)
+CANONICAL_FIXTURES = {
+    "00000000-0000-4000-8000-000000000101": "porte-du-non-retour-ouidah",
+    "00000000-0000-4000-8000-000000000102": "marche-dantokpa-cotonou",
+    "00000000-0000-4000-8000-000000000103": "table-locale-cotonou",
+    "00000000-0000-4000-8000-000000000104": "festival-culturel-ouidah-test",
+}
+CANONICAL_FIXTURE_IDS = frozenset(CANONICAL_FIXTURES)
+CANONICAL_FIXTURE_SLUGS = frozenset(CANONICAL_FIXTURES.values())
 UUID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
@@ -344,6 +349,8 @@ def load_sources(
         "Catalog slugs must be non-empty canonical strings",
     )
     require(len(slugs) == len(set(slugs)), "Catalog slugs must be globally unique")
+    slug_overlap = sorted(set(slugs) & CANONICAL_FIXTURE_SLUGS)
+    require(not slug_overlap, f"Demo slugs overlap canonical fixtures: {', '.join(slug_overlap)}")
     overlap = sorted(set(ids) & CANONICAL_FIXTURE_IDS)
     require(not overlap, f"Demo UUIDs overlap canonical fixtures: {', '.join(overlap)}")
     listing_ids = set(ids)

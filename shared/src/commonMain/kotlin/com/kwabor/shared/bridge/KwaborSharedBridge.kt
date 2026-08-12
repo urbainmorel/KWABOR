@@ -15,7 +15,7 @@ import com.kwabor.shared.presentation.navigation.label
 import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
 
 class KwaborSharedBridge internal constructor(
-    private val hasCatalogConfiguration: Boolean,
+    val hasCatalogConfiguration: Boolean,
     private val rootNavigationProfile: RootNavigationProfile = RootNavigationProfile.Full,
 ) {
     constructor() : this(hasCatalogConfiguration = false)
@@ -50,17 +50,17 @@ class KwaborSharedBridge internal constructor(
     fun isUnavailableRootDeepLink(rawUrl: String): Boolean = RootDeepLinkParser.parse(rawUrl, rootNavigationProfile) ==
         RootDeepLinkResult.Rejected(RootDeepLinkRejection.DestinationUnavailable)
 
-    fun isClosedBetaCatalog(): Boolean = rootNavigationProfile == RootNavigationProfile.ClosedBetaCatalog
+    val isClosedBetaCatalog: Boolean
+        get() = rootNavigationProfile == RootNavigationProfile.ClosedBetaCatalog
 
-    fun rootDestinationUnavailableMessage(): String = strings.rootDestinationUnavailable
+    val rootDestinationUnavailableMessage: String
+        get() = strings.rootDestinationUnavailable
 
     fun catalogDetailListingIdForDeepLink(rawUrl: String): String? =
         when (val result = CatalogDetailDeepLinkParser.parse(rawUrl)) {
             is CatalogDetailDeepLinkResult.Accepted -> result.listingId
             is CatalogDetailDeepLinkResult.Rejected -> null
         }
-
-    fun hasCatalogConfiguration(): Boolean = hasCatalogConfiguration
 
     fun onboardingEntryKey(
         firstLaunchCompleted: Boolean,

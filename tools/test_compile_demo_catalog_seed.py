@@ -331,6 +331,20 @@ class DemoCatalogCompilerTest(unittest.TestCase):
         with self.assertRaisesRegex(COMPILER.CatalogCompileError, "overlap canonical fixtures"):
             self.load()
 
+    def test_canonical_fixture_slug_guard_matches_the_canonical_seed(self) -> None:
+        seed = (COMPILER.REPOSITORY_ROOT / "supabase" / "seed.sql").read_text(encoding="utf-8")
+        insert_start = seed.index("insert into public.listings")
+        insert_end = seed.index("on conflict (id) do update set", insert_start)
+        listing_insert = seed[insert_start:insert_end]
+        fixture_positions = sorted(
+            (listing_insert.index(f"'{fixture_id}'"), fixture_id)
+            for fixture_id in COMPILER.CANONICAL_FIXTURES
+        )
+        for index, (start, fixture_id) in enumerate(fixture_positions):
+            end = fixture_positions[index + 1][0] if index + 1 < len(fixture_positions) else len(listing_insert)
+            expected_slug = COMPILER.CANONICAL_FIXTURES[fixture_id]
+            self.assertIn(f"'{expected_slug}'", listing_insert[start:end])
+
     def test_rejects_missing_media_manifest(self) -> None:
         (self.fixture.fragments / "events-media.json").unlink()
         with self.assertRaisesRegex(COMPILER.CatalogCompileError, "Missing required source"):
@@ -366,6 +380,13 @@ class DemoCatalogCompilerTest(unittest.TestCase):
         places[1]["slug"] = places[0]["slug"]
         self.fixture.write("places", places)
         with self.assertRaisesRegex(COMPILER.CatalogCompileError, "slugs must be globally unique"):
+            self.load()
+
+    def test_rejects_canonical_fixture_slug_overlap(self) -> None:
+        events = self.fixture.read("events")
+        events[0]["slug"] = "festival-culturel-ouidah-test"
+        self.fixture.write("events", events)
+        with self.assertRaisesRegex(COMPILER.CatalogCompileError, "slugs overlap canonical fixtures"):
             self.load()
 
     def test_rejects_duplicate_room_identity_and_order(self) -> None:

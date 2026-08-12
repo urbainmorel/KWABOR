@@ -39,7 +39,7 @@ struct ContentView: View {
     let onCatalogDetailDeepLinkAcknowledged: (CatalogDetailDeepLinkDelivery) -> Bool
     @State private var selectedDestination = RootDestination.home
 
-    private var isClosedBetaCatalog: Bool { bridge.isClosedBetaCatalog() }
+    private var isClosedBetaCatalog: Bool { bridge.isClosedBetaCatalog }
 
     init(
         bridge: KwaborSharedBridge,

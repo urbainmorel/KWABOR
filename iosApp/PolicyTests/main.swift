@@ -1693,7 +1693,7 @@ private let unavailableRootDeepLinkSection = sourceSection(
 )
 expect(
     sourceContains(
-        "rootNavigationNotice = bridge.rootDestinationUnavailableMessage()",
+        "rootNavigationNotice = bridge.rootDestinationUnavailableMessage",
         before: "pendingInternalDeepLink.enqueueRoot(destinationKey: RootDestination.home.rawValue)",
         in: unavailableRootDeepLinkSection
     ),

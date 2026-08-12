@@ -55,7 +55,14 @@ class KwaborSharedBridgeTest {
         val telemetry = bridge.onboardingTelemetry()
         assertEquals("intro_video_shown", telemetry.shownEvent.name.wireName)
         assertEquals("intro_video_skipped", telemetry.skippedEvent.name.wireName)
-        assertFalse(bridge.hasCatalogConfiguration())
+        assertFalse(bridge.hasCatalogConfiguration)
+    }
+
+    @Test
+    fun reflectsCompositionRootAvailabilityForIosHost() {
+        val bridge = KwaborSharedBridge(hasCatalogConfiguration = true)
+
+        assertTrue(bridge.hasCatalogConfiguration)
     }
 
     @Test
@@ -97,13 +104,6 @@ class KwaborSharedBridgeTest {
     }
 
     @Test
-    fun reflectsCompositionRootAvailabilityForIosHost() {
-        val bridge = KwaborSharedBridge(hasCatalogConfiguration = true)
-
-        assertTrue(bridge.hasCatalogConfiguration())
-    }
-
-    @Test
     fun exposesOnlyAcceptedCatalogDetailDeepLinksToNativeHosts() {
         val bridge = KwaborSharedBridge()
         val listingId = "123e4567-e89b-42d3-a456-426614174000"
@@ -130,15 +130,15 @@ class KwaborSharedBridgeTest {
         assertEquals("social", fullBridge.rootDestinationKeyForDeepLink("kwabor://app/social"))
         assertNull(betaBridge.rootDestinationKeyForDeepLink("kwabor://app/social"))
         assertTrue(betaBridge.isUnavailableRootDeepLink("kwabor://app/social"))
-        assertFalse(fullBridge.isClosedBetaCatalog())
-        assertTrue(betaBridge.isClosedBetaCatalog())
+        assertFalse(fullBridge.isClosedBetaCatalog)
+        assertTrue(betaBridge.isClosedBetaCatalog)
         assertEquals("Accueil", fullBridge.homeLabel())
         assertEquals("Profil", fullBridge.profileLabel())
         assertEquals("Explorer", betaBridge.homeLabel())
         assertEquals("Compte", betaBridge.profileLabel())
         assertEquals(
             "Cette section n’est pas disponible dans cette version.",
-            betaBridge.rootDestinationUnavailableMessage(),
+            betaBridge.rootDestinationUnavailableMessage,
         )
     }
 }

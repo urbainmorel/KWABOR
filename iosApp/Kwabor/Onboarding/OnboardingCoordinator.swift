@@ -587,7 +587,7 @@ final class OnboardingCoordinator: ObservableObject {
                 isSigningOut: isSigningOutAccount,
                 isDeletingAccount: isDeletingAccount
             ) else { return true }
-            rootNavigationNotice = bridge.rootDestinationUnavailableMessage()
+            rootNavigationNotice = bridge.rootDestinationUnavailableMessage
             pendingInternalDeepLink.enqueueRoot(destinationKey: RootDestination.home.rawValue)
             return true
         }

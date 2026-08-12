@@ -460,7 +460,7 @@
     "categoryId": "event-culture",
     "status": "publie",
     "name": "Festival culturel de Ouidah Démo",
-    "slug": "festival-culturel-ouidah-test",
+    "slug": "festival-culturel-ouidah-demo",
     "description": "Festival culturel entièrement fictif imaginé près de la Porte du Non-Retour, avec scènes acoustiques, installations lumineuses et ateliers de démonstration. Le programme, les intervenants, les tarifs et la billetterie sont inventés; aucun billet réel n'est disponible. Contenu fictif créé pour la bêta fermée Kwabor.",
     "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
     "contentLang": "fr",
@@ -503,7 +503,7 @@
       "organizerName": "Organisation fictive Kwabor Démonstration",
       "organizerContact": "demo-events@kwabor.test",
       "ticketType": "payant",
-      "ticketUrl": "https://tickets.kwabor.test/festival-culturel-ouidah-test",
+      "ticketUrl": "https://tickets.kwabor.test/festival-culturel-ouidah-demo",
       "capacity": 140,
       "ticketTiers": [
         {

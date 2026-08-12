@@ -38,6 +38,12 @@ CANONICAL_FIXTURE_IDS = {
     "00000000-0000-4000-8000-000000000103",
     "00000000-0000-4000-8000-000000000104",
 }
+CANONICAL_FIXTURE_SLUGS = {
+    "porte-du-non-retour-ouidah",
+    "marche-dantokpa-cotonou",
+    "table-locale-cotonou",
+    "festival-culturel-ouidah-test",
+}
 DEMO_REPLACEMENT_IDS = {
     "00000000-0000-4000-8000-000000000214",
     "00000000-0000-4000-8000-000000000215",
@@ -257,6 +263,10 @@ def load_and_verify_fragments() -> list[dict[str, Any]]:
     require(DEMO_REPLACEMENT_IDS <= listing_ids, "All four replacement demo listing IDs must be present")
     slugs = [listing["slug"] for listing in all_listings]
     require(len(slugs) == len(set(slugs)), "Listing slugs must be globally unique")
+    require(
+        not (CANONICAL_FIXTURE_SLUGS & set(slugs)),
+        "Demo catalog slugs must not collide with canonical fixtures",
+    )
     place_counts = Counter(
         listing["subtype"] for listing in all_listings if family_by_id[listing["id"]] == "places"
     )
