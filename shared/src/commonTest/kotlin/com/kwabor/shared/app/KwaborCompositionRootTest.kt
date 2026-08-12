@@ -11,6 +11,7 @@ import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.explore.ExplorePresenter
 import com.kwabor.shared.presentation.favorites.FavoritesPresenter
 import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -145,9 +146,21 @@ class KwaborCompositionRootTest {
             assertNull(root.authPresenter)
             assertNull(root.interactionCoordinator)
             assertTrue(root.clockProvider.nowEpochMilliseconds() > 0L)
+            assertEquals(RootNavigationProfile.Full, root.rootNavigationProfile)
         } finally {
             root.close()
         }
+    }
+
+    @Test
+    fun stagingSelectsTheClosedBetaCatalogProfileOnly() {
+        assertEquals(
+            RootNavigationProfile.ClosedBetaCatalog,
+            rootNavigationProfileForEnvironmentName(" staging "),
+        )
+        assertEquals(RootNavigationProfile.Full, rootNavigationProfileForEnvironmentName("development"))
+        assertEquals(RootNavigationProfile.Full, rootNavigationProfileForEnvironmentName("production"))
+        assertEquals(RootNavigationProfile.Full, rootNavigationProfileForEnvironmentName("preview"))
     }
 
     @Test

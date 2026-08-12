@@ -1,52 +1,165 @@
-name: Android release artifact
+name: Android closed-beta release
 
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: Target GitHub Environment
+      expected_sha:
+        description: Exact qualified main commit SHA to build and optionally publish
         required: true
-        type: choice
-        options:
-          - staging
-          - production
+        type: string
       version_code:
-        description: Positive Play Store version code
+        description: Positive Google Play version code
         required: true
         type: string
       version_name:
         description: Semantic version, for example 1.0.0-rc.1
         required: true
         type: string
+      publish_to_play_internal:
+        description: Publish the built AAB to Google Play Internal after protected approval
+        required: true
+        default: false
+        type: boolean
+      publish_confirmation:
+        description: For publication only, type PUBLISH-EXACT-AAB-TO-PLAY-INTERNAL
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
 
 concurrency:
-  group: android-release-${{ inputs.environment }}
+  group: android-closed-beta-release
   cancel-in-progress: false
 
 jobs:
-  artifact:
-    name: Build ${{ inputs.environment }} artifact
+  build:
+    name: Build signed staging AAB
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    environment: ${{ inputs.environment }}
-    permissions:
-      contents: read
+    environment: staging
+    outputs:
+      aab_name: ${{ steps.release_metadata.outputs.aab_name }}
+      artifact_name: ${{ steps.release_metadata.outputs.artifact_name }}
     env:
-      KWABOR_ENVIRONMENT: ${{ inputs.environment }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VERSION_CODE: ${{ inputs.version_code }}
+      VERSION_NAME: ${{ inputs.version_name }}
+      KWABOR_ENVIRONMENT: staging
       KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
       KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
       KWABOR_FIREBASE_PROJECT_ID: ${{ vars.KWABOR_FIREBASE_PROJECT_ID }}
+      KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256: ${{ vars.KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256 }}
       KWABOR_GOOGLE_WEB_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_WEB_CLIENT_ID }}
+      KWABOR_ANDROID_UPLOAD_CERT_SHA256: ${{ vars.KWABOR_ANDROID_UPLOAD_CERT_SHA256 }}
       KWABOR_VERSION_CODE: ${{ inputs.version_code }}
       KWABOR_VERSION_NAME: ${{ inputs.version_name }}
+
     steps:
-      - name: Require protected main
-        if: github.ref != 'refs/heads/main'
+      - name: Validate closed-beta request
+        shell: bash
         run: |
-          echo "Release artifacts may only be built from main." >&2
-          exit 1
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "urbainmorel/KWABOR" ]]; then
+            echo "Android closed-beta releases are restricted to the canonical repository." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
+            echo "The release must target the selected main exact-head." >&2
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_sha must be a full lowercase commit SHA." >&2
+            exit 1
+          fi
+          if [[ ! "$VERSION_CODE" =~ ^[1-9][0-9]*$ || ${#VERSION_CODE} -gt 10 ]] ||
+            (( 10#$VERSION_CODE > 2100000000 )); then
+            echo "version_code must be an integer between 1 and 2100000000." >&2
+            exit 1
+          fi
+          if [[ ${#VERSION_NAME} -gt 64 || ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "version_name must be semantic, for example 1.0.0-rc.1." >&2
+            exit 1
+          fi
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Verify checkout and successful exact-head CI
+        id: ci_provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]]; then
+            echo "Checked-out commit does not match expected_sha." >&2
+            exit 1
+          fi
+          response="$(
+            gh api --method GET \
+              "/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f "head_sha=$EXPECTED_SHA" \
+              -f status=success \
+              -F per_page=100
+          )"
+          ci_run_id="$(
+            jq -r --arg sha "$EXPECTED_SHA" \
+              '[.workflow_runs[] | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push" and
+                .conclusion == "success"
+              )] | sort_by(.run_number) | last | .id // empty' \
+              <<<"$response"
+          )"
+          ci_run_url="$(
+            jq -r --arg sha "$EXPECTED_SHA" \
+              '[.workflow_runs[] | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push" and
+                .conclusion == "success"
+              )] | sort_by(.run_number) | last | .html_url // empty' \
+              <<<"$response"
+          )"
+          if [[ ! "$ci_run_id" =~ ^[1-9][0-9]*$ || "$ci_run_url" != https://github.com/* ]]; then
+            echo "No successful CI run proves this exact-head." >&2
+            exit 1
+          fi
+          echo "ci_run_id=$ci_run_id" >>"$GITHUB_OUTPUT"
+          echo "ci_run_url=$ci_run_url" >>"$GITHUB_OUTPUT"
+
+      - name: Require protected staging Environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment_json="$(gh api "/repos/$GITHUB_REPOSITORY/environments/staging")"
+          if ! jq -e '
+            .name == "staging" and
+            .can_admins_bypass == false and
+            .deployment_branch_policy.protected_branches == true and
+            .deployment_branch_policy.custom_branch_policies == false and
+            any(
+              .protection_rules[];
+              .type == "required_reviewers" and
+              .prevent_self_review == true and
+              (.reviewers | length) > 0
+            )
+          ' <<<"$environment_json" >/dev/null; then
+            echo \
+              "The staging Environment must forbid admin bypass, allow only protected branches, require a reviewer, and prevent self-review." \
+              >&2
+            exit 1
+          fi
 
       - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
         with:
@@ -55,39 +168,100 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
-      - name: Validate public mobile configuration
+      - name: Guard protected staging identity
         shell: bash
         run: |
-          if [[ -z "$KWABOR_SUPABASE_URL" || -z "$KWABOR_SUPABASE_PUBLISHABLE_KEY" ]]; then
-            echo "The selected GitHub Environment is missing its Supabase client variables." >&2
+          set -euo pipefail
+          for value in \
+            "$KWABOR_SUPABASE_URL" \
+            "$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            "$KWABOR_SUPABASE_PROJECT_REF" \
+            "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" \
+            "$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            "$KWABOR_FIREBASE_PROJECT_ID" \
+            "$KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256" \
+            "$KWABOR_GOOGLE_WEB_CLIENT_ID" \
+            "$KWABOR_ANDROID_UPLOAD_CERT_SHA256"; do
+            if [[ -z "$value" ]]; then
+              echo "The staging Environment is missing required Android release configuration." >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$KWABOR_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ ]]; then
+            echo "The staging Supabase project ref is invalid." >&2
+            exit 1
+          fi
+          if [[ "$KWABOR_SUPABASE_URL" != "https://${KWABOR_SUPABASE_PROJECT_REF}.supabase.co" ]]; then
+            echo "The mobile Supabase URL does not match the staging project ref." >&2
+            exit 1
+          fi
+          if [[
+            ! "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ ||
+            "$KWABOR_SUPABASE_PROJECT_REF" == "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF"
+          ]]; then
+            echo "The staging and production Supabase project refs must be valid and distinct." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_STAGING_PROJECT_REF_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "The protected staging Supabase identity digest is invalid." >&2
+            exit 1
+          fi
+          actual_supabase_digest="$(printf '%s' "$KWABOR_SUPABASE_PROJECT_REF" | sha256sum | cut -d' ' -f1)"
+          if [[ "$actual_supabase_digest" != "$KWABOR_STAGING_PROJECT_REF_SHA256" ]]; then
+            echo "The Supabase project ref does not match the protected staging identity." >&2
+            exit 1
+          fi
+          if [[
+            ! "$KWABOR_FIREBASE_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ||
+            ! "$KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256" =~ ^[0-9a-f]{64}$
+          ]]; then
+            echo "The protected staging Firebase identity is invalid." >&2
+            exit 1
+          fi
+          actual_firebase_digest="$(printf '%s' "$KWABOR_FIREBASE_PROJECT_ID" | sha256sum | cut -d' ' -f1)"
+          if [[ "$actual_firebase_digest" != "$KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256" ]]; then
+            echo "The Firebase project does not match the protected staging identity." >&2
             exit 1
           fi
           if [[ ! "$KWABOR_GOOGLE_WEB_CLIENT_ID" =~ ^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$ ]]; then
-            echo "The selected GitHub Environment has an invalid Google Web OAuth client ID." >&2
+            echo "The staging Google Web OAuth client ID is invalid." >&2
+            exit 1
+          fi
+          normalized_upload_cert="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ ! "$normalized_upload_cert" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "The expected Android upload certificate fingerprint is invalid." >&2
             exit 1
           fi
 
-      - name: Inject Firebase Android configuration
+      - name: Inject staging Firebase Android configuration
         shell: bash
         env:
           FIREBASE_CONFIG_BASE64: ${{ secrets.KWABOR_FIREBASE_ANDROID_CONFIG_BASE64 }}
         run: |
+          set -euo pipefail
           if [[ -z "$FIREBASE_CONFIG_BASE64" ]]; then
-            echo "The selected GitHub Environment is missing its Firebase Android configuration." >&2
+            echo "The staging Environment is missing its Firebase Android configuration." >&2
             exit 1
           fi
           config_path="androidApp/google-services.json"
-          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > "$config_path"
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode >"$config_path"
           chmod 600 "$config_path"
           project_id="$(jq -r '.project_info.project_id // empty' "$config_path")"
-          package_count="$(jq '[.client[] | select(.client_info.android_client_info.package_name == "com.kwabor.android")] | length' "$config_path")"
-          if [[ -z "$KWABOR_FIREBASE_PROJECT_ID" || "$project_id" != "$KWABOR_FIREBASE_PROJECT_ID" || "$package_count" != "1" ]]; then
-            echo "The Firebase Android configuration is invalid or targets another environment/application." >&2
+          package_count="$(
+            jq \
+              '[.client[] | select(.client_info.android_client_info.package_name == "com.kwabor.android")] | length' \
+              "$config_path"
+          )"
+          if [[ "$project_id" != "$KWABOR_FIREBASE_PROJECT_ID" || "$package_count" != "1" ]]; then
+            echo "The Firebase Android configuration targets another environment or application." >&2
             exit 1
           fi
 
-      - name: Inject production upload keystore
-        if: inputs.environment == 'production'
+      - name: Inject and validate Android upload keystore
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.KWABOR_ANDROID_KEYSTORE_BASE64 }}
@@ -95,67 +269,388 @@ jobs:
           KEY_ALIAS: ${{ secrets.KWABOR_ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KWABOR_ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           if [[ -z "$KEYSTORE_BASE64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
-            echo "The production upload-keystore secrets are incomplete." >&2
+            echo "The staging Environment is missing complete Android upload-key credentials." >&2
+            exit 1
+          fi
+          if [[ ! "$KEY_ALIAS" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "The Android upload-key alias has an unsafe or unsupported shape." >&2
             exit 1
           fi
           keystore_path="$RUNNER_TEMP/kwabor-upload.jks"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode >"$keystore_path"
           chmod 600 "$keystore_path"
-          echo "::add-mask::$KEYSTORE_PASSWORD"
-          echo "::add-mask::$KEY_ALIAS"
-          echo "::add-mask::$KEY_PASSWORD"
-          {
-            echo "KWABOR_ANDROID_KEYSTORE_PATH=$keystore_path"
-            echo "KWABOR_ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
-            echo "KWABOR_ANDROID_KEY_ALIAS=$KEY_ALIAS"
-            echo "KWABOR_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
-          } >> "$GITHUB_ENV"
-
-      - name: Build staging APK
-        if: inputs.environment == 'staging'
-        run: ./gradlew check :androidApp:assembleStaging
-
-      - name: Build production Android App Bundle
-        if: inputs.environment == 'production'
-        run: ./gradlew check :androidApp:bundleRelease
-
-      - name: Write artifact checksums
-        shell: bash
-        run: |
-          if [[ "${{ inputs.environment }}" == "staging" ]]; then
-            artifact="androidApp/build/outputs/apk/staging/androidApp-staging.apk"
-          else
-            artifact="androidApp/build/outputs/bundle/release/androidApp-release.aab"
+          keytool -list \
+            -keystore "$keystore_path" \
+            -storepass:env KEYSTORE_PASSWORD \
+            -alias "$KEY_ALIAS" >/dev/null
+          actual_upload_cert="$(
+            keytool -exportcert \
+              -keystore "$keystore_path" \
+              -storepass:env KEYSTORE_PASSWORD \
+              -alias "$KEY_ALIAS" |
+              openssl x509 -inform der -noout -fingerprint -sha256 |
+              cut -d= -f2 |
+              tr -d ':' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          expected_upload_cert="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ "$actual_upload_cert" != "$expected_upload_cert" ]]; then
+            echo "The injected keystore does not contain the protected Android upload certificate." >&2
+            exit 1
           fi
-          test -f "$artifact"
-          sha256sum "$artifact" > androidApp/build/outputs/KWABOR-SHA256SUMS.txt
 
-      - name: Upload staging artifact
-        if: inputs.environment == 'staging'
+      - name: Build staging Android App Bundle
+        run: ./gradlew --no-daemon :androidApp:bundleStaging
+
+      - name: Replace debug signature with protected upload signature
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KWABOR_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KWABOR_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KWABOR_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          generated_aab="androidApp/build/outputs/bundle/staging/androidApp-staging.aab"
+          unsigned_aab="$RUNNER_TEMP/kwabor-staging-unsigned.aab"
+          signed_aab="$RUNNER_TEMP/kwabor-staging-signed.aab"
+          test -s "$generated_aab"
+          python3 -B tools/prepare_android_release_bundle.py strip "$generated_aab" "$unsigned_aab"
+          jarsigner \
+            -keystore "$RUNNER_TEMP/kwabor-upload.jks" \
+            -storepass:env KEYSTORE_PASSWORD \
+            -keypass:env KEY_PASSWORD \
+            -signedjar "$signed_aab" \
+            "$unsigned_aab" \
+            "$KEY_ALIAS"
+          jarsigner -verify "$signed_aab" >/dev/null
+          python3 -B tools/prepare_android_release_bundle.py verify "$signed_aab"
+          actual_bundle_cert="$(
+            keytool -printcert -jarfile "$signed_aab" |
+              awk '/SHA256:/{sub(/.*SHA256:[[:space:]]*/, ""); gsub(/:/, ""); print tolower($0); exit}'
+          )"
+          expected_upload_cert="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ "$actual_bundle_cert" != "$expected_upload_cert" ]]; then
+            echo "The signed AAB certificate does not match the protected upload certificate." >&2
+            exit 1
+          fi
+          mv "$signed_aab" "$generated_aab"
+          rm -f "$unsigned_aab"
+
+      - name: Assemble checksums and provenance
+        id: release_metadata
+        shell: bash
+        env:
+          CI_RUN_ID: ${{ steps.ci_provenance.outputs.ci_run_id }}
+          CI_RUN_URL: ${{ steps.ci_provenance.outputs.ci_run_url }}
+        run: |
+          set -euo pipefail
+          release_dir="release/android"
+          aab_name="kwabor-staging-${VERSION_NAME}-${VERSION_CODE}.aab"
+          artifact_name="kwabor-android-staging-${VERSION_NAME}-${VERSION_CODE}-${EXPECTED_SHA}"
+          mkdir -p "$release_dir"
+          cp "androidApp/build/outputs/bundle/staging/androidApp-staging.aab" "$release_dir/$aab_name"
+          cp "androidApp/build/outputs/mapping/staging/mapping.txt" "$release_dir/mapping.txt"
+          test -s "$release_dir/$aab_name"
+          test -s "$release_dir/mapping.txt"
+          aab_sha256="$(sha256sum "$release_dir/$aab_name" | cut -d' ' -f1)"
+          mapping_sha256="$(sha256sum "$release_dir/mapping.txt" | cut -d' ' -f1)"
+          upload_cert_sha256="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          (
+            cd "$release_dir"
+            printf '%s  %s\n' "$aab_sha256" "$aab_name"
+            printf '%s  %s\n' "$mapping_sha256" mapping.txt
+          ) >"$release_dir/KWABOR-SHA256SUMS.txt"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg expected_sha "$EXPECTED_SHA" \
+            --arg version_name "$VERSION_NAME" \
+            --argjson version_code "$VERSION_CODE" \
+            --arg aab_file "$aab_name" \
+            --arg aab_sha256 "$aab_sha256" \
+            --arg mapping_sha256 "$mapping_sha256" \
+            --arg upload_certificate_sha256 "$upload_cert_sha256" \
+            --arg staging_project_ref_sha256 "$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            --arg firebase_project_id_sha256 "$KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256" \
+            --arg ci_run_id "$CI_RUN_ID" \
+            --arg ci_run_url "$CI_RUN_URL" \
+            --arg workflow_run_id "$GITHUB_RUN_ID" \
+            --arg workflow_run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg built_at_utc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            '{
+              schema_version: 1,
+              repository: $repository,
+              source_commit: $expected_sha,
+              environment: "staging",
+              application_id: "com.kwabor.android",
+              variant: "staging",
+              version_name: $version_name,
+              version_code: $version_code,
+              aab_file: $aab_file,
+              aab_sha256: $aab_sha256,
+              mapping_file: "mapping.txt",
+              mapping_sha256: $mapping_sha256,
+              upload_certificate_sha256: $upload_certificate_sha256,
+              staging_project_ref_sha256: $staging_project_ref_sha256,
+              firebase_project_id_sha256: $firebase_project_id_sha256,
+              qualified_ci_run_id: $ci_run_id,
+              qualified_ci_run_url: $ci_run_url,
+              workflow_run_id: $workflow_run_id,
+              workflow_run_attempt: $workflow_run_attempt,
+              built_at_utc: $built_at_utc
+            }' >"$release_dir/KWABOR-ANDROID-PROVENANCE.json"
+          echo "aab_name=$aab_name" >>"$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >>"$GITHUB_OUTPUT"
+
+      - name: Upload signed closed-beta artifact
+        id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: kwabor-android-staging-${{ inputs.version_name }}-${{ inputs.version_code }}
-          path: |
-            androidApp/build/outputs/apk/staging/androidApp-staging.apk
-            androidApp/build/outputs/mapping/staging/mapping.txt
-            androidApp/build/outputs/KWABOR-SHA256SUMS.txt
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload production artifact
-        if: inputs.environment == 'production'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: kwabor-android-production-${{ inputs.version_name }}-${{ inputs.version_code }}
-          path: |
-            androidApp/build/outputs/bundle/release/androidApp-release.aab
-            androidApp/build/outputs/mapping/release/mapping.txt
-            androidApp/build/outputs/KWABOR-SHA256SUMS.txt
+          name: ${{ steps.release_metadata.outputs.artifact_name }}
+          path: release/android
           if-no-files-found: error
           retention-days: 30
 
-      - name: Remove injected Firebase configuration
+      - name: Record build evidence
+        shell: bash
+        run: |
+          {
+            echo "### Signed Android closed-beta build"
+            echo "- Exact head: \`$EXPECTED_SHA\`"
+            echo "- Version: \`$VERSION_NAME ($VERSION_CODE)\`"
+            echo "- Backend tier: \`staging\`"
+            echo "- Artifact: [${{ steps.release_metadata.outputs.artifact_name }}](${{ steps.upload.outputs.artifact-url }})"
+            echo "- Artifact digest: \`${{ steps.upload.outputs.artifact-digest }}\`"
+            echo "- Qualified CI: ${{ steps.ci_provenance.outputs.ci_run_url }}"
+            echo "- Publication requested: \`${{ inputs.publish_to_play_internal }}\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Remove injected signing and Firebase material
         if: always()
         shell: bash
-        run: rm -f androidApp/google-services.json
+        run: |
+          rm -f \
+            androidApp/google-services.json \
+            "$RUNNER_TEMP/kwabor-upload.jks" \
+            "$RUNNER_TEMP/kwabor-staging-unsigned.aab" \
+            "$RUNNER_TEMP/kwabor-staging-signed.aab"
+
+  publish:
+    name: Publish exact AAB to Google Play Internal
+    if: inputs.publish_to_play_internal
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: play-internal
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VERSION_CODE: ${{ inputs.version_code }}
+      VERSION_NAME: ${{ inputs.version_name }}
+      KWABOR_ANDROID_UPLOAD_CERT_SHA256: ${{ vars.KWABOR_ANDROID_UPLOAD_CERT_SHA256 }}
+      KWABOR_PLAY_PACKAGE_NAME: ${{ vars.KWABOR_PLAY_PACKAGE_NAME }}
+
+    steps:
+      - name: Require explicit protected publication
+        shell: bash
+        env:
+          PUBLISH_CONFIRMATION: ${{ inputs.publish_confirmation }}
+        run: |
+          set -euo pipefail
+          if [[
+            "$GITHUB_REPOSITORY" != "urbainmorel/KWABOR" ||
+            "$GITHUB_REF" != "refs/heads/main" ||
+            "$EXPECTED_SHA" != "$GITHUB_SHA"
+          ]]; then
+            echo "Google Play Internal publication must target the canonical main exact-head." >&2
+            exit 1
+          fi
+          if [[ "$PUBLISH_CONFIRMATION" != "PUBLISH-EXACT-AAB-TO-PLAY-INTERNAL" ]]; then
+            echo "Google Play Internal publication requires the exact confirmation phrase." >&2
+            exit 1
+          fi
+          if [[ "$KWABOR_PLAY_PACKAGE_NAME" != "com.kwabor.android" ]]; then
+            echo "The protected Play package name is missing or invalid." >&2
+            exit 1
+          fi
+
+      - name: Require protected play-internal Environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment_json="$(gh api "/repos/$GITHUB_REPOSITORY/environments/play-internal")"
+          if ! jq -e '
+            .name == "play-internal" and
+            .can_admins_bypass == false and
+            .deployment_branch_policy.protected_branches == true and
+            .deployment_branch_policy.custom_branch_policies == false and
+            any(
+              .protection_rules[];
+              .type == "required_reviewers" and
+              .prevent_self_review == true and
+              (.reviewers | length) > 0
+            )
+          ' <<<"$environment_json" >/dev/null; then
+            echo \
+              "The play-internal Environment must forbid admin bypass, allow only protected branches, require a reviewer, and prevent self-review." \
+              >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Download exact build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release/android
+
+      - name: Reverify artifact provenance, hashes, and signature
+        id: verify_artifact
+        shell: bash
+        env:
+          AAB_NAME: ${{ needs.build.outputs.aab_name }}
+        run: |
+          set -euo pipefail
+          release_dir="release/android"
+          provenance="$release_dir/KWABOR-ANDROID-PROVENANCE.json"
+          checksum_file="$release_dir/KWABOR-SHA256SUMS.txt"
+          aab="$release_dir/$AAB_NAME"
+          test -s "$aab"
+          test -s "$release_dir/mapping.txt"
+          test -s "$provenance"
+          test -s "$checksum_file"
+          if [[ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]]; then
+            echo "Publication checkout does not match expected_sha." >&2
+            exit 1
+          fi
+          expected_upload_cert="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ ! "$expected_upload_cert" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "The protected upload certificate fingerprint is invalid." >&2
+            exit 1
+          fi
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$EXPECTED_SHA" \
+            --arg version_name "$VERSION_NAME" \
+            --argjson version_code "$VERSION_CODE" \
+            --arg aab_name "$AAB_NAME" \
+            --arg upload_cert "$expected_upload_cert" \
+            --arg workflow_run_id "$GITHUB_RUN_ID" \
+            --arg workflow_run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '.schema_version == 1 and
+             .repository == $repository and
+             .source_commit == $sha and
+             .environment == "staging" and
+             .application_id == "com.kwabor.android" and
+             .variant == "staging" and
+             .version_name == $version_name and
+             .version_code == $version_code and
+             .aab_file == $aab_name and
+             .mapping_file == "mapping.txt" and
+             .upload_certificate_sha256 == $upload_cert and
+             .workflow_run_id == $workflow_run_id and
+             .workflow_run_attempt == $workflow_run_attempt' \
+            "$provenance" >/dev/null
+          (
+            cd "$release_dir"
+            sha256sum --check --strict KWABOR-SHA256SUMS.txt
+          )
+          actual_aab_sha256="$(sha256sum "$aab" | cut -d' ' -f1)"
+          actual_mapping_sha256="$(sha256sum "$release_dir/mapping.txt" | cut -d' ' -f1)"
+          provenance_aab_sha256="$(jq -r '.aab_sha256' "$provenance")"
+          provenance_mapping_sha256="$(jq -r '.mapping_sha256' "$provenance")"
+          if [[
+            "$provenance_aab_sha256" != "$actual_aab_sha256" ||
+            "$provenance_mapping_sha256" != "$actual_mapping_sha256"
+          ]]; then
+            echo "Artifact hashes do not match their exact-head provenance." >&2
+            exit 1
+          fi
+          jarsigner -verify "$aab" >/dev/null
+          python3 -B tools/prepare_android_release_bundle.py verify "$aab"
+          actual_bundle_cert="$(
+            keytool -printcert -jarfile "$aab" |
+              awk '/SHA256:/{sub(/.*SHA256:[[:space:]]*/, ""); gsub(/:/, ""); print tolower($0); exit}'
+          )"
+          if [[ "$actual_bundle_cert" != "$expected_upload_cert" ]]; then
+            echo "The AAB signer is not the protected Google Play upload certificate." >&2
+            exit 1
+          fi
+          echo "aab=$aab" >>"$GITHUB_OUTPUT"
+          echo "release_name=Kwabor beta $VERSION_NAME ($VERSION_CODE) ${EXPECTED_SHA:0:12}" >>"$GITHUB_OUTPUT"
+
+      - name: Materialize Google Play service-account credential
+        id: play_credentials
+        shell: bash
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.KWABOR_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" ]]; then
+            echo "The play-internal Environment is missing its service-account credential." >&2
+            exit 1
+          fi
+          credential_path="$RUNNER_TEMP/google-play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" | base64 --decode >"$credential_path"
+          chmod 600 "$credential_path"
+          jq -e '
+            .type == "service_account" and
+            (.project_id | type == "string" and length > 0) and
+            (.client_email | type == "string" and endswith(".gserviceaccount.com")) and
+            (.private_key | type == "string" and startswith("-----BEGIN PRIVATE KEY-----"))
+          ' "$credential_path" >/dev/null
+          echo "path=$credential_path" >>"$GITHUB_OUTPUT"
+
+      - name: Publish to closed Google Play Internal track
+        uses: r0adkll/upload-google-play@7f5b759879c088a86faf85d18779f7f14e79a086 # v1.1.4
+        with:
+          serviceAccountJson: ${{ steps.play_credentials.outputs.path }}
+          packageName: com.kwabor.android
+          releaseFiles: ${{ steps.verify_artifact.outputs.aab }}
+          mappingFile: release/android/mapping.txt
+          tracks: internal
+          status: completed
+          releaseName: ${{ steps.verify_artifact.outputs.release_name }}
+
+      - name: Record publication evidence
+        shell: bash
+        run: |
+          {
+            echo "### Google Play Internal publication"
+            echo "- Exact head: \`$EXPECTED_SHA\`"
+            echo "- Version: \`$VERSION_NAME ($VERSION_CODE)\`"
+            echo "- Track: \`internal\`"
+            echo "- Build artifact: \`${{ needs.build.outputs.artifact_name }}\`"
+            echo "- Workflow run: \`$GITHUB_RUN_ID\` attempt \`$GITHUB_RUN_ATTEMPT\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Remove Google Play credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/google-play-service-account.json"

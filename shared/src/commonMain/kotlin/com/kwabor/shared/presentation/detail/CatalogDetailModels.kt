@@ -59,6 +59,7 @@ data class CatalogDetailUiModel(
     val contact: CatalogDetailContactUiModel?,
     val tags: List<String>,
     val content: CatalogDetailContentUiModel,
+    val isDemoContent: Boolean = false,
 )
 
 data class CatalogDetailMediaUiModel(

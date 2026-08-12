@@ -129,6 +129,38 @@ jobs:
       - name: Verify brand asset integrity
         run: python3 tools/verify-brand-assets.py
 
+      - name: Verify closed-beta catalog sources and media
+        run: |
+          python3 -m pip install --disable-pip-version-check --requirement tools/requirements-demo-media.txt
+          python3 -B -m py_compile \
+            tools/build-demo-catalog-contact-sheets.py \
+            tools/build-demo-catalog-manifest.py \
+            tools/compile-demo-catalog-seed.py \
+            tools/ios-closed-beta-release.py \
+            tools/prepare_android_release_bundle.py \
+            tools/publish-demo-catalog-storage.py \
+            tools/run-demo-catalog-database.py \
+            tools/verify-demo-catalog.py
+          python3 -B -m unittest \
+            tools.test_compile_demo_catalog_seed \
+            tools.test_android_release_workflow \
+            tools.test_ios_closed_beta_release \
+            tools.test_prepare_android_release_bundle \
+            tools.test_publish_demo_catalog_storage \
+            tools.test_run_demo_catalog_database
+          python3 -B tools/verify-demo-catalog.py --require-media
+          python3 -B tools/build-demo-catalog-manifest.py --check
+          python3 -B tools/compile-demo-catalog-seed.py --check
+          python3 -B tools/build-demo-catalog-contact-sheets.py
+
+      - name: Archive closed-beta visual review sheets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-closed-beta-contact-sheets-${{ github.sha }}
+          path: build/demo-catalog-contact-sheets/*.jpg
+          if-no-files-found: error
+          retention-days: 30
+
   gradle_check:
     name: Gradle quality
     runs-on: ubuntu-24.04
@@ -187,6 +219,7 @@ jobs:
           python3 tools/test-event-details-concurrency.py
           python3 tools/test-search-history-concurrency.py
           python3 tools/test-favorites-concurrency.py
+          python3 tools/test-demo-catalog-seed.py
 
       - name: Enforce security advisors and inspect performance
         run: |

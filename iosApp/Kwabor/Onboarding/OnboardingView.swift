@@ -119,6 +119,17 @@ struct OnboardingView: View {
         } message: {
             Text(coordinator.promoterActivationErrorMessage ?? coordinator.strings.authPromoterInviteInvalid)
         }
+        .alert(
+            coordinator.bridge.appName(),
+            isPresented: Binding(
+                get: { coordinator.rootNavigationNotice != nil },
+                set: { if !$0 { coordinator.dismissRootNavigationNotice() } }
+            )
+        ) {
+            Button(coordinator.strings.authConfirm, action: coordinator.dismissRootNavigationNotice)
+        } message: {
+            Text(coordinator.rootNavigationNotice ?? "")
+        }
         .onAppear {
             applyViewerContext(coordinator.exploreViewerID)
         }

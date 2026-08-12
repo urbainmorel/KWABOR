@@ -9,6 +9,14 @@ enum RootDestination: String, CaseIterable, Hashable, Identifiable {
 
     var id: String { rawValue }
 
+    static let closedBetaCases: [RootDestination] = [.home, .profile]
+
+    var isClosedBetaVisible: Bool { Self.closedBetaCases.contains(self) }
+
+    static func visibleCases(closedBetaCatalog: Bool) -> [RootDestination] {
+        closedBetaCatalog ? closedBetaCases : allCases
+    }
+
     var systemImage: String {
         switch self {
         case .home: "safari.fill"

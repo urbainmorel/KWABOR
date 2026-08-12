@@ -3,6 +3,7 @@ package com.kwabor.shared.app
 import com.kwabor.shared.data.auth.authDataModule
 import com.kwabor.shared.data.catalog.catalogDataModule
 import com.kwabor.shared.data.config.KwaborEnvironment
+import com.kwabor.shared.data.config.KwaborEnvironmentTier
 import com.kwabor.shared.data.config.createKwaborEnvironmentOrNull
 import com.kwabor.shared.data.core.coreDataModule
 import com.kwabor.shared.data.explore.exploreDataModule
@@ -33,6 +34,7 @@ import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
 import com.kwabor.shared.presentation.guide.guideDiscoveryPresentationModule
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.interaction.interactionPresentationModule
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import com.kwabor.shared.presentation.search.SearchPresenter
 import com.kwabor.shared.presentation.search.searchPresentationModule
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
@@ -46,6 +48,7 @@ class KwaborCompositionRoot internal constructor(
     private val application: KoinApplication,
     hasAuthentication: Boolean,
     private val hasPersistence: Boolean,
+    val rootNavigationProfile: RootNavigationProfile,
 ) {
     val catalogRepository: CatalogRepository = application.koin.get()
     val clockProvider: ClockProvider = application.koin.get()
@@ -104,7 +107,19 @@ internal fun createKwaborCompositionRootOrNull(
         application = application,
         hasAuthentication = authSessionManager != null,
         hasPersistence = persistenceConfiguration != null,
+        rootNavigationProfile = environment.tier.toRootNavigationProfile(),
     )
+}
+
+internal fun rootNavigationProfileForEnvironmentName(environmentName: String?): RootNavigationProfile =
+    KwaborEnvironmentTier.fromConfiguration(environmentName)?.toRootNavigationProfile()
+        ?: RootNavigationProfile.Full
+
+private fun KwaborEnvironmentTier.toRootNavigationProfile(): RootNavigationProfile = when (this) {
+    KwaborEnvironmentTier.Development,
+    KwaborEnvironmentTier.Production,
+    -> RootNavigationProfile.Full
+    KwaborEnvironmentTier.Staging -> RootNavigationProfile.ClosedBetaCatalog
 }
 
 private fun createRootModule(

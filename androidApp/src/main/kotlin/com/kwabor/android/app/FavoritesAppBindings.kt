@@ -23,6 +23,7 @@ import com.kwabor.android.ui.screens.favorites.FavoritesScreenActions
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
 import com.kwabor.shared.presentation.favorites.FavoritesIntent
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 
 @Composable
@@ -76,6 +77,7 @@ internal fun NavGraphBuilder.favoritesChildRoute(
     strings: KwaborStrings,
     mediaUrlPolicy: ListingMediaUrlPolicy,
     paddingValues: PaddingValues,
+    rootNavigationProfile: RootNavigationProfile,
 ) {
     composable<FavoritesRoute> {
         val state by viewModel.state.collectAsStateWithLifecycle()
@@ -93,6 +95,7 @@ internal fun NavGraphBuilder.favoritesChildRoute(
                 viewModel.screenActions(onBack = { navController.popBackStack() })
             },
             modifier = Modifier.padding(bottom = paddingValues.calculateBottomPadding()),
+            showClosedBetaDemoDisclosure = rootNavigationProfile == RootNavigationProfile.ClosedBetaCatalog,
         )
     }
 }

@@ -2,12 +2,12 @@
 
 ## Phase actuelle
 
-Livraison V1 incrémentale — le raccord mobile Explore v2 est intégré dans `main` et le présent lot
-termine SYNC-001 : outbox Room v4 Like/Favori, drain partagé Android/iOS, RPC account-fenced et
-suppression de compte coordonnée. La PR `#59` est validée exact-head et attend sa revue/fusion. Le
-drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
+Préparation de la V1 bêta fermée catalogue, acceptée le 12 août 2026 dans ADR-0036. Le lot actif
+construit un corpus staging reproductible de 60 fiches complètes et 180 visuels, puis restreint le
+parcours Android/iOS aux capacités réellement livrées `Explorer · Compte`. La cible V1 complète du
+PRD reste post-bêta ; aucune surface différée n'est déclarée terminée.
 
-## Snapshot courant — 10 août 2026
+## Snapshot courant — 12 août 2026
 
 - La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
   Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
@@ -25,10 +25,10 @@ drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
-- La PR `#59` porte SYNC-001 au commit exact `a81ea8f0cc65be8d4e785040b97569999e6f7324`.
-  Le run `31370227545` passe ses 16 jobs : intégrité, Gradle, Supabase/pgTAP et concurrence,
-  Edge Function, Android API 30/31/36, Swift policies, XCFrameworks et Xcode 16.4 simulateur
-  Debug/Staging/Release. La PR est `CLEAN` et reste ouverte jusqu'à revue/fusion.
+- La PR `#59` a intégré SYNC-001. `main` est au commit `0f7850621896e88d5d5738b67c42878de86e46bc`.
+  Le run post-fusion `31378013483` est vert pour intégrité, Gradle, Supabase, l'Edge Function et
+  Xcode simulateur Debug/Staging/Release. Les preuves Android launch non requises par ce delta ont
+  été explicitement ignorées par leur gate de périmètre.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -41,8 +41,9 @@ drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
 - La décision de release reste **no-go** : staging/production, fournisseurs réels, préflight des
   données, corpus, juridique, builds signés, appareils physiques, accessibilité, performance,
   sauvegarde et rollback ne sont pas qualifiés.
-- Le PRD et le DESIGN conservent une V1 complète à cinq racines. La V1 minimale proposée par
-  l'audit n'est ni approuvée ni tracée par ADR ; STATE-001 ne modifie pas ce périmètre.
+- Le PRD et le DESIGN conservent leur cible complète à cinq racines. ADR-0036 accepte un profil de
+  bêta fermé distinct : navigation `Explorer · Compte`, catalogue de 60 fiches et report explicite
+  des surfaces incomplètes. Ce profil ne remplace pas la cible complète.
 - Le socle domaine HISTORY-001 est livré dans le flux coordonné : canonicalisation partagée avec
   Search, scopes invité/compte, préférences, import confirmé, contrats repository et diagnostics
   expurgés. Le cache Search actuel stocke des résultats bornés mais encore aucune requête utilisateur.

@@ -48,3 +48,6 @@ Thumbs.db
 # Python tooling caches
 __pycache__/
 *.py[cod]
+
+# Generated demo-media masters and rejected variants
+tmp/imagegen/

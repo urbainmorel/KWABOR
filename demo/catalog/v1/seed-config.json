@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "v1",
+  "catalogAnchorDate": "2026-08-12",
+  "timeZone": "Africa/Porto-Novo",
+  "mediaRightsApproval": {
+    "status": "approved-by-product-owner",
+    "approvedBy": "Kwabor product owner",
+    "approvedAt": "2026-08-12",
+    "scope": "closed-beta-demo-only"
+  }
+}

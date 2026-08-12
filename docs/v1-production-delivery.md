@@ -2,6 +2,16 @@
 
 Ce document transforme le périmètre V1 du `PRD.md` en séquence de livraison traçable, sans confondre l'existant, la cible et les prérequis externes.
 
+> [!NOTE]
+> [ADR-0036](adr/0036-closed-beta-catalog-delivery-profile.md) définit désormais un profil
+> intermédiaire **accepté** pour tester le produit : une bêta fermée centrée sur le catalogue, avec
+> 60 fiches complètes et une navigation réduite. Ce profil ne remplace ni ce plan de production ni
+> la cible V1 complète du PRD. Les fonctions différées restent dans le backlog et ne sont pas
+> considérées comme livrées.
+
+L'exécution détaillée de ce profil, ses gates et sa stratégie de tests proportionnée sont définies
+dans le [plan V1 bêta fermée](closed-beta-delivery-plan.md).
+
 ## En un coup d'œil
 
 | Élément | Décision |

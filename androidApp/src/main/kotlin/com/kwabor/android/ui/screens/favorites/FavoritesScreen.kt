@@ -67,6 +67,7 @@ internal fun FavoritesScreen(
     mediaUrlPolicy: ListingMediaUrlPolicy,
     actions: FavoritesScreenActions,
     modifier: Modifier = Modifier,
+    showClosedBetaDemoDisclosure: Boolean = false,
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -89,6 +90,9 @@ internal fun FavoritesScreen(
         },
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (showClosedBetaDemoDisclosure) {
+                KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
+            }
             if (state.isOffline) {
                 OfflineBanner(strings = strings)
             }

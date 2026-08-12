@@ -39,6 +39,8 @@ struct ContentView: View {
     let onCatalogDetailDeepLinkAcknowledged: (CatalogDetailDeepLinkDelivery) -> Bool
     @State private var selectedDestination = RootDestination.home
 
+    private var isClosedBetaCatalog: Bool { bridge.isClosedBetaCatalog() }
+
     init(
         bridge: KwaborSharedBridge,
         exploreStore: ExploreStore,
@@ -121,7 +123,7 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { proxy in
             TabView(selection: destinationBinding) {
-                ForEach(RootDestination.allCases) { destination in
+                ForEach(RootDestination.visibleCases(closedBetaCatalog: isClosedBetaCatalog)) { destination in
                     NavigationStack {
                         RootDestinationContent(
                             destination: destination,
@@ -141,6 +143,7 @@ struct ContentView: View {
                             latestAccountSecurityError: latestAccountSecurityError,
                             isSigningOutAccount: isSigningOutAccount,
                             accountSignOutErrorMessage: accountSignOutErrorMessage,
+                            isClosedBetaCatalog: isClosedBetaCatalog,
                             onExploreAuthenticationRequired: onExploreAuthenticationRequired,
                             onListingOpen: catalogDetailStore.open,
                             onSignOut: onSignOut,
@@ -223,6 +226,10 @@ struct ContentView: View {
 
     @discardableResult
     private func selectDestinationIfAllowed(_ destination: RootDestination) -> Bool {
+        guard destinationIsVisible(destination) else {
+            selectedDestination = .home
+            return false
+        }
         guard destination == .home || !isGuestSession else {
             onProtectedDestinationSelected(destination.rawValue)
             return false
@@ -232,9 +239,9 @@ struct ContentView: View {
     }
 
     private func replayPendingDestinationAfterAuthentication() {
-        let rootDestination = rootDeepLinkDelivery.flatMap {
-            RootDestination(rawValue: $0.destinationKey)
-        }
+        let rootDestination = rootDeepLinkDelivery
+            .flatMap { RootDestination(rawValue: $0.destinationKey) }
+            .flatMap { destinationIsVisible($0) ? $0 : nil }
         switch ProtectedDestinationReplayPolicy.action(
             isGuest: isGuestSession,
             hasPendingRootDeepLink: rootDeepLinkDelivery != nil,
@@ -243,8 +250,9 @@ struct ContentView: View {
         ) {
         case let .applyRootDeepLink(discardProtectedDestination):
             guard let rootDeepLinkDelivery else { return }
-            guard let rootDestination else {
+            guard let rootDestination, destinationIsVisible(rootDestination) else {
                 _ = onRootDeepLinkAcknowledged(rootDeepLinkDelivery)
+                selectedDestination = .home
                 return
             }
             guard onRootDeepLinkAcknowledged(rootDeepLinkDelivery) else { return }
@@ -256,8 +264,10 @@ struct ContentView: View {
             guard let rootDeepLinkDelivery else { return }
             _ = onProtectedRootDeepLinkTransferred(rootDeepLinkDelivery)
         case let .select(destinationKey):
-            guard let destination = RootDestination(rawValue: destinationKey) else {
+            guard let destination = RootDestination(rawValue: destinationKey),
+                  destinationIsVisible(destination) else {
                 _ = onPendingProtectedDestinationConsumed(destinationKey)
+                selectedDestination = .home
                 return
             }
             guard onPendingProtectedDestinationConsumed(destinationKey) else { return }
@@ -275,6 +285,10 @@ struct ContentView: View {
         selectedDestination = .home
         catalogDetailStore.open(listingID: delivery.listingID)
         _ = onCatalogDetailDeepLinkAcknowledged(delivery)
+    }
+
+    private func destinationIsVisible(_ destination: RootDestination) -> Bool {
+        !isClosedBetaCatalog || destination.isClosedBetaVisible
     }
 }
 
@@ -306,6 +320,7 @@ private struct RootDestinationContent: View {
     let latestAccountSecurityError: () -> String?
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
+    let isClosedBetaCatalog: Bool
     let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onListingOpen: (String) -> Void
     let onSignOut: () -> Void
@@ -323,7 +338,9 @@ private struct RootDestinationContent: View {
                     searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
                     onListingOpen: onListingOpen,
-                    onAuthenticationRequired: onExploreAuthenticationRequired
+                    onAuthenticationRequired: onExploreAuthenticationRequired,
+                    showsClosedBetaDisclosure: isClosedBetaCatalog,
+                    showsGuideDiscoveryEntry: !isClosedBetaCatalog
                 )
                 .toolbar(.hidden, for: .navigationBar)
             } else if destination == .profile {
@@ -367,7 +384,10 @@ private struct RootDestinationContent: View {
                 email: displayedAccountEmail
             )
 
-            FavoritesEntryLink(store: favoritesStore)
+            FavoritesEntryLink(
+                store: favoritesStore,
+                showsClosedBetaDisclosure: isClosedBetaCatalog
+            )
 
             NavigationLink {
                 AccountSettingsView(

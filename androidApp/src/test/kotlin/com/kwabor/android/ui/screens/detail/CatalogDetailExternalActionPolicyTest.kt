@@ -153,6 +153,27 @@ class CatalogDetailExternalActionPolicyTest {
     }
 
     @Test
+    fun everyDemoContentVariant_blocksAllExternalCtasIncludingDirections() {
+        val demoContents = listOf(placeContent()) +
+            establishmentContents() +
+            eventContent(isEnded = false)
+
+        demoContents.forEach { content ->
+            val actions = detailModel(
+                content = content,
+                directions = validDirections(),
+                contact = validContact(),
+                isDemoContent = true,
+            ).toExternalActionUiModel()
+
+            assertNull(actions.primary)
+            assertNull(actions.secondaryDirections)
+            assertNull(actions.contact)
+            assertNull(actions.menu)
+        }
+    }
+
+    @Test
     fun rejectedAndUnavailableLaunches_shareTheSameGenericErrorContract() {
         assertFalse(DetailExternalActionResult.Opened.shouldShowGenericError)
         assertTrue(DetailExternalActionResult.Rejected.shouldShowGenericError)
@@ -164,6 +185,7 @@ private fun detailModel(
     content: CatalogDetailContentUiModel,
     directions: CatalogDetailDirectionsUiModel? = null,
     contact: CatalogDetailContactUiModel? = null,
+    isDemoContent: Boolean = false,
 ): CatalogDetailUiModel = CatalogDetailUiModel(
     id = "detail-actions",
     title = "Fiche",
@@ -182,6 +204,7 @@ private fun detailModel(
     contact = contact,
     tags = emptyList(),
     content = content,
+    isDemoContent = isDemoContent,
 )
 
 private fun validDirections(): CatalogDetailDirectionsUiModel = CatalogDetailDirectionsUiModel(

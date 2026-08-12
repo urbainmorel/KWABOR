@@ -35,6 +35,14 @@ internal data class CatalogDetailExternalActionUiModel(
 )
 
 internal fun CatalogDetailUiModel.toExternalActionUiModel(): CatalogDetailExternalActionUiModel {
+    if (isDemoContent) {
+        return CatalogDetailExternalActionUiModel(
+            primary = null,
+            secondaryDirections = null,
+            contact = null,
+            menu = null,
+        )
+    }
     val directionsAction = directions?.toActionOrNull()
     val contactActions = content.establishmentContactOrNull(contact)
     val eventContent = content as? CatalogDetailContentUiModel.Event

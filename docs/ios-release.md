@@ -1,6 +1,7 @@
 # Release iOS Kwabor
 
-Ce runbook décrit la fondation de build, de signature et d'archive iOS. L'export IPA et l'envoi TestFlight restent une gate de publication dédiée après validation du compte App Store Connect.
+Ce runbook décrit le flux manuel de bêta fermée iOS : archive Staging signée, export IPA puis upload
+séparé vers un groupe TestFlight interne. Il ne couvre aucune soumission App Store publique.
 
 ## Matrice des configurations
 
@@ -97,7 +98,8 @@ Le propriétaire doit donc :
 2. activer Push Notifications et Sign in with Apple sur cet App ID ;
 3. créer ou régénérer un certificat Apple Distribution et un provisioning profile App Store incluant ces capacités ;
 4. sauvegarder le certificat et sa clé privée hors dépôt ;
-5. renseigner les variables et secrets GitHub de staging puis production.
+5. renseigner les variables et secrets des Environments `staging` et `testflight-internal` pour la
+   bêta ; la future production publique reste un provisioning séparé hors de ce workflow.
 
 Aucun profil, certificat, mot de passe, fichier `.p12` ou `.mobileprovision` n'est versionné.
 
@@ -116,32 +118,58 @@ xcodebuild -project iosApp/Kwabor.xcodeproj -scheme Kwabor -configuration Releas
 
 Ces commandes valident le projet et les ressources ; elles ne produisent pas un artefact distribuable.
 
-## Workflow d'archive signée
+## Workflow d'archive signée et TestFlight interne
 
-Le workflow `iOS archive artifact` s'exécute uniquement depuis `main`, dans le GitHub Environment `staging` ou `production`. Chaque environnement doit contenir :
+Le workflow `iOS closed beta archive and TestFlight` s'exécute uniquement depuis `main`.
+`archive-only` utilise l'Environment `staging` ; `upload-testflight-internal` réaudite `staging` puis
+exige `testflight-internal`. Tous deux doivent interdire le bypass administrateur, n'admettre que les
+branches protégées sans politique personnalisée hybride, exiger un reviewer et empêcher
+l'auto-approbation. L'Environment `staging` contient :
 
 | Nom | Type | Contenu |
 |---|---|---|
 | `KWABOR_SUPABASE_URL` | Variable | URL publique du projet ciblé |
 | `KWABOR_SUPABASE_PUBLISHABLE_KEY` | Variable | clé publishable du projet ciblé |
+| `KWABOR_SUPABASE_PROJECT_REF` | Variable | project ref Supabase staging exact |
+| `KWABOR_PRODUCTION_SUPABASE_PROJECT_REF` | Variable | project ref production distinct, utilisé comme garde négative |
+| `KWABOR_STAGING_PROJECT_REF_SHA256` | Variable | SHA-256 protégé du project ref staging |
 | `KWABOR_FIREBASE_PROJECT_ID` | Variable | project ID Firebase exact du tier |
 | `KWABOR_GOOGLE_IOS_CLIENT_ID` | Variable | client OAuth iOS `*.apps.googleusercontent.com` |
 | `KWABOR_GOOGLE_SERVER_CLIENT_ID` | Variable | client OAuth Web/serveur distinct, configuré dans Supabase |
 | `KWABOR_GOOGLE_REVERSED_CLIENT_ID` | Variable | schéma callback exact dérivé du client iOS |
 | `KWABOR_IOS_DEVELOPMENT_TEAM` | Variable | Team ID Apple sur 10 caractères |
+| `KWABOR_IOS_BUNDLE_ID` | Variable | bundle ID exact `com.kwabor.ios` |
+| `KWABOR_IOS_PROVISIONING_PROFILE_NAME` | Variable | nom exact du profil App Store staging |
+| `KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION` | Variable | déclaration export compliance attendue |
 | `KWABOR_FIREBASE_IOS_CONFIG_BASE64` | Secret | `GoogleService-Info.plist` du tier encodé en Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Secret | certificat + clé privée exportés en `.p12`, encodés Base64 |
 | `KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Secret | mot de passe du `.p12` |
 | `KWABOR_IOS_PROVISIONING_PROFILE_BASE64` | Secret | profil App Store encodé Base64 |
 
-Le workflow :
+L'opération `archive-only` reçoit `expected_sha`, `validated_ci_run_id`, `build_number` et
+`version_name`, puis :
 
-1. valide tier, version, build number, configuration Supabase et cohérence des trois identifiants OAuth Google ;
-2. importe le certificat dans un keychain temporaire ;
-3. vérifie bundle ID, APNs production et Sign in with Apple dans le profil ;
-4. assemble le XCFramework release et archive avec signature manuelle ;
-5. vérifie Info.plist, callback Google, Privacy Manifest, assets, dSYM, signature et entitlements ;
-6. publie uniquement l'archive compressée et son SHA-256 ;
+1. exige le SHA exact de `main` et le run CI réussi explicitement fourni ;
+2. valide Staging, version, build number, Supabase, Firebase et les identifiants OAuth Google ;
+3. importe le certificat dans un keychain temporaire et vérifie le profil ;
+4. assemble le XCFramework release, archive avec signature manuelle et exporte l'IPA interne ;
+5. revérifie Info.plist, callback Google, Privacy Manifest, assets, dSYM, signature et entitlements ;
+6. archive IPA, xcarchive, dSYM, hashes, provenance et reçu GEL ;
 7. supprime keychain et profil du runner, y compris après échec.
 
-L'export App Store, le téléversement TestFlight et le rollout appartiennent à `STORE-IOS-001`. Cette séparation empêche qu'un simple build de fondation publie involontairement une version.
+`upload-testflight-internal` reçoit en plus `archive_run_id`, les notes françaises et la confirmation
+`UPLOAD-TESTFLIGHT-INTERNAL`. Il retélécharge seulement l'artefact immuable du run `archive-only`,
+revérifie SHA, signature, profil et backend Staging, puis utilise les variables App Store Connect
+`KWABOR_ASC_KEY_ID`, `KWABOR_ASC_ISSUER_ID`, `KWABOR_ASC_APP_ID`,
+`KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID` et le secret `KWABOR_ASC_PRIVATE_KEY_BASE64`. Il attend le
+traitement Apple et associe le build uniquement au groupe interne configuré.
+
+Le job d'upload s'exécute sous `testflight-internal` : cet Environment doit donc contenir une copie
+strictement concordante de toutes les variables staging et des trois secrets de signature ci-dessus,
+en plus des quatre variables App Store Connect et de sa clé privée. Le workflow compare de nouveau
+ces valeurs à l'artefact et échoue fermé sur toute divergence. Cette duplication est volontairement
+explicite ; elle ne doit jamais être remplacée par une valeur production ou un secret de dépôt global.
+
+Aucune opération ne soumet le build à l'App Review, n'active un groupe externe ni ne publie une
+version publique. Le traitement TestFlight et l'installation sur appareils réels restent des preuves
+G6 obligatoires.

@@ -1,0 +1,167 @@
+name: Closed beta demo catalog database
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Full commit SHA whose generated catalog is being operated
+        required: true
+        type: string
+      operation:
+        description: Publish, verify, or logically hide the exact demo catalog
+        required: true
+        type: choice
+        options:
+          - publish
+          - verify
+          - rollback
+      rollback_confirmation:
+        description: For rollback only, type HIDE-EXACT-DEMO-CATALOG
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: closed-beta-demo-catalog-staging
+  cancel-in-progress: false
+
+jobs:
+  catalog_database:
+    name: ${{ inputs.operation }} demo catalog on staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: staging
+    env:
+      KWABOR_ENVIRONMENT: staging
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+      KWABOR_DEMO_MEDIA_BASE_URL: ${{ vars.KWABOR_DEMO_MEDIA_BASE_URL }}
+
+    steps:
+      - name: Validate exact-head input
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_sha must be a full lowercase commit SHA." >&2
+            exit 1
+          fi
+          if [[ "${{ github.repository }}" != "urbainmorel/KWABOR" ]]; then
+            echo "Demo catalog database operations are restricted to the canonical repository." >&2
+            exit 1
+          fi
+          if [[ "${{ github.ref }}" != "refs/heads/main" || "$EXPECTED_SHA" != "${{ github.sha }}" ]]; then
+            echo "Demo catalog database operations may only target the selected main exact-head." >&2
+            exit 1
+          fi
+
+      - name: Require protected staging Environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment_json="$(gh api "/repos/$GITHUB_REPOSITORY/environments/staging")"
+          if ! jq -e '
+            .name == "staging" and
+            .can_admins_bypass == false and
+            .deployment_branch_policy.protected_branches == true and
+            .deployment_branch_policy.custom_branch_policies == false and
+            any(
+              .protection_rules[];
+              .type == "required_reviewers" and
+              .prevent_self_review == true and
+              (.reviewers | length) > 0
+            )
+          ' <<<"$environment_json" >/dev/null; then
+            echo "The staging Environment is not protected for a demo database operation." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+
+      - name: Verify checkout and deterministic inputs
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python3 -B -m py_compile tools/run-demo-catalog-database.py
+          python3 -B -m unittest \
+            tools.test_compile_demo_catalog_seed \
+            tools.test_run_demo_catalog_database
+          python3 -B tools/verify-demo-catalog.py --require-media
+          python3 -B tools/build-demo-catalog-manifest.py --check
+          python3 -B tools/compile-demo-catalog-seed.py --check
+
+      - name: Guard protected staging authority
+        shell: bash
+        env:
+          KWABOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.KWABOR_SUPABASE_SERVICE_ROLE_KEY }}
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          for value in \
+            "$KWABOR_SUPABASE_URL" \
+            "$KWABOR_SUPABASE_PROJECT_REF" \
+            "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" \
+            "$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            "$KWABOR_DEMO_MEDIA_BASE_URL" \
+            "$KWABOR_SUPABASE_SERVICE_ROLE_KEY" \
+            "$KWABOR_STAGING_DATABASE_URL"; do
+            if [[ -z "$value" ]]; then
+              echo "The staging Environment is missing required catalog authority." >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$KWABOR_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ || ! "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ ]]; then
+            echo "The staging or production project ref is invalid." >&2
+            exit 1
+          fi
+          if [[ "$KWABOR_SUPABASE_PROJECT_REF" == "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" ]]; then
+            echo "Staging and production project refs must be distinct." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_STAGING_PROJECT_REF_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "The protected staging project-ref digest is invalid." >&2
+            exit 1
+          fi
+          actual_ref_digest="$(printf '%s' "$KWABOR_SUPABASE_PROJECT_REF" | sha256sum | cut -d' ' -f1)"
+          if [[ "$actual_ref_digest" != "$KWABOR_STAGING_PROJECT_REF_SHA256" ]]; then
+            echo "The staging project ref does not match its protected identity digest." >&2
+            exit 1
+          fi
+          echo "::add-mask::$KWABOR_SUPABASE_SERVICE_ROLE_KEY"
+          echo "::add-mask::$KWABOR_STAGING_DATABASE_URL"
+
+      - name: Verify all immutable media before database operation
+        if: inputs.operation != 'rollback'
+        env:
+          KWABOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.KWABOR_SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 -B tools/publish-demo-catalog-storage.py verify
+
+      - name: Require rollback confirmation
+        if: inputs.operation == 'rollback' && inputs.rollback_confirmation != 'HIDE-EXACT-DEMO-CATALOG'
+        run: |
+          echo "Rollback requires the exact confirmation phrase." >&2
+          exit 1
+
+      - name: Execute exact catalog database operation
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+        run: |
+          args=("${{ inputs.operation }}")
+          if [[ "${{ inputs.operation }}" == "rollback" ]]; then
+            args+=(--confirm-rollback HIDE-EXACT-DEMO-CATALOG)
+          fi
+          python3 -B tools/run-demo-catalog-database.py "${args[@]}"

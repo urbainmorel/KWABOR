@@ -349,6 +349,22 @@ restent des gates hébergées avant activation de `account-delete`.
 
 ## Intégrité, marque et média
 
+### Catalogue de la bêta fermée
+
+Le lot ADR-0036 ajoute une porte distincte du seed canonique. Elle devra prouver exactement
+60 fiches publiées — 15 lieux, 15 événements, 15 hôtels, 15 restaurants — et 20 fiches pour chacune
+des villes Cotonou, Ouidah et Porto-Novo. Chaque fiche doit posséder trois JPEG 960 × 1280 ordonnés,
+une seule couverture, un alt unique, un SHA-256 conforme et aucune métadonnée EXIF/GPS.
+
+Les tests dynamiques Supabase et Storage s'exécutent uniquement dans GitHub Actions. Le harness
+versionné vérifie l'idempotence exacte du second import, les RPC Explore/Detail sous rôles
+`anon`/`authenticated`, la conservation d'un Favori et d'un Like visant le corpus, puis le rollback
+logique conservant 60 parents, 180 médias, tous les enfants typés et les données hors manifeste. Les
+pgTAP existants couvrent en profondeur les contrats RPC/détails/RLS et les refus Storage client. Les
+workflows de publication restent inutilisables tant que le GitHub Environment `staging` protégé,
+ses variables, ses secrets et son reviewer ne sont pas provisionnés. Voir le
+[runbook](runbooks/closed-beta-catalog-release.md).
+
 ```powershell
 python -B -m unittest tools/test_verify_repository_integrity.py
 python -B tools/verify-repository-integrity.py

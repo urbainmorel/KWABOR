@@ -1,24 +1,28 @@
 # Déploiement et distribution
 
-> KWABOR produit des artefacts Android/iOS par workflows manuels contrôlés. Le dépôt ne publie pas
-> automatiquement dans Google Play, App Store Connect ou un projet Supabase distant.
+> KWABOR produit des artefacts Android/iOS par workflows manuels contrôlés. Android peut publier
+> explicitement un AAB staging dans Google Play Internal après une seconde approbation protégée ;
+> aucun workflow ne réalise de rollout public ni de déploiement Supabase implicite.
 
 ## État de livraison
 
 | Cible | Automatisation présente | Preuve encore requise |
 | --- | --- | --- |
-| Android staging | APK minifié par workflow manuel | Projet fournisseur, appareil et revue interne |
-| Android production | AAB signé, mapping R8 et SHA-256 | Play App Signing, fiche Store et rollout |
-| iOS staging/production | `.xcarchive.zip` signé et checksum | Export IPA, upload TestFlight et App Review |
+| Android bêta staging | AAB signé, mapping, SHA-256 et provenance ; job Play Internal séparé | Environments protégés, traitement Play et appareils réels |
+| Android public production | Hors workflow G6, aucune publication automatisée | Requalification complète après la bêta fermée |
+| iOS bêta staging | archive signée, IPA, dSYM, SHA-256 et provenance ; upload TestFlight interne séparé | Environments protégés, traitement TestFlight et appareils réels |
+| iOS public production | Hors workflow G6, aucune soumission App Store automatisée | Requalification complète après la bêta fermée |
 | Supabase | Migrations/tests versionnés | Projets staging/production, sauvegarde et déploiement contrôlé |
 
-La décision de release V1 reste **no-go** tant que les gates du
-[plan de livraison](v1-production-delivery.md) ne sont pas satisfaites.
+La bêta fermée reste **no-go** tant que G6 et G7 du
+[plan de bêta](closed-beta-delivery-plan.md) ne sont pas satisfaites. La release V1 publique reste
+séparément soumise au [plan de livraison production](v1-production-delivery.md).
 
 ## Préconditions communes
 
 - commit candidat sur `main`, relu et CI verte ;
-- environnement `staging` ou `production` protégé et complet ;
+- Environments `staging`, `play-internal` ou `production` requis par la plateforme, protégés et
+  complets ;
 - migrations testées sur une stack isolée, puis préflight sur toute base persistante ;
 - version Android/iOS cohérente et supérieure à la dernière version distribuée ;
 - CGU, confidentialité, licences média/UGC et formulaires Stores validés ;
@@ -26,33 +30,44 @@ La décision de release V1 reste **no-go** tant que les gates du
 
 ## Flux Android
 
-Le workflow `.github/workflows/android-release.yml` accepte `staging` ou `production` et uniquement
-depuis `main`.
+Le workflow `.github/workflows/android-release.yml` est staging-only, manuel et limité au dépôt
+canonique sur `main`. Il sépare la construction B7.02 de la publication B7.04 :
 
-1. Choisir le tier et fournir `version_code`/`version_name`.
-2. Laisser le workflow vérifier Supabase, OAuth, Firebase et, en production, la clé d'upload.
-3. Exécuter la gate `check` puis construire l'APK staging ou l'AAB production.
-4. Télécharger l'artefact, `mapping.txt` et `KWABOR-SHA256SUMS.txt`.
-5. Vérifier le hash et archiver le mapping avec la release.
-6. Distribuer l'APK staging uniquement par le canal interne approuvé ; ne jamais le téléverser sur
-   Play, car il utilise le certificat debug.
-7. Pour la production seulement, téléverser manuellement l'AAB dans la piste Play prévue, puis
-   suivre le rollout approuvé.
+1. Fournir `expected_sha`, `version_code` et `version_name`. Laisser
+   `publish_to_play_internal=false` pour produire uniquement l'archive.
+2. Le job `build` exige que `expected_sha` soit le SHA sélectionné de `main` et qu'un run `CI`
+   déclenché par `push` soit vert sur ce SHA exact.
+3. Après approbation de l'Environment `staging`, vérifier que seules les branches protégées sont
+   admises, sans politique personnalisée hybride, avec reviewer sans auto-approbation et
+   interdiction du bypass administrateur.
+4. Vérifier les identités Supabase/Firebase staging, construire `bundleStaging`, retirer sa signature
+   debug puis signer l'AAB avec la clé d'upload protégée.
+5. Archiver l'AAB, `mapping.txt`, `KWABOR-SHA256SUMS.txt` et
+   `KWABOR-ANDROID-PROVENANCE.json`, avec URL et digest Actions.
+6. Si une publication a été demandée, attendre l'approbation distincte de l'Environment
+   `play-internal` et la confirmation `PUBLISH-EXACT-AAB-TO-PLAY-INTERNAL`.
+7. Le job `publish` retélécharge l'artefact du même run, revérifie provenance, hashes et signature,
+   puis téléverse exclusivement vers `tracks: internal`. Il n'accède à aucun backend production et
+   ne peut effectuer aucun rollout public.
+8. Vérifier ensuite le traitement Play, l'installation depuis la liste fermée et consigner les
+   preuves dans le GEL ; un upload accepté ne ferme pas G6 à lui seul.
 
 Procédure détaillée : [android-release.md](android-release.md).
 
 ## Flux iOS
 
-Le workflow `.github/workflows/ios-archive.yml` accepte `staging` ou `production` depuis `main`.
+Le workflow `.github/workflows/ios-archive.yml` est staging-only, manuel et sépare deux opérations.
 
-1. Fournir version, build number, variables fournisseur et secrets de signature du tier.
-2. Le workflow vérifie bundle ID, OAuth, Firebase, APNs et Sign in with Apple.
-3. Construire le XCFramework release puis archiver avec le profil manuel injecté.
-4. Vérifier signature, entitlements, Privacy Manifest, dSYM et checksum.
-5. Télécharger et vérifier le `.xcarchive.zip` signé. Il ne peut pas être envoyé directement à
-   TestFlight ou à l'App Store.
-6. Implémenter et qualifier l'export App Store/IPA suivi de l'upload dans `STORE-IOS-001` avant toute
-   distribution TestFlight ; cette gate n'existe pas encore dans le workflow.
+1. `archive-only` exige `expected_sha`, un run CI `main` exact et l'Environment `staging` protégé.
+2. Il vérifie les identités staging, construit le XCFramework release, archive avec signature
+   manuelle, exporte l'IPA interne et produit xcarchive, dSYM, hashes et provenance.
+3. `upload-testflight-internal` exige le `archive_run_id` de cette archive, le même
+   `validated_ci_run_id`, une confirmation explicite et l'Environment `testflight-internal` protégé.
+4. Le job retélécharge l'artefact immuable, revérifie SHA, signature, profil et backend staging,
+   téléverse vers App Store Connect, attend le traitement puis l'associe uniquement au groupe de
+   testeurs internes autorisé.
+5. Aucun chemin de ce workflow ne soumet l'application à l'App Review ni ne publie une version
+   publique.
 
 Procédure détaillée : [ios-release.md](ios-release.md).
 

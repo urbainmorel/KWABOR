@@ -2,6 +2,7 @@ package com.kwabor.shared.bridge
 
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -113,5 +114,31 @@ class KwaborSharedBridgeTest {
         )
         assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/$listingId?source=share"))
         assertNull(bridge.catalogDetailListingIdForDeepLink("kwabor://listing/not-a-uuid"))
+    }
+
+    @Test
+    fun appliesClosedBetaRootNavigationWithoutChangingTheFullProfile() {
+        val fullBridge = KwaborSharedBridge(
+            hasCatalogConfiguration = true,
+            rootNavigationProfile = RootNavigationProfile.Full,
+        )
+        val betaBridge = KwaborSharedBridge(
+            hasCatalogConfiguration = true,
+            rootNavigationProfile = RootNavigationProfile.ClosedBetaCatalog,
+        )
+
+        assertEquals("social", fullBridge.rootDestinationKeyForDeepLink("kwabor://app/social"))
+        assertNull(betaBridge.rootDestinationKeyForDeepLink("kwabor://app/social"))
+        assertTrue(betaBridge.isUnavailableRootDeepLink("kwabor://app/social"))
+        assertFalse(fullBridge.isClosedBetaCatalog())
+        assertTrue(betaBridge.isClosedBetaCatalog())
+        assertEquals("Accueil", fullBridge.homeLabel())
+        assertEquals("Profil", fullBridge.profileLabel())
+        assertEquals("Explorer", betaBridge.homeLabel())
+        assertEquals("Compte", betaBridge.profileLabel())
+        assertEquals(
+            "Cette section n’est pas disponible dans cette version.",
+            betaBridge.rootDestinationUnavailableMessage(),
+        )
     }
 }

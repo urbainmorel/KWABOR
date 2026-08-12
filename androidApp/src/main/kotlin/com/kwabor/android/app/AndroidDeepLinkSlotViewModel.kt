@@ -100,6 +100,7 @@ private fun String.acceptedNavigationDeepLinkOrNull(): AndroidNavigationDeepLink
     return when (val parsed = AndroidNavigationDeepLinkParser.parse(this)) {
         is AndroidNavigationDeepLink.CatalogDetail,
         is AndroidNavigationDeepLink.Root,
+        AndroidNavigationDeepLink.UnavailableRoot,
         -> parsed
         AndroidNavigationDeepLink.Rejected -> null
     }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import com.kwabor.android.R
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.media.ListingMediaUrlPolicy
+import com.kwabor.android.ui.components.KwaborInlineBanner
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.detail.CatalogDetailContentUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
@@ -102,6 +103,11 @@ private fun LazyListScope.detailMediaItems(data: DetailContentData, resources: C
 }
 
 private fun LazyListScope.detailSummaryItems(data: DetailContentData, resources: CatalogDetailContentResources) {
+    if (data.state.model.isDemoContent) {
+        item {
+            KwaborInlineBanner(text = resources.strings.closedBetaDemoDisclosure)
+        }
+    }
     item {
         DetailMetrics(
             metrics = data.state.model.metrics,

@@ -91,6 +91,7 @@ struct CatalogDetailSheet: View {
 
     @MainActor
     private func openExternal(_ target: CatalogDetailExternalURLTarget) {
+        guard !currentContentIsDemo else { return }
         launchExternal(target) {
             externalActionFailed = true
         }
@@ -98,9 +99,14 @@ struct CatalogDetailSheet: View {
 
     @MainActor
     private func openContactExternal(_ target: CatalogDetailExternalURLTarget) {
+        guard !currentContentIsDemo else { return }
         launchExternal(target) {
             contactExternalActionFailed = true
         }
+    }
+
+    private var currentContentIsDemo: Bool {
+        (store.state as? CatalogDetailUiStateContent)?.model.isDemoContent == true
     }
 
     @MainActor
@@ -251,6 +257,10 @@ private struct CatalogDetailContentView: View {
                     strings: store.strings.detail
                 )
                 .detailHorizontalPadding()
+                if state.model.isDemoContent {
+                    CatalogDetailDemoDisclosure(text: store.strings.closedBetaDemoDisclosure)
+                        .detailHorizontalPadding()
+                }
                 CatalogDetailDescriptionSection(
                     description: state.model.description,
                     expanded: state.isDescriptionExpanded,
@@ -270,6 +280,7 @@ private struct CatalogDetailContentView: View {
                     content: state.model.content,
                     strings: store.strings.detail,
                     commonStrings: store.strings,
+                    allowsExternalActions: !state.model.isDemoContent,
                     onOpenExternal: onOpenExternal
                 )
                 .detailHorizontalPadding()
@@ -329,6 +340,7 @@ private struct CatalogDetailContentView: View {
     }
 
     private var primaryAction: CatalogDetailPrimaryAction? {
+        guard !state.model.isDemoContent else { return nil }
         let content = state.model.content
         if content is CatalogDetailContentUiModelPlace,
            let directions = state.model.directions,
@@ -352,12 +364,28 @@ private struct CatalogDetailContentView: View {
     }
 
     private var secondaryDirections: CatalogDetailDirectionsUiModel? {
-        guard !(state.model.content is CatalogDetailContentUiModelPlace),
+        guard !state.model.isDemoContent,
+              !(state.model.content is CatalogDetailContentUiModelPlace),
               let directions = state.model.directions,
               CatalogDetailExternalURLPolicy.url(for: directions.target) != nil else {
             return nil
         }
         return directions
+    }
+}
+
+private struct CatalogDetailDemoDisclosure: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(KwaborDesignTokens.Spacing.md)
+            .background(KwaborDesignTokens.ColorToken.ink100)
+            .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.card))
+            .accessibilityLabel(text)
     }
 }
 

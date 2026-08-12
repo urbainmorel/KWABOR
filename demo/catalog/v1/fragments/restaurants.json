@@ -1,0 +1,2300 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000515",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Table Locale Cotonou Démo",
+    "slug": "table-locale-cotonou-demo",
+    "description": "Table Locale Cotonou Démo est un restaurant imaginaire de Cotonou. Cette fiche illustre une cuisine béninoise familiale présentée dans un cadre urbain chaleureux. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Table Démo",
+    "address": "Adresse fictive bêta, voie Table Démo 01, Cotonou",
+    "lat": 6.3586,
+    "lng": 2.4041,
+    "priceFromXof": 5000,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "ouest-africaine"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Table Locale Cotonou Démo à Cotonou, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Table Locale Cotonou Démo, restaurant entièrement fictif à Cotonou : petit restaurant fictif aux murs ocre, terrasse ombragée et plantes tropicales. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Table Locale Cotonou Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Table Locale Cotonou Démo à Cotonou : assiette soignée de pâte de maïs, sauce tomate épicée et légumes locaux stylisés. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Table Locale Cotonou Démo à Cotonou, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Table Locale Cotonou Démo à Cotonou : salle lumineuse en bois et fibres naturelles, tables dressées sans marque. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000501",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Jardin des Saveurs Démo",
+    "slug": "jardin-des-saveurs-demo-cotonou",
+    "description": "Jardin des Saveurs Démo est un restaurant imaginaire de Cotonou. Cette fiche illustre des produits végétaux tropicaux et des recettes contemporaines d’inspiration béninoise. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Saveurs Démo",
+    "address": "Adresse fictive bêta, allée Saveurs Démo 02, Cotonou",
+    "lat": 6.3744,
+    "lng": 2.3868,
+    "priceFromXof": 8500,
+    "priceUnit": "par_personne",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise contemporaine",
+        "végétarienne"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Jardin des Saveurs Démo à Cotonou, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Jardin des Saveurs Démo, restaurant entièrement fictif à Cotonou : cour-jardin fictive avec façade ivoire, pergola en bois et feuillage luxuriant. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Jardin des Saveurs Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Jardin des Saveurs Démo à Cotonou : composition colorée de légumes tropicaux rôtis, igname et sauce verte dans une céramique artisanale. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Jardin des Saveurs Démo à Cotonou, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Jardin des Saveurs Démo à Cotonou : terrasse de jardin élégante, bois clair, rotin et lumière filtrée. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000502",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Marmite du Littoral Démo",
+    "slug": "marmite-du-littoral-demo-cotonou",
+    "description": "Marmite du Littoral Démo est un restaurant imaginaire de Cotonou. Cette fiche illustre des poissons, céréales et condiments du littoral dans une interprétation entièrement imaginaire. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Littoral Démo",
+    "address": "Adresse fictive bêta, passage Littoral Démo 03, Cotonou",
+    "lat": 6.3498,
+    "lng": 2.4215,
+    "priceFromXof": 6500,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "poissons"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Marmite du Littoral Démo à Cotonou, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Marmite du Littoral Démo, restaurant entièrement fictif à Cotonou : restaurant fictif bleu grisé et sable avec auvent profond et jardinières tropicales. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Marmite du Littoral Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Marmite du Littoral Démo à Cotonou : poisson grillé générique, riz parfumé et condiments colorés sur une table en bois. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Marmite du Littoral Démo à Cotonou, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Marmite du Littoral Démo à Cotonou : salle aérée bleu doux, suspensions en fibres et vaisselle neutre. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000503",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Patio des Épices Démo",
+    "slug": "patio-des-epices-demo-cotonou",
+    "description": "Patio des Épices Démo est un restaurant imaginaire de Cotonou. Cette fiche illustre un menu de dégustation fictif autour d’épices douces, de céréales et de sauces locales. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Épices Démo",
+    "address": "Adresse fictive bêta, cour Épices Démo 04, Cotonou",
+    "lat": 6.3826,
+    "lng": 2.4093,
+    "priceFromXof": 12000,
+    "priceUnit": "par_personne",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1410,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1410,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise créative",
+        "africaine contemporaine"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Patio des Épices Démo à Cotonou, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Patio des Épices Démo, restaurant entièrement fictif à Cotonou : patio contemporain fictif couleur terre cuite avec claustras et herbes aromatiques. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Patio des Épices Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Patio des Épices Démo à Cotonou : plat de dégustation moderne aux céréales, légumes et sauces épicées disposées avec précision. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Patio des Épices Démo à Cotonou, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Patio des Épices Démo à Cotonou : patio raffiné terracotta et indigo, tables en bois sombre et lumière chaude. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000504",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Bol de la Lagune Démo",
+    "slug": "bol-de-la-lagune-demo-cotonou",
+    "description": "Bol de la Lagune Démo est un restaurant imaginaire de Cotonou. Cette fiche illustre des bols généreux de riz, légumineuses et sauces inspirés du quotidien côtier. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Lagune Démo",
+    "address": "Adresse fictive bêta, promenade Lagune Démo 05, Cotonou",
+    "lat": 6.3931,
+    "lng": 2.4327,
+    "priceFromXof": 4000,
+    "priceUnit": "par_personne",
+    "priceTier": 1,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1020,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1020,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1020,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1020,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1080,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 1080,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 450,
+            "closes_minute": 1020,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "cantine"
+      ],
+      "meals": [
+        "petit-déjeuner",
+        "déjeuner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Bol de la Lagune Démo à Cotonou, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Bol de la Lagune Démo, restaurant entièrement fictif à Cotonou : cantine fictive propre et colorée, façade vert sauge et comptoir ouvert. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Bol de la Lagune Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Bol de la Lagune Démo à Cotonou : grand bol de riz, haricots, légumes croquants et sauce rouge, présentation appétissante. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Bol de la Lagune Démo à Cotonou, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Bol de la Lagune Démo à Cotonou : petite salle conviviale vert sauge et bois clair, tables simples parfaitement rangées. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000505",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Table des Palmes Démo",
+    "slug": "table-des-palmes-demo-ouidah",
+    "description": "Table des Palmes Démo est un restaurant imaginaire de Ouidah. Cette fiche illustre des recettes béninoises servies dans une cour tropicale imaginaire sous les palmes. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Palmes Démo",
+    "address": "Adresse fictive bêta, sentier Palmes Démo 06, Ouidah",
+    "lat": 6.3612,
+    "lng": 2.0774,
+    "priceFromXof": 7500,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "grillades"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Table des Palmes Démo à Ouidah, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Table des Palmes Démo, restaurant entièrement fictif à Ouidah : restaurant fictif à pavillon sable sous des palmes, terrasse ombragée et sol ocre. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Table des Palmes Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Table des Palmes Démo à Ouidah : assiette béninoise stylisée avec igname, légumes braisés et sauce parfumée. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Table des Palmes Démo à Ouidah, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Table des Palmes Démo à Ouidah : terrasse sous palmes, mobilier tressé, nappes écrues et lumière naturelle. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000506",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Marmite de Sable Démo",
+    "slug": "marmite-de-sable-demo-ouidah",
+    "description": "Marmite de Sable Démo est un restaurant imaginaire de Ouidah. Cette fiche illustre une cuisine familiale fictive de marmites, céréales et légumes dans un décor côtier sobre. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Sable Démo",
+    "address": "Adresse fictive bêta, piste Sable Démo 07, Ouidah",
+    "lat": 6.3478,
+    "lng": 2.0919,
+    "priceFromXof": 4500,
+    "priceUnit": "par_personne",
+    "priceTier": 1,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "familiale"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Marmite de Sable Démo à Ouidah, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Marmite de Sable Démo, restaurant entièrement fictif à Ouidah : petite adresse fictive beige sable avec toit léger, banc maçonné et plantes en pots. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Marmite de Sable Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Marmite de Sable Démo à Ouidah : marmite en terre contenant un ragoût de légumes et viande générique, servie avec pâte de maïs. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Marmite de Sable Démo à Ouidah, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Marmite de Sable Démo à Ouidah : salle simple couleur sable, étagères de céramiques neutres et tables de bois. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000507",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Cour des Aromates Démo",
+    "slug": "cour-des-aromates-demo-ouidah",
+    "description": "Cour des Aromates Démo est un restaurant imaginaire de Ouidah. Cette fiche illustre une carte contemporaine fictive valorisant herbes aromatiques, poissons et légumes tropicaux. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Aromates Démo",
+    "address": "Adresse fictive bêta, cour Aromates Démo 08, Ouidah",
+    "lat": 6.3779,
+    "lng": 2.1056,
+    "priceFromXof": 10000,
+    "priceUnit": "par_personne",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1410,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1410,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise contemporaine",
+        "poissons"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Cour des Aromates Démo à Ouidah, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Cour des Aromates Démo, restaurant entièrement fictif à Ouidah : cour fictive ocre rouge avec jardinières d’herbes, arcades sobres et tables ombragées. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Cour des Aromates Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Cour des Aromates Démo à Ouidah : filet de poisson générique, purée d’igname et herbes fraîches dans une assiette contemporaine. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Cour des Aromates Démo à Ouidah, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Cour des Aromates Démo à Ouidah : cour élégante aux murs ocre, plantes aromatiques et tables en bois foncé. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000508",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Assiette de la Lagune Démo",
+    "slug": "assiette-de-la-lagune-demo-ouidah",
+    "description": "Assiette de la Lagune Démo est un restaurant imaginaire de Ouidah. Cette fiche illustre des assiettes de produits aquatiques et végétaux dans une atmosphère lagunaire inventée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Eau Démo",
+    "address": "Adresse fictive bêta, voie Eau Démo 09, Ouidah",
+    "lat": 6.3693,
+    "lng": 2.0598,
+    "priceFromXof": 7000,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "fruits de mer"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Assiette de la Lagune Démo à Ouidah, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Assiette de la Lagune Démo, restaurant entièrement fictif à Ouidah : restaurant fictif bleu profond et bois, terrasse tournée vers un jardin d’eau stylisé. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Assiette de la Lagune Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Assiette de la Lagune Démo à Ouidah : crevettes génériques sautées, riz aux herbes et légumes tropicaux dans une assiette bleue. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Assiette de la Lagune Démo à Ouidah, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Assiette de la Lagune Démo à Ouidah : salle bleu nuit et fibres naturelles avec ouverture sur un jardin humide imaginaire. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000509",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Cuisine des Embruns Démo",
+    "slug": "cuisine-des-embruns-demo-ouidah",
+    "description": "Cuisine des Embruns Démo est un restaurant imaginaire de Ouidah. Cette fiche illustre une cuisine côtière imaginaire aux saveurs acidulées, grillées et légèrement épicées. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Embruns Démo",
+    "address": "Adresse fictive bêta, allée Embruns Démo 10, Ouidah",
+    "lat": 6.3409,
+    "lng": 2.0752,
+    "priceFromXof": 5500,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1350,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1290,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "côtière béninoise",
+        "grillades"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Cuisine des Embruns Démo à Ouidah, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Cuisine des Embruns Démo, restaurant entièrement fictif à Ouidah : maison-restauration fictive blanche et bleu grisé avec terrasse ventilée et palmes. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Cuisine des Embruns Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Cuisine des Embruns Démo à Ouidah : poisson grillé générique accompagné d’attiéké revisité, crudités et citron vert. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Cuisine des Embruns Démo à Ouidah, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Cuisine des Embruns Démo à Ouidah : terrasse blanche et bleue, mobilier en bois patiné générique et lumière côtière. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000510",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Table des Arcades Démo",
+    "slug": "table-des-arcades-demo-porto-novo",
+    "description": "Table des Arcades Démo est un restaurant imaginaire de Porto-Novo. Cette fiche illustre des plats béninois revisités dans un décor imaginaire d’arcades contemporaines. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Arcades Démo",
+    "address": "Adresse fictive bêta, passage Arcades Démo 11, Porto-Novo",
+    "lat": 6.4937,
+    "lng": 2.6228,
+    "priceFromXof": 8000,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise contemporaine",
+        "ouest-africaine"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Table des Arcades Démo à Porto-Novo, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Table des Arcades Démo, restaurant entièrement fictif à Porto-Novo : restaurant fictif à arcades ivoire, cour plantée et portes bleu indigo. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Table des Arcades Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Table des Arcades Démo à Porto-Novo : plat contemporain de maïs, légumes rôtis et sauce béninoise dressé avec élégance. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Table des Arcades Démo à Porto-Novo, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Table des Arcades Démo à Porto-Novo : salle sous arcades modernes, murs ivoire, accents indigo et tables en bois. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000511",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Marmite de l’Ouémé Démo",
+    "slug": "marmite-de-l-oueme-demo-porto-novo",
+    "description": "Marmite de l’Ouémé Démo est un restaurant imaginaire de Porto-Novo. Cette fiche illustre des recettes mijotées fictives inspirées des produits agricoles et fluviaux du sud-est. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Ouémé Démo",
+    "address": "Adresse fictive bêta, voie Ouémé Démo 12, Porto-Novo",
+    "lat": 6.5073,
+    "lng": 2.6502,
+    "priceFromXof": 6000,
+    "priceUnit": "par_personne",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 660,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 690,
+            "closes_minute": 1260,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "mijotés"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Marmite de l’Ouémé Démo à Porto-Novo, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Marmite de l’Ouémé Démo, restaurant entièrement fictif à Porto-Novo : adresse fictive terre cuite et vert profond, véranda et jardin tropical humide. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Marmite de l’Ouémé Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Marmite de l’Ouémé Démo à Porto-Novo : ragoût riche de légumes, poisson générique et épices dans une marmite artisanale. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Marmite de l’Ouémé Démo à Porto-Novo, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Marmite de l’Ouémé Démo à Porto-Novo : véranda conviviale, murs terre cuite, grandes plantes et tables sombres. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000512",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Patio des Saveurs Démo",
+    "slug": "patio-des-saveurs-demo-porto-novo",
+    "description": "Patio des Saveurs Démo est un restaurant imaginaire de Porto-Novo. Cette fiche illustre une expérience de dégustation fictive mêlant techniques contemporaines et ingrédients béninois. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Saveurs Démo",
+    "address": "Adresse fictive bêta, cour Saveurs Démo 13, Porto-Novo",
+    "lat": 6.4849,
+    "lng": 2.6117,
+    "priceFromXof": 11000,
+    "priceUnit": "par_personne",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1439,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1439,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise créative",
+        "gastronomique africaine"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Patio des Saveurs Démo à Porto-Novo, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Patio des Saveurs Démo, restaurant entièrement fictif à Porto-Novo : patio fictif terracotta et crème, claustras graphiques et végétation luxuriante. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Patio des Saveurs Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Patio des Saveurs Démo à Porto-Novo : assiette de dégustation abstraite avec igname, légumes, poisson et sauces colorées. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Patio des Saveurs Démo à Porto-Novo, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Patio des Saveurs Démo à Porto-Novo : patio premium terracotta, éclairage doux, céramiques neutres et tables espacées. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000513",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Bol Ocre Démo",
+    "slug": "bol-ocre-demo-porto-novo",
+    "description": "Bol Ocre Démo est un restaurant imaginaire de Porto-Novo. Cette fiche illustre des bols rapides et équilibrés, totalement fictifs, autour du maïs, des haricots et des légumes. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Ocre Démo",
+    "address": "Adresse fictive bêta, ruelle Ocre Démo 14, Porto-Novo",
+    "lat": 6.5162,
+    "lng": 2.6359,
+    "priceFromXof": 3500,
+    "priceUnit": "par_personne",
+    "priceTier": 1,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 990,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 990,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 990,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 990,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 1050,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 390,
+            "closes_minute": 1050,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 420,
+            "closes_minute": 990,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise",
+        "cantine"
+      ],
+      "meals": [
+        "petit-déjeuner",
+        "déjeuner"
+      ],
+      "reservation": false,
+      "menuUrl": null
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Bol Ocre Démo à Porto-Novo, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Bol Ocre Démo, restaurant entièrement fictif à Porto-Novo : petite cantine fictive ocre clair, comptoir ouvert et quelques plantes tropicales. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Bol Ocre Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Bol Ocre Démo à Porto-Novo : bol généreux de haricots, maïs, légumes frais et sauce légèrement pimentée. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Bol Ocre Démo à Porto-Novo, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Bol Ocre Démo à Porto-Novo : salle compacte ocre et crème, bancs en bois et décoration géométrique sans marque. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000514",
+    "type": "etablissement",
+    "subtype": "restaurant",
+    "listingClass": "commercial",
+    "categoryId": "commercial-restaurant",
+    "status": "publie",
+    "name": "Cuisine des Jardins Démo",
+    "slug": "cuisine-des-jardins-demo-porto-novo",
+    "description": "Cuisine des Jardins Démo est un restaurant imaginaire de Porto-Novo. Cette fiche illustre un menu fictif axé sur les herbes, légumes et céréales dans un jardin urbain imaginaire. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Jardins Démo",
+    "address": "Adresse fictive bêta, allée Jardins Démo 15, Porto-Novo",
+    "lat": 6.5268,
+    "lng": 2.6574,
+    "priceFromXof": 9000,
+    "priceUnit": "par_personne",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "tuesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "wednesday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "thursday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "friday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "saturday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 720,
+            "closes_minute": 1380,
+            "closes_next_day": false
+          }
+        ]
+      },
+      "sunday": {
+        "status": "periods",
+        "periods": [
+          {
+            "opens_minute": 750,
+            "closes_minute": 1320,
+            "closes_next_day": false
+          }
+        ]
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "restaurant",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "food",
+      "cuisines": [
+        "béninoise contemporaine",
+        "végétarienne"
+      ],
+      "meals": [
+        "déjeuner",
+        "dîner"
+      ],
+      "reservation": true,
+      "menuUrl": null
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Cuisine des Jardins Démo à Porto-Novo, cadre de restauration béninois imaginé pour la démonstration Kwabor.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Cuisine des Jardins Démo, restaurant entièrement fictif à Porto-Novo : restaurant-jardin fictif vert profond et ivoire, pergola et massifs tropicaux. Composition premium photo-first, lumière naturelle, architecture crédible et accueillante, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plat fictif présenté par Cuisine des Jardins Démo, composition béninoise réaliste créée uniquement pour la bêta fermée Kwabor.",
+        "prompt": "Photographie culinaire réaliste en portrait 3:4 au Bénin pour le restaurant fictif Cuisine des Jardins Démo à Porto-Novo : assiette végétale raffinée d’igname, légumes verts, céréales et sauce aux herbes. Lumière naturelle latérale, couleurs appétissantes mais crédibles, vaisselle artisanale générique, faible profondeur de champ, sRGB. Sans texte, sans emballage, sans logo, sans marque, sans filigrane, sans mains et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Salle fictive de Cuisine des Jardins Démo à Porto-Novo, tables préparées dans une ambiance chaleureuse sans clientèle visible.",
+        "prompt": "Photographie d’intérieur réaliste en portrait 3:4 au Bénin, salle du restaurant fictif Cuisine des Jardins Démo à Porto-Novo : salle-jardin lumineuse avec pergola, feuillage dense et mobilier en rotin. Tables préparées, ambiance chaleureuse, lumière disponible, matériaux plausibles, rendu éditorial premium, sRGB. Sans texte, sans menu lisible, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  }
+]

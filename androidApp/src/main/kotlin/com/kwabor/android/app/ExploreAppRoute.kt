@@ -31,6 +31,10 @@ internal fun ExploreRoute(
             state = exploreState,
             searchState = searchState,
             isGuestSession = isGuestSession,
+            showClosedBetaDemoDisclosure = dependencies.rootNavigationProfile ==
+                com.kwabor.shared.presentation.navigation.RootNavigationProfile.ClosedBetaCatalog,
+            showGuideDiscoveryEntry = dependencies.rootNavigationProfile ==
+                com.kwabor.shared.presentation.navigation.RootNavigationProfile.Full,
         ),
         strings = strings,
         mediaUrlPolicy = dependencies.listingMediaUrlPolicy,

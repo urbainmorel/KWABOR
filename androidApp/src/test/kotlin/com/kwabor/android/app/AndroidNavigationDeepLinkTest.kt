@@ -2,6 +2,7 @@ package com.kwabor.android.app
 
 import com.kwabor.android.auth.AndroidDeepLinkDestination
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,6 +18,24 @@ class AndroidNavigationDeepLinkTest {
             RootNavigationDestination.Profile,
             assertIs<AndroidNavigationDeepLink.Root>(result).destination,
         )
+    }
+
+    @Test
+    fun parserAppliesTheSelectedNavigationProfile() {
+        listOf("social", "add", "notifications").forEach { routeKey ->
+            assertIs<AndroidNavigationDeepLink.Root>(
+                AndroidNavigationDeepLinkParser.parse(
+                    rawUrl = "kwabor://app/$routeKey",
+                    profile = RootNavigationProfile.Full,
+                ),
+            )
+            assertIs<AndroidNavigationDeepLink.UnavailableRoot>(
+                AndroidNavigationDeepLinkParser.parse(
+                    rawUrl = "kwabor://app/$routeKey",
+                    profile = RootNavigationProfile.ClosedBetaCatalog,
+                ),
+            )
+        }
     }
 
     @Test
@@ -101,6 +120,32 @@ class AndroidNavigationDeepLinkTest {
     }
 
     @Test
+    fun hiddenClosedBetaRootFallsBackWithNeutralNoticeAndAcknowledgement() {
+        val calls = mutableListOf<String>()
+        val delivery = AndroidDeepLinkDelivery(
+            deliveryId = TEST_DELIVERY_ID,
+            rawUrl = "kwabor://app/notifications",
+        )
+
+        dispatchAndroidNavigationDeepLink(
+            delivery = delivery,
+            profile = RootNavigationProfile.ClosedBetaCatalog,
+            actions = AndroidNavigationDeepLinkDispatchActions(
+                onRootDestination = { destination -> calls += "root:${destination.routeKey}" },
+                onHomeDestination = { calls += "home" },
+                onUnavailableRoot = { calls += "unavailable-root" },
+                onCatalogDetailOpen = { listingId -> calls += "open:$listingId" },
+                onAcknowledged = { deliveryId -> calls += "ack:$deliveryId" },
+            ),
+        )
+
+        assertEquals(
+            listOf("home", "unavailable-root", "ack:$TEST_DELIVERY_ID"),
+            calls,
+        )
+    }
+
+    @Test
     fun sensitiveAuthPolicyResetsAndTemporarilyRejectsNavigationLinks() {
         listOf(
             true to false,
@@ -145,9 +190,11 @@ class AndroidNavigationDeepLinkTest {
 
         dispatchAndroidNavigationDeepLink(
             delivery = readyDelivery,
+            profile = RootNavigationProfile.ClosedBetaCatalog,
             actions = AndroidNavigationDeepLinkDispatchActions(
                 onRootDestination = { destination -> calls += "root:${destination.routeKey}" },
                 onHomeDestination = { calls += "home" },
+                onUnavailableRoot = { calls += "unavailable-root" },
                 onCatalogDetailOpen = { listingId -> calls += "open:$listingId" },
                 onAcknowledged = { deliveryId -> calls += "ack:$deliveryId" },
             ),

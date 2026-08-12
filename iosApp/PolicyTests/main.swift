@@ -1645,8 +1645,90 @@ private let federatedSignInSource = repositorySource(
 private let onboardingCoordinatorSource = repositorySource(
     "iosApp/Kwabor/Onboarding/OnboardingCoordinator.swift"
 )
+private let rootNavigationSource = repositorySource(
+    "iosApp/Kwabor/App/RootNavigation.swift"
+)
+private let contentViewSource = repositorySource(
+    "iosApp/Kwabor/App/ContentView.swift"
+)
+private let catalogDetailSheetSource = repositorySource(
+    "iosApp/Kwabor/Detail/CatalogDetailSheet.swift"
+)
+private let catalogDetailTypedContentSource = repositorySource(
+    "iosApp/Kwabor/Detail/CatalogDetailTypedContent.swift"
+)
+private let sharedBridgeSource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/bridge/KwaborSharedBridge.kt"
+)
+private let kwaborStringsSource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/i18n/KwaborStrings.kt"
+)
 private let iosPackageLockSource = repositorySource(
     "iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+)
+
+expect(
+    rootNavigationSource.contains(
+        "static let closedBetaCases: [RootDestination] = [.home, .profile]"
+    ) && contentViewSource.contains(
+        "ForEach(RootDestination.visibleCases(closedBetaCatalog: isClosedBetaCatalog))"
+    ),
+    "The closed-beta tab surface must expose only the Explorer and Account roots."
+)
+expect(
+    kwaborStringsSource.contains("closedBetaExploreRoot = \"Explorer\"") &&
+        kwaborStringsSource.contains("closedBetaAccountRoot = \"Compte\"") &&
+        sharedBridgeSource.contains(
+            "RootNavigationDestination.Home.label(strings, rootNavigationProfile)"
+        ) && sharedBridgeSource.contains(
+            "RootNavigationDestination.Profile.label(strings, rootNavigationProfile)"
+        ),
+    "The iOS bridge must use the exact closed-beta labels without changing the full profile."
+)
+
+private let unavailableRootDeepLinkSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "if bridge.isUnavailableRootDeepLink",
+    until: "return requiresProtectedAuthentication"
+)
+expect(
+    sourceContains(
+        "rootNavigationNotice = bridge.rootDestinationUnavailableMessage()",
+        before: "pendingInternalDeepLink.enqueueRoot(destinationKey: RootDestination.home.rawValue)",
+        in: unavailableRootDeepLinkSection
+    ),
+    "A hidden closed-beta root deep link must show a neutral notice and fall back to Explorer."
+)
+
+private let catalogDetailPrimaryActionSection = sourceSection(
+    catalogDetailSheetSource,
+    from: "private var primaryAction: CatalogDetailPrimaryAction?",
+    until: "private var secondaryDirections: CatalogDetailDirectionsUiModel?"
+)
+private let catalogDetailSecondaryDirectionsSection = sourceSection(
+    catalogDetailSheetSource,
+    from: "private var secondaryDirections: CatalogDetailDirectionsUiModel?",
+    until: "private struct CatalogDetailDemoDisclosure"
+)
+expect(
+    sourceContains(
+        "guard !state.model.isDemoContent else { return nil }",
+        before: "CatalogDetailExternalURLPolicy.url(for: directions.target)",
+        in: catalogDetailPrimaryActionSection
+    ) && catalogDetailSecondaryDirectionsSection.contains(
+        "guard !state.model.isDemoContent"
+    ) && catalogDetailTypedContentSource.contains(
+        "if allowsExternalActions,"
+    ) && catalogDetailTypedContentSource.contains(
+        "allowsExternalActions && ticketing.externalUrl.flatMap"
+    ),
+    "Demo listings must expose no external CTA, including directions, menu, contact, or ticketing."
+)
+expect(
+    catalogDetailSheetSource.components(
+        separatedBy: "guard !currentContentIsDemo else { return }"
+    ).count - 1 == 2,
+    "The iOS external launch boundary must also reject stale actions after switching to demo content."
 )
 
 expect(

@@ -339,6 +339,22 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ### Qualification, bêta et publication
 
+- [x] BETA-SCOPE-001 — Accepter le profil de livraison V1 bêta fermée catalogue dans ADR-0036,
+  sans déclarer la V1 complète du PRD terminée.
+- [x] BETA-PLAN-001 — Définir l'objectif unique, le chemin critique, les tâches, les gates et la
+  stratégie de tests proportionnée dans `docs/closed-beta-delivery-plan.md`.
+- [x] BETA-CATALOG-001 — Livrer un manifeste vérifié de 60 fiches complètes : 15 lieux,
+  15 événements, 15 hôtels et 15 restaurants, répartis à parts égales entre Cotonou, Ouidah et
+  Porto-Novo.
+- [x] BETA-MEDIA-001 — Générer, revoir et optimiser 180 JPEG 3:4 réalistes, sans EXIF/GPS,
+  avec alt unique et manifeste SHA-256 ; aucun visuel ne doit être embarqué dans les apps.
+- [ ] BETA-SEED-001 — Ajouter un seed démo idempotent séparé du seed canonique, un bucket Storage
+  staging sans écriture client, un upload immuable et les tests prouvant exactement 60 fiches.
+- [x] BETA-NAV-001 — Restreindre Android/iOS à l'allowlist `Explorer · Compte`, retirer les
+  placeholders et traiter les deep links des racines différées sans écran mort.
+- [ ] BETA-STAGING-001 — Charger le corpus en staging, prouver rollback, offline, performances,
+  accessibilité et builds signés avant d'ouvrir la cohorte.
+
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.
   - [x] SEC-001A — Fermer les contournements OAuth/onboarding, Social, membres, claims, signalements et classification des fiches ; hotfix ACL séparé de la taxonomie et 316 assertions pgTAP locales vertes.

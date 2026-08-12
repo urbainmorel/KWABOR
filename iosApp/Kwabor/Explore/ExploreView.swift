@@ -8,11 +8,20 @@ struct ExploreView: View {
     @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
     let onListingOpen: (String) -> Void
     let onAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
+    let showsClosedBetaDisclosure: Bool
+    let showsGuideDiscoveryEntry: Bool
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
+            if showsClosedBetaDisclosure {
+                ExploreBanner(
+                    text: store.strings.closedBetaDemoDisclosure,
+                    foreground: KwaborDesignTokens.ColorToken.ink950,
+                    background: KwaborDesignTokens.ColorToken.ink100
+                )
+            }
             if searchStore.state.isActive {
                 SearchOfflineBanner(
                     store: searchStore,
@@ -26,6 +35,7 @@ struct ExploreView: View {
                     store: store,
                     searchStore: searchStore,
                     guideDiscoveryStore: guideDiscoveryStore,
+                    showsGuideDiscoveryEntry: showsGuideDiscoveryEntry,
                     columns: gridColumns(availableWidth: proxy.size.width),
                     onListingOpen: onListingOpen
                 )
@@ -108,6 +118,7 @@ private struct ExploreScrollContent: View {
     @ObservedObject var store: ExploreStore
     @ObservedObject var searchStore: SearchStore
     @ObservedObject var guideDiscoveryStore: GuideDiscoveryStore
+    let showsGuideDiscoveryEntry: Bool
     let columns: [GridItem]
     let onListingOpen: (String) -> Void
 
@@ -117,6 +128,9 @@ private struct ExploreScrollContent: View {
                 if searchStore.state.isActive {
                     SearchTransientBanners(store: searchStore)
                 } else {
+                    if showsGuideDiscoveryEntry {
+                        GuideDiscoveryEntryLink(store: guideDiscoveryStore)
+                    }
                     ExploreTransientBanners(store: store)
                 }
                 ExploreHeader(store: store, searchStore: searchStore)
@@ -131,7 +145,6 @@ private struct ExploreScrollContent: View {
                         commonStrings: store.strings
                     )
                 } else {
-                    GuideDiscoveryEntryLink(store: guideDiscoveryStore)
                     if store.state.isRefreshing {
                         HStack(spacing: KwaborDesignTokens.Spacing.sm) {
                             ProgressView()
