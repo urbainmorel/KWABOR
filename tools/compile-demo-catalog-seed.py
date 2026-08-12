@@ -676,17 +676,18 @@ def _upsert_section(
     )
 
 
-def _insert_do_nothing_section(
+def _insert_missing_section(
     table: str,
     columns: Sequence[str],
     rows: Sequence[Sequence[str]],
-    conflict_columns: Sequence[str],
 ) -> str:
     require(bool(rows), "Cannot render an empty INSERT section")
+    selected_columns = ", ".join(f"desired.{column}" for column in columns)
     return (
-        f"insert into {table} ({', '.join(columns)}) values\n"
-        f"{values_block(rows)}\n"
-        f"on conflict ({', '.join(conflict_columns)}) do nothing;"
+        f"insert into {table} ({', '.join(columns)})\n"
+        f"select {selected_columns}\n"
+        f"from (values\n{values_block(rows)}\n) as desired ({', '.join(columns)})\n"
+        f"where not exists (select 1 from {table} existing where existing.id = desired.id);"
     )
 
 
@@ -1074,9 +1075,7 @@ where existing.listing_id = parent.id
 def render_seed_sql(sources: CatalogSources) -> str:
     event_ids = [listing["id"] for listing in sources.listings if listing["type"] == "evenement"]
     non_event_ids = [listing["id"] for listing in sources.listings if listing["type"] != "evenement"]
-    listings_insert = _insert_do_nothing_section(
-        "public.listings", LISTING_COLUMNS, _listing_rows(sources), ("id",)
-    )
+    listings_insert = _insert_missing_section("public.listings", LISTING_COLUMNS, _listing_rows(sources))
     event_id_sql = id_list_sql(event_ids)
     non_event_id_sql = id_list_sql(non_event_ids)
     published_at = sql_string(
