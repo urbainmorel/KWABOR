@@ -521,11 +521,11 @@ def _listing_rows(sources: CatalogSources) -> list[list[str]]:
                 sql_json(listing["socials"]),
                 sql_text_array(tags),
                 sql_bool(listing["verified"]),
-                sql_number(listing["ratingAvg"]),
+                f"{sql_number(listing['ratingAvg'])}::numeric(3, 2)",
                 sql_number(listing["ratingCount"]),
                 sql_number(listing["viewsCount"]),
                 sql_number(listing["likesCount"]),
-                "null",
+                "null::timestamptz",
             ]
         )
     return rows

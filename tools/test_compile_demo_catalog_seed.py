@@ -242,6 +242,8 @@ class DemoCatalogCompilerTest(unittest.TestCase):
         self.assertIn(str(COMPILER.uuid.uuid5(COMPILER.MEDIA_UUID_NAMESPACE, "00000000-0000-4000-8000-000000000201:media:0")), sql)
         self.assertIn("where not exists (select 1 from public.listings existing where existing.id = desired.id)", sql)
         self.assertNotIn("on conflict (id) do nothing", sql)
+        self.assertIn("null::numeric(3, 2)", sql)
+        self.assertIn("null::timestamptz", sql)
         self.assertIn("Diff sets remove only obsolete generated children", sql)
         self.assertIn("where row(target.", sql)
         self.assertIn("is distinct from row(excluded.", sql)
