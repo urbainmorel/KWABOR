@@ -89,6 +89,9 @@ fun ExploreScreen(
         actions.onSearchClose()
     }
     Column(modifier = modifier.fillMaxSize()) {
+        if (model.showClosedBetaDemoDisclosure) {
+            KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
+        }
         if (if (searchState.isActive) searchState.isOffline else state.isOffline) {
             OfflineBanner(strings = strings)
         }
@@ -121,6 +124,8 @@ data class ExploreScreenUiModel(
     val state: ExploreUiState,
     val searchState: SearchUiState = SearchUiState(),
     val isGuestSession: Boolean = true,
+    val showClosedBetaDemoDisclosure: Boolean = false,
+    val showGuideDiscoveryEntry: Boolean = true,
 )
 
 @Composable
@@ -141,6 +146,7 @@ private fun ExploreContent(
         strings = strings,
         mediaUrlPolicy = mediaUrlPolicy,
         isGuestSession = model.isGuestSession,
+        showGuideDiscoveryEntry = model.showGuideDiscoveryEntry,
         actions = actions,
     )
     val explorePaginationGuard = remember(state.selectedTab, state.selectedChipId, state.selectedCityId) {
@@ -170,6 +176,7 @@ private data class ExploreGridContent(
     val strings: KwaborStrings,
     val mediaUrlPolicy: ListingMediaUrlPolicy,
     val isGuestSession: Boolean,
+    val showGuideDiscoveryEntry: Boolean,
     val actions: ExploreScreenActions,
 )
 
@@ -316,7 +323,7 @@ private fun LazyGridScope.exploreSurfaceItems(content: ExploreGridContent, onApp
     item(span = { GridItemSpan(maxLineSpan) }) {
         ExploreHeader(state, searchState, strings, content.isGuestSession, actions)
     }
-    if (!searchState.isActive) {
+    if (!searchState.isActive && content.showGuideDiscoveryEntry) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             ExploreGuideDiscoveryEntry(strings = strings, onClick = actions.onGuideDiscoveryClick)
         }
@@ -336,6 +343,46 @@ private fun LazyGridScope.exploreSurfaceItems(content: ExploreGridContent, onApp
             actions = actions,
         )
         exploreAppendFooter(state = state, strings = strings, onRetry = onAppendRetry)
+    }
+}
+
+@Composable
+private fun ExploreGuideDiscoveryEntry(strings: KwaborStrings, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { role = Role.Button },
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(KwaborRadius.Control),
+    ) {
+        Row(
+            modifier = Modifier.padding(KwaborSpacing.Lg),
+            horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PersonSearch,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+            ) {
+                Text(
+                    text = strings.guideDiscovery.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = strings.guideDiscovery.entrySubtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -447,46 +494,6 @@ private fun ExploreHeader(
         ExploreSearchControl(state = searchState, strings = strings, actions = actions)
         if (!searchState.isActive || searchState.scope == SearchScope.ActiveTab) {
             ExploreChips(state.chips, state.selectedChipId, actions.onChipSelected)
-        }
-    }
-}
-
-@Composable
-private fun ExploreGuideDiscoveryEntry(strings: KwaborStrings, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { role = Role.Button },
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(KwaborRadius.Control),
-    ) {
-        Row(
-            modifier = Modifier.padding(KwaborSpacing.Lg),
-            horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.PersonSearch,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
-            ) {
-                Text(
-                    text = strings.guideDiscovery.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = strings.guideDiscovery.entrySubtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }

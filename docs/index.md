@@ -19,6 +19,8 @@
 | [DESIGN](../DESIGN.md) | Produit, design, mobile | Navigation, écrans, états et modèle cible |
 | [Plan de livraison V1](v1-production-delivery.md) | Pilotage | Dépendances, séquence et gates de production |
 | [Suivi V1](V1-PROGRESS.md) | Équipe | État vérifié, preuves et limites courantes |
+| [Catalogue bêta fermée](closed-beta-catalog.md) | Produit, contenu, ingénierie | Contrat des 60 fiches, 180 médias et staging |
+| [Plan d'exécution bêta fermée](closed-beta-delivery-plan.md) | Produit, ingénierie, release | Objectif, chemin critique, tâches, gates et stratégie de tests |
 
 ## Développement
 
@@ -49,6 +51,7 @@
 | [Incident Auth/session/suppression](runbooks/auth-session-account-deletion-incident.md) | Diagnostiquer et reprendre un parcours Auth ou une suppression interrompue |
 | [Vidéo d'introduction Store-only](runbooks/onboarding-video-store-release.md) | Remplacer ou qualifier le média embarqué |
 | [Préflight des autorisations](runbooks/security-authorization-preflight.md) | Avant toute migration de sécurité sur une base persistante |
+| [Catalogue bêta fermée](runbooks/closed-beta-catalog-release.md) | Qualifier, charger ou retirer le corpus staging de démonstration |
 | [Onboarding mobile](onboarding.md) | Comprendre et diagnostiquer le premier lancement/auth |
 
 ## Décisions et audits

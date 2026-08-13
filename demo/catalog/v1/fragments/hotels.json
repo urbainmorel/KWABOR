@@ -1,0 +1,1883 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000401",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Azur des Cocotiers Démo",
+    "slug": "azur-des-cocotiers-demo-cotonou",
+    "description": "Azur des Cocotiers Démo est un hôtel imaginaire de Cotonou, pensé comme une escale tropicale et calme, structurée autour d’un jardin de cocotiers imaginaire. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Azur Démo",
+    "address": "Adresse fictive bêta, voie Azur Démo 01, Cotonou",
+    "lat": 6.3584,
+    "lng": 2.3821,
+    "priceFromXof": 42000,
+    "priceUnit": "par_nuit",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 24,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000401",
+          "name": "Chambre Confort",
+          "priceXof": 42000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000401",
+          "name": "Chambre Jardin",
+          "priceXof": 57000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000401",
+          "name": "Suite Patio",
+          "priceXof": 74000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Azur des Cocotiers Démo à Cotonou, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Azur des Cocotiers Démo, hôtel entièrement fictif à Cotonou : façade sable et blanche, brise-soleil en bois et cocotiers. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Azur des Cocotiers Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Azur des Cocotiers Démo à Cotonou : chambre lumineuse aux fibres naturelles, coton blanc et accents indigo. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Azur des Cocotiers Démo à Cotonou, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Azur des Cocotiers Démo à Cotonou : petit-déjeuner béninois stylisé sur une terrasse végétalisée. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000402",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Patio Indigo Démo",
+    "slug": "patio-indigo-demo-cotonou",
+    "description": "Patio Indigo Démo est un hôtel imaginaire de Cotonou, pensé comme une escale urbaine et raffinée, inspirée des patios ombragés et de l’indigo. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Indigo Démo",
+    "address": "Adresse fictive bêta, passage Indigo Démo 02, Cotonou",
+    "lat": 6.3718,
+    "lng": 2.4017,
+    "priceFromXof": 68000,
+    "priceUnit": "par_nuit",
+    "priceTier": 4,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 4,
+      "roomCount": 32,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000402",
+          "name": "Chambre Confort",
+          "priceXof": 68000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000402",
+          "name": "Chambre Jardin",
+          "priceXof": 83000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000402",
+          "name": "Suite Patio",
+          "priceXof": 100000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Patio Indigo Démo à Cotonou, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Patio Indigo Démo, hôtel entièrement fictif à Cotonou : patio contemporain ocre et indigo avec claustras géométriques. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Patio Indigo Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Patio Indigo Démo à Cotonou : suite urbaine élégante, murs ivoire, textile indigo et mobilier artisanal sans marque. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Patio Indigo Démo à Cotonou, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Patio Indigo Démo à Cotonou : bassin décoratif et salon extérieur sous une lumière de fin d’après-midi. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000403",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Lagune Sereine Démo",
+    "slug": "lagune-sereine-demo-cotonou",
+    "description": "Lagune Sereine Démo est un hôtel imaginaire de Cotonou, pensé comme une escale intimiste et ventilée, avec une atmosphère inspirée des rives lagunaires. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Serein Démo",
+    "address": "Adresse fictive bêta, promenade Sereine Démo 03, Cotonou",
+    "lat": 6.3892,
+    "lng": 2.4176,
+    "priceFromXof": 35000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 18,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000403",
+          "name": "Chambre Confort",
+          "priceXof": 35000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000403",
+          "name": "Chambre Jardin",
+          "priceXof": 50000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000403",
+          "name": "Suite Patio",
+          "priceXof": 67000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Lagune Sereine Démo à Cotonou, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Lagune Sereine Démo, hôtel entièrement fictif à Cotonou : architecture basse couleur argile, galerie couverte et végétation humide. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Lagune Sereine Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Lagune Sereine Démo à Cotonou : chambre apaisante vert sauge, bois clair et grande fenêtre protégée. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Lagune Sereine Démo à Cotonou, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Lagune Sereine Démo à Cotonou : terrasse fictive face à un jardin d’eau, fauteuils tressés et lanternes sans flamme. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000404",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Jardin Corail Démo",
+    "slug": "jardin-corail-demo-cotonou",
+    "description": "Jardin Corail Démo est un hôtel imaginaire de Cotonou, pensé comme une escale simple et chaleureuse, ouverte sur une cour colorée aux tons corail. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Corail Démo",
+    "address": "Adresse fictive bêta, allée Corail Démo 04, Cotonou",
+    "lat": 6.3479,
+    "lng": 2.4052,
+    "priceFromXof": 26000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 2,
+      "roomCount": 16,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000404",
+          "name": "Chambre Confort",
+          "priceXof": 26000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000404",
+          "name": "Chambre Jardin",
+          "priceXof": 41000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000404",
+          "name": "Suite Patio",
+          "priceXof": 58000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Jardin Corail Démo à Cotonou, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Jardin Corail Démo, hôtel entièrement fictif à Cotonou : petit hôtel fictif aux enduits corail pâle, auvent profond et jardin tropical. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Jardin Corail Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Jardin Corail Démo à Cotonou : chambre compacte, mobilier en bois local générique et textiles corail sobres. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Jardin Corail Démo à Cotonou, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Jardin Corail Démo à Cotonou : cour intérieure fleurie avec tables de repos et ombres graphiques. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000405",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Horizon des Alizés Démo",
+    "slug": "horizon-des-alizes-demo-cotonou",
+    "description": "Horizon des Alizés Démo est un hôtel imaginaire de Cotonou, pensé comme une escale contemporaine et ample, imaginée pour évoquer l’air marin et les grands horizons. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Secteur Alizés Démo",
+    "address": "Adresse fictive bêta, avenue des Alizés Démo 05, Cotonou",
+    "lat": 6.3546,
+    "lng": 2.3614,
+    "priceFromXof": 82000,
+    "priceUnit": "par_nuit",
+    "priceTier": 4,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 5,
+      "roomCount": 40,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000405",
+          "name": "Chambre Confort",
+          "priceXof": 82000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000405",
+          "name": "Chambre Jardin",
+          "priceXof": 97000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000405",
+          "name": "Suite Patio",
+          "priceXof": 114000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Horizon des Alizés Démo à Cotonou, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Horizon des Alizés Démo, hôtel entièrement fictif à Cotonou : volume contemporain blanc cassé, pierre sombre, palmes et ciel côtier lumineux. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Horizon des Alizés Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Horizon des Alizés Démo à Cotonou : suite spacieuse avec tête de lit tressée, pierre beige et baie vitrée. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Horizon des Alizés Démo à Cotonou, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Horizon des Alizés Démo à Cotonou : terrasse panoramique fictive au coucher du soleil, bassin calme et assises épurées. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000406",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Escale des Palmes Démo",
+    "slug": "escale-des-palmes-demo-ouidah",
+    "description": "Escale des Palmes Démo est un hôtel imaginaire de Ouidah, pensé comme une escale paisible et végétale, composée de pavillons imaginaires sous les palmes. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Palmes Démo",
+    "address": "Adresse fictive bêta, chemin des Palmes Démo 06, Ouidah",
+    "lat": 6.3658,
+    "lng": 2.0739,
+    "priceFromXof": 32000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 20,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000406",
+          "name": "Chambre Confort",
+          "priceXof": 32000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000406",
+          "name": "Chambre Jardin",
+          "priceXof": 47000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000406",
+          "name": "Suite Patio",
+          "priceXof": 64000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Escale des Palmes Démo à Ouidah, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Escale des Palmes Démo, hôtel entièrement fictif à Ouidah : pavillons sable à toiture légère, allée de palmes et lumière dorée. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Escale des Palmes Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Escale des Palmes Démo à Ouidah : chambre naturelle en rotin, lin écru et touches vert palmier. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Escale des Palmes Démo à Ouidah, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Escale des Palmes Démo à Ouidah : petite piscine de cour entourée de végétation dense et de transats neutres. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000407",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Cour Rouge Démo",
+    "slug": "cour-rouge-demo-ouidah",
+    "description": "Cour Rouge Démo est un hôtel imaginaire de Ouidah, pensé comme une escale conviviale et sobre, organisée autour d’une cour en terre rouge stylisée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Rouge Démo",
+    "address": "Adresse fictive bêta, venelle Rouge Démo 07, Ouidah",
+    "lat": 6.3741,
+    "lng": 2.0927,
+    "priceFromXof": 24000,
+    "priceUnit": "par_nuit",
+    "priceTier": 1,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 2,
+      "roomCount": 14,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000407",
+          "name": "Chambre Confort",
+          "priceXof": 24000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000407",
+          "name": "Chambre Jardin",
+          "priceXof": 39000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000407",
+          "name": "Suite Patio",
+          "priceXof": 56000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Cour Rouge Démo à Ouidah, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Cour Rouge Démo, hôtel entièrement fictif à Ouidah : maison d’hôtes fictive ocre rouge, galerie ombragée et plantes en pots. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Cour Rouge Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Cour Rouge Démo à Ouidah : chambre simple avec murs terre cuite, couvre-lit crème et bois foncé. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Cour Rouge Démo à Ouidah, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Cour Rouge Démo à Ouidah : cour commune au sol ocre, bancs maçonnés et arbre tropical central. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000408",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Refuge de la Lagune Démo",
+    "slug": "refuge-de-la-lagune-demo-ouidah",
+    "description": "Refuge de la Lagune Démo est un hôtel imaginaire de Ouidah, pensé comme une escale feutrée et contemporaine, inspirée des paysages d’eau et de mangrove. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Refuge Démo",
+    "address": "Adresse fictive bêta, piste du Refuge Démo 08, Ouidah",
+    "lat": 6.3517,
+    "lng": 2.1048,
+    "priceFromXof": 56000,
+    "priceUnit": "par_nuit",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 4,
+      "roomCount": 26,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000408",
+          "name": "Chambre Confort",
+          "priceXof": 56000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000408",
+          "name": "Chambre Jardin",
+          "priceXof": 71000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000408",
+          "name": "Suite Patio",
+          "priceXof": 88000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Refuge de la Lagune Démo à Ouidah, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Refuge de la Lagune Démo, hôtel entièrement fictif à Ouidah : lodge fictif sur terrain sec, bois sombre, pierre claire et jardin de mangrove stylisé. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Refuge de la Lagune Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Refuge de la Lagune Démo à Ouidah : suite paisible bleu profond, bois texturé et vue sur végétation humide. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Refuge de la Lagune Démo à Ouidah, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Refuge de la Lagune Démo à Ouidah : salon extérieur couvert face à un miroir d’eau au matin. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000409",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Maison des Embruns Démo",
+    "slug": "maison-des-embruns-demo-ouidah",
+    "description": "Maison des Embruns Démo est un hôtel imaginaire de Ouidah, pensé comme une escale claire et décontractée, évoquant une maison côtière protégée du vent. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Embruns Démo",
+    "address": "Adresse fictive bêta, sentier des Embruns Démo 09, Ouidah",
+    "lat": 6.3429,
+    "lng": 2.0618,
+    "priceFromXof": 39000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 22,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000409",
+          "name": "Chambre Confort",
+          "priceXof": 39000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000409",
+          "name": "Chambre Jardin",
+          "priceXof": 54000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000409",
+          "name": "Suite Patio",
+          "priceXof": 71000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Maison des Embruns Démo à Ouidah, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Maison des Embruns Démo, hôtel entièrement fictif à Ouidah : maison côtière imaginaire blanche, volets bois, terrasse et graminées tropicales. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Maison des Embruns Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Maison des Embruns Démo à Ouidah : chambre blanche et bleu grisé avec voilage léger et mobilier tressé. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Maison des Embruns Démo à Ouidah, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Maison des Embruns Démo à Ouidah : terrasse de petit-déjeuner abritée, vaisselle artisanale générique et lumière marine. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000410",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Jardin de Sable Démo",
+    "slug": "jardin-de-sable-demo-ouidah",
+    "description": "Jardin de Sable Démo est un hôtel imaginaire de Ouidah, pensé comme une escale intime et artisanale, avec une cour minérale et des plantations locales stylisées. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Secteur Sable Démo",
+    "address": "Adresse fictive bêta, allée du Sable Démo 10, Ouidah",
+    "lat": 6.3846,
+    "lng": 2.0835,
+    "priceFromXof": 28000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "ouidah"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 2,
+      "roomCount": 12,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000410",
+          "name": "Chambre Confort",
+          "priceXof": 28000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000410",
+          "name": "Chambre Jardin",
+          "priceXof": 43000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000410",
+          "name": "Suite Patio",
+          "priceXof": 60000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Jardin de Sable Démo à Ouidah, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Jardin de Sable Démo, hôtel entièrement fictif à Ouidah : petit hôtel fictif beige sable, murs courbes et jardin sec tropical. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Jardin de Sable Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Jardin de Sable Démo à Ouidah : chambre douce couleur sable avec niches murales et textiles tissés sans motif de marque. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Jardin de Sable Démo à Ouidah, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Jardin de Sable Démo à Ouidah : coin lecture extérieur sous une pergola en bois, végétation et sol minéral. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000411",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Patio des Masques Démo",
+    "slug": "patio-des-masques-demo-porto-novo",
+    "description": "Patio des Masques Démo est un hôtel imaginaire de Porto-Novo, pensé comme une escale culturelle et graphique, avec des formes décoratives abstraites sans objet patrimonial réel. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Patio Démo",
+    "address": "Adresse fictive bêta, cour du Patio Démo 11, Porto-Novo",
+    "lat": 6.4948,
+    "lng": 2.6194,
+    "priceFromXof": 31000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 18,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000411",
+          "name": "Chambre Confort",
+          "priceXof": 31000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000411",
+          "name": "Chambre Jardin",
+          "priceXof": 46000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000411",
+          "name": "Suite Patio",
+          "priceXof": 63000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Patio des Masques Démo à Porto-Novo, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Patio des Masques Démo, hôtel entièrement fictif à Porto-Novo : patio fictif ocre et crème, motifs géométriques abstraits et végétation tropicale. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Patio des Masques Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Patio des Masques Démo à Porto-Novo : chambre contemporaine ocre avec art mural abstrait non identifiable et bois sombre. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Patio des Masques Démo à Porto-Novo, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Patio des Masques Démo à Porto-Novo : salon de cour sous des arcades, coussins sobres et lumière matinale. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000412",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Rives de l’Ouémé Démo",
+    "slug": "rives-de-l-oueme-demo-porto-novo",
+    "description": "Rives de l’Ouémé Démo est un hôtel imaginaire de Porto-Novo, pensé comme une escale élégante et lumineuse, inspirée par les paysages fluviaux du sud-est béninois. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Rives Démo",
+    "address": "Adresse fictive bêta, promenade des Rives Démo 12, Porto-Novo",
+    "lat": 6.5061,
+    "lng": 2.6478,
+    "priceFromXof": 59000,
+    "priceUnit": "par_nuit",
+    "priceTier": 3,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 4,
+      "roomCount": 28,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000412",
+          "name": "Chambre Confort",
+          "priceXof": 59000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000412",
+          "name": "Chambre Jardin",
+          "priceXof": 74000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000412",
+          "name": "Suite Patio",
+          "priceXof": 91000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Rives de l’Ouémé Démo à Porto-Novo, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Rives de l’Ouémé Démo, hôtel entièrement fictif à Porto-Novo : hôtel imaginaire aux lignes horizontales, pierre claire, bois et jardin humide. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Rives de l’Ouémé Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Rives de l’Ouémé Démo à Porto-Novo : suite vert profond et beige, tissus naturels et fenêtre sur une végétation fluviale fictive. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Rives de l’Ouémé Démo à Porto-Novo, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Rives de l’Ouémé Démo à Porto-Novo : terrasse couverte au bord d’un bassin paysager, ambiance calme de fin de journée. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000413",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Maison Ocre Démo",
+    "slug": "maison-ocre-demo-porto-novo",
+    "description": "Maison Ocre Démo est un hôtel imaginaire de Porto-Novo, pensé comme une escale familiale et compacte, habillée de teintes ocre et de matières naturelles. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Ocre Démo",
+    "address": "Adresse fictive bêta, ruelle Ocre Démo 13, Porto-Novo",
+    "lat": 6.4827,
+    "lng": 2.6041,
+    "priceFromXof": 23000,
+    "priceUnit": "par_nuit",
+    "priceTier": 1,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 2,
+      "roomCount": 15,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000413",
+          "name": "Chambre Confort",
+          "priceXof": 23000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000413",
+          "name": "Chambre Jardin",
+          "priceXof": 38000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000413",
+          "name": "Suite Patio",
+          "priceXof": 55000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Maison Ocre Démo à Porto-Novo, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Maison Ocre Démo, hôtel entièrement fictif à Porto-Novo : maison d’hôtes fictive ocre, porche simple et jardin de fougères. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Maison Ocre Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Maison Ocre Démo à Porto-Novo : chambre compacte ocre clair, draps blancs et petit bureau en bois. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Maison Ocre Démo à Porto-Novo, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Maison Ocre Démo à Porto-Novo : véranda tranquille avec fauteuils tressés, plantes et carrelage graphique générique. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000414",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Jardin des Arcades Démo",
+    "slug": "jardin-des-arcades-demo-porto-novo",
+    "description": "Jardin des Arcades Démo est un hôtel imaginaire de Porto-Novo, pensé comme une escale ombragée et raffinée, organisée autour d’arcades contemporaines et d’un jardin intérieur. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Arcades Démo",
+    "address": "Adresse fictive bêta, passage des Arcades Démo 14, Porto-Novo",
+    "lat": 6.5134,
+    "lng": 2.6312,
+    "priceFromXof": 37000,
+    "priceUnit": "par_nuit",
+    "priceTier": 2,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 3,
+      "roomCount": 21,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000414",
+          "name": "Chambre Confort",
+          "priceXof": 37000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000414",
+          "name": "Chambre Jardin",
+          "priceXof": 52000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000414",
+          "name": "Suite Patio",
+          "priceXof": 69000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Jardin des Arcades Démo à Porto-Novo, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Jardin des Arcades Démo, hôtel entièrement fictif à Porto-Novo : façade fictive à arcades modernes, enduit ivoire et plantes luxuriantes. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Jardin des Arcades Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Jardin des Arcades Démo à Porto-Novo : chambre calme avec arche décorative, palette ivoire et accents terracotta. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Jardin des Arcades Démo à Porto-Novo, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Jardin des Arcades Démo à Porto-Novo : jardin intérieur sous arcades avec bassin discret et assises en bois. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000415",
+    "type": "etablissement",
+    "subtype": "hotel",
+    "listingClass": "commercial",
+    "categoryId": "commercial-hotel",
+    "status": "publie",
+    "name": "Étoile de la Lagune Démo",
+    "slug": "etoile-de-la-lagune-demo-porto-novo",
+    "description": "Étoile de la Lagune Démo est un hôtel imaginaire de Porto-Novo, pensé comme une escale premium et paisible, associant volumes contemporains et reflets lagunaires stylisés. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Secteur Étoile Démo",
+    "address": "Adresse fictive bêta, boulevard Étoile Démo 15, Porto-Novo",
+    "lat": 6.5223,
+    "lng": 2.6591,
+    "priceFromXof": 64000,
+    "priceUnit": "par_nuit",
+    "priceTier": 4,
+    "openingHours": {
+      "monday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "tuesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "wednesday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "thursday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "friday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "saturday": {
+        "status": "open_24_hours",
+        "periods": []
+      },
+      "sunday": {
+        "status": "open_24_hours",
+        "periods": []
+      }
+    },
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": "demo@kwabor.test",
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "hotel",
+      "porto-novo"
+    ],
+    "verified": false,
+    "ratingAvg": null,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T09:00:00+01:00",
+    "demoDisclosure": "Fiche entièrement fictive créée pour la bêta fermée Kwabor : établissement, adresse, coordonnées, prix, disponibilités, avis et visuels ne représentent aucune offre réelle.",
+    "detail": {
+      "variant": "lodging",
+      "starRating": 4,
+      "roomCount": 30,
+      "checkinTime": "14:00:00",
+      "checkoutTime": "11:00:00",
+      "roomTypes": [
+        {
+          "id": "10000000-0000-4000-8000-000000000415",
+          "name": "Chambre Confort",
+          "priceXof": 64000,
+          "displayOrder": 0
+        },
+        {
+          "id": "20000000-0000-4000-8000-000000000415",
+          "name": "Chambre Jardin",
+          "priceXof": 79000,
+          "displayOrder": 1
+        },
+        {
+          "id": "30000000-0000-4000-8000-000000000415",
+          "name": "Suite Patio",
+          "priceXof": 96000,
+          "displayOrder": 2
+        }
+      ]
+    },
+    "amenities": [
+      "wifi",
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "kind": "image",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive de Étoile de la Lagune Démo à Porto-Novo, architecture tropicale mise en scène sous une lumière naturelle douce.",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 au Bénin, vue extérieure de Étoile de la Lagune Démo, hôtel entièrement fictif à Porto-Novo : hôtel fictif contemporain aux volumes blancs, cuivre patiné et jardin tropical. Composition premium photo-first, lumière naturelle, détails architecturaux crédibles, végétation locale plausible, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Chambre de démonstration de Étoile de la Lagune Démo, décor fictif soigné avec matières naturelles et lumière apaisée.",
+        "prompt": "Photographie intérieure réaliste en portrait 3:4 au Bénin, chambre de démonstration de l’hôtel fictif Étoile de la Lagune Démo à Porto-Novo : suite premium bleu nuit et cuivre mat, textiles sobres et grande baie vitrée. Cadrage vertical accueillant, lumière disponible, rendu photographique premium, textures crédibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      },
+      {
+        "role": "gallery",
+        "kind": "image",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Espace d’accueil fictif de Étoile de la Lagune Démo à Porto-Novo, ambiance tropicale conçue pour illustrer la bêta Kwabor.",
+        "prompt": "Photographie lifestyle réaliste en portrait 3:4 au Bénin, troisième vue officielle de l’hôtel fictif Étoile de la Lagune Démo à Porto-Novo : lounge extérieur au crépuscule devant un bassin réfléchissant, sans clientèle visible. Atmosphère paisible, lumière naturelle cinématographique, architecture et végétation plausibles, sRGB. Sans texte, sans enseigne, sans logo, sans marque, sans filigrane et sans personne reconnaissable."
+      }
+    ]
+  }
+]

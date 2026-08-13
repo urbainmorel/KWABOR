@@ -63,32 +63,41 @@ import com.kwabor.shared.presentation.favorites.label
 @Composable
 internal fun FavoritesScreen(
     state: FavoritesUiState,
-    strings: KwaborStrings,
-    mediaUrlPolicy: ListingMediaUrlPolicy,
+    resources: FavoritesScreenResources,
     actions: FavoritesScreenActions,
     modifier: Modifier = Modifier,
+    showClosedBetaDemoDisclosure: Boolean = false,
 ) {
+    FavoritesScaffold(
+        state = state,
+        resources = resources,
+        actions = actions,
+        modifier = modifier,
+        showClosedBetaDemoDisclosure = showClosedBetaDemoDisclosure,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FavoritesScaffold(
+    state: FavoritesUiState,
+    resources: FavoritesScreenResources,
+    actions: FavoritesScreenActions,
+    modifier: Modifier,
+    showClosedBetaDemoDisclosure: Boolean,
+) {
+    val strings = resources.strings
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         topBar = {
-            TopAppBar(
-                title = { Text(strings.favorites.title) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = actions.onBack,
-                        modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = strings.registrationBack,
-                        )
-                    }
-                },
-            )
+            FavoritesTopAppBar(strings = strings, onBack = actions.onBack)
         },
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (showClosedBetaDemoDisclosure) {
+                KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
+            }
             if (state.isOffline) {
                 OfflineBanner(strings = strings)
             }
@@ -97,11 +106,30 @@ internal fun FavoritesScreen(
             FavoritesContent(
                 state = state,
                 strings = strings,
-                mediaUrlPolicy = mediaUrlPolicy,
+                mediaUrlPolicy = resources.mediaUrlPolicy,
                 actions = actions,
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FavoritesTopAppBar(strings: KwaborStrings, onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(strings.favorites.title) },
+        navigationIcon = {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(KwaborSizing.MinimumAccessibleTouchTarget),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = strings.registrationBack,
+                )
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

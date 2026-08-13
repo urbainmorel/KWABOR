@@ -6,6 +6,8 @@ import com.kwabor.shared.domain.catalog.CatalogMediaKind
 import com.kwabor.shared.domain.catalog.CatalogMetrics
 import com.kwabor.shared.i18n.KwaborStrings
 
+private const val DEMO_CONTENT_TAG = "demo-kwabor"
+
 internal fun CatalogDetail.toCatalogDetailUiModel(
     strings: KwaborStrings,
     nowEpochMilliseconds: Long,
@@ -32,6 +34,7 @@ internal fun CatalogDetail.toCatalogDetailUiModel(
         contact = toDetailContactUiModel(),
         tags = commonModel.tags.map(String::toDisplayWords).distinct(),
         content = toCatalogDetailVariantUiModel(detailStrings, nowEpochMilliseconds),
+        isDemoContent = commonModel.tags.any { tag -> tag.equals(DEMO_CONTENT_TAG, ignoreCase = true) },
     )
 }
 

@@ -5,6 +5,7 @@ struct CatalogDetailTypedContent: View {
     let content: CatalogDetailContentUiModel
     let strings: CatalogDetailStrings
     let commonStrings: KwaborStrings
+    let allowsExternalActions: Bool
     let onOpenExternal: @MainActor (CatalogDetailExternalURLTarget) -> Void
 
     @ViewBuilder
@@ -53,7 +54,8 @@ struct CatalogDetailTypedContent: View {
             CatalogDetailLabelGroup(title: strings.meals, labels: food.meals)
             Text(food.reservationLabel)
                 .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
-            if let menuURL = food.menuUrl,
+            if allowsExternalActions,
+               let menuURL = food.menuUrl,
                CatalogDetailExternalURLPolicy.url(for: .https(menuURL)) != nil {
                 CatalogDetailExternalButton(
                     title: strings.menu,
@@ -105,7 +107,8 @@ struct CatalogDetailTypedContent: View {
             CatalogDetailTicketing(
                 ticketing: event.ticketing,
                 strings: strings,
-                freeLabel: commonStrings.free
+                freeLabel: commonStrings.free,
+                allowsExternalActions: allowsExternalActions
             )
         }
     }
@@ -210,6 +213,7 @@ private struct CatalogDetailTicketing: View {
     let ticketing: CatalogDetailTicketingUiModel
     let strings: CatalogDetailStrings
     let freeLabel: String
+    let allowsExternalActions: Bool
 
     @ViewBuilder
     var body: some View {
@@ -218,9 +222,7 @@ private struct CatalogDetailTicketing: View {
             Text(strings.freeEvent)
                 .font(.body.weight(.semibold))
             Text(
-                free.externalUrl.flatMap {
-                    CatalogDetailExternalURLPolicy.url(for: .https($0))
-                } != nil
+                registrationIsAvailable(free)
                     ? strings.registrationAvailable
                     : strings.registrationUnavailable
             )
@@ -234,5 +236,11 @@ private struct CatalogDetailTicketing: View {
                 transactional: true
             )
         }
+    }
+
+    private func registrationIsAvailable(_ ticketing: CatalogDetailTicketingUiModelFree) -> Bool {
+        allowsExternalActions && ticketing.externalUrl.flatMap {
+            CatalogDetailExternalURLPolicy.url(for: .https($0))
+        } != nil
     }
 }

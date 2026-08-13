@@ -124,6 +124,18 @@ L'identité visuelle est un **levier produit**, pas une couche décorative. Sur 
 
 ## 5. Périmètre
 
+### Profil de livraison transitoire — V1 bêta fermée catalogue
+
+La première cohorte produit suit le profil réduit accepté par
+[`ADR-0036`](docs/adr/0036-closed-beta-catalog-delivery-profile.md). Ce profil expose seulement le
+parcours catalogue cohérent `Explorer · Compte` sur Android et iOS, avec 60 fiches de démonstration
+complètes et 180 visuels vérifiés. Il masque les racines et actions non terminées sans placeholder ni
+CTA mort.
+
+Ce profil sert à mesurer l'intérêt du produit avant l'achèvement de toutes les verticales. Il ne
+modifie pas le périmètre V1 complet ci-dessous, ne reclasse aucune fonctionnalité comme terminée et
+n'autorise pas une publication publique en production.
+
 ### 5.1 MVP (V1.0) — dans le périmètre
 **Découverte (B2C)**
 - **Écran d'intro** au tout premier lancement : **vidéo d'arrière-plan immersive** (univers touristique/culturel/festif du Bénin), **embarquée et versionnée avec l'application**, sautable → écran **« Se connecter ou s'inscrire »**. Tout remplacement exige une nouvelle version Android/iOS publiée dans les Stores.

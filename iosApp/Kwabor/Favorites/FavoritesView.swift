@@ -4,10 +4,14 @@ import UIKit
 
 struct FavoritesEntryLink: View {
     @ObservedObject var store: FavoritesStore
+    let showsClosedBetaDisclosure: Bool
 
     var body: some View {
         NavigationLink {
-            FavoritesView(store: store)
+            FavoritesView(
+                store: store,
+                showsClosedBetaDisclosure: showsClosedBetaDisclosure
+            )
         } label: {
             HStack(spacing: KwaborDesignTokens.Spacing.md) {
                 Image(systemName: "bookmark.fill")
@@ -51,10 +55,18 @@ struct FavoritesEntryLink: View {
 
 struct FavoritesView: View {
     @ObservedObject var store: FavoritesStore
+    let showsClosedBetaDisclosure: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
+            if showsClosedBetaDisclosure {
+                FavoritesBanner(
+                    text: store.commonStrings.closedBetaDemoDisclosure,
+                    foreground: KwaborDesignTokens.ColorToken.ink950,
+                    background: KwaborDesignTokens.ColorToken.ink100
+                )
+            }
             if store.state.isOffline {
                 FavoritesBanner(
                     text: store.commonStrings.offlineBanner,

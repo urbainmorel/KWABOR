@@ -1,0 +1,1361 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000301",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Escales Sonores du Littoral",
+    "slug": "escales-sonores-littoral-cotonou-demo",
+    "description": "Soirée musicale fictive mêlant percussions douces, cordes et paysages sonores dans un jardin côtier imaginaire de Cotonou. L'événement, sa programmation, ses tarifs et ses organisateurs sont inventés uniquement pour la bêta fermée Kwabor; aucune réservation réelle n'est proposée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Fidjrossè",
+    "address": "Adresse fictive, Jardin des Brises du Littoral, Cotonou",
+    "lat": 6.3538,
+    "lng": 2.3532,
+    "priceFromXof": 3000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "musique"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 14,
+        "startLocalTime": "18:30",
+        "durationMinutes": 210,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000201",
+      "organizerName": "Collectif fictif Rivage Sonore",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/escales-sonores-littoral-cotonou-demo",
+      "capacity": 180,
+      "ticketTiers": [
+        {
+          "label": "Accès démo",
+          "priceXof": 3000,
+          "displayOrder": 0
+        },
+        {
+          "label": "Soutien démo",
+          "priceXof": 7000,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Scène musicale fictive éclairée de lanternes dans un jardin côtier de Cotonou au soir",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'une scène musicale fictive dans un jardin côtier à Cotonou, Bénin, instruments acoustiques sans marque, lanternes chaudes et palmiers au crépuscule, juste avant ouverture; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Percussions et cordes fictives disposées sur un tapis face à une scène de bois sobre",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un ensemble fictif de percussions et d'instruments à cordes génériques posé sur un tapis tissé devant une scène en bois à Cotonou, lumière ambrée et détails nets, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Allée fictive de lanternes menant vers une petite scène sous les palmiers du littoral",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une allée fictive de lanternes menant vers une petite scène sous des palmiers à Cotonou, chaises vides soigneusement alignées et ciel bleu profond, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000302",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Atelier Couleurs de Cotonou",
+    "slug": "atelier-couleurs-cotonou-demo",
+    "description": "Atelier créatif fictif autour de pigments, papiers et compositions abstraites inspirées des teintes urbaines de Cotonou. Le rendez-vous, les intervenants et les places disponibles sont inventés pour la bêta fermée Kwabor; aucune inscription réelle n'est ouverte. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Zongo",
+    "address": "Adresse fictive, Halle des Tisserands de Zongo, Cotonou",
+    "lat": 6.3736,
+    "lng": 2.4251,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "atelier"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 31,
+        "startLocalTime": "10:00",
+        "durationMinutes": 180,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000215",
+      "organizerName": "Atelier fictif Palette Urbaine",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 36,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Grande table d'atelier fictive couverte de pigments et de papiers colorés à Cotonou",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un atelier artistique fictif à Cotonou, Bénin, grande table couverte de pigments naturels, papiers colorés et pinceaux sans marque, salle lumineuse avant l'activité; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Pigments fictifs ocre, indigo et jaune disposés dans des coupelles sur une natte tissée",
+        "prompt": "Photographie macro réaliste en portrait 3:4 de pigments fictifs ocre, indigo et jaune dans des coupelles artisanales posées sur une natte béninoise, lumière naturelle latérale et texture très détaillée, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Mur fictif de compositions abstraites sans signature dans une salle créative de Zongo",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un mur d'atelier fictif à Zongo présentant des compositions abstraites originales et non signées, tabourets en bois et faisceaux de soleil, ambiance pédagogique, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000303",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Scène des Contes Urbains",
+    "slug": "scene-contes-urbains-cotonou-demo",
+    "description": "Veillée fictive de récits contemporains mise en scène dans une cour imaginaire de Ganhi, avec objets sonores et décors minimalistes. La programmation, l'équipe et la billetterie sont inventées pour la bêta fermée Kwabor; aucun billet réel n'est vendu. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Ganhi",
+    "address": "Adresse fictive, Cour des Mémoires de Ganhi, Cotonou",
+    "lat": 6.3609,
+    "lng": 2.4302,
+    "priceFromXof": 2000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "contes"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 52,
+        "startLocalTime": "19:00",
+        "durationMinutes": 150,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000202",
+      "organizerName": "Compagnie fictive Paroles de Ville",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/scene-contes-urbains-cotonou-demo",
+      "capacity": 96,
+      "ticketTiers": [
+        {
+          "label": "Écoute démo",
+          "priceXof": 2000,
+          "displayOrder": 0
+        },
+        {
+          "label": "Cercle démo",
+          "priceXof": 5000,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Petite scène fictive de conte dans une cour ocre éclairée par des lampes chaudes",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'une petite scène de conte fictive dans une cour ocre à Ganhi, Cotonou, fauteuil vide, objets sonores et lampes chaudes, décor minimaliste avant le spectacle, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Fauteuil de conteur fictif entouré de calebasses décoratives et d'un tapis graphique",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un fauteuil de conteur fictif entouré de calebasses décoratives génériques et d'un tapis aux motifs originaux dans une cour béninoise, lumière théâtrale douce, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Rangées de bancs fictifs face à une scène encadrée d'arcades dans la nuit de Ganhi",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 de bancs vides face à une scène fictive encadrée d'arcades à Ganhi, ciel nocturne bleu et éclairage ambré subtil, salle prête à accueillir, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000304",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Balade Photo des Lumières du Port",
+    "slug": "balade-photo-lumieres-port-cotonou-demo",
+    "description": "Parcours photo fictif consacré aux reflets, textures et lumières de la ville, scénarisé autour d'un refuge écologique imaginaire. Le rendez-vous, l'encadrement et les places sont inventés pour la bêta fermée Kwabor; aucune inscription réelle n'existe. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Agla",
+    "address": "Adresse fictive, Mangrove Urbaine d'Agla, Cotonou",
+    "lat": 6.3831,
+    "lng": 2.3455,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "photo"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 76,
+        "startLocalTime": "16:30",
+        "durationMinutes": 120,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000203",
+      "organizerName": "Groupe fictif Cadre Littoral",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 24,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Passerelle fictive d'Agla baignée de lumière dorée avec reflets dans la mangrove",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une balade photo fictive à Agla, Cotonou, passerelle de mangrove baignée de lumière dorée, petits trépieds génériques rangés au départ et reflets humides, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Appareil photo générique fictif posé sur une rambarde face aux palétuviers lumineux",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un appareil photo générique sans marque posé sur une rambarde en bois face aux palétuviers d'Agla, Bénin, soleil bas et profondeur de champ délicate; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Reflets abstraits fictifs de feuillages et de ciel cuivré dans une eau calme de Cotonou",
+        "prompt": "Photographie artistique réaliste en portrait 3:4 de reflets abstraits de feuillages et de ciel cuivré dans une eau calme à Cotonou, Bénin, texture naturelle et composition verticale contemplative; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000305",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Rencontres Danse des Quartiers",
+    "slug": "rencontres-danse-quartiers-cotonou-demo",
+    "description": "Rencontres chorégraphiques fictives imaginées comme une succession de formes courtes dans un marché au bord de l'eau. Les artistes, le programme, les tarifs et l'organisation sont inventés pour la bêta fermée Kwabor; aucune vente réelle n'est proposée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Ladji",
+    "address": "Adresse fictive, Marché des Paniers du Lac, Cotonou",
+    "lat": 6.3888,
+    "lng": 2.4327,
+    "priceFromXof": 2500,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "danse"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 102,
+        "startLocalTime": "17:00",
+        "durationMinutes": 240,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000204",
+      "organizerName": "Plateforme fictive Mouvements Croisés",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/rencontres-danse-quartiers-cotonou-demo",
+      "capacity": 220,
+      "ticketTiers": [
+        {
+          "label": "Gradin démo",
+          "priceXof": 2500,
+          "displayOrder": 0
+        },
+        {
+          "label": "Cercle démo",
+          "priceXof": 6000,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Plateau de danse fictif au bord de l'eau avec voiles colorés et lumière de fin du jour",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'un plateau de danse fictif au bord de l'eau à Cotonou, voiles colorés en mouvement, sol en bois et lumières de fin du jour, répétition vue de loin avec silhouettes non identifiables, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Voiles fictifs suspendus au-dessus d'un plateau vide face aux reflets du lac à Ladji",
+        "prompt": "Photographie réaliste en portrait 3:4 de voiles textiles fictifs suspendus au-dessus d'un plateau vide à Ladji, Cotonou, reflets du lac et sièges en bois, composition aérienne avant spectacle, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Coulisses fictives avec étoffes, bracelets de scène et éclairage ambré sans interprète",
+        "prompt": "Photographie réaliste en portrait 3:4 de coulisses de danse fictives au Bénin, étoffes pliées, bracelets de scène génériques et éclairage ambré, espace ordonné sans interprète visible; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000315",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Festival culturel de Ouidah Démo",
+    "slug": "festival-culturel-ouidah-demo",
+    "description": "Festival culturel entièrement fictif imaginé près de la Porte du Non-Retour, avec scènes acoustiques, installations lumineuses et ateliers de démonstration. Le programme, les intervenants, les tarifs et la billetterie sont inventés; aucun billet réel n'est disponible. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Plage de Ouidah",
+    "address": "Porte du Non-Retour, Route des Esclaves, Ouidah",
+    "lat": 6.3422,
+    "lng": 2.08,
+    "priceFromXof": 2000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "festival"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 21,
+        "startLocalTime": "18:45",
+        "durationMinutes": 180,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000214",
+      "organizerName": "Organisation fictive Kwabor Démonstration",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/festival-culturel-ouidah-demo",
+      "capacity": 140,
+      "ticketTiers": [
+        {
+          "label": "Festival démo",
+          "priceXof": 2000,
+          "displayOrder": 0
+        },
+        {
+          "label": "Pass démo",
+          "priceXof": 4500,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Scène fictive du Festival culturel de Ouidah Démo près du littoral au crépuscule",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'un festival culturel fictif près du littoral de Ouidah, Bénin, petite scène acoustique, lanternes et installations originales au crépuscule, vue générée avant ouverture; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Lanternes et instruments fictifs disposés dans le sable pour le festival Démo de Ouidah",
+        "prompt": "Photographie réaliste en portrait 3:4 de lanternes et d'instruments acoustiques fictifs disposés dans le sable pour un festival Démo à Ouidah, Bénin, lumière chaude et arrière-plan bleu profond avant le public; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Allée fictive illuminée menant aux installations du festival Démo sous les palmiers",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une allée fictive illuminée menant aux installations d'un festival culturel Démo sous les palmiers à Ouidah, Bénin, ambiance nocturne paisible et scène vide; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000306",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Cinéma des Dunes",
+    "slug": "cinema-dunes-ouidah-demo",
+    "description": "Projection en plein air fictive dans un jardin de dunes imaginaire, avec écran sobre, assises légères et sélection de courts métrages inventés. La séance et ses participants sont créés pour la bêta fermée Kwabor; aucune inscription ni œuvre réelle n'est associée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Djègbadji",
+    "address": "Adresse fictive, Jardin des Dunes de Djègbadji, Ouidah",
+    "lat": 6.3355,
+    "lng": 2.1024,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "cinema"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 43,
+        "startLocalTime": "19:15",
+        "durationMinutes": 135,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000207",
+      "organizerName": "Écran fictif Côte Claire",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 120,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Écran de cinéma fictif dressé entre des dunes avec chaises basses sous un ciel bleu nuit",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'un cinéma de plein air fictif dans les dunes près d'Ouidah, écran blanc sans image, chaises basses et petites lampes, ciel bleu nuit et herbes côtières, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Rangées fictives de coussins et de lanternes face à un écran blanc dans le sable",
+        "prompt": "Photographie réaliste en portrait 3:4 de rangées de coussins et lanternes fictifs face à un écran blanc dans le sable d'Ouidah, lumière chaude, végétation côtière et projection pas encore commencée, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Projecteur générique fictif posé dans un caisson en bois face aux dunes au crépuscule",
+        "prompt": "Photographie rapprochée réaliste en portrait 3:4 d'un projecteur générique sans marque installé dans un caisson en bois face aux dunes d'Ouidah, crépuscule violet et texture du sable nette, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000307",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Laboratoire des Rythmes de la Côte",
+    "slug": "laboratoire-rythmes-cote-ouidah-demo",
+    "description": "Session musicale fictive autour de rythmes originaux, d'instruments génériques et d'expérimentations acoustiques dans une cour imaginaire. Les artistes, l'atelier et les tarifs sont inventés pour la bêta fermée Kwabor; aucune billetterie réelle n'est ouverte. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Zomaï",
+    "address": "Adresse fictive, Cour des Tambours de Zomaï, Ouidah",
+    "lat": 6.3672,
+    "lng": 2.0886,
+    "priceFromXof": 3500,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "rythmes"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 69,
+        "startLocalTime": "15:00",
+        "durationMinutes": 240,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000206",
+      "organizerName": "Laboratoire fictif Onde de Terre",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/laboratoire-rythmes-cote-ouidah-demo",
+      "capacity": 72,
+      "ticketTiers": [
+        {
+          "label": "Session démo",
+          "priceXof": 3500,
+          "displayOrder": 0
+        },
+        {
+          "label": "Immersion démo",
+          "priceXof": 8000,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Cercle fictif d'instruments acoustiques dans une cour de terre rouge baignée de soleil",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'un laboratoire musical fictif à Ouidah, cercle d'instruments acoustiques originaux et génériques dans une cour de terre rouge, lumière de l'après-midi avant atelier, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Tambours fictifs, petites cloches et cordes disposés sur des tapis aux tons naturels",
+        "prompt": "Photographie réaliste en portrait 3:4 de tambours fictifs, petites cloches génériques et instruments à cordes disposés sur des tapis naturels à Ouidah, textures artisanales et lumière rasante, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Installation sonore fictive en bois sous un auvent ouvert sur un patio végétalisé",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 d'une installation sonore fictive en bois sous un auvent à Ouidah, patio végétalisé, ombres profondes et espace prêt pour une expérimentation acoustique, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000308",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Parade des Lanternes d'Argile",
+    "slug": "parade-lanternes-argile-ouidah-demo",
+    "description": "Installation-parade fictive de lanternes en argile et de formes lumineuses originales dans les allées d'un marché imaginaire. L'événement, les objets, les participants et le parcours sont inventés pour la bêta fermée Kwabor; aucune inscription réelle n'est proposée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Avlékété",
+    "address": "Adresse fictive, Marché des Teinturières d'Avlékété, Ouidah",
+    "lat": 6.3482,
+    "lng": 2.0477,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "lanternes"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 95,
+        "startLocalTime": "18:00",
+        "durationMinutes": 150,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000208",
+      "organizerName": "Fabrique fictive Lueurs d'Argile",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 260,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Allée fictive d'Avlékété illuminée par des lanternes d'argile aux formes originales",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'une parade-installation fictive à Avlékété près d'Ouidah, allée illuminée par des lanternes d'argile aux formes originales, tissus indigo et nuit douce, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Lanternes fictives en terre perforée projetant des motifs lumineux sur un mur indigo",
+        "prompt": "Photographie rapprochée réaliste en portrait 3:4 de lanternes fictives en terre perforée projetant des motifs lumineux abstraits sur un mur indigo à Ouidah, chaleur visible et ambiance artisanale, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Installation fictive de lumières au sol serpentant entre des étoffes suspendues dans la nuit",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une installation fictive de petites lumières au sol serpentant entre des étoffes suspendues à Avlékété, nuit bleue et perspective immersive, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000309",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Journée des Saveurs du Littoral",
+    "slug": "journee-saveurs-littoral-ouidah-demo",
+    "description": "Journée culinaire fictive mettant en scène recettes imaginaires, produits locaux génériques et tables de dégustation près d'une lagune inventée. Les cuisiniers, menus, tarifs et billets sont créés pour la bêta fermée Kwabor; aucun repas réel n'est vendu. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Avlékété",
+    "address": "Adresse fictive, Sentier des Palétuviers Rouges, Ouidah",
+    "lat": 6.3387,
+    "lng": 2.0568,
+    "priceFromXof": 3000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "cuisine"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 130,
+        "startLocalTime": "11:00",
+        "durationMinutes": 420,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000205",
+      "organizerName": "Cuisine fictive Table des Vents",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/journee-saveurs-littoral-ouidah-demo",
+      "capacity": 160,
+      "ticketTiers": [
+        {
+          "label": "Découverte démo",
+          "priceXof": 3000,
+          "displayOrder": 0
+        },
+        {
+          "label": "Dégustation démo",
+          "priceXof": 7500,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Tables de dégustation fictives dressées sous un auvent face à la lagune près d'Ouidah",
+        "prompt": "Photographie culinaire événementielle réaliste en portrait 3:4 de tables de dégustation fictives sous un auvent face à une lagune près d'Ouidah, vaisselle artisanale, plats béninois génériques sans marque et lumière naturelle, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Assortiment fictif de bouchées colorées servi dans des coupelles en terre au bord de l'eau",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un assortiment fictif de bouchées colorées inspirées du Bénin dans des coupelles en terre, nappe de fibres et lagune floue en arrière-plan, stylisme naturel; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Cuisine ouverte fictive avec marmites en terre et paniers d'ingrédients avant le service",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une cuisine événementielle ouverte fictive près d'Ouidah, marmites en terre, paniers d'ingrédients frais génériques et plan de travail propre avant service, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000310",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Matinée des Masques en Papier",
+    "slug": "matinee-masques-papier-porto-novo-demo",
+    "description": "Atelier-exposition fictif de sculptures en papier aux formes entièrement originales, conçu pour explorer volumes, couleurs et ombres sans référence rituelle. Le programme, les œuvres et les participants sont inventés pour la bêta fermée Kwabor; aucune inscription réelle n'est ouverte. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Tokpota",
+    "address": "Adresse fictive, Passage des Masques de Tokpota, Porto-Novo",
+    "lat": 6.5098,
+    "lng": 2.6197,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "papier"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 28,
+        "startLocalTime": "09:30",
+        "durationMinutes": 210,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000211",
+      "organizerName": "Atelier fictif Formes Légères",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 40,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Sculptures fictives en papier coloré suspendues dans une cour lumineuse de Porto-Novo",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un atelier-exposition fictif à Porto-Novo, sculptures abstraites originales en papier coloré suspendues dans une cour lumineuse, tables prêtes avant activité, aucune référence rituelle réelle, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Formes fictives en papier plié projetant des ombres graphiques sur un mur de terre claire",
+        "prompt": "Photographie réaliste en portrait 3:4 de formes sculpturales fictives en papier plié projetant des ombres graphiques sur un mur de terre claire à Porto-Novo, couleurs sobres et détail délicat, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Table fictive d'atelier avec papiers, fibres et outils génériques soigneusement alignés",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une table d'atelier fictive au Bénin, papiers colorés, fibres naturelles et outils génériques soigneusement alignés, lumière matinale et espace pédagogique vide; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000311",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Salon du Livre des Lagunes",
+    "slug": "salon-livre-lagunes-porto-novo-demo",
+    "description": "Salon littéraire fictif installé face à la lagune, avec ouvrages imaginaires, coins de lecture et conversations scénarisées. Les auteurs, titres, tarifs et organisateurs sont inventés pour la bêta fermée Kwabor; aucune publication ni billetterie réelle n'est associée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Akonaboè",
+    "address": "Adresse fictive, Escale Verte de la Lagune, Porto-Novo",
+    "lat": 6.4857,
+    "lng": 2.6411,
+    "priceFromXof": 1500,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "livres"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 58,
+        "startLocalTime": "10:00",
+        "durationMinutes": 480,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000210",
+      "organizerName": "Maison fictive Pages de Lagune",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/salon-livre-lagunes-porto-novo-demo",
+      "capacity": 200,
+      "ticketTiers": [
+        {
+          "label": "Journée démo",
+          "priceXof": 1500,
+          "displayOrder": 0
+        },
+        {
+          "label": "Pass démo",
+          "priceXof": 3500,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Pavillon littéraire fictif ouvert sur la lagune avec livres sans titre et fauteuils colorés",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un salon du livre fictif à Porto-Novo, pavillon ouvert sur la lagune, ouvrages aux couvertures vierges sans titre et fauteuils colorés, lumière douce du matin, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Table fictive de livres aux couvertures unies devant les reflets argentés de la lagune",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une table de livres fictifs aux couvertures unies sans écriture devant la lagune de Porto-Novo, marque-pages en fibres, tasse artisanale et reflets argentés, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Coin de lecture fictif sous un auvent de fibres avec coussins et vue sur l'eau calme",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un coin de lecture fictif sous un auvent de fibres à Porto-Novo, coussins, petite étagère de livres vierges et vue sur l'eau calme, ambiance reposante, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000312",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Concert des Cours Illuminées",
+    "slug": "concert-cours-illuminees-porto-novo-demo",
+    "description": "Concert acoustique fictif réparti entre les voûtes et la cour d'une maison imaginaire, avec scénographie lumineuse et instruments génériques. Les artistes, le programme, les tarifs et les billets sont inventés pour la bêta fermée Kwabor; aucune vente réelle n'est proposée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Adjina",
+    "address": "Adresse fictive, Maison des Voûtes d'Adjina, Porto-Novo",
+    "lat": 6.4985,
+    "lng": 2.6254,
+    "priceFromXof": 4000,
+    "priceUnit": "par_entree",
+    "priceTier": 2,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "concert"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 84,
+        "startLocalTime": "19:30",
+        "durationMinutes": 180,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000209",
+      "organizerName": "Ensemble fictif Voûtes en Musique",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/concert-cours-illuminees-porto-novo-demo",
+      "capacity": 130,
+      "ticketTiers": [
+        {
+          "label": "Cour démo",
+          "priceXof": 4000,
+          "displayOrder": 0
+        },
+        {
+          "label": "Galerie démo",
+          "priceXof": 9000,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Cour à voûtes fictive illuminée pour un concert acoustique nocturne à Porto-Novo",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'un concert acoustique fictif dans une cour à voûtes de Porto-Novo, instruments génériques sur une petite scène, éclairage ambré et bleu, sièges vides avant ouverture, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Instruments à cordes fictifs sous une arcade éclairée par des lampes au sol discrètes",
+        "prompt": "Photographie réaliste en portrait 3:4 d'instruments à cordes fictifs et génériques sous une arcade à Porto-Novo, lampes au sol discrètes, carreaux colorés et lumière de répétition, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Succession fictive de voûtes colorées menant vers une scène lumineuse dans la nuit",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une succession de voûtes fictives colorées menant vers une scène lumineuse à Porto-Novo, nuit profonde, sol légèrement réfléchissant et cadrage symétrique, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000313",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Atelier Indigo et Papier",
+    "slug": "atelier-indigo-papier-porto-novo-demo",
+    "description": "Atelier fictif associant papier artisanal, bains indigo et impressions géométriques originales dans un marché imaginaire de Porto-Novo. Les animateurs, le matériel et les places sont inventés pour la bêta fermée Kwabor; aucune réservation réelle n'est disponible. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Ouando",
+    "address": "Adresse fictive, Marché des Étoffes Indigo, Porto-Novo",
+    "lat": 6.5127,
+    "lng": 2.6034,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "indigo"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 118,
+        "startLocalTime": "14:00",
+        "durationMinutes": 210,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000213",
+      "organizerName": "Atelier fictif Bleu Papier",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "gratuit",
+      "ticketUrl": null,
+      "capacity": 32,
+      "ticketTiers": []
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Table d'atelier fictive couverte de papiers indigo et de tampons géométriques à Porto-Novo",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un atelier indigo et papier fictif à Porto-Novo, grande table couverte de feuilles bleues et de tampons géométriques originaux, cour lumineuse avant activité, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Feuilles de papier fictives aux dégradés indigo séchant sur des cordes dans une cour claire",
+        "prompt": "Photographie réaliste en portrait 3:4 de feuilles de papier fictives aux dégradés indigo séchant sur des cordes dans une cour de Porto-Novo, brise légère, murs clairs et sol ocre, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Tampons fictifs en bois et coupelles de pigment bleu disposés sur une natte naturelle",
+        "prompt": "Photographie macro réaliste en portrait 3:4 de tampons fictifs en bois aux motifs abstraits et de coupelles de pigment bleu sur une natte naturelle au Bénin, lumière douce et textures précises; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000314",
+    "type": "evenement",
+    "subtype": "culture",
+    "listingClass": "evenementiel",
+    "categoryId": "event-culture",
+    "status": "publie",
+    "name": "Semaine des Histoires de la Lagune",
+    "slug": "semaine-histoires-lagune-porto-novo-demo",
+    "description": "Cycle fictif de lectures, objets sonores et petites installations inspirées de paysages lagunaires imaginaires, installé dans une halle de poterie inventée. Les récits, auteurs, tarifs et billets sont créés pour la bêta fermée Kwabor; aucune vente réelle n'est possible. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Akpassa",
+    "address": "Adresse fictive, Halle des Potières d'Akpassa, Porto-Novo",
+    "lat": 6.4863,
+    "lng": 2.6168,
+    "priceFromXof": 2500,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "culture",
+      "histoires"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "event",
+      "category": "culture",
+      "schedule": {
+        "kind": "relative_to_seed_date",
+        "startOffsetDays": 156,
+        "startLocalTime": "17:30",
+        "durationMinutes": 300,
+        "timeZone": "Africa/Porto-Novo"
+      },
+      "venueListingId": "00000000-0000-4000-8000-000000000212",
+      "organizerName": "Cercle fictif Histoires d'Eau",
+      "organizerContact": "demo-events@kwabor.test",
+      "ticketType": "payant",
+      "ticketUrl": "https://tickets.kwabor.test/semaine-histoires-lagune-porto-novo-demo",
+      "capacity": 150,
+      "ticketTiers": [
+        {
+          "label": "Soirée démo",
+          "priceXof": 2500,
+          "displayOrder": 0
+        },
+        {
+          "label": "Semaine démo",
+          "priceXof": 6500,
+          "displayOrder": 1
+        }
+      ]
+    },
+    "amenities": [],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Halle fictive transformée en espace de récits avec jarres lumineuses et voiles bleus",
+        "prompt": "Photographie événementielle réaliste en portrait 3:4 d'une halle de poterie fictive à Porto-Novo transformée en espace de récits, jarres lumineuses, voiles bleus et petite scène vide, ambiance lagunaire stylisée, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Jarres fictives éclairées de l'intérieur devant des voiles évoquant les reflets de la lagune",
+        "prompt": "Photographie réaliste en portrait 3:4 de jarres fictives éclairées de l'intérieur devant des voiles bleus évoquant des reflets de lagune à Porto-Novo, installation originale et lumière douce, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Coin de lecture fictif entouré de céramiques mates et de coussins aux tons d'eau",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un coin de lecture fictif entouré de céramiques mates et de coussins bleu-vert dans une halle de Porto-Novo, espace calme avant la séance, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  }
+]

@@ -12,7 +12,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.android.presentation.detail.CatalogDetailViewModel
 import com.kwabor.android.presentation.explore.ExploreIntent
 import com.kwabor.android.presentation.explore.ExploreViewModel
@@ -20,9 +19,10 @@ import com.kwabor.android.presentation.favorites.FavoritesEffect
 import com.kwabor.android.presentation.favorites.FavoritesViewModel
 import com.kwabor.android.ui.screens.favorites.FavoritesScreen
 import com.kwabor.android.ui.screens.favorites.FavoritesScreenActions
-import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.android.ui.screens.favorites.FavoritesScreenResources
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
 import com.kwabor.shared.presentation.favorites.FavoritesIntent
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 
 @Composable
@@ -73,9 +73,9 @@ internal fun FavoritesViewModel.screenActions(onBack: () -> Unit): FavoritesScre
 internal fun NavGraphBuilder.favoritesChildRoute(
     navController: NavHostController,
     viewModel: FavoritesViewModel,
-    strings: KwaborStrings,
-    mediaUrlPolicy: ListingMediaUrlPolicy,
+    resources: FavoritesScreenResources,
     paddingValues: PaddingValues,
+    rootNavigationProfile: RootNavigationProfile,
 ) {
     composable<FavoritesRoute> {
         val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,12 +87,12 @@ internal fun NavGraphBuilder.favoritesChildRoute(
         }
         FavoritesScreen(
             state = state,
-            strings = strings,
-            mediaUrlPolicy = mediaUrlPolicy,
+            resources = resources,
             actions = remember(viewModel, navController) {
                 viewModel.screenActions(onBack = { navController.popBackStack() })
             },
             modifier = Modifier.padding(bottom = paddingValues.calculateBottomPadding()),
+            showClosedBetaDemoDisclosure = rootNavigationProfile == RootNavigationProfile.ClosedBetaCatalog,
         )
     }
 }

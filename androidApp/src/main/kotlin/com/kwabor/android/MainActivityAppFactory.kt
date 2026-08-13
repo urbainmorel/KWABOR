@@ -99,6 +99,7 @@ internal class MainActivityAppFactory(
         observabilityController = applicationState.observability,
         listingMediaUrlPolicy = PublicHttpsListingMediaUrlPolicy,
         detailExternalActionLauncher = AndroidDetailExternalActionLauncher(activity.applicationContext),
+        rootNavigationProfile = compositionRoot.rootNavigationProfile,
     )
 
     private fun createExploreViewModel(): ExploreViewModel = ViewModelProvider(

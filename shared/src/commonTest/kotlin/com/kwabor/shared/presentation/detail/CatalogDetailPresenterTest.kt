@@ -90,6 +90,20 @@ class CatalogDetailPresenterTest {
     }
 
     @Test
+    fun load_marksDemoContentFromTheTypedTag() = runTest {
+        val base = assertIs<CatalogDetail.Place>(catalogDetailFixture())
+        val source = base.copy(common = base.common.copy(tags = listOf("demo-kwabor", "nature")))
+        val presenter = CatalogDetailPresenter(
+            FakeDetailCatalogQueryRepository { DomainResult.Success(source) },
+            FixedDetailClock(DETAIL_TEST_NOW),
+        )
+
+        val model = assertIs<CatalogDetailUiState.Content>(presenter.load(source.common.id, strings)).model
+
+        assertTrue(model.isDemoContent)
+    }
+
+    @Test
     fun load_exposesTypedDirectionsContactAndMenuTargets() = runTest {
         val source = catalogDetailFixture(variant = DetailFixtureVariant.Food)
         val repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) }

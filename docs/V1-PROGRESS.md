@@ -7,15 +7,15 @@ Ce fichier est le tableau de bord courant de la reprise V1. Le détail chronolog
 
 | Élément | État vérifié |
 | --- | --- |
-| Date du snapshot | 10 août 2026 |
-| Référence Git | Base : `main` au merge `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58` ; lot courant : `a81ea8f0cc65be8d4e785040b97569999e6f7324` |
-| Intégration | PR `#50` V1 à `#58` EXPLORE-002B2B1 fusionnées ; SYNC-001 validé dans la PR ouverte `#59`, en attente de revue/fusion |
+| Date du snapshot | 12 août 2026 |
+| Référence Git | `main` à `0f7850621896e88d5d5738b67c42878de86e46bc` ; lot bêta sur `codex/beta-001-demo-catalog` |
+| Intégration | PR `#50` à `#59` fusionnées ; préparation du corpus et du profil de bêta fermée en cours |
 | Sécurité | PR `#35` fusionnée ; préflight et déploiement sur environnement persistant non exécutés |
 | Ancienne pile | Les PR `#36` à `#48` sont fermées avec commentaires de supersession ; leurs têtes sont déjà ancêtres de `main` via `#50` |
 | Auth parallèle | PR `#34` fermée avec commentaire de supersession, non ancêtre de `main` et remplacée fonctionnellement par AUTH-UX-001 intégrée |
-| CI exacte | Run `31370227545` entièrement vert sur la PR `#59` (16/16), dont Supabase, Gradle, Android API 30/31/36 et iOS Debug/Staging/Release |
+| CI exacte | Run post-fusion `31378013483` vert sur `main`, dont Supabase, Gradle et iOS Debug/Staging/Release |
 | Décision de release | **No-go** |
-| Périmètre V1 | Divergence ouverte entre le PRD/DESIGN complet et la V1 minimale proposée par l'audit |
+| Périmètre V1 | ADR-0036 accepté : bêta fermée catalogue d'abord ; cible PRD/DESIGN complète conservée après bêta |
 
 Les anciens pourcentages d'avancement ont été retirés : ils n'étaient pas reliés à une matrice de
 couverture vérifiable et donnaient une précision trompeuse après la fusion de la pile.
@@ -101,10 +101,11 @@ couverture vérifiable et donnaient une précision trompeuse après la fusion de
 - dashboard Promoteur, campagnes, paiement et facturation ;
 - conversion multidevise, thème sombre complet et préférences avancées.
 
-Le [PRD](../PRD.md) et le [DESIGN](../DESIGN.md) conservent ces fonctions dans leur V1 actuelle. Le
-[rapport de préparation](audits/2026-07-30-v1-production-readiness.md) propose de les reporter pour
-une V1 minimale, mais cette réduction n'est pas approuvée ni tracée par ADR. STATE-001 ne modifie
-donc ni les cinq racines officielles ni le périmètre produit.
+Le [PRD](../PRD.md) et le [DESIGN](../DESIGN.md) conservent ces fonctions dans leur cible complète.
+[ADR-0036](adr/0036-closed-beta-catalog-delivery-profile.md) accepte désormais leur report après une
+bêta fermée centrée sur le catalogue. La navigation de cette bêta est réduite à `Explorer · Compte`
+et son ouverture exige 60 fiches complètes avec 180 visuels vérifiés. Ce profil ne déclare aucune
+fonction reportée comme livrée et ne remplace pas la cible produit complète.
 
 ## État des PR historiques
 

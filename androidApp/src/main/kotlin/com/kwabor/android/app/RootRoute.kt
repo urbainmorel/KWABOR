@@ -6,6 +6,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.navOptions
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
+import com.kwabor.shared.presentation.navigation.isVisibleIn
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -48,7 +50,12 @@ internal fun NavDestination.toRootDestination(): RootNavigationDestination? = wh
     else -> null
 }
 
-internal fun NavHostController.navigateToRoot(destination: RootNavigationDestination) {
+internal fun NavHostController.navigateToRoot(
+    destination: RootNavigationDestination,
+    profile: RootNavigationProfile = RootNavigationProfile.Full,
+) {
+    val visibleDestination = destination.takeIf { candidate -> candidate.isVisibleIn(profile) }
+        ?: RootNavigationDestination.Home
     val options = navOptions {
         popUpTo(graph.findStartDestination().id) {
             saveState = true
@@ -56,7 +63,7 @@ internal fun NavHostController.navigateToRoot(destination: RootNavigationDestina
         launchSingleTop = true
         restoreState = true
     }
-    when (destination) {
+    when (visibleDestination) {
         RootNavigationDestination.Home -> navigate(HomeRoute, options)
         RootNavigationDestination.Social -> navigate(SocialRoute, options)
         RootNavigationDestination.Add -> navigate(AddRoute, options)

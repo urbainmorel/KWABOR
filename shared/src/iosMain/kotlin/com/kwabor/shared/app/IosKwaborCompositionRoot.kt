@@ -27,7 +27,10 @@ class IosKwaborCompositionRoot(
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
     private val viewerSessionScopeTracker = sharedRoot?.viewerSessionScopeTracker ?: ViewerSessionScopeTracker()
 
-    val bridge = KwaborSharedBridge(hasCatalogConfiguration = sharedRoot != null)
+    val bridge = KwaborSharedBridge(
+        hasCatalogConfiguration = sharedRoot != null,
+        rootNavigationProfile = rootNavigationProfileForEnvironmentName(environmentName),
+    )
     val exploreController = IosExploreController(
         presenter = sharedRoot?.explorePresenter,
         dispatcherProvider = dispatcherProvider,

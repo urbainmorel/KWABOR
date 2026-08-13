@@ -1,26 +1,36 @@
 # Release Android Kwabor
 
-Ce runbook décrit la production reproductible des artefacts Android. Il ne remplace ni l'approbation du GitHub Environment `production`, ni la validation Play Console.
+Ce runbook décrit le chemin G6 de la bêta fermée Android : construire un AAB `staging` signé,
+archiver sa provenance, puis, sur demande explicite, publier ce même artefact dans Google Play
+Internal. Ce workflow n'utilise jamais le backend production et ne réalise aucun rollout public.
 
 ## Matrice des variants
 
 | Variant | Tier distant | Identité visible | Signature | Artefact |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `debug` | `development` | Kwabor Dev, version `-debug` | certificat debug local | APK de développement |
-| `staging` | `staging` | Kwabor Staging, version `-staging` | certificat debug, distribution interne uniquement | APK minifié |
-| `release` | `production` | Kwabor | clé d'upload propriétaire injectée | AAB minifié pour Play |
+| `staging` local | `staging` | Kwabor Staging, version `-staging` | certificat debug local | APK ou AAB non distribuable sur Play |
+| `staging` G6 | `staging` | Kwabor Staging, version `-staging` | clé d'upload Play protégée | AAB minifié pour Play Internal |
+| `release` | `production` | Kwabor | configuration Gradle existante, hors profil bêta | aucun artefact produit par le workflow G6 |
 
-Les trois variants gardent l'application ID `com.kwabor.android`. La séparation des données repose sur des projets fournisseurs distincts et sur les valeurs injectées pour chaque tier.
+Les variants gardent l'application ID `com.kwabor.android`. Le workflow G6 construit uniquement
+`bundleStaging`. Il vérifie que les identités Supabase et Firebase correspondent au staging protégé
+et que la référence Supabase production, utilisée seulement comme garde négatif, est distincte.
 
-R8 réduit les ressources, minifie et obfusque `staging` et `release`. Le fichier `mapping.txt` est conservé avec chaque artefact afin de désobfusquer les crashs. Le workflow produit aussi un SHA-256 de l'APK ou de l'AAB.
+R8 réduit les ressources, minifie et obfusque `staging`. Le workflow retire la signature debug du
+bundle généré, le signe avec la clé d'upload protégée, puis vérifie sa signature et l'empreinte du
+certificat. Il archive l'AAB, `mapping.txt`, leurs SHA-256 et la provenance exacte.
 
 ## Versionnement
 
-- `KWABOR_VERSION_CODE` ou `kwabor.versionCode` : entier strictement positif et croissant pour chaque upload Play.
-- `KWABOR_VERSION_NAME` ou `kwabor.versionName` : version sémantique, par exemple `1.0.0` ou `1.0.0-rc.1`.
+- `KWABOR_VERSION_CODE` ou `kwabor.versionCode` : entier de `1` à `2 100 000 000`, strictement
+  croissant pour chaque upload Play.
+- `KWABOR_VERSION_NAME` ou `kwabor.versionName` : version sémantique de 64 caractères maximum,
+  par exemple `1.0.0` ou `1.0.0-rc.1`.
 - Valeurs locales par défaut hors distribution : code `1`, nom `0.1.0`.
 
-Le build rejette un code invalide ou un nom hors contrat avant compilation.
+Le workflow rejette les zéros initiaux, les valeurs hors bornes et les noms hors contrat avant le
+checkout ou la compilation.
 
 ## Identité visuelle et lancement
 
@@ -119,102 +129,176 @@ surface onboarding configurée n'est exposée. Ces preuves automatisées ne remp
 perceptuelle finale sur appareils Pixel/Samsung et iOS. Une matrice sans frame wordmark clairement
 identifiable est donc rejetée lors de cette revue, même si ses garde-fous temporels sont verts.
 
-## Clé d'upload production
+## Clé d'upload Play
 
-Le propriétaire génère et sauvegarde une clé d'upload dédiée hors du dépôt. Exemple à exécuter dans un emplacement privé et sauvegardé :
+Le propriétaire génère et sauvegarde une clé d'upload dédiée hors du dépôt. Exemple à exécuter dans
+un emplacement privé et sauvegardé :
 
 ```powershell
 keytool -genkeypair -v -keystore kwabor-upload.jks -alias kwabor-upload -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-La protection finale de l'application doit utiliser Play App Signing. La clé d'upload sert à authentifier les nouveaux bundles ; sa perte ou sa compromission doit être traitée selon la procédure Play de réinitialisation de clé d'upload.
+Google Play doit utiliser Play App Signing. La clé d'upload authentifie l'AAB envoyé à Play
+Internal ; elle n'est jamais embarquée dans Git. Sa perte ou sa compromission suit la procédure
+Play de réinitialisation de clé d'upload.
 
-Pour un build local production, fournir ensemble :
-
-- `KWABOR_ANDROID_KEYSTORE_PATH` ou `kwabor.android.signing.storePath` ;
-- `KWABOR_ANDROID_KEYSTORE_PASSWORD` ou `kwabor.android.signing.storePassword` ;
-- `KWABOR_ANDROID_KEY_ALIAS` ou `kwabor.android.signing.keyAlias` ;
-- `KWABOR_ANDROID_KEY_PASSWORD` ou `kwabor.android.signing.keyPassword`.
-
-Une configuration partielle, un fichier absent ou une demande directe d'artefact release sans ces quatre valeurs fait échouer le build. Aucun certificat production factice n'est créé par le projet.
+Le workflow compare deux fois le certificat à `KWABOR_ANDROID_UPLOAD_CERT_SHA256` : lors de
+l'injection du keystore, puis sur l'AAB signé. Il exige exactement une structure de signature JAR
+et refuse un bundle partiellement ou doublement signé.
 
 ## Configuration GitHub
 
-Les GitHub Environments `staging` et `production` doivent fournir les variables publiques
-`KWABOR_SUPABASE_URL`, `KWABOR_SUPABASE_PUBLISHABLE_KEY`, `KWABOR_FIREBASE_PROJECT_ID` et
-`KWABOR_GOOGLE_WEB_CLIENT_ID`. Le client OAuth Google est le client Web/serveur du tier configuré
-dans Supabase et doit respecter `*.apps.googleusercontent.com` ; une valeur absente ou mal formée
-arrête le workflow avant le build.
+### Protections obligatoires
 
-### Configuration Firebase staging et production
+Les GitHub Environments `staging` et `play-internal` sont distincts. Chacun doit :
 
-Chaque GitHub Environment doit contenir le secret `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64`, encodé
-depuis le `google-services.json` de ce même environnement. Le workflow le décode dans le checkout,
-vérifie le project ID et le package `com.kwabor.android`, puis le supprime même après échec.
+- imposer `deployment_branch_policy.protected_branches=true` et
+  `deployment_branch_policy.custom_branch_policies=false` ;
+- définir au moins un reviewer obligatoire ;
+- interdire l'auto-approbation avec `prevent_self_review` ;
+- interdire le bypass administrateur avec `can_admins_bypass`.
 
-Avant la première distribution contenant une configuration Firebase réelle, prouver que la population
-ciblée n'a reçu aucune ancienne build ayant activé la collecte automatique Crashlytics ou Performance.
-Sur les appareils staging, partir d'une installation propre. Si une build Firebase antérieure a été
-distribuée, bloquer la release et documenter une migration dédiée : un override persistant déjà actif
-peut commencer son travail lors de l'initialisation et la nouvelle app ne peut pas annuler avec certitude
-un upload déjà engagé.
+Le workflow lit ces règles avec l'API GitHub et échoue fermé si une condition manque. Les secrets ne
+doivent pas être placés au niveau dépôt pour contourner ces Environments.
 
-### Secrets de signature production
+### Environment `staging` — build B7.02
 
-Dans le GitHub Environment `production`, créer les secrets suivants :
+Variables requises :
+
+| Variable | Rôle |
+| --- | --- |
+| `KWABOR_SUPABASE_URL` | URL HTTPS exacte du projet staging |
+| `KWABOR_SUPABASE_PUBLISHABLE_KEY` | clé publique mobile staging |
+| `KWABOR_SUPABASE_PROJECT_REF` | référence du projet staging |
+| `KWABOR_PRODUCTION_SUPABASE_PROJECT_REF` | garde négatif : doit différer du staging |
+| `KWABOR_STAGING_PROJECT_REF_SHA256` | empreinte protégée de la référence staging |
+| `KWABOR_FIREBASE_PROJECT_ID` | identifiant Firebase staging |
+| `KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256` | empreinte protégée de l'identifiant Firebase |
+| `KWABOR_GOOGLE_WEB_CLIENT_ID` | client OAuth Web/serveur staging |
+| `KWABOR_ANDROID_UPLOAD_CERT_SHA256` | empreinte du certificat de la clé d'upload |
+
+La référence production n'est jamais injectée dans l'application. Elle sert uniquement à prouver
+que l'URL mobile pointe vers un projet staging distinct.
+
+Secrets requis :
 
 | Secret | Contenu |
-|---|---|
-| `KWABOR_ANDROID_KEYSTORE_BASE64` | keystore encodé en Base64 sur une seule valeur |
+| --- | --- |
+| `KWABOR_FIREBASE_ANDROID_CONFIG_BASE64` | `google-services.json` staging encodé en Base64 |
+| `KWABOR_ANDROID_KEYSTORE_BASE64` | keystore d'upload encodé en Base64 |
 | `KWABOR_ANDROID_KEYSTORE_PASSWORD` | mot de passe du keystore |
 | `KWABOR_ANDROID_KEY_ALIAS` | alias de la clé d'upload |
 | `KWABOR_ANDROID_KEY_PASSWORD` | mot de passe de la clé |
 
-Le workflow décode le keystore dans le répertoire temporaire du runner, masque les valeurs sensibles et ne publie que l'AAB, le mapping R8 et le checksum. `staging` n'a accès à aucun de ces secrets.
+Le workflow vérifie le project ID Firebase et l'unique client `com.kwabor.android`, puis supprime le
+fichier et le keystore temporaires, y compris après échec.
+
+Avant la première distribution Firebase réelle, confirmer que les testeurs partent d'une
+installation propre. Si une ancienne build a pu activer une collecte automatique, bloquer la
+release et documenter sa migration avant la cohorte.
+
+### Environment `play-internal` — publication B7.04
+
+| Type | Nom | Valeur attendue |
+| --- | --- | --- |
+| Variable | `KWABOR_PLAY_PACKAGE_NAME` | exactement `com.kwabor.android` |
+| Variable | `KWABOR_ANDROID_UPLOAD_CERT_SHA256` | même empreinte que dans `staging` |
+| Secret | `KWABOR_PLAY_SERVICE_ACCOUNT_JSON_BASE64` | JSON du compte de service Play encodé en Base64 |
+
+Le compte de service doit être autorisé uniquement pour les opérations nécessaires sur
+l'application Kwabor. Le workflow valide sa forme avant l'appel à Google Play et supprime le JSON
+temporaire après l'étape de publication.
 
 ## Builds locaux
 
-Après avoir configuré le tier ciblé dans `local.properties` :
+Après configuration du tier dans `local.properties`, les commandes de développement restent :
 
 ```powershell
-.\gradlew.bat check :androidApp:assembleDebug
-.\gradlew.bat check :androidApp:assembleStaging
-.\gradlew.bat check :androidApp:bundleRelease
+.\gradlew.bat :androidApp:assembleDebug
+.\gradlew.bat :androidApp:assembleStaging
+.\gradlew.bat :androidApp:bundleStaging
 ```
 
-La troisième commande exige la clé d'upload injectée. Les sorties attendues sont :
+Sorties principales :
 
 - `androidApp/build/outputs/apk/debug/androidApp-debug.apk` ;
 - `androidApp/build/outputs/apk/staging/androidApp-staging.apk` ;
-- `androidApp/build/outputs/bundle/release/androidApp-release.aab` ;
-- `androidApp/build/outputs/mapping/<variant>/mapping.txt` pour les variants minifiés.
+- `androidApp/build/outputs/bundle/staging/androidApp-staging.aab` ;
+- `androidApp/build/outputs/mapping/staging/mapping.txt`.
 
-## Workflow manuel
+L'AAB `bundleStaging` local conserve la signature debug définie dans Gradle : il ne doit jamais être
+téléversé sur Play. Seul le job G6 retire cette signature, applique la clé d'upload protégée et
+produit l'AAB distribuable. Le workflow bêta ne lance jamais `bundleRelease` et ne charge aucune
+configuration backend production.
 
-Le workflow GitHub Actions `Android release artifact` accepte uniquement `staging` ou `production`, un `version_code` et un `version_name`. Il doit être lancé depuis `main` :
+## Workflow manuel G6
 
-1. choisir `staging` pour l'APK interne ou `production` pour l'AAB Play ;
-2. vérifier que les variables Supabase, Firebase et OAuth Google du GitHub Environment ciblé existent ;
-3. pour production, faire approuver le déploiement par le propriétaire ;
-4. télécharger l'artefact Actions et vérifier son SHA-256 ;
-5. archiver le mapping R8 avec la release correspondante.
+Le workflow `Android closed-beta release` est uniquement déclenchable par `workflow_dispatch` sur
+le dépôt canonique et la branche `main`.
 
-Le workflow exécute la gate `check` avant de publier. Toute configuration distante ou signature manquante arrête la génération.
+| Entrée | Contrat |
+| --- | --- |
+| `expected_sha` | SHA Git complet, minuscule, de 40 caractères |
+| `version_code` | entier Play croissant de `1` à `2 100 000 000` |
+| `version_name` | version sémantique, 64 caractères maximum |
+| `publish_to_play_internal` | `false` par défaut ; active le job de publication séparé |
+| `publish_confirmation` | `PUBLISH-EXACT-AAB-TO-PLAY-INTERNAL` si publication demandée |
 
-## Contrôles avant Play Console
+### Job 1 — construire et archiver
 
-- `versionCode` supérieur au dernier bundle téléversé ;
-- environnement `production`, project ref Supabase et client OAuth Google production vérifiés ;
-- signature de l'AAB issue de la clé d'upload attendue ;
-- mapping R8 et SHA-256 archivés ;
-- aucun fichier de configuration ou secret ajouté à Git ;
-- manifest fusionné sans `FirebaseInitProvider`, six valeurs de collecte à `false` et instrumentation
-  Performance automatique désactivée ;
-- manifest fusionné sans `AD_ID`, permissions AdServices, Install Referrer ni
-  `android.ext.adservices`, contrôlé pour debug, staging et release par
-  `:androidApp:verifyFirebaseMergedManifests` ;
-- `verifyFirebaseDependencyBoundary` vert : les dépendances Gradle évaluées ne contiennent le groupe
-  Firebase que dans `:androidApp`, et l'inventaire des scripts audités est intact ;
-- lignée Firebase propre confirmée, ou plan de migration legacy approuvé avant rollout ;
-- CI de la révision `main` verte ;
-- formulaire Data safety, politique de confidentialité et consentements validés par le propriétaire.
+1. Vérifier que `expected_sha` est le SHA sélectionné de `main`.
+2. Checkout ce SHA sans conserver les credentials Git.
+3. Exiger un run `CI` réussi, déclenché par `push` sur `main`, pour ce SHA exact.
+4. Vérifier les protections de l'Environment `staging` et les identités staging.
+5. Construire `:androidApp:bundleStaging` sans rejouer la gate globale déjà prouvée par la CI.
+6. Retirer la signature debug, signer avec la clé d'upload et vérifier le certificat attendu.
+7. Archiver pendant 30 jours l'AAB, `mapping.txt`, `KWABOR-SHA256SUMS.txt` et
+   `KWABOR-ANDROID-PROVENANCE.json`.
+
+Le nom de l'artefact contient version, code et `expected_sha`. La provenance relie le SHA source,
+le run CI qualifié, le run de build, les empreintes de staging, la signature et les hashes de
+l'AAB/mapping. Si `publish_to_play_internal` vaut `false`, le workflow s'arrête ici sans accès Play.
+
+### Job 2 — publier après approbation
+
+Le job `publish` dépend du job de build. Il ne démarre que si
+`publish_to_play_internal` vaut `true`, après approbation de l'Environment `play-internal` et avec la
+phrase de confirmation exacte.
+
+Avant tout upload, il retélécharge l'artefact du même run et revérifie :
+
+- checkout, `expected_sha`, version et code ;
+- provenance du run et backend `staging` ;
+- SHA-256 de l'AAB et du mapping ;
+- signature unique et certificat d'upload ;
+- package `com.kwabor.android` et credential Play.
+
+L'action Play est épinglée par SHA, utilise exclusivement `tracks: internal` avec
+`status: completed` et ne définit aucun `userFraction`. « Completed » rend la version disponible à
+tous les testeurs éligibles de la piste Internal ; ce n'est ni une promotion ni un rollout public.
+
+## Preflight et preuves G6
+
+Avant d'approuver le job `publish` :
+
+- G4 et G5 sont verts pour le même `expected_sha` ;
+- le `versionCode` dépasse la dernière version téléversée ;
+- les deux Environments respectent toutes les protections et contiennent uniquement les autorités
+  attendues ;
+- Play App Signing, le compte de service, l'application `com.kwabor.android` et la liste fermée de
+  testeurs existent ;
+- l'empreinte du certificat d'upload correspond à Play Console ;
+- l'artefact Actions, son digest, la provenance, les SHA-256 et le mapping R8 sont inspectés ;
+- aucun secret ou fichier fournisseur n'a été ajouté à Git ;
+- les consentements, la fiche Data safety, la confidentialité et les droits média sont approuvés.
+
+Un succès d'upload ne ferme pas G6. Il faut encore prouver le traitement Play Internal,
+l'installation sur les appareils cibles, les parcours critiques, l'accessibilité et les mesures P75
+définies dans le [plan de bêta fermée](closed-beta-delivery-plan.md).
+
+Le GEL enregistre le workflow/run, `expected_sha`, l'URL et le digest de l'artefact, les SHA-256,
+l'auteur/reviewer, l'horodatage et le résultat Play. Toute nouvelle RC exige un nouveau
+`versionCode`, un SHA exact requalifié et les gates affectées.
+
+Documents liés : [ADR-0036](adr/0036-closed-beta-catalog-delivery-profile.md),
+[déploiement](deployment.md) et [configuration des environnements](environment-configuration.md).

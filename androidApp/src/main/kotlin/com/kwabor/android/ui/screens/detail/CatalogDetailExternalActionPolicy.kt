@@ -35,39 +35,49 @@ internal data class CatalogDetailExternalActionUiModel(
 )
 
 internal fun CatalogDetailUiModel.toExternalActionUiModel(): CatalogDetailExternalActionUiModel {
+    if (isDemoContent) {
+        return CatalogDetailExternalActionUiModel(
+            primary = null,
+            secondaryDirections = null,
+            contact = null,
+            menu = null,
+        )
+    }
     val directionsAction = directions?.toActionOrNull()
     val contactActions = content.establishmentContactOrNull(contact)
-    val eventContent = content as? CatalogDetailContentUiModel.Event
-    val ticketAction = eventContent?.ticketActionOrNull()
     return CatalogDetailExternalActionUiModel(
-        primary = when (content) {
-            is CatalogDetailContentUiModel.Place -> directionsAction?.let {
-                CatalogDetailPrimaryExternalAction.Directions(it)
-            }
-            is CatalogDetailContentUiModel.Lodging,
-            is CatalogDetailContentUiModel.Food,
-            is CatalogDetailContentUiModel.Nightlife,
-            is CatalogDetailContentUiModel.Guide,
-            -> contactActions?.let { CatalogDetailPrimaryExternalAction.Contact }
-            is CatalogDetailContentUiModel.Event -> ticketAction?.let {
-                CatalogDetailPrimaryExternalAction.Ticket(
-                    action = it,
-                    enabled = !eventContent.isEnded,
-                )
-            }
-        },
-        secondaryDirections = when (content) {
-            is CatalogDetailContentUiModel.Place -> null
-            is CatalogDetailContentUiModel.Lodging,
-            is CatalogDetailContentUiModel.Food,
-            is CatalogDetailContentUiModel.Nightlife,
-            is CatalogDetailContentUiModel.Guide,
-            is CatalogDetailContentUiModel.Event,
-            -> directionsAction
-        },
+        primary = content.primaryExternalActionOrNull(directionsAction, contactActions),
+        secondaryDirections = content.secondaryDirectionsOrNull(directionsAction),
         contact = contactActions,
         menu = (content as? CatalogDetailContentUiModel.Food)?.menuUrl.toHttpsActionOrNull(),
     )
+}
+
+private fun CatalogDetailContentUiModel.primaryExternalActionOrNull(
+    directions: DetailExternalAction.Directions?,
+    contact: CatalogDetailContactActions?,
+): CatalogDetailPrimaryExternalAction? = when (this) {
+    is CatalogDetailContentUiModel.Place -> directions?.let(CatalogDetailPrimaryExternalAction::Directions)
+    is CatalogDetailContentUiModel.Lodging,
+    is CatalogDetailContentUiModel.Food,
+    is CatalogDetailContentUiModel.Nightlife,
+    is CatalogDetailContentUiModel.Guide,
+    -> contact?.let { CatalogDetailPrimaryExternalAction.Contact }
+    is CatalogDetailContentUiModel.Event -> ticketActionOrNull()?.let { action ->
+        CatalogDetailPrimaryExternalAction.Ticket(action = action, enabled = !isEnded)
+    }
+}
+
+private fun CatalogDetailContentUiModel.secondaryDirectionsOrNull(
+    directions: DetailExternalAction.Directions?,
+): DetailExternalAction.Directions? = when (this) {
+    is CatalogDetailContentUiModel.Place -> null
+    is CatalogDetailContentUiModel.Lodging,
+    is CatalogDetailContentUiModel.Food,
+    is CatalogDetailContentUiModel.Nightlife,
+    is CatalogDetailContentUiModel.Guide,
+    is CatalogDetailContentUiModel.Event,
+    -> directions
 }
 
 internal val DetailExternalActionResult.shouldShowGenericError: Boolean

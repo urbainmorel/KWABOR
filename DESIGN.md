@@ -844,6 +844,14 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 
 ## 13. Navigation & architecture de l'information
 
+> [!NOTE]
+> La navigation cible à cinq racines reste définie ci-dessous. Pour la cohorte transitoire de
+> l'[ADR-0036](docs/adr/0036-closed-beta-catalog-delivery-profile.md), la surface visible est une
+> allowlist `Explorer · Compte` : Recherche et Détail restent enfants d'Explorer ; Favoris et
+> Paramètres minimaux restent enfants de Compte. Social, Ajouter et Notifications ne sont ni
+> affichés, ni désactivés, ni remplacés par un placeholder. Un deep link visant une racine masquée
+> est ignoré et l'app revient vers Explorer.
+
 ```
 Bottom Nav (plate, 5 items égaux — aucun central)
 ├── Accueil (Explore)

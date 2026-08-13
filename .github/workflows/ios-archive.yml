@@ -1,61 +1,160 @@
-name: iOS archive artifact
+name: iOS closed beta archive and TestFlight
 
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: Target GitHub Environment
+      operation:
+        description: Create the signed archive, or manually upload a previously archived RC
         required: true
         type: choice
         options:
-          - staging
-          - production
+          - archive-only
+          - upload-testflight-internal
+      expected_sha:
+        description: Exact validated 40-character lowercase commit SHA on main
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful main CI run ID for expected_sha
+        required: true
+        type: string
       build_number:
-        description: Positive App Store build number
+        description: Positive and unused App Store Connect build number
         required: true
         type: string
       version_name:
         description: Apple version number, for example 1.0.0
         required: true
         type: string
+      archive_run_id:
+        description: For upload only, successful archive-only workflow run ID
+        required: false
+        type: string
+      release_notes:
+        description: For upload only, French What to Test notes (1-4000 characters)
+        required: false
+        type: string
+      upload_confirmation:
+        description: For upload only, type UPLOAD-TESTFLIGHT-INTERNAL
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
 
 concurrency:
-  group: ios-archive-${{ inputs.environment }}
+  group: ios-closed-beta-staging
   cancel-in-progress: false
 
 jobs:
   archive:
-    name: Build ${{ inputs.environment }} archive
+    name: Archive and export staging IPA
+    if: inputs.operation == 'archive-only'
     runs-on: macos-15
-    timeout-minutes: 60
-    environment: ${{ inputs.environment }}
-    permissions:
-      contents: read
+    timeout-minutes: 75
+    environment: staging
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       PACKAGE_LOCK: iosApp/Kwabor.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
-      KWABOR_ENVIRONMENT: ${{ inputs.environment }}
+      KWABOR_ENVIRONMENT: staging
       KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
       KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
       KWABOR_FIREBASE_PROJECT_ID: ${{ vars.KWABOR_FIREBASE_PROJECT_ID }}
       KWABOR_GOOGLE_IOS_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_IOS_CLIENT_ID }}
       KWABOR_GOOGLE_SERVER_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_SERVER_CLIENT_ID }}
       KWABOR_GOOGLE_REVERSED_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_REVERSED_CLIENT_ID }}
       KWABOR_IOS_DEVELOPMENT_TEAM: ${{ vars.KWABOR_IOS_DEVELOPMENT_TEAM }}
+      KWABOR_IOS_BUNDLE_ID: ${{ vars.KWABOR_IOS_BUNDLE_ID }}
+      KWABOR_IOS_EXPECTED_PROFILE_NAME: ${{ vars.KWABOR_IOS_PROVISIONING_PROFILE_NAME }}
+      KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION: ${{ vars.KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION }}
       KWABOR_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
       KWABOR_IOS_VERSION_NAME: ${{ inputs.version_name }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
     steps:
-      - name: Require protected main
-        if: github.ref != 'refs/heads/main'
+      - name: Validate protected archive request
+        shell: bash
+        env:
+          ARCHIVE_RUN_ID_INPUT: ${{ inputs.archive_run_id }}
+          RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}
+          UPLOAD_CONFIRMATION_INPUT: ${{ inputs.upload_confirmation }}
         run: |
-          echo "Archives may only be built from main." >&2
-          exit 1
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "urbainmorel/KWABOR" ]]; then
+            echo "iOS closed-beta releases are restricted to the canonical repository." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
+            echo "The archive must target the selected main exact-head." >&2
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ || ! "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "expected_sha and validated_ci_run_id are invalid." >&2
+            exit 1
+          fi
+          if [[ -n "$ARCHIVE_RUN_ID_INPUT" || -n "$RELEASE_NOTES_INPUT" || -n "$UPLOAD_CONFIRMATION_INPUT" ]]; then
+            echo "Upload-only inputs must be empty for archive-only." >&2
+            exit 1
+          fi
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+
+      - name: Verify exact checkout and local release policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python3 -B -m py_compile \
+            tools/ios-closed-beta-release.py \
+            tools/test_ios_closed_beta_release.py
+          python3 -B -m unittest tools.test_ios_closed_beta_release
+
+      - name: Audit protected staging Environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment_document="$RUNNER_TEMP/staging-environment.json"
+          environment_evidence="$RUNNER_TEMP/staging-environment-evidence.json"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/environments/staging" > "$environment_document"
+          python3 -B tools/ios-closed-beta-release.py validate-environment \
+            --document "$environment_document" \
+            --name staging \
+            --output "$environment_evidence"
+          echo "KWABOR_STAGING_ENVIRONMENT_EVIDENCE=$environment_evidence" >> "$GITHUB_ENV"
+
+      - name: Verify successful exact-head CI provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_document="$RUNNER_TEMP/validated-ci-run.json"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" > "$run_document"
+          python3 -B tools/ios-closed-beta-release.py validate-github-run \
+            --document "$run_document" \
+            --run-id "$VALIDATED_CI_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ci.yml \
+            --allowed-event push
 
       - name: Verify Xcode 16.4
         shell: bash
         run: |
+          set -euo pipefail
           xcodebuild -version
           test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "16.4"
 
@@ -66,81 +165,113 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
-      - name: Validate archive configuration
+      - name: Guard staging application authority
         shell: bash
         run: |
-          if [[ -z "$KWABOR_SUPABASE_URL" || -z "$KWABOR_SUPABASE_PUBLISHABLE_KEY" ]]; then
-            echo "The selected GitHub Environment is missing its Supabase client variables." >&2
+          set -euo pipefail
+          for value in \
+            "$KWABOR_SUPABASE_URL" \
+            "$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            "$KWABOR_SUPABASE_PROJECT_REF" \
+            "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" \
+            "$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            "$KWABOR_FIREBASE_PROJECT_ID" \
+            "$KWABOR_GOOGLE_IOS_CLIENT_ID" \
+            "$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
+            "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
+            "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            "$KWABOR_IOS_BUNDLE_ID" \
+            "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            "$KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION"; do
+            if [[ -z "$value" ]]; then
+              echo "The staging Environment is missing required iOS release authority." >&2
+              exit 1
+            fi
+          done
+          if [[ "$KWABOR_IOS_BUNDLE_ID" != "com.kwabor.ios" || ! "$KWABOR_IOS_DEVELOPMENT_TEAM" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "The protected Apple team or bundle identity is invalid." >&2
             exit 1
           fi
-          google_client_id_pattern='^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$'
-          if [[ ! "$KWABOR_GOOGLE_IOS_CLIENT_ID" =~ $google_client_id_pattern ||
-                ! "$KWABOR_GOOGLE_SERVER_CLIENT_ID" =~ $google_client_id_pattern ||
-                "$KWABOR_GOOGLE_IOS_CLIENT_ID" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]; then
-            echo "The selected GitHub Environment has invalid or non-distinct Google OAuth client IDs." >&2
+          if [[ "$KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION" != "false" ]]; then
+            echo "The protected export-compliance attestation must explicitly declare no non-exempt encryption." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_IOS_BUILD_NUMBER" =~ ^[1-9][0-9]*$ || ! "$KWABOR_IOS_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "The iOS version/build pair is invalid." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ || "$KWABOR_SUPABASE_URL" != "https://${KWABOR_SUPABASE_PROJECT_REF}.supabase.co" ]]; then
+            echo "The Supabase URL does not identify the exact staging project." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ || "$KWABOR_SUPABASE_PROJECT_REF" == "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" ]]; then
+            echo "Staging and production Supabase project refs must be valid and distinct." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_STAGING_PROJECT_REF_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "The protected staging project-ref digest is invalid." >&2
+            exit 1
+          fi
+          actual_ref_digest="$(printf '%s' "$KWABOR_SUPABASE_PROJECT_REF" | shasum -a 256 | awk '{print $1}')"
+          if [[ "$actual_ref_digest" != "$KWABOR_STAGING_PROJECT_REF_SHA256" ]]; then
+            echo "The Supabase project does not match the protected staging identity." >&2
+            exit 1
+          fi
+          google_client_pattern='^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$'
+          if [[ ! "$KWABOR_GOOGLE_IOS_CLIENT_ID" =~ $google_client_pattern || ! "$KWABOR_GOOGLE_SERVER_CLIENT_ID" =~ $google_client_pattern || "$KWABOR_GOOGLE_IOS_CLIENT_ID" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]; then
+            echo "The Google OAuth client IDs are invalid or not distinct." >&2
             exit 1
           fi
           google_ios_identifier="${KWABOR_GOOGLE_IOS_CLIENT_ID%.apps.googleusercontent.com}"
-          expected_reversed_client_id="com.googleusercontent.apps.$google_ios_identifier"
-          if [[ "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" != "$expected_reversed_client_id" ]]; then
-            echo "KWABOR_GOOGLE_REVERSED_CLIENT_ID does not match the iOS OAuth client ID." >&2
+          if [[ "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" != "com.googleusercontent.apps.$google_ios_identifier" ]]; then
+            echo "The reversed Google client ID is inconsistent." >&2
             exit 1
           fi
-          if [[ ! "$KWABOR_IOS_DEVELOPMENT_TEAM" =~ ^[A-Z0-9]{10}$ ]]; then
-            echo "KWABOR_IOS_DEVELOPMENT_TEAM must be a 10-character Apple Team ID." >&2
-            exit 1
-          fi
-          if [[ ! "$KWABOR_IOS_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-            echo "The iOS build number must be a positive integer." >&2
-            exit 1
-          fi
-          if [[ ! "$KWABOR_IOS_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "The iOS version name must contain exactly three period-separated integers." >&2
-            exit 1
-          fi
+          echo "::add-mask::$KWABOR_SUPABASE_PUBLISHABLE_KEY"
 
-      - name: Inject Firebase iOS configuration
+      - name: Inject exact Firebase staging configuration
         shell: bash
         env:
           FIREBASE_CONFIG_BASE64: ${{ secrets.KWABOR_FIREBASE_IOS_CONFIG_BASE64 }}
         run: |
+          set -euo pipefail
           if [[ -z "$FIREBASE_CONFIG_BASE64" ]]; then
-            echo "The selected GitHub Environment is missing its Firebase iOS configuration." >&2
+            echo "The staging Environment is missing Firebase iOS configuration." >&2
             exit 1
           fi
           config_path="$RUNNER_TEMP/GoogleService-Info.plist"
-          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > "$config_path"
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | /usr/bin/base64 -D > "$config_path"
           chmod 600 "$config_path"
           bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$config_path" 2>/dev/null || true)"
           project_id="$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' "$config_path" 2>/dev/null || true)"
-          if [[ -z "$KWABOR_FIREBASE_PROJECT_ID" || "$project_id" != "$KWABOR_FIREBASE_PROJECT_ID" || "$bundle_id" != "com.kwabor.ios" ]]; then
-            echo "The Firebase iOS configuration is invalid or targets another environment/application." >&2
+          if [[ "$bundle_id" != "$KWABOR_IOS_BUNDLE_ID" || "$project_id" != "$KWABOR_FIREBASE_PROJECT_ID" ]]; then
+            echo "Firebase configuration targets another environment or app." >&2
             exit 1
           fi
           echo "KWABOR_FIREBASE_IOS_CONFIG_PATH=$config_path" >> "$GITHUB_ENV"
 
-      - name: Install signing assets
+      - name: Install and validate exact App Store signing assets
         shell: bash
         env:
           CERTIFICATE_BASE64: ${{ secrets.KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           PROVISIONING_PROFILE_BASE64: ${{ secrets.KWABOR_IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
+          set -euo pipefail
           if [[ -z "$CERTIFICATE_BASE64" || -z "$CERTIFICATE_PASSWORD" || -z "$PROVISIONING_PROFILE_BASE64" ]]; then
-            echo "The selected environment has incomplete iOS signing secrets." >&2
+            echo "The staging Environment has incomplete iOS signing secrets." >&2
             exit 1
           fi
-
           keychain_path="$RUNNER_TEMP/kwabor-signing.keychain-db"
           keychain_password="$(openssl rand -hex 24)"
           certificate_path="$RUNNER_TEMP/kwabor-distribution.p12"
           profile_source="$RUNNER_TEMP/kwabor.mobileprovision"
           profile_plist="$RUNNER_TEMP/kwabor-profile.plist"
+          profile_metadata="$RUNNER_TEMP/kwabor-profile-metadata.json"
 
-          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
-          printf '%s' "$PROVISIONING_PROFILE_BASE64" | base64 --decode > "$profile_source"
+          printf '%s' "$CERTIFICATE_BASE64" | /usr/bin/base64 -D > "$certificate_path"
+          printf '%s' "$PROVISIONING_PROFILE_BASE64" | /usr/bin/base64 -D > "$profile_source"
           chmod 600 "$certificate_path" "$profile_source"
-
           security create-keychain -p "$keychain_password" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security unlock-keychain -p "$keychain_password" "$keychain_path"
@@ -148,23 +279,29 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
           security list-keychains -d user -s "$keychain_path" login.keychain-db
 
+          identities_path="$RUNNER_TEMP/kwabor-identities.txt"
+          security find-identity -v -p codesigning "$keychain_path" > "$identities_path"
+          identity_count="$(grep -Ec '^[[:space:]]*[0-9]+\) [0-9A-F]{40} "Apple Distribution:' "$identities_path" || true)"
+          if [[ "$identity_count" != "1" ]]; then
+            echo "Exactly one Apple Distribution identity is required." >&2
+            exit 1
+          fi
+          identity_sha1="$(sed -nE 's/^[[:space:]]*[0-9]+\) ([0-9A-F]{40}) ".*"$/\1/p' "$identities_path")"
+          identity_name="$(sed -nE 's/^[[:space:]]*[0-9]+\) [0-9A-F]{40} "(.*)"$/\1/p' "$identities_path")"
+          if [[ "$identity_name" != Apple\ Distribution:*" ($KWABOR_IOS_DEVELOPMENT_TEAM)" ]]; then
+            echo "The Apple Distribution certificate targets another team." >&2
+            exit 1
+          fi
+
           security cms -D -i "$profile_source" > "$profile_plist"
+          python3 -B tools/ios-closed-beta-release.py validate-profile \
+            --profile-plist "$profile_plist" \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --certificate-sha1 "$identity_sha1" \
+            --output "$profile_metadata"
           profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
-          profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$profile_plist")"
-          profile_team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$profile_plist")"
-          application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$profile_plist")"
-          aps_environment="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$profile_plist" 2>/dev/null || true)"
-          apple_sign_in="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.applesignin:0' "$profile_plist" 2>/dev/null || true)"
-
-          if [[ "$profile_team" != "$KWABOR_IOS_DEVELOPMENT_TEAM" || "$application_identifier" != *".com.kwabor.ios" ]]; then
-            echo "The provisioning profile does not target the configured team and com.kwabor.ios." >&2
-            exit 1
-          fi
-          if [[ "$aps_environment" != "production" || "$apple_sign_in" != "Default" ]]; then
-            echo "The provisioning profile must include production APNs and Sign in with Apple." >&2
-            exit 1
-          fi
-
           installed_profile="$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
           mkdir -p "$(dirname "$installed_profile")"
           cp "$profile_source" "$installed_profile"
@@ -172,14 +309,16 @@ jobs:
           echo "::add-mask::$CERTIFICATE_PASSWORD"
           echo "::add-mask::$keychain_password"
           {
+            echo "KWABOR_IOS_CERTIFICATE_SHA1=$identity_sha1"
             echo "KWABOR_IOS_KEYCHAIN_PATH=$keychain_path"
             echo "KWABOR_IOS_KEYCHAIN_PASSWORD=$keychain_password"
+            echo "KWABOR_IOS_PROFILE_METADATA=$profile_metadata"
             echo "KWABOR_IOS_PROFILE_PATH=$installed_profile"
-            echo "KWABOR_IOS_PROFILE_NAME=$profile_name"
+            echo "KWABOR_IOS_PROFILE_UUID=$profile_uuid"
           } >> "$GITHUB_ENV"
 
       - name: Build release XCFramework
-        run: ./gradlew :shared:assembleSharedReleaseXCFramework
+        run: ./gradlew :shared:assembleSharedReleaseXCFramework --console=plain
 
       - name: Resolve pinned iOS packages
         shell: bash
@@ -193,84 +332,210 @@ jobs:
             -onlyUsePackageVersionsFromResolvedFile
           git diff --exit-code -- "$PACKAGE_LOCK"
 
-      - name: Archive signed app
+      - name: Archive signed Staging app
         shell: bash
         run: |
-          if [[ "$KWABOR_ENVIRONMENT" == "staging" ]]; then
-            configuration="Staging"
-          else
-            configuration="Release"
-          fi
-          archive_path="$RUNNER_TEMP/Kwabor-$KWABOR_ENVIRONMENT.xcarchive"
+          set -euo pipefail
+          archive_path="$RUNNER_TEMP/Kwabor-staging.xcarchive"
           xcodebuild archive \
             -project iosApp/Kwabor.xcodeproj \
             -scheme Kwabor \
-            -configuration "$configuration" \
+            -configuration Staging \
             -destination 'generic/platform=iOS' \
             -archivePath "$archive_path" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData-Staging" \
             -disableAutomaticPackageResolution \
-            KWABOR_ENVIRONMENT="$KWABOR_ENVIRONMENT" \
-            KWABOR_SUPABASE_URL="$KWABOR_SUPABASE_URL" \
-            KWABOR_SUPABASE_PUBLISHABLE_KEY="$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            KWABOR_ENVIRONMENT=staging \
+            KWABOR_BUNDLE_IDENTIFIER="$KWABOR_IOS_BUNDLE_ID" \
+            KWABOR_SUPABASE_URL_STAGING="$KWABOR_SUPABASE_URL" \
+            KWABOR_SUPABASE_PUBLISHABLE_KEY_STAGING="$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            KWABOR_FIREBASE_IOS_CONFIG_PATH_STAGING="$KWABOR_FIREBASE_IOS_CONFIG_PATH" \
             KWABOR_GOOGLE_IOS_CLIENT_ID_STAGING="$KWABOR_GOOGLE_IOS_CLIENT_ID" \
             KWABOR_GOOGLE_SERVER_CLIENT_ID_STAGING="$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
             KWABOR_GOOGLE_REVERSED_CLIENT_ID_STAGING="$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
-            KWABOR_GOOGLE_IOS_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_IOS_CLIENT_ID" \
-            KWABOR_GOOGLE_SERVER_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
-            KWABOR_GOOGLE_REVERSED_CLIENT_ID_PRODUCTION="$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
             KWABOR_MARKETING_VERSION="$KWABOR_IOS_VERSION_NAME" \
             KWABOR_CURRENT_PROJECT_VERSION="$KWABOR_IOS_BUILD_NUMBER" \
             KWABOR_DEVELOPMENT_TEAM="$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            KWABOR_PROVISIONING_PROFILE_SPECIFIER="$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
             DEVELOPMENT_TEAM="$KWABOR_IOS_DEVELOPMENT_TEAM" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$KWABOR_IOS_PROFILE_NAME" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KWABOR_IOS_KEYCHAIN_PATH"
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KWABOR_IOS_KEYCHAIN_PATH" \
+            INFOPLIST_KEY_ITSAppUsesNonExemptEncryption=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO
           echo "KWABOR_IOS_ARCHIVE_PATH=$archive_path" >> "$GITHUB_ENV"
 
-      - name: Verify signed archive
+      - name: Verify signed Staging archive and symbols
         shell: bash
         run: |
+          set -euo pipefail
           app_path="$KWABOR_IOS_ARCHIVE_PATH/Products/Applications/Kwabor.app"
           info_plist="$app_path/Info.plist"
           entitlements_plist="$RUNNER_TEMP/kwabor-archive-entitlements.plist"
+          embedded_profile_plist="$RUNNER_TEMP/kwabor-archive-profile.plist"
+          embedded_profile_metadata="$RUNNER_TEMP/kwabor-archive-profile-metadata.json"
+          dsym_path="$KWABOR_IOS_ARCHIVE_PATH/dSYMs/Kwabor.app.dSYM"
 
           test -f "$app_path/PrivacyInfo.xcprivacy"
           test -f "$app_path/GoogleService-Info.plist"
           test -f "$app_path/Assets.car"
-          test -d "$KWABOR_IOS_ARCHIVE_PATH/dSYMs/Kwabor.app.dSYM"
-          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")" == "com.kwabor.ios" ]]
+          test -d "$dsym_path"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")" == "$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$info_plist")" == "Kwabor Staging" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")" == "$KWABOR_IOS_VERSION_NAME" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")" == "$KWABOR_IOS_BUILD_NUMBER" ]]
-          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_ENVIRONMENT' "$info_plist")" == "$KWABOR_ENVIRONMENT" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$info_plist")" == "false" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_ENVIRONMENT' "$info_plist")" == "staging" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_SUPABASE_URL' "$info_plist")" == "$KWABOR_SUPABASE_URL" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_SUPABASE_PUBLISHABLE_KEY' "$info_plist")" == "$KWABOR_SUPABASE_PUBLISHABLE_KEY" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_IOS_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_IOS_CLIENT_ID" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_SERVER_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_REVERSED_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" ]]
-          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:1:CFBundleURLSchemes:0' "$info_plist")" == "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$app_path/GoogleService-Info.plist")" == "$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' "$app_path/GoogleService-Info.plist")" == "$KWABOR_FIREBASE_PROJECT_ID" ]]
 
           codesign --verify --deep --strict --verbose=2 "$app_path"
           codesign -d --entitlements :- "$app_path" > "$entitlements_plist"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$entitlements_plist")" == "$KWABOR_IOS_DEVELOPMENT_TEAM.$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$entitlements_plist")" == "$KWABOR_IOS_DEVELOPMENT_TEAM" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :get-task-allow' "$entitlements_plist")" == "false" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$entitlements_plist")" == "production" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.applesignin:0' "$entitlements_plist")" == "Default" ]]
 
-      - name: Package archive and checksum
+          security cms -D -i "$app_path/embedded.mobileprovision" > "$embedded_profile_plist"
+          python3 -B tools/ios-closed-beta-release.py validate-profile \
+            --profile-plist "$embedded_profile_plist" \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --certificate-sha1 "$KWABOR_IOS_CERTIFICATE_SHA1" \
+            --output "$embedded_profile_metadata"
+          cmp "$embedded_profile_metadata" "$KWABOR_IOS_PROFILE_METADATA"
+
+          binary_uuids="$(dwarfdump --uuid "$app_path/Kwabor" | awk '{print $2}' | sort)"
+          dsym_uuids="$(dwarfdump --uuid "$dsym_path/Contents/Resources/DWARF/Kwabor" | awk '{print $2}' | sort)"
+          [[ -n "$binary_uuids" && "$binary_uuids" == "$dsym_uuids" ]]
+
+      - name: Export signed App Store Connect IPA without upload
         shell: bash
         run: |
-          output_directory="$RUNNER_TEMP/kwabor-ios-output"
+          set -euo pipefail
+          export_options="$RUNNER_TEMP/export-options.plist"
+          export_directory="$RUNNER_TEMP/Kwabor-IPA"
+          python3 -B tools/ios-closed-beta-release.py export-options \
+            --destination export \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --output "$export_options"
+          xcodebuild -exportArchive \
+            -archivePath "$KWABOR_IOS_ARCHIVE_PATH" \
+            -exportPath "$export_directory" \
+            -exportOptionsPlist "$export_options"
+
+          ipa_candidates=("$export_directory"/*.ipa)
+          if [[ "${#ipa_candidates[@]}" != "1" || ! -f "${ipa_candidates[0]}" ]]; then
+            echo "The App Store Connect export did not produce exactly one IPA." >&2
+            exit 1
+          fi
+          ipa_path="${ipa_candidates[0]}"
+          unpack_directory="$RUNNER_TEMP/Kwabor-IPA-verify"
+          mkdir -p "$unpack_directory"
+          ditto -x -k "$ipa_path" "$unpack_directory"
+          app_candidates=("$unpack_directory"/Payload/*.app)
+          if [[ "${#app_candidates[@]}" != "1" || ! -d "${app_candidates[0]}" ]]; then
+            echo "The exported IPA does not contain exactly one application." >&2
+            exit 1
+          fi
+          exported_app="${app_candidates[0]}"
+          exported_info="$exported_app/Info.plist"
+          exported_profile_plist="$RUNNER_TEMP/kwabor-exported-profile.plist"
+          exported_profile_metadata="$RUNNER_TEMP/kwabor-exported-profile-metadata.json"
+          codesign --verify --deep --strict --verbose=2 "$exported_app"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$exported_info")" == "$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$exported_info")" == "$KWABOR_IOS_VERSION_NAME" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$exported_info")" == "$KWABOR_IOS_BUILD_NUMBER" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$exported_info")" == "false" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_ENVIRONMENT' "$exported_info")" == "staging" ]]
+          security cms -D -i "$exported_app/embedded.mobileprovision" > "$exported_profile_plist"
+          python3 -B tools/ios-closed-beta-release.py validate-profile \
+            --profile-plist "$exported_profile_plist" \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --certificate-sha1 "$KWABOR_IOS_CERTIFICATE_SHA1" \
+            --output "$exported_profile_metadata"
+          cmp "$exported_profile_metadata" "$KWABOR_IOS_PROFILE_METADATA"
+          echo "KWABOR_IOS_EXPORTED_IPA=$ipa_path" >> "$GITHUB_ENV"
+
+      - name: Package IPA archive dSYM hashes and GEL evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_directory="$RUNNER_TEMP/kwabor-ios-archive-output"
           mkdir -p "$output_directory"
-          archive_zip="$output_directory/Kwabor-$KWABOR_ENVIRONMENT-$KWABOR_IOS_VERSION_NAME-$KWABOR_IOS_BUILD_NUMBER.xcarchive.zip"
-          ditto -c -k --sequesterRsrc --keepParent "$KWABOR_IOS_ARCHIVE_PATH" "$archive_zip"
-          shasum -a 256 "$archive_zip" > "$output_directory/KWABOR-SHA256SUMS.txt"
+          base_name="Kwabor-staging-$KWABOR_IOS_VERSION_NAME-$KWABOR_IOS_BUILD_NUMBER-$EXPECTED_SHA"
+          archive_filename="$base_name.xcarchive.zip"
+          ipa_filename="$base_name.ipa"
+          dsym_filename="$base_name.dSYM.zip"
+
+          python3 -B tools/ios-closed-beta-release.py archive-provenance \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --version-name "$KWABOR_IOS_VERSION_NAME" \
+            --build-number "$KWABOR_IOS_BUILD_NUMBER" \
+            --profile-metadata "$KWABOR_IOS_PROFILE_METADATA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --actor "$GITHUB_ACTOR" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$KWABOR_IOS_ARCHIVE_PATH/KWABOR-PROVENANCE.json"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$KWABOR_IOS_ARCHIVE_PATH" \
+            "$output_directory/$archive_filename"
+          cp "$KWABOR_IOS_EXPORTED_IPA" "$output_directory/$ipa_filename"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$KWABOR_IOS_ARCHIVE_PATH/dSYMs/Kwabor.app.dSYM" \
+            "$output_directory/$dsym_filename"
+          (
+            cd "$output_directory"
+            shasum -a 256 "$archive_filename" "$ipa_filename" "$dsym_filename" > KWABOR-SHA256SUMS.txt
+          )
+          python3 -B tools/ios-closed-beta-release.py write-evidence \
+            --directory "$output_directory" \
+            --archive-filename "$archive_filename" \
+            --ipa-filename "$ipa_filename" \
+            --dsym-filename "$dsym_filename" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --version-name "$KWABOR_IOS_VERSION_NAME" \
+            --build-number "$KWABOR_IOS_BUILD_NUMBER" \
+            --profile-metadata "$KWABOR_IOS_PROFILE_METADATA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --actor "$GITHUB_ACTOR" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --output "$output_directory/GEL-G6-IOS-ARCHIVE.json"
+          cp "$KWABOR_STAGING_ENVIRONMENT_EVIDENCE" "$output_directory/GEL-G6-STAGING-ENVIRONMENT.json"
+          (
+            cd "$output_directory"
+            shasum -a 256 \
+              GEL-G6-IOS-ARCHIVE.json \
+              GEL-G6-STAGING-ENVIRONMENT.json >> KWABOR-SHA256SUMS.txt
+          )
           echo "KWABOR_IOS_OUTPUT_DIRECTORY=$output_directory" >> "$GITHUB_ENV"
 
-      - name: Upload signed archive
+      - name: Upload immutable signed archive evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: kwabor-ios-${{ inputs.environment }}-${{ inputs.version_name }}-${{ inputs.build_number }}
+          name: kwabor-ios-staging-${{ inputs.version_name }}-${{ inputs.build_number }}-${{ inputs.expected_sha }}
           path: ${{ env.KWABOR_IOS_OUTPUT_DIRECTORY }}
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
 
-      - name: Remove signing assets
+      - name: Remove signing and provider assets
         if: always()
         shell: bash
         run: |
@@ -279,8 +544,487 @@ jobs:
           if [[ -n "${KWABOR_IOS_PROFILE_PATH:-}" ]]; then
             rm -f "$KWABOR_IOS_PROFILE_PATH"
           fi
-          rm -f "$RUNNER_TEMP/kwabor-distribution.p12" \
+          rm -f \
+            "$RUNNER_TEMP/kwabor-distribution.p12" \
             "$RUNNER_TEMP/kwabor.mobileprovision" \
             "$RUNNER_TEMP/kwabor-profile.plist" \
+            "$RUNNER_TEMP/kwabor-archive-profile.plist" \
+            "$RUNNER_TEMP/kwabor-exported-profile.plist" \
             "$RUNNER_TEMP/kwabor-archive-entitlements.plist" \
             "$RUNNER_TEMP/GoogleService-Info.plist"
+
+  upload_testflight:
+    name: Upload exact archive to internal TestFlight
+    if: inputs.operation == 'upload-testflight-internal'
+    runs-on: macos-15
+    timeout-minutes: 75
+    environment: testflight-internal
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      KWABOR_ENVIRONMENT: staging
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KWABOR_SUPABASE_PUBLISHABLE_KEY }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+      KWABOR_FIREBASE_PROJECT_ID: ${{ vars.KWABOR_FIREBASE_PROJECT_ID }}
+      KWABOR_GOOGLE_IOS_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_IOS_CLIENT_ID }}
+      KWABOR_GOOGLE_SERVER_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_SERVER_CLIENT_ID }}
+      KWABOR_GOOGLE_REVERSED_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_REVERSED_CLIENT_ID }}
+      KWABOR_IOS_DEVELOPMENT_TEAM: ${{ vars.KWABOR_IOS_DEVELOPMENT_TEAM }}
+      KWABOR_IOS_BUNDLE_ID: ${{ vars.KWABOR_IOS_BUNDLE_ID }}
+      KWABOR_IOS_EXPECTED_PROFILE_NAME: ${{ vars.KWABOR_IOS_PROVISIONING_PROFILE_NAME }}
+      KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION: ${{ vars.KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION }}
+      KWABOR_ASC_KEY_ID: ${{ vars.KWABOR_ASC_KEY_ID }}
+      KWABOR_ASC_ISSUER_ID: ${{ vars.KWABOR_ASC_ISSUER_ID }}
+      KWABOR_ASC_APP_ID: ${{ vars.KWABOR_ASC_APP_ID }}
+      KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID: ${{ vars.KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID }}
+      KWABOR_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
+      KWABOR_IOS_VERSION_NAME: ${{ inputs.version_name }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      ARCHIVE_RUN_ID: ${{ inputs.archive_run_id }}
+      RELEASE_NOTES: ${{ inputs.release_notes }}
+    steps:
+      - name: Validate protected manual upload request
+        shell: bash
+        env:
+          UPLOAD_CONFIRMATION_INPUT: ${{ inputs.upload_confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "urbainmorel/KWABOR" ]]; then
+            echo "iOS closed-beta releases are restricted to the canonical repository." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
+            echo "The upload must target the selected main exact-head." >&2
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ || ! "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ || ! "$ARCHIVE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "The exact-head, CI run, or archive run identifier is invalid." >&2
+            exit 1
+          fi
+          if [[ "$ARCHIVE_RUN_ID" == "$GITHUB_RUN_ID" || "$UPLOAD_CONFIRMATION_INPUT" != "UPLOAD-TESTFLIGHT-INTERNAL" ]]; then
+            echo "Manual internal TestFlight upload confirmation is invalid." >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          notes = os.environ.get("RELEASE_NOTES", "").strip()
+          if not 1 <= len(notes) <= 4000:
+              raise SystemExit("release_notes must contain 1 to 4000 characters")
+          PY
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+
+      - name: Verify exact checkout and local release policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python3 -B -m py_compile \
+            tools/ios-closed-beta-release.py \
+            tools/test_ios_closed_beta_release.py
+          python3 -B -m unittest tools.test_ios_closed_beta_release
+
+      - name: Audit staging and TestFlight protected Environments
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for environment_name in staging testflight-internal; do
+            environment_document="$RUNNER_TEMP/$environment_name-environment.json"
+            environment_evidence="$RUNNER_TEMP/$environment_name-environment-evidence.json"
+            gh api \
+              --header 'Accept: application/vnd.github+json' \
+              --header 'X-GitHub-Api-Version: 2026-03-10' \
+              "repos/$GITHUB_REPOSITORY/environments/$environment_name" > "$environment_document"
+            python3 -B tools/ios-closed-beta-release.py validate-environment \
+              --document "$environment_document" \
+              --name "$environment_name" \
+              --output "$environment_evidence"
+          done
+          {
+            echo "KWABOR_STAGING_ENVIRONMENT_EVIDENCE=$RUNNER_TEMP/staging-environment-evidence.json"
+            echo "KWABOR_TESTFLIGHT_ENVIRONMENT_EVIDENCE=$RUNNER_TEMP/testflight-internal-environment-evidence.json"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify CI and source archive workflow provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ci_document="$RUNNER_TEMP/validated-ci-run.json"
+          archive_document="$RUNNER_TEMP/source-archive-run.json"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" > "$ci_document"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$ARCHIVE_RUN_ID" > "$archive_document"
+          python3 -B tools/ios-closed-beta-release.py validate-github-run \
+            --document "$ci_document" \
+            --run-id "$VALIDATED_CI_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ci.yml \
+            --allowed-event push
+          python3 -B tools/ios-closed-beta-release.py validate-github-run \
+            --document "$archive_document" \
+            --run-id "$ARCHIVE_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ios-archive.yml \
+            --allowed-event workflow_dispatch
+
+      - name: Verify Xcode 16.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "16.4"
+          xcodebuild -help > "$RUNNER_TEMP/xcodebuild-help.txt" 2>&1
+          grep -q -- '-authenticationKeyPath' "$RUNNER_TEMP/xcodebuild-help.txt"
+          grep -q -- '-authenticationKeyID' "$RUNNER_TEMP/xcodebuild-help.txt"
+          grep -q -- '-authenticationKeyIssuerID' "$RUNNER_TEMP/xcodebuild-help.txt"
+          grep -q -- 'testFlightInternalTestingOnly' "$RUNNER_TEMP/xcodebuild-help.txt"
+
+      - name: Guard staging Store and application authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in \
+            "$KWABOR_SUPABASE_URL" \
+            "$KWABOR_SUPABASE_PUBLISHABLE_KEY" \
+            "$KWABOR_SUPABASE_PROJECT_REF" \
+            "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" \
+            "$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            "$KWABOR_FIREBASE_PROJECT_ID" \
+            "$KWABOR_GOOGLE_IOS_CLIENT_ID" \
+            "$KWABOR_GOOGLE_SERVER_CLIENT_ID" \
+            "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" \
+            "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            "$KWABOR_IOS_BUNDLE_ID" \
+            "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            "$KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION" \
+            "$KWABOR_ASC_KEY_ID" \
+            "$KWABOR_ASC_ISSUER_ID" \
+            "$KWABOR_ASC_APP_ID" \
+            "$KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID"; do
+            if [[ -z "$value" ]]; then
+              echo "The staging Environment is missing required iOS/TestFlight authority." >&2
+              exit 1
+            fi
+          done
+          if [[ "$KWABOR_IOS_BUNDLE_ID" != "com.kwabor.ios" || ! "$KWABOR_IOS_DEVELOPMENT_TEAM" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "The protected Apple team or bundle identity is invalid." >&2
+            exit 1
+          fi
+          if [[ "$KWABOR_IOS_USES_NON_EXEMPT_ENCRYPTION" != "false" ]]; then
+            echo "The protected export-compliance attestation must explicitly declare no non-exempt encryption." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_ASC_KEY_ID" =~ ^[A-Z0-9]{10}$ || ! "$KWABOR_ASC_ISSUER_ID" =~ ^[0-9A-Fa-f-]{36}$ || ! "$KWABOR_ASC_APP_ID" =~ ^[A-Za-z0-9-]{1,128}$ || ! "$KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID" =~ ^[A-Za-z0-9-]{1,128}$ ]]; then
+            echo "App Store Connect API authority is malformed." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_IOS_BUILD_NUMBER" =~ ^[1-9][0-9]*$ || ! "$KWABOR_IOS_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "The iOS version/build pair is invalid." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ || "$KWABOR_SUPABASE_URL" != "https://${KWABOR_SUPABASE_PROJECT_REF}.supabase.co" ]]; then
+            echo "The Supabase URL does not identify the exact staging project." >&2
+            exit 1
+          fi
+          if [[ ! "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ || "$KWABOR_SUPABASE_PROJECT_REF" == "$KWABOR_PRODUCTION_SUPABASE_PROJECT_REF" ]]; then
+            echo "Staging and production Supabase project refs must be valid and distinct." >&2
+            exit 1
+          fi
+          actual_ref_digest="$(printf '%s' "$KWABOR_SUPABASE_PROJECT_REF" | shasum -a 256 | awk '{print $1}')"
+          if [[ ! "$KWABOR_STAGING_PROJECT_REF_SHA256" =~ ^[0-9a-f]{64}$ || "$actual_ref_digest" != "$KWABOR_STAGING_PROJECT_REF_SHA256" ]]; then
+            echo "The Supabase project does not match the protected staging identity." >&2
+            exit 1
+          fi
+          echo "::add-mask::$KWABOR_SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Download exact immutable archive artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: kwabor-ios-staging-${{ inputs.version_name }}-${{ inputs.build_number }}-${{ inputs.expected_sha }}
+          path: ${{ runner.temp }}/kwabor-ios-source
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.archive_run_id }}
+          digest-mismatch: error
+
+      - name: Install and validate unchanged App Store signing assets
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.KWABOR_IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.KWABOR_IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.KWABOR_IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CERTIFICATE_BASE64" || -z "$CERTIFICATE_PASSWORD" || -z "$PROVISIONING_PROFILE_BASE64" ]]; then
+            echo "The staging Environment has incomplete iOS signing secrets." >&2
+            exit 1
+          fi
+          keychain_path="$RUNNER_TEMP/kwabor-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          certificate_path="$RUNNER_TEMP/kwabor-distribution.p12"
+          profile_source="$RUNNER_TEMP/kwabor.mobileprovision"
+          profile_plist="$RUNNER_TEMP/kwabor-profile.plist"
+          profile_metadata="$RUNNER_TEMP/kwabor-profile-metadata.json"
+
+          printf '%s' "$CERTIFICATE_BASE64" | /usr/bin/base64 -D > "$certificate_path"
+          printf '%s' "$PROVISIONING_PROFILE_BASE64" | /usr/bin/base64 -D > "$profile_source"
+          chmod 600 "$certificate_path" "$profile_source"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path" login.keychain-db
+
+          identities_path="$RUNNER_TEMP/kwabor-identities.txt"
+          security find-identity -v -p codesigning "$keychain_path" > "$identities_path"
+          identity_count="$(grep -Ec '^[[:space:]]*[0-9]+\) [0-9A-F]{40} "Apple Distribution:' "$identities_path" || true)"
+          if [[ "$identity_count" != "1" ]]; then
+            echo "Exactly one Apple Distribution identity is required." >&2
+            exit 1
+          fi
+          identity_sha1="$(sed -nE 's/^[[:space:]]*[0-9]+\) ([0-9A-F]{40}) ".*"$/\1/p' "$identities_path")"
+          identity_name="$(sed -nE 's/^[[:space:]]*[0-9]+\) [0-9A-F]{40} "(.*)"$/\1/p' "$identities_path")"
+          if [[ "$identity_name" != Apple\ Distribution:*" ($KWABOR_IOS_DEVELOPMENT_TEAM)" ]]; then
+            echo "The Apple Distribution certificate targets another team." >&2
+            exit 1
+          fi
+          security cms -D -i "$profile_source" > "$profile_plist"
+          python3 -B tools/ios-closed-beta-release.py validate-profile \
+            --profile-plist "$profile_plist" \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --certificate-sha1 "$identity_sha1" \
+            --output "$profile_metadata"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+          installed_profile="$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+          mkdir -p "$(dirname "$installed_profile")"
+          cp "$profile_source" "$installed_profile"
+
+          echo "::add-mask::$CERTIFICATE_PASSWORD"
+          echo "::add-mask::$keychain_password"
+          {
+            echo "KWABOR_IOS_CERTIFICATE_SHA1=$identity_sha1"
+            echo "KWABOR_IOS_KEYCHAIN_PATH=$keychain_path"
+            echo "KWABOR_IOS_KEYCHAIN_PASSWORD=$keychain_password"
+            echo "KWABOR_IOS_PROFILE_METADATA=$profile_metadata"
+            echo "KWABOR_IOS_PROFILE_PATH=$installed_profile"
+          } >> "$GITHUB_ENV"
+
+      - name: Install and validate App Store Connect API key
+        shell: bash
+        env:
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.KWABOR_ASC_PRIVATE_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ASC_PRIVATE_KEY_BASE64" ]]; then
+            echo "The staging Environment is missing its App Store Connect private key." >&2
+            exit 1
+          fi
+          private_key_path="$RUNNER_TEMP/AuthKey_${KWABOR_ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_PRIVATE_KEY_BASE64" | /usr/bin/base64 -D > "$private_key_path"
+          chmod 600 "$private_key_path"
+          grep -q '^-----BEGIN PRIVATE KEY-----$' "$private_key_path"
+          openssl pkey -in "$private_key_path" -check -noout >/dev/null
+          key_description="$(openssl pkey -in "$private_key_path" -text -noout)"
+          if ! grep -Eq 'ASN1 OID: prime256v1|NIST CURVE: P-256' <<< "$key_description"; then
+            echo "The App Store Connect key is not an ES256/P-256 key." >&2
+            exit 1
+          fi
+          echo "KWABOR_ASC_PRIVATE_KEY_PATH=$private_key_path" >> "$GITHUB_ENV"
+
+      - name: Verify source hashes provenance signature and staging identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_directory="$RUNNER_TEMP/kwabor-ios-source"
+          base_name="Kwabor-staging-$KWABOR_IOS_VERSION_NAME-$KWABOR_IOS_BUILD_NUMBER-$EXPECTED_SHA"
+          archive_filename="$base_name.xcarchive.zip"
+          ipa_filename="$base_name.ipa"
+          dsym_filename="$base_name.dSYM.zip"
+          evidence_path="$source_directory/GEL-G6-IOS-ARCHIVE.json"
+          (
+            cd "$source_directory"
+            shasum -a 256 -c KWABOR-SHA256SUMS.txt
+          )
+          python3 -B tools/ios-closed-beta-release.py verify-evidence \
+            --directory "$source_directory" \
+            --evidence "$evidence_path" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --version-name "$KWABOR_IOS_VERSION_NAME" \
+            --build-number "$KWABOR_IOS_BUILD_NUMBER" \
+            --archive-run-id "$ARCHIVE_RUN_ID" \
+            --profile-metadata "$KWABOR_IOS_PROFILE_METADATA"
+
+          unpack_directory="$RUNNER_TEMP/Kwabor-archive-source"
+          mkdir -p "$unpack_directory"
+          ditto -x -k "$source_directory/$archive_filename" "$unpack_directory"
+          archive_candidates=("$unpack_directory"/*.xcarchive)
+          if [[ "${#archive_candidates[@]}" != "1" || ! -d "${archive_candidates[0]}" ]]; then
+            echo "The source artifact does not contain exactly one xcarchive." >&2
+            exit 1
+          fi
+          archive_path="${archive_candidates[0]}"
+          python3 -B tools/ios-closed-beta-release.py verify-archive-provenance \
+            --provenance "$archive_path/KWABOR-PROVENANCE.json" \
+            --evidence "$evidence_path"
+
+          app_path="$archive_path/Products/Applications/Kwabor.app"
+          info_plist="$app_path/Info.plist"
+          embedded_profile_plist="$RUNNER_TEMP/kwabor-source-profile.plist"
+          embedded_profile_metadata="$RUNNER_TEMP/kwabor-source-profile-metadata.json"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")" == "$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")" == "$KWABOR_IOS_VERSION_NAME" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")" == "$KWABOR_IOS_BUILD_NUMBER" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$info_plist")" == "false" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_ENVIRONMENT' "$info_plist")" == "staging" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_SUPABASE_URL' "$info_plist")" == "$KWABOR_SUPABASE_URL" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_SUPABASE_PUBLISHABLE_KEY' "$info_plist")" == "$KWABOR_SUPABASE_PUBLISHABLE_KEY" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_IOS_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_IOS_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_SERVER_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_SERVER_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :KWABOR_GOOGLE_REVERSED_CLIENT_ID' "$info_plist")" == "$KWABOR_GOOGLE_REVERSED_CLIENT_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$app_path/GoogleService-Info.plist")" == "$KWABOR_IOS_BUNDLE_ID" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' "$app_path/GoogleService-Info.plist")" == "$KWABOR_FIREBASE_PROJECT_ID" ]]
+          security cms -D -i "$app_path/embedded.mobileprovision" > "$embedded_profile_plist"
+          python3 -B tools/ios-closed-beta-release.py validate-profile \
+            --profile-plist "$embedded_profile_plist" \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --certificate-sha1 "$KWABOR_IOS_CERTIFICATE_SHA1" \
+            --output "$embedded_profile_metadata"
+          cmp "$embedded_profile_metadata" "$KWABOR_IOS_PROFILE_METADATA"
+          {
+            echo "KWABOR_IOS_ARCHIVE_PATH=$archive_path"
+            echo "KWABOR_IOS_SOURCE_DIRECTORY=$source_directory"
+            echo "KWABOR_IOS_SOURCE_EVIDENCE=$evidence_path"
+          } >> "$GITHUB_ENV"
+
+      - name: Preflight exact App Store app internal group and unused build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tools/ios-closed-beta-release.py asc-preflight \
+            --key-id "$KWABOR_ASC_KEY_ID" \
+            --issuer-id "$KWABOR_ASC_ISSUER_ID" \
+            --private-key "$KWABOR_ASC_PRIVATE_KEY_PATH" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --app-id "$KWABOR_ASC_APP_ID" \
+            --group-id "$KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID" \
+            --version-name "$KWABOR_IOS_VERSION_NAME" \
+            --build-number "$KWABOR_IOS_BUILD_NUMBER" \
+            --output "$RUNNER_TEMP/app-store-connect-preflight.json"
+
+      - name: Manually upload archive as TestFlight Internal Only
+        shell: bash
+        run: |
+          set -euo pipefail
+          upload_options="$RUNNER_TEMP/upload-options.plist"
+          upload_export_path="$RUNNER_TEMP/Kwabor-TestFlight-upload"
+          python3 -B tools/ios-closed-beta-release.py export-options \
+            --destination upload \
+            --team-id "$KWABOR_IOS_DEVELOPMENT_TEAM" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --profile-name "$KWABOR_IOS_EXPECTED_PROFILE_NAME" \
+            --output "$upload_options"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :destination' "$upload_options")" == "upload" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :testFlightInternalTestingOnly' "$upload_options")" == "true" ]]
+          upload_started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo "KWABOR_TESTFLIGHT_UPLOAD_STARTED_AT=$upload_started_at" >> "$GITHUB_ENV"
+          xcodebuild -exportArchive \
+            -archivePath "$KWABOR_IOS_ARCHIVE_PATH" \
+            -exportPath "$upload_export_path" \
+            -exportOptionsPlist "$upload_options" \
+            -authenticationKeyPath "$KWABOR_ASC_PRIVATE_KEY_PATH" \
+            -authenticationKeyID "$KWABOR_ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$KWABOR_ASC_ISSUER_ID"
+          echo "KWABOR_TESTFLIGHT_UPLOAD_OPTIONS=$upload_options" >> "$GITHUB_ENV"
+
+      - name: Wait for processing publish notes and assign exact internal group
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/GEL-G6-IOS-TESTFLIGHT.json"
+          python3 -B tools/ios-closed-beta-release.py asc-publish \
+            --key-id "$KWABOR_ASC_KEY_ID" \
+            --issuer-id "$KWABOR_ASC_ISSUER_ID" \
+            --private-key "$KWABOR_ASC_PRIVATE_KEY_PATH" \
+            --bundle-id "$KWABOR_IOS_BUNDLE_ID" \
+            --app-id "$KWABOR_ASC_APP_ID" \
+            --group-id "$KWABOR_TESTFLIGHT_INTERNAL_GROUP_ID" \
+            --version-name "$KWABOR_IOS_VERSION_NAME" \
+            --build-number "$KWABOR_IOS_BUILD_NUMBER" \
+            --release-notes "$RELEASE_NOTES" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --archive-run-id "$ARCHIVE_RUN_ID" \
+            --upload-run-id "$GITHUB_RUN_ID" \
+            --upload-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --upload-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --actor "$GITHUB_ACTOR" \
+            --uploaded-after "$KWABOR_TESTFLIGHT_UPLOAD_STARTED_AT" \
+            --timeout-seconds 1800 \
+            --output "$receipt"
+
+          receipt_directory="$RUNNER_TEMP/kwabor-testflight-receipt"
+          mkdir -p "$receipt_directory"
+          cp "$receipt" "$receipt_directory/GEL-G6-IOS-TESTFLIGHT.json"
+          cp "$KWABOR_IOS_SOURCE_EVIDENCE" "$receipt_directory/GEL-G6-IOS-ARCHIVE.json"
+          cp "$KWABOR_IOS_SOURCE_DIRECTORY/KWABOR-SHA256SUMS.txt" "$receipt_directory/KWABOR-SOURCE-SHA256SUMS.txt"
+          cp "$RUNNER_TEMP/app-store-connect-preflight.json" "$receipt_directory/APP-STORE-CONNECT-PREFLIGHT.json"
+          cp "$KWABOR_TESTFLIGHT_UPLOAD_OPTIONS" "$receipt_directory/INTERNAL-ONLY-EXPORT-OPTIONS.plist"
+          cp "$KWABOR_STAGING_ENVIRONMENT_EVIDENCE" "$receipt_directory/GEL-G6-STAGING-ENVIRONMENT.json"
+          cp "$KWABOR_TESTFLIGHT_ENVIRONMENT_EVIDENCE" "$receipt_directory/GEL-G6-TESTFLIGHT-ENVIRONMENT.json"
+          (
+            cd "$receipt_directory"
+            shasum -a 256 \
+              GEL-G6-IOS-TESTFLIGHT.json \
+              GEL-G6-IOS-ARCHIVE.json \
+              KWABOR-SOURCE-SHA256SUMS.txt \
+              APP-STORE-CONNECT-PREFLIGHT.json \
+              INTERNAL-ONLY-EXPORT-OPTIONS.plist \
+              GEL-G6-STAGING-ENVIRONMENT.json \
+              GEL-G6-TESTFLIGHT-ENVIRONMENT.json > KWABOR-TESTFLIGHT-SHA256SUMS.txt
+          )
+          echo "KWABOR_TESTFLIGHT_RECEIPT_DIRECTORY=$receipt_directory" >> "$GITHUB_ENV"
+
+      - name: Upload internal TestFlight GEL receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-ios-testflight-internal-${{ inputs.version_name }}-${{ inputs.build_number }}-${{ inputs.expected_sha }}
+          path: ${{ env.KWABOR_TESTFLIGHT_RECEIPT_DIRECTORY }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Remove signing and App Store Connect assets
+        if: always()
+        shell: bash
+        run: |
+          keychain_path="${KWABOR_IOS_KEYCHAIN_PATH:-$RUNNER_TEMP/kwabor-signing.keychain-db}"
+          security delete-keychain "$keychain_path" 2>/dev/null || true
+          if [[ -n "${KWABOR_IOS_PROFILE_PATH:-}" ]]; then
+            rm -f "$KWABOR_IOS_PROFILE_PATH"
+          fi
+          rm -f \
+            "$RUNNER_TEMP/kwabor-distribution.p12" \
+            "$RUNNER_TEMP/kwabor.mobileprovision" \
+            "$RUNNER_TEMP/kwabor-profile.plist" \
+            "$RUNNER_TEMP/kwabor-source-profile.plist" \
+            "$RUNNER_TEMP/AuthKey_${KWABOR_ASC_KEY_ID:-missing}.p8"

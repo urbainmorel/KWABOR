@@ -1,0 +1,1130 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000215",
+    "type": "lieu",
+    "subtype": "marche",
+    "listingClass": "commercial",
+    "categoryId": "commercial-marche",
+    "status": "publie",
+    "name": "Marche Dantokpa",
+    "slug": "marche-dantokpa",
+    "description": "Grand marché réel de Cotonou, présenté ici comme repère visuel du catalogue. Les données d'activité, la sélection d'étals et les visuels de cette fiche sont des démonstrations générées non documentaires. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Lieu réel; visuels générés non documentaires pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Dantokpa",
+    "address": "Boulevard Saint Michel, Cotonou",
+    "lat": 6.3707,
+    "lng": 2.431,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "marche",
+      "cotonou"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "marche",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès libre; informations d'activité fournies uniquement pour la démonstration."
+    },
+    "amenities": [
+      "parking",
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Vue générée du Marché Dantokpa à Cotonou, avec toitures, étals et lumière du matin",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 du Marché Dantokpa à Cotonou, Bénin, représentation générée non documentaire, vue ample des toitures et des étals colorés sous une lumière matinale naturelle; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Représentation générée d'une allée de Dantokpa avec tissus, paniers et comptoirs en bois",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une allée du Marché Dantokpa à Cotonou, Bénin, interprétation générée non documentaire, textiles sans marque, paniers tressés et comptoirs en bois sous une lumière latérale douce; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Vue générée des passages couverts de Dantokpa après la pluie, dans une ambiance calme",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 des passages couverts du Marché Dantokpa à Cotonou, Bénin, scène générée non documentaire après la pluie, sols humides et étals génériques avant ouverture; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000201",
+    "type": "lieu",
+    "subtype": "nature",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-nature",
+    "status": "publie",
+    "name": "Jardin des Brises du Littoral",
+    "slug": "jardin-brises-littoral-cotonou-demo",
+    "description": "Jardin côtier fictif composé de palmiers, graminées et bancs ombragés, conçu pour évoquer une pause fraîche près du littoral de Cotonou. Cette fiche et ses conditions de visite sont entièrement fictives et réservées à la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Fidjrossè",
+    "address": "Adresse fictive, secteur littoral de Fidjrossè, Cotonou",
+    "lat": 6.3538,
+    "lng": 2.3532,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "nature",
+      "littoral"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "nature",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Promenade fictive en accès libre, sans réservation."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Jardin côtier fictif de Cotonou bordé de palmiers et de graminées sous un ciel clair",
+        "prompt": "Photographie paysagère réaliste en portrait 3:4 d'un jardin côtier fictif à Cotonou, Bénin, palmiers élancés, graminées locales, sentier sableux et aperçu discret de l'océan, lumière claire de fin d'après-midi; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Banc en bois fictif sous des palmes avec ombres graphiques dans un jardin du littoral",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un banc sculptural en bois sous des palmes dans un jardin fictif du littoral béninois, ombres graphiques, sable blond et végétation luxuriante, atmosphère calme, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Passerelle fictive en bois traversant des herbes côtières au soleil couchant de Cotonou",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une passerelle en bois fictive traversant des herbes côtières à Cotonou, Bénin, ciel doré après une averse et reflets humides, cadrage photo-first premium; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000202",
+    "type": "lieu",
+    "subtype": "historique",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-historique",
+    "status": "publie",
+    "name": "Cour des Mémoires de Ganhi",
+    "slug": "cour-memoires-ganhi-cotonou-demo",
+    "description": "Cour patrimoniale fictive où briques ocre, arcades sobres et objets du quotidien composent un parcours intimiste sur la mémoire urbaine. Le lieu, le récit et les modalités de visite sont inventés pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Ganhi",
+    "address": "Adresse fictive, quartier Ganhi, Cotonou",
+    "lat": 6.3609,
+    "lng": 2.4302,
+    "priceFromXof": 1500,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "histoire",
+      "architecture"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "historique",
+      "isFree": false,
+      "entryFeeXof": 1500,
+      "feeNote": "Tarif fictif de démonstration, sans vente ni réservation réelle."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Cour patrimoniale fictive de Ganhi avec arcades ocre et grand arbre central ombragé",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 d'une cour patrimoniale fictive à Ganhi, Cotonou, Bénin, arcades ocre, murs patinés et grand arbre central, lumière matinale douce, rendu documentaire sans prétention historique; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Arcade fictive en briques ocre décorée de poteries sobres dans la cour de Ganhi",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une arcade fictive en briques ocre à Cotonou, poteries artisanales non marquées, enduit patiné et faisceau de lumière naturelle, détails tactiles très nets, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Galerie fictive aux volets bleu profond ouvrant sur une cour végétale silencieuse",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une galerie historique fictive à Ganhi au Bénin, volets bleu profond, sol minéral, feuillages et jeux d'ombre, atmosphère silencieuse de fin de journée; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000203",
+    "type": "lieu",
+    "subtype": "nature",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-nature",
+    "status": "publie",
+    "name": "Mangrove Urbaine d'Agla",
+    "slug": "mangrove-urbaine-agla-cotonou-demo",
+    "description": "Petit refuge écologique fictif parcouru par une passerelle légère entre palétuviers, eau saumâtre et observatoires ombragés. Le site et toutes les informations de visite sont inventés pour démontrer l'expérience Kwabor en bêta fermée. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Agla",
+    "address": "Adresse fictive, lisière humide d'Agla, Cotonou",
+    "lat": 6.3831,
+    "lng": 2.3455,
+    "priceFromXof": 1000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "nature",
+      "mangrove"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "nature",
+      "isFree": false,
+      "entryFeeXof": 1000,
+      "feeNote": "Contribution fictive de démonstration, sans encaissement réel."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Passerelle fictive traversant une mangrove dense à Agla sous une lumière verte tamisée",
+        "prompt": "Photographie naturaliste réaliste en portrait 3:4 d'une mangrove urbaine fictive à Agla, Cotonou, Bénin, passerelle en bois clair, palétuviers denses et eau calme, lumière verte filtrée, humidité visible; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Racines de palétuviers fictifs reflétées dans une eau calme près de Cotonou",
+        "prompt": "Photographie macro paysagère réaliste en portrait 3:4 de racines de palétuviers dans un refuge fictif près de Cotonou, reflets précis sur l'eau saumâtre, feuillage humide et lumière après pluie, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Observatoire fictif en bois ouvert sur les feuillages d'une mangrove urbaine béninoise",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un petit observatoire en bois fictif au bord d'une mangrove urbaine béninoise, lignes minimalistes, feuillages profonds et rayon de soleil, cadrage vertical immersif, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000204",
+    "type": "lieu",
+    "subtype": "marche",
+    "listingClass": "commercial",
+    "categoryId": "commercial-marche",
+    "status": "publie",
+    "name": "Marché des Paniers du Lac",
+    "slug": "marche-paniers-lac-cotonou-demo",
+    "description": "Marché fictif à taille humaine mettant en scène paniers, nattes et objets en fibres naturelles dans des kiosques inspirés du bord de lac. Cette fiche est un contenu de démonstration inventé pour la bêta fermée Kwabor, sans vendeur ni offre réelle. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "cotonou",
+    "district": "Ladji",
+    "address": "Adresse fictive, rive de Ladji, Cotonou",
+    "lat": 6.3888,
+    "lng": 2.4327,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "marche",
+      "vannerie"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "marche",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès libre fictif, aucun achat réel disponible."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Kiosques fictifs de vannerie au bord du lac avec paniers suspendus et toiture légère",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un marché de vannerie fictif au bord d'un lac à Cotonou, Bénin, kiosques ouverts, paniers suspendus et toiture de fibres, lumière chaude du matin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Collection fictive de paniers béninois aux tressages variés posés sur une natte claire",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une collection fictive de paniers béninois aux tressages variés, disposés sur une natte claire dans un kiosque ouvert, tons naturels et détail artisanal précis, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Terrasse fictive du marché donnant sur une eau paisible et des barques lointaines",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une terrasse de marché fictive à Cotonou donnant sur une eau paisible, paniers au premier plan et petites barques génériques lointaines, lumière bleue du soir, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000214",
+    "type": "lieu",
+    "subtype": "historique",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-historique",
+    "status": "publie",
+    "name": "Porte du Non-Retour",
+    "slug": "porte-du-non-retour",
+    "description": "Monument patrimonial réel de Ouidah présenté comme repère du parcours mémoriel. Le texte éditorial, les conditions de visite et les visuels de cette fiche sont des éléments de démonstration générés non documentaires. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Lieu réel; visuels générés non documentaires pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Plage de Ouidah",
+    "address": "Route des Esclaves, Ouidah",
+    "lat": 6.3422,
+    "lng": 2.08,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "histoire",
+      "patrimoine"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "historique",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès présenté comme libre; modalités fournies uniquement pour la démonstration."
+    },
+    "amenities": [
+      "accessible-pmr",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Représentation générée de la Porte du Non-Retour à Ouidah face au littoral lumineux",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 de la Porte du Non-Retour à Ouidah, Bénin, représentation générée non documentaire, monument encadré par le littoral sous une lumière dorée du matin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Vue générée d'un détail sculptural de la Porte du Non-Retour sous une lumière rasante",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un détail sculptural de la Porte du Non-Retour à Ouidah, Bénin, interprétation générée non documentaire, matière minérale et ombres rasantes sans inscription ajoutée; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Représentation générée du monument depuis le sable avec palmiers et ciel après l'orage",
+        "prompt": "Photographie réaliste en portrait 3:4 de la Porte du Non-Retour vue depuis le sable à Ouidah, Bénin, scène générée non documentaire avec palmiers, herbes côtières et ciel lumineux après l'orage; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000205",
+    "type": "lieu",
+    "subtype": "nature",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-nature",
+    "status": "publie",
+    "name": "Sentier des Palétuviers Rouges",
+    "slug": "sentier-paletuviers-rouges-ouidah-demo",
+    "description": "Sentier écologique fictif serpentant entre palétuviers, lagune et petites plateformes d'observation, pensé pour une découverte lente du paysage côtier. Ce lieu et toutes ses informations sont inventés pour la démonstration de la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Avlékété",
+    "address": "Adresse fictive, zone lagunaire d'Avlékété, Ouidah",
+    "lat": 6.3387,
+    "lng": 2.0568,
+    "priceFromXof": 1200,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "nature",
+      "lagune"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "nature",
+      "isFree": false,
+      "entryFeeXof": 1200,
+      "feeNote": "Contribution fictive pour l'entretien, sans paiement réel."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Sentier fictif sur pilotis au milieu de palétuviers rouges et d'une lagune calme",
+        "prompt": "Photographie naturaliste réaliste en portrait 3:4 d'un sentier fictif sur pilotis dans une lagune près d'Ouidah, Bénin, palétuviers aux racines rougeâtres, eau calme et ciel couvert lumineux; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Plateforme fictive d'observation en bois face aux reflets verts de la lagune d'Ouidah",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une plateforme d'observation fictive en bois face à une lagune d'Ouidah, reflets verts, garde-corps artisanal et végétation dense, atmosphère paisible, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Canopée fictive de palétuviers vue depuis un chemin étroit après une pluie tropicale",
+        "prompt": "Photographie immersive réaliste en portrait 3:4 sous une canopée de palétuviers fictive au Bénin, chemin étroit humide, gouttes sur les feuilles et lumière diffuse après pluie, profondeur naturelle; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000206",
+    "type": "lieu",
+    "subtype": "historique",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-historique",
+    "status": "publie",
+    "name": "Cour des Tambours de Zomaï",
+    "slug": "cour-tambours-zomai-ouidah-demo",
+    "description": "Cour culturelle fictive organisée autour de tambours sculptés, de murs en terre et d'un patio ombragé destiné à des récits sonores imaginaires. Le site, sa collection et ses conditions d'accès sont inventés pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Zomaï",
+    "address": "Adresse fictive, quartier Zomaï, Ouidah",
+    "lat": 6.3672,
+    "lng": 2.0886,
+    "priceFromXof": 2000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "histoire",
+      "musique"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "historique",
+      "isFree": false,
+      "entryFeeXof": 2000,
+      "feeNote": "Billet fictif de démonstration, aucune visite réelle n'est vendue."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Cour fictive de Zomaï avec tambours sculptés disposés sous un grand auvent en bois",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une cour culturelle fictive à Ouidah, Bénin, tambours aux formes originales disposés sous un grand auvent en bois, murs de terre et lumière chaude; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Groupe de tambours fictifs aux patines variées devant un mur de terre rouge sobre",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un groupe de tambours fictifs aux patines variées devant un mur de terre rouge à Ouidah, détails du bois et cordages, lumière rasante de fin d'après-midi, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Patio fictif de Zomaï éclairé par des ouvertures rondes et entouré de bancs bas",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 d'un patio fictif à Zomaï, ouvertures rondes projetant des cercles de lumière, bancs bas en bois et sol ocre parfaitement sobre, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000207",
+    "type": "lieu",
+    "subtype": "nature",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-nature",
+    "status": "publie",
+    "name": "Jardin des Dunes de Djègbadji",
+    "slug": "jardin-dunes-djegbadji-ouidah-demo",
+    "description": "Jardin de dunes fictif mêlant plantes côtières, cheminements de bois et petits belvédères ouverts sur un paysage de sable préservé. La destination et les informations présentées sont entièrement inventées pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Djègbadji",
+    "address": "Adresse fictive, dunes de Djègbadji, Ouidah",
+    "lat": 6.3355,
+    "lng": 2.1024,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "nature",
+      "dunes"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "nature",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Promenade fictive gratuite, sans réservation."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Chemin de bois fictif traversant des dunes végétalisées sous le ciel lumineux d'Ouidah",
+        "prompt": "Photographie paysagère réaliste en portrait 3:4 d'un jardin de dunes fictif à Djègbadji, Ouidah, Bénin, chemin de bois sinueux, plantes côtières et ciel ample, lumière douce de matinée; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Belvédère fictif en bois clair posé au-dessus d'herbes côtières agitées par le vent",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un belvédère fictif en bois clair au-dessus d'herbes côtières près d'Ouidah, vent visible dans la végétation et horizon marin voilé, palette naturelle, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Plantes succulentes fictives et traces de vent sur le sable doré des dunes de Djègbadji",
+        "prompt": "Photographie rapprochée réaliste en portrait 3:4 de plantes succulentes et de traces de vent dans le sable d'un jardin de dunes fictif au Bénin, soleil bas, textures fines et arrière-plan doux; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000208",
+    "type": "lieu",
+    "subtype": "marche",
+    "listingClass": "commercial",
+    "categoryId": "commercial-marche",
+    "status": "publie",
+    "name": "Marché des Teinturières d'Avlékété",
+    "slug": "marche-teinturieres-avlekete-ouidah-demo",
+    "description": "Marché-atelier fictif consacré aux étoffes teintes, aux bains de couleur et aux fibres suspendues dans une cour ventilée. La fiche, les artisans et les offres sont inventés exclusivement pour montrer le potentiel de la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "ouidah",
+    "district": "Avlékété",
+    "address": "Adresse fictive, village d'Avlékété, Ouidah",
+    "lat": 6.3482,
+    "lng": 2.0477,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "marche",
+      "textile"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "marche",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès fictif libre, aucun article réellement vendu."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Cour de marché fictive à Avlékété avec étoffes indigo suspendues entre des piliers ocre",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'un marché-atelier fictif à Avlékété près d'Ouidah, étoffes indigo originales suspendues entre piliers ocre, cour ventilée et lumière diffuse, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Cuves de teinture fictives entourées de fibres naturelles et de tissus aux bleus profonds",
+        "prompt": "Photographie réaliste en portrait 3:4 de cuves de teinture fictives dans un atelier béninois, fibres naturelles, tissus aux bleus profonds et sol éclaboussé de pigments, composition artisanale soignée, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Étoffes fictives séchant au vent dans une allée sableuse du marché d'Avlékété",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'étoffes fictives séchant au vent dans une allée sableuse à Avlékété, Bénin, alternance d'indigo et de tons terre, soleil filtré; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000209",
+    "type": "lieu",
+    "subtype": "historique",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-historique",
+    "status": "publie",
+    "name": "Maison des Voûtes d'Adjina",
+    "slug": "maison-voutes-adjina-porto-novo-demo",
+    "description": "Maison patrimoniale fictive aux voûtes généreuses, carreaux colorés et cour intérieure végétalisée, imaginée comme un lieu de lecture de la ville. Le bâtiment et son histoire sont des créations réservées à la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Adjina",
+    "address": "Adresse fictive, quartier Adjina, Porto-Novo",
+    "lat": 6.4985,
+    "lng": 2.6254,
+    "priceFromXof": 1800,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "histoire",
+      "voutes"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "historique",
+      "isFree": false,
+      "entryFeeXof": 1800,
+      "feeNote": "Tarif fictif de démonstration, sans billetterie réelle."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Façade fictive à grandes voûtes crème et volets verts dans une rue calme d'Adjina",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 d'une maison patrimoniale entièrement fictive à Adjina, Porto-Novo, Bénin, grandes voûtes crème, volets verts et cour pavée, lumière douce, inspiration locale sans copier un édifice réel; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Galerie intérieure fictive avec carreaux colorés et succession de voûtes baignées de soleil",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une galerie intérieure fictive à Porto-Novo, succession de voûtes, carreaux colorés aux motifs originaux et lumière traversante, rendu premium très naturel, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Cour intérieure fictive d'Adjina avec bassin peu profond, fougères et murs patinés",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une cour intérieure fictive à Adjina au Bénin, petit bassin réfléchissant, fougères, murs patinés et ombre fraîche de midi; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000210",
+    "type": "lieu",
+    "subtype": "nature",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-nature",
+    "status": "publie",
+    "name": "Escale Verte de la Lagune",
+    "slug": "escale-verte-lagune-porto-novo-demo",
+    "description": "Escale naturelle fictive aménagée sur une rive paisible avec ponton, plantes aquatiques et abris légers tournés vers la lagune. Cette destination et ses informations sont inventées uniquement pour illustrer la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Akonaboè",
+    "address": "Adresse fictive, rive d'Akonaboè, Porto-Novo",
+    "lat": 6.4857,
+    "lng": 2.6411,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "nature",
+      "lagune"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "nature",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Escale fictive gratuite, aucun transport réel n'est proposé."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Ponton fictif de Porto-Novo avançant dans une lagune calme bordée de plantes aquatiques",
+        "prompt": "Photographie paysagère réaliste en portrait 3:4 d'une escale lagunaire fictive à Porto-Novo, Bénin, ponton de bois, plantes aquatiques et eau parfaitement calme sous un ciel pastel du matin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Abri fictif en bois et fibres face aux reflets argentés de la lagune de Porto-Novo",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un abri léger fictif en bois et fibres au bord de la lagune de Porto-Novo, banc simple, reflets argentés et végétation tropicale, atmosphère silencieuse, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Feuilles aquatiques fictives et petite barque générique sur une eau dorée au crépuscule",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 de feuilles aquatiques et d'une petite barque générique sans marque sur une lagune fictive au Bénin, eau dorée au crépuscule et brume légère; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000211",
+    "type": "lieu",
+    "subtype": "historique",
+    "listingClass": "patrimonial",
+    "categoryId": "heritage-historique",
+    "status": "publie",
+    "name": "Passage des Masques de Tokpota",
+    "slug": "passage-masques-tokpota-porto-novo-demo",
+    "description": "Passage patrimonial fictif reliant deux petites cours où des formes sculptées originales racontent une histoire imaginaire de métiers et de fêtes. Le lieu, les œuvres et le récit sont inventés pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Tokpota",
+    "address": "Adresse fictive, quartier Tokpota, Porto-Novo",
+    "lat": 6.5098,
+    "lng": 2.6197,
+    "priceFromXof": 1000,
+    "priceUnit": "par_entree",
+    "priceTier": 1,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "histoire",
+      "sculpture"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "historique",
+      "isFree": false,
+      "entryFeeXof": 1000,
+      "feeNote": "Prix fictif indicatif, aucune entrée réelle n'est commercialisée."
+    },
+    "amenities": [
+      "accessible-pmr"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Passage fictif de Tokpota aux murs ocre ponctués de sculptures abstraites en bois",
+        "prompt": "Photographie architecturale réaliste en portrait 3:4 d'un passage patrimonial fictif à Tokpota, Porto-Novo, murs ocre, niches et sculptures abstraites originales en bois, lumière zénithale, sans reproduire d'objet sacré réel, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Sculpture abstraite fictive aux lignes douces installée dans une niche de terre claire",
+        "prompt": "Photographie réaliste en portrait 3:4 d'une sculpture abstraite entièrement fictive aux lignes douces dans une niche de terre claire à Porto-Novo, grain du bois visible et ombre précise, objet non rituel, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Petite cour fictive de Tokpota avec banc circulaire et silhouettes sculptées non rituelles",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une petite cour fictive à Tokpota, banc circulaire, végétation et silhouettes sculptées décoratives non rituelles, lumière de fin de matinée, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000212",
+    "type": "lieu",
+    "subtype": "marche",
+    "listingClass": "commercial",
+    "categoryId": "commercial-marche",
+    "status": "publie",
+    "name": "Halle des Potières d'Akpassa",
+    "slug": "halle-potieres-akpassa-porto-novo-demo",
+    "description": "Halle fictive consacrée à des poteries contemporaines, avec démonstrations imaginaires, étagères en terre et patio de cuisson mis en scène. La fiche, les créateurs et les objets sont inventés pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Akpassa",
+    "address": "Adresse fictive, quartier Akpassa, Porto-Novo",
+    "lat": 6.4863,
+    "lng": 2.6168,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "marche",
+      "poterie"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "marche",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès fictif libre, aucune poterie réellement proposée."
+    },
+    "amenities": [
+      "accessible-pmr",
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Halle fictive d'Akpassa aux étagères de poteries mates sous une toiture ajourée",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une halle de poterie fictive à Akpassa, Porto-Novo, Bénin, étagères de céramiques mates originales, toiture ajourée et sol ocre, lumière naturelle graphique; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Ensemble fictif de vases en terre aux formes contemporaines sur des socles minéraux",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un ensemble fictif de vases en terre aux formes contemporaines, disposés sur des socles minéraux dans un marché de Porto-Novo, palette rouge et charbon, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Patio fictif de cuisson avec four en terre éteint et jarres alignées au soleil",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un patio de cuisson fictif à Porto-Novo, four en terre éteint, jarres alignées et mur texturé sous un soleil franc, scène artisanale sécurisée et vide, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000213",
+    "type": "lieu",
+    "subtype": "marche",
+    "listingClass": "commercial",
+    "categoryId": "commercial-marche",
+    "status": "publie",
+    "name": "Marché des Étoffes Indigo",
+    "slug": "marche-etoffes-indigo-porto-novo-demo",
+    "description": "Marché fictif aux galeries étroites où étoffes indigo, fibres naturelles et accessoires sans marque composent une promenade très visuelle. Tous les exposants, produits et renseignements sont inventés pour la bêta fermée Kwabor. Contenu fictif créé pour la bêta fermée Kwabor.",
+    "demoDisclosure": "Fiche et visuels fictifs créés uniquement pour la bêta fermée Kwabor.",
+    "contentLang": "fr",
+    "cityId": "porto-novo",
+    "district": "Ouando",
+    "address": "Adresse fictive, quartier Ouando, Porto-Novo",
+    "lat": 6.5127,
+    "lng": 2.6034,
+    "priceFromXof": null,
+    "priceUnit": "aucune",
+    "priceTier": null,
+    "openingHours": {},
+    "contactPhone": null,
+    "contactWhatsapp": null,
+    "externalUrl": null,
+    "email": null,
+    "socials": {},
+    "tags": [
+      "demo-kwabor",
+      "contenu-fictif",
+      "marche",
+      "indigo"
+    ],
+    "verified": false,
+    "ratingCount": 0,
+    "viewsCount": 0,
+    "likesCount": 0,
+    "publishedAt": "2026-08-12T00:00:00Z",
+    "detail": {
+      "variant": "place",
+      "placeCategory": "marche",
+      "isFree": true,
+      "entryFeeXof": null,
+      "feeNote": "Accès fictif libre, sans commerce ni commande réelle."
+    },
+    "amenities": [
+      "parking"
+    ],
+    "media": [
+      {
+        "role": "cover",
+        "displayOrder": 0,
+        "isCover": true,
+        "alt": "Galerie fictive de marché à Porto-Novo drapée d'étoffes indigo et de fibres claires",
+        "prompt": "Photographie éditoriale réaliste en portrait 3:4 d'une galerie de marché fictive à Porto-Novo, Bénin, étoffes indigo originales, fibres claires et structure en bois, lumière traversante élégante; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 1,
+        "isCover": false,
+        "alt": "Empilement fictif de tissus indigo aux motifs géométriques originaux sur une table basse",
+        "prompt": "Photographie réaliste en portrait 3:4 d'un empilement de tissus indigo fictifs aux motifs géométriques originaux, posé sur une table basse en bois à Porto-Novo, texture précise et lumière douce, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      },
+      {
+        "role": "gallery",
+        "displayOrder": 2,
+        "isCover": false,
+        "alt": "Allée fictive du marché indigo avec panneaux de tissu mouvant dans la brise de Porto-Novo",
+        "prompt": "Photographie cinématographique réaliste en portrait 3:4 d'une allée de marché fictive à Porto-Novo, grands panneaux indigo mouvant dans la brise, sol clair et perspective profonde, ambiance avant ouverture, au Bénin; sans texte, logo, filigrane ni personne reconnaissable.",
+        "kind": "image"
+      }
+    ],
+    "ratingAvg": null
+  }
+]

@@ -20,6 +20,7 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var observabilityConsentErrorMessage: String?
     @Published private(set) var promoterActivationContext: PromoterActivationContext?
     @Published private(set) var promoterActivationErrorMessage: String?
+    @Published private(set) var rootNavigationNotice: String?
     @Published private var pendingInternalDeepLink = PendingInternalDeepLink()
     @Published private(set) var interruptedRegistrationEmail: String?
     @Published var isAuthenticationPresented = false
@@ -580,7 +581,21 @@ final class OnboardingCoordinator: ObservableObject {
             pendingInternalDeepLink.enqueueRoot(destinationKey: rootDestinationKey)
             return true
         }
+        if bridge.isUnavailableRootDeepLink(rawUrl: url.absoluteString) {
+            guard InternalDeepLinkIngressPolicy.shouldRetain(
+                validatedDestinationExists: true,
+                isSigningOut: isSigningOutAccount,
+                isDeletingAccount: isDeletingAccount
+            ) else { return true }
+            rootNavigationNotice = bridge.rootDestinationUnavailableMessage
+            pendingInternalDeepLink.enqueueRoot(destinationKey: RootDestination.home.rawValue)
+            return true
+        }
         return requiresProtectedAuthentication
+    }
+
+    func dismissRootNavigationNotice() {
+        rootNavigationNotice = nil
     }
 
     @discardableResult
