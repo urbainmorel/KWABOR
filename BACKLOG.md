@@ -348,12 +348,13 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   Porto-Novo.
 - [x] BETA-MEDIA-001 — Générer, revoir et optimiser 180 JPEG 3:4 réalistes, sans EXIF/GPS,
   avec alt unique et manifeste SHA-256 ; aucun visuel ne doit être embarqué dans les apps.
-- [ ] BETA-SEED-001 — Ajouter un seed démo idempotent séparé du seed canonique, un bucket Storage
+- [x] BETA-SEED-001 — Ajouter un seed démo idempotent séparé du seed canonique, un bucket Storage
   staging sans écriture client, un upload immuable et les tests prouvant exactement 60 fiches.
 - [x] BETA-NAV-001 — Restreindre Android/iOS à l'allowlist `Explorer · Compte`, retirer les
   placeholders et traiter les deep links des racines différées sans écran mort.
 - [ ] BETA-STAGING-001 — Charger le corpus en staging, prouver rollback, offline, performances,
-  accessibilité et builds signés avant d'ouvrir la cohorte.
+  accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
+  dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61).
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

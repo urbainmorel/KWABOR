@@ -2,12 +2,13 @@
 
 ## Phase actuelle
 
-Préparation de la V1 bêta fermée catalogue, acceptée le 12 août 2026 dans ADR-0036. Le lot actif
-construit un corpus staging reproductible de 60 fiches complètes et 180 visuels, puis restreint le
-parcours Android/iOS aux capacités réellement livrées `Explorer · Compte`. La cible V1 complète du
-PRD reste post-bêta ; aucune surface différée n'est déclarée terminée.
+Déploiement opérateur de la V1 bêta fermée catalogue, acceptée le 12 août 2026 dans ADR-0036. Le lot
+applicatif et données est fusionné dans `main` : corpus reproductible de 60 fiches complètes et
+180 visuels, parcours Android/iOS limité aux capacités réellement livrées `Explorer · Compte`,
+workflows staging et distributions internes. La cible V1 complète du PRD reste post-bêta ; aucune
+surface différée n'est déclarée terminée.
 
-## Snapshot courant — 12 août 2026
+## Snapshot courant — 13 août 2026
 
 - La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
   Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
@@ -29,6 +30,11 @@ PRD reste post-bêta ; aucune surface différée n'est déclarée terminée.
   Le run post-fusion `31378013483` est vert pour intégrité, Gradle, Supabase, l'Edge Function et
   Xcode simulateur Debug/Staging/Release. Les preuves Android launch non requises par ce delta ont
   été explicitement ignorées par leur gate de périmètre.
+- La PR `#60` a intégré la V1 bêta fermée catalogue. `main` est au commit de fusion
+  `b577d0871b1ee206762af96bdadb48691b2bb4f7`. Le run de qualification `31652615920` est vert après
+  l'unique reprise ciblée autorisée d'une acquisition screencap API 36 classée infrastructure ; le
+  run post-fusion `31654557932` est également vert pour intégrité/médias, Gradle, Supabase, Edge
+  Function et Xcode simulateur Debug/Staging/Release.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -496,24 +502,32 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-SYNC-001 est terminé et validé exact-head dans la PR `#59` ; seule sa revue/fusion reste ouverte. Il
-n'ajoute ni moniteur réseau plateforme ni ordre global multi-appareils. Aucun nouveau lot fonctionnel
-n'est engagé silencieusement : EXPLORE-002B2B2 attend l'arbitrage Produit du drawer avancé,
-HISTORY-001B attend les gates d'ADR-0031, et STAB-002B reste suspendu à la décision structurante sur
-les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de bout en bout.
+BETA-STAGING-001 est le chemin critique. Le code, les 60 fiches, les 180 médias, les tests dynamiques
+Supabase et les workflows de distribution sont fusionnés et qualifiés ; il reste à provisionner les
+Environments GitHub et les comptes fournisseurs, publier puis vérifier Storage et le catalogue sur
+le vrai staging, produire les builds signés internes et exécuter le pilote. La checklist opérateur
+non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
+secret ne doit être publié dans GitHub Issues.
 
 ## Blocages / limites
 
-- Le périmètre PRD nommé V1 dépasse largement une version minimale livrable. La réduction proposée dans l'audit exige une validation propriétaire et un ADR avant de masquer ou reporter Social, `+`, Notifications, B2B, paiement et IA.
+- ADR-0036 autorise explicitement le profil transitoire de bêta fermée `Explorer · Compte` et le
+  report de Social, `+`, Notifications, B2B, paiement et IA. Cette autorisation ne vaut ni
+  achèvement de la V1 complète du PRD ni ouverture publique de production.
+- Le déploiement est bloqué en sécurité tant qu'un second reviewer GitHub de confiance n'est pas
+  désigné et que `staging`, `play-internal` et `testflight-internal` ne sont pas protégés sans bypass
+  admin, avec revue obligatoire et interdiction d'auto-approbation. Les projets Supabase/Firebase,
+  les comptes Stores, certificats, profils et secrets fournisseurs restent à provisionner via
+  [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61), jamais dans le dépôt ou dans un
+  commentaire.
 - Pour le texte actif HISTORY V1, la rétention serveur glissante proposée de 180 jours et les
   modalités juridiques d'activation de la personnalisation restent bloquées par le Juridique/DPO.
   Les plafonds, le défaut désactivé et la resoumission sans doublon sont déjà actés par ADR-0029.
   ADR-0031 reste proposé et ajoute des gates V2, dont la durée de conservation des tombstones et
   clés d’idempotence avec Juridique/DPO et Opérations.
-- La navigation globale complète, les fonctions de détail encore absentes, l'administration
-  opérateur, les contenus réels, le pipeline média et les validations natives/appareils bloquent
-  encore une V1 commercialement exploitable. Les actions externes intégrées ne couvrent pas encore
-  carte, avis, partage public, signalement et claim.
+- La navigation globale complète, l'administration opérateur et les fonctions différées bloquent
+  encore une V1 commercialement exploitable, mais pas le profil fermé ADR-0036. Ce profil exige
+  encore staging réel, builds internes signés, validations appareils et pilote avant tout go/no-go.
 - IOS-PRIVACY-001B2 doit encore valider les finalités, la liaison, la rétention et les réglages
   fournisseurs avec le propriétaire, puis rapprocher l'archive exacte du Privacy Report Xcode et
   d'App Store Connect. L'inventaire local IOS-PRIVACY-001B1 ne constitue donc pas une preuve de
@@ -594,11 +608,9 @@ les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de b
 
 ## Prochaine tâche logique
 
-Faire relire puis fusionner la PR `#59`. Faire ensuite arbitrer par Produit EXPLORE-002B2B2 avant
-tout drawer avancé : presets de dates civiles du
-Bénin, prix, multi-ville, compteur live et partage des filtres avec Search. En parallèle, faire
-arbitrer ADR-0031 avant HISTORY-001B ; les recherches récentes restent conservées par conception
-pour l'assistant IA et la pertinence du fil, sous les plafonds et choix de personnalisation à
-arbitrer. OPS-001B ne démarre qu'après provisionnement staging ; avant d'activer `account-delete`,
-les AMR réelles et la politique des en-têtes/journaux doivent être qualifiées. Tout changement
-d'octets de la vidéo embarquée exige toujours une nouvelle release Android/iOS dans les Stores.
+Résoudre [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : désigner le
+second reviewer, protéger et provisionner les trois Environments GitHub, publier puis vérifier les
+180 médias, publier puis vérifier les 60 fiches, exécuter les smokes staging, produire l'AAB Play
+Internal et l'IPA TestFlight Internal, puis ouvrir le pilote de 10 appareils Android et 5 iPhone
+pendant sept jours. Le go/no-go exige zéro P0/P1 et au moins 99,5 % de sessions sans crash. Les lots
+post-bêta restent différés tant que cette preuve n'est pas acquise.
