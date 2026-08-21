@@ -35,6 +35,10 @@ surface différée n'est déclarée terminée.
   l'unique reprise ciblée autorisée d'une acquisition screencap API 36 classée infrastructure ; le
   run post-fusion `31654557932` est également vert pour intégrité/médias, Gradle, Supabase, Edge
   Function et Xcode simulateur Debug/Staging/Release.
+- Le présent lot local ajoute la mesure monotone et consentie du first usable viewport Explore sur
+  Android/iOS, avec confirmation de rendu, états terminaux typés et annulation sur navigation ou
+  arrière-plan. Il ne produit aucune valeur de performance fictive : la campagne physique B7.10
+  (10 cold + 20 warm par plateforme) reste une gate no-go.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale

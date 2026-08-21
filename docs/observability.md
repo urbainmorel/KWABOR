@@ -205,6 +205,26 @@ ne garantit une modification complète à chaud que lorsqu'elle intervient avant
 mesures Performance livrées sont uniquement des traces personnalisées ouvertes sous consentement
 diagnostics ; leur envoi s'arrête dès que ce consentement n'est plus effectif.
 
+### First usable viewport Explore
+
+La bêta fermée instrumente `explore_initial_load` sur Android et iOS avec l'horloge monotone de la
+plateforme. Le départ correspond au point de cycle de vie éligible d'Explore au premier plan ; le
+premier échantillon éligible du processus est `cold`, puis chaque retour après masquage, navigation ou
+arrière-plan est `warm`. Une recherche ou une fiche qui recouvre Explore annule l'échantillon.
+
+La mesure ne se termine qu'après confirmation d'un rendu de taille positive, postérieur aux
+skeletons, pour un contenu tactile et scrollable ou un état terminal vide, offline ou erreur. Les
+callbacks de rendu portent une génération : un callback obsolète ou dupliqué ne peut rien publier.
+Un retrait du consentement, un passage en arrière-plan ou une navigation annule localement la mesure
+et aucune trace partielle n'est remise à Firebase.
+
+La trace terminée contient uniquement la métrique entière `first_usable_viewport_us` et deux
+attributs à vocabulaire fermé : `sample_kind` (`cold` ou `warm`) et `viewport_state` (`content`,
+`empty`, `offline` ou `error`). Aucun identifiant, texte libre, ville, URL ou contenu de fiche n'est
+attaché. Cette instrumentation ne constitue pas la preuve B7.10 : les 10 mesures cold et 20 warm sur
+chacun des appareils physiques de référence, sous le profil réseau gelé, restent à exécuter et à
+archiver sans inventer de valeurs.
+
 Les erreurs non fatales acceptent seulement un `DiagnosticCode` fermé. Aucun message d'exception amont, payload, token, URL fournisseur ou donnée utilisateur n'est joint aux rapports.
 
 ## Déclarations stores à valider

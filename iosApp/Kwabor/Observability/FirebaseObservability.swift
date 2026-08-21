@@ -31,9 +31,17 @@ final class FirebaseObservability {
     private var installationDeletionInFlight = false
     private var authenticatedSessionBound = false
     private var runtimeCollectionSuspended = true
+    private var publishedPerformanceCollectionAllowed = false
 
     private(set) var consent: ObservabilityConsent
     private(set) var isConfigured = false
+    var onPerformanceCollectionEligibilityChanged: ((Bool) -> Void)? {
+        didSet {
+            let allowed = isPerformanceCollectionAllowed
+            publishedPerformanceCollectionAllowed = allowed
+            onPerformanceCollectionEligibilityChanged?(allowed)
+        }
+    }
 
     init(bundle: Bundle = .main, legacyUserDefaults: UserDefaults = .standard) {
         let consentStore = FirebaseConsentStore(
@@ -263,6 +271,7 @@ final class FirebaseObservability {
             )
             remoteConfigurationGeneration += 1
             stopRemoteConfigurationUpdates()
+            publishPerformanceCollectionEligibility()
             return
         }
         replaceEffectiveConsent(
@@ -306,6 +315,7 @@ final class FirebaseObservability {
             startRemoteConfigurationSession()
         }
         resumePendingDiagnosticsReportPurge()
+        publishPerformanceCollectionEligibility()
     }
 
     private func configureIfNeeded(for consent: ObservabilityConsent) {
@@ -378,6 +388,28 @@ final class FirebaseObservability {
             return nil
         }
         return FirebasePerformanceTrace(trace: trace)
+    }
+
+    var isPerformanceCollectionAllowed: Bool {
+        isConfigured && effectiveDiagnosticsAllowed
+    }
+
+    private func publishPerformanceCollectionEligibility() {
+        let allowed = isPerformanceCollectionAllowed
+        guard publishedPerformanceCollectionAllowed != allowed else { return }
+        publishedPerformanceCollectionAllowed = allowed
+        onPerformanceCollectionEligibilityChanged?(allowed)
+    }
+
+    func recordPerformanceMeasurement(_ measurement: PerformanceMeasurement) {
+        guard isPerformanceCollectionAllowed,
+              let trace = Performance.startTrace(name: measurement.traceName.wireName) else {
+            return
+        }
+        trace.setValue(measurement.metricValue, forMetric: measurement.metricName.wireName)
+        trace.setValue(measurement.sampleKind.wireName, forAttribute: performanceSampleKindAttribute)
+        trace.setValue(measurement.viewportState.wireName, forAttribute: performanceViewportStateAttribute)
+        trace.stop()
     }
 
     private func startRemoteConfigurationSession() {
@@ -1375,6 +1407,8 @@ private let remoteConfigFetchInterval: TimeInterval = 43_200
 private let notApplicable = "not_applicable"
 private let diagnosticDomain = "com.kwabor.observability"
 private let diagnosticErrorCode = 1
+private let performanceSampleKindAttribute = "sample_kind"
+private let performanceViewportStateAttribute = "viewport_state"
 private let remoteConfigFetchFailureCode = "remote_config_fetch_failed"
 private let legacyConsentKeys = [
     "kwabor.observability.analytics_allowed",

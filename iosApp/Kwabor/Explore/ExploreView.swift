@@ -10,8 +10,11 @@ struct ExploreView: View {
     let onAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let showsClosedBetaDisclosure: Bool
     let showsGuideDiscoveryEntry: Bool
+    let isObscured: Bool
+    let performanceCollectionRequested: Bool
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var citySelectorSheetPresentation: ExploreSheetPresentation?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,8 +45,26 @@ struct ExploreView: View {
             }
         }
         .background(KwaborDesignTokens.ColorToken.paper50)
-        .sheet(isPresented: citySelectorBinding) {
+        .background {
+            if performanceCollectionRequested,
+               probeSurfaceUnobscured,
+               let token = store.firstUsableViewportDrawToken {
+                ExploreFirstUsableViewportCommitReader(
+                    token: token,
+                    onCommitted: store.firstUsableViewportWasCommitted
+                )
+            }
+        }
+        .sheet(item: citySelectorBinding) { presentation in
             ExploreCitySelector(store: store)
+                .background {
+                    ExploreSheetDismissalObserver(
+                        token: presentation.token,
+                        onAttached: store.surfacePresentationAttached,
+                        onRemoved: citySelectorPresentationDidRemove
+                    )
+                    .id(presentation.id)
+                }
         }
         .onChange(of: store.authenticationRequest?.id) { _, _ in
             guard let request = store.authenticationRequest else { return }
@@ -60,20 +81,62 @@ struct ExploreView: View {
         .onChange(of: searchContextFingerprint) { _, _ in
             searchStore.updateExploreContext(store.state)
         }
+        .onChange(of: store.state.isCitySelectorOpen) { _, isPresented in
+            reconcileCitySelectorPresentation(isPresented)
+        }
         .onAppear {
             searchStore.updateExploreContext(store.state)
+            store.screenAppeared(
+                applicationActive: UIApplication.shared.applicationState == .active,
+                surfaceUnobscured: probeSurfaceUnobscured
+            )
+            reconcileCitySelectorPresentation(store.state.isCitySelectorOpen)
+        }
+        .onDisappear {
+            dismissCitySelectorSheetPresentation()
+            store.closeCitySelector()
+            store.screenDisappeared()
+        }
+        .onChange(of: probeSurfaceUnobscured) { _, unobscured in
+            store.surfaceVisibilityChanged(unobscured)
+        }
+        .onChange(of: performanceCollectionRequested) { _, _ in
+            store.performanceCollectionEligibilityChanged()
         }
     }
 
-    private var citySelectorBinding: Binding<Bool> {
+    private var citySelectorBinding: Binding<ExploreSheetPresentation?> {
         Binding(
-            get: { store.state.isCitySelectorOpen },
-            set: { isPresented in
-                if !isPresented {
+            get: { citySelectorSheetPresentation },
+            set: { presentation in
+                if let presentation {
+                    citySelectorSheetPresentation = presentation
+                } else {
+                    dismissCitySelectorSheetPresentation()
                     store.closeCitySelector()
                 }
             }
         )
+    }
+
+    private func reconcileCitySelectorPresentation(_ isPresented: Bool) {
+        if isPresented {
+            guard citySelectorSheetPresentation == nil else { return }
+            let token = store.surfacePresentationStarted(.citySelector)
+            citySelectorSheetPresentation = ExploreSheetPresentation(token: token)
+        } else {
+            dismissCitySelectorSheetPresentation()
+        }
+    }
+
+    private func dismissCitySelectorSheetPresentation() {
+        guard let presentation = citySelectorSheetPresentation else { return }
+        store.surfacePresentationDismissRequested(presentation.token)
+        citySelectorSheetPresentation = nil
+    }
+
+    private func citySelectorPresentationDidRemove(_ token: ExploreSurfacePresentationToken) {
+        store.surfacePresentationRemoved(token)
     }
 
     private func gridColumns(availableWidth: CGFloat) -> [GridItem] {
@@ -111,6 +174,187 @@ struct ExploreView: View {
             String(describing: store.state.currency),
             cityFingerprint,
         ].joined(separator: "#")
+    }
+
+    private var probeSurfaceUnobscured: Bool {
+        !searchStore.state.isActive &&
+            !store.state.isCitySelectorOpen &&
+            !store.surfacePresentationObscured &&
+            !isObscured
+    }
+}
+
+struct ExploreSheetPresentation: Identifiable {
+    let token: ExploreSurfacePresentationToken
+
+    var id: Int64 { token.generation }
+}
+
+struct ExploreSheetDismissalObserver: UIViewRepresentable {
+    let token: ExploreSurfacePresentationToken
+    let onAttached: (ExploreSurfacePresentationToken) -> Void
+    let onRemoved: (ExploreSurfacePresentationToken) -> Void
+
+    func makeUIView(context: Context) -> ExploreSheetDismissalSentinelView {
+        ExploreSheetDismissalSentinelView(
+            token: token,
+            onAttached: onAttached,
+            onRemoved: onRemoved
+        )
+    }
+
+    func updateUIView(_ view: ExploreSheetDismissalSentinelView, context: Context) {
+        view.update(onAttached: onAttached, onRemoved: onRemoved)
+    }
+}
+
+final class ExploreSheetDismissalSentinelView: UIView {
+    private let token: ExploreSurfacePresentationToken
+    private var onAttached: ((ExploreSurfacePresentationToken) -> Void)?
+    private var onRemoved: ((ExploreSurfacePresentationToken) -> Void)?
+    private var didDeliverAttachment = false
+    private var didDeliverRemoval = false
+
+    init(
+        token: ExploreSurfacePresentationToken,
+        onAttached: @escaping (ExploreSurfacePresentationToken) -> Void,
+        onRemoved: @escaping (ExploreSurfacePresentationToken) -> Void
+    ) {
+        self.token = token
+        self.onAttached = onAttached
+        self.onRemoved = onRemoved
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    func update(
+        onAttached: @escaping (ExploreSurfacePresentationToken) -> Void,
+        onRemoved: @escaping (ExploreSurfacePresentationToken) -> Void
+    ) {
+        self.onAttached = onAttached
+        self.onRemoved = onRemoved
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            deliverAttachment()
+            return
+        }
+        guard didDeliverAttachment else { return }
+        deliverRemoval()
+    }
+
+    private func deliverAttachment() {
+        guard !didDeliverAttachment else { return }
+        didDeliverAttachment = true
+        let attachment = onAttached
+        onAttached = nil
+        attachment?(token)
+    }
+
+    private func deliverRemoval() {
+        guard !didDeliverRemoval else { return }
+        didDeliverRemoval = true
+        let completion = onRemoved
+        onRemoved = nil
+        let removedToken = token
+        DispatchQueue.main.async {
+            completion?(removedToken)
+        }
+    }
+}
+
+private struct ExploreFirstUsableViewportCommitReader: UIViewRepresentable {
+    let token: ExploreFirstUsableViewportDrawToken
+    let onCommitted: (ExploreFirstUsableViewportDrawToken) -> Void
+
+    func makeUIView(context: Context) -> ExploreFirstUsableViewportCommitView {
+        ExploreFirstUsableViewportCommitView()
+    }
+
+    func updateUIView(_ view: ExploreFirstUsableViewportCommitView, context: Context) {
+        view.update(token: token, onCommitted: onCommitted)
+    }
+
+    static func dismantleUIView(_ view: ExploreFirstUsableViewportCommitView, coordinator: Void) {
+        view.clear()
+    }
+}
+
+private final class ExploreFirstUsableViewportCommitView: UIView {
+    private var token: ExploreFirstUsableViewportDrawToken?
+    private var tokenSignature: String?
+    private var committedSignature: String?
+    private var onCommitted: ((ExploreFirstUsableViewportDrawToken) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+        contentMode = .redraw
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    func update(
+        token: ExploreFirstUsableViewportDrawToken,
+        onCommitted: @escaping (ExploreFirstUsableViewportDrawToken) -> Void
+    ) {
+        self.token = token
+        tokenSignature = "\(token.generation):\(token.viewportState.wireName)"
+        self.onCommitted = onCommitted
+        setNeedsDisplay()
+    }
+
+    func clear() {
+        token = nil
+        tokenSignature = nil
+        committedSignature = nil
+        onCommitted = nil
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        setNeedsDisplay()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if bounds.width > 0, bounds.height > 0 {
+            setNeedsDisplay()
+        }
+    }
+
+    override func draw(_ rect: CGRect) {
+        super.draw(rect)
+        guard window != nil,
+              bounds.width > 0,
+              bounds.height > 0,
+              let token,
+              let signature = tokenSignature,
+              committedSignature != signature else {
+            return
+        }
+        committedSignature = signature
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  self.window != nil,
+                  self.tokenSignature == signature else {
+                return
+            }
+            self.onCommitted?(token)
+        }
     }
 }
 

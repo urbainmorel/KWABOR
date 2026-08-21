@@ -3,6 +3,7 @@ package com.kwabor.android.observability
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ class AndroidObservabilityController internal constructor(
     private val stateLock = AndroidObservabilityStateLock()
     private val mutableConsent = MutableStateFlow(ObservabilityConsent())
     private val mutablePrivacyOperationFailed = MutableStateFlow(false)
+    private val mutablePerformanceCollectionAllowed = MutableStateFlow(false)
     private var requestedUserId: String? = null
     private var boundUserId: String? = null
     private var pendingConsentMutation: PendingConsentMutation? = null
@@ -28,10 +30,14 @@ class AndroidObservabilityController internal constructor(
             mutablePrivacyOperationFailed.value =
                 failed || runtimeSuspendedAfterPersistenceFailure || pendingConsentMutation != null
         },
+        onPerformanceCollectionAllowedChanged = { allowed ->
+            mutablePerformanceCollectionAllowed.value = allowed
+        },
     )
 
     val consent: StateFlow<ObservabilityConsent> = mutableConsent.asStateFlow()
     val privacyOperationFailed: StateFlow<Boolean> = mutablePrivacyOperationFailed.asStateFlow()
+    val performanceCollectionAllowed: StateFlow<Boolean> = mutablePerformanceCollectionAllowed.asStateFlow()
     val isConfigured: Boolean get() = runtime.isConfigured
 
     fun start() = stateLock.hold {
@@ -99,6 +105,10 @@ class AndroidObservabilityController internal constructor(
 
     fun startTrace(name: PerformanceTraceName): PerformanceTrace = stateLock.hold {
         runtime.startTrace(name)
+    }
+
+    fun recordPerformanceMeasurement(measurement: PerformanceMeasurement) = stateLock.hold {
+        runtime.recordPerformanceMeasurement(measurement)
     }
 
     fun close() = stateLock.hold {
@@ -226,6 +236,8 @@ internal interface AndroidCollectionBackend {
     fun recordDiagnostic(code: DiagnosticCode)
 
     fun startTrace(name: PerformanceTraceName): PerformanceTrace
+
+    fun recordPerformanceMeasurement(measurement: PerformanceMeasurement)
 }
 
 internal interface AndroidPrivacyMaintenanceBackend {

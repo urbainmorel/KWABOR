@@ -374,6 +374,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     reset Supabase et 753 assertions pgTAP ainsi que la porte globale `spotlessCheck detekt check`
     verts.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
+  - [x] PERF-A11Y-001A — Instrumenter le first usable viewport Explore Android/iOS avec horloge
+    monotone, confirmation de rendu, générations anti-doublon et consentement diagnostics fail-closed.
+  - [ ] PERF-A11Y-001B — Exécuter et archiver B7.10 sur appareils physiques : par plateforme,
+    10 mesures cold et 20 warm sous le profil réseau gelé, sans mesure simulée.
 - [x] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
   - [x] OPS-001A — Livrer le runbook Auth/session/suppression avec diagnostics en lecture seule,

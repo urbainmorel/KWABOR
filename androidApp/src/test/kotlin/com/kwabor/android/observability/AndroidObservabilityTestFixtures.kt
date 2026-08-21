@@ -3,6 +3,7 @@ package com.kwabor.android.observability
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
 internal class TestConsentStore(
@@ -139,6 +140,7 @@ internal class TestObservabilityBackend(
     val events = mutableListOf<AnalyticsEvent>()
     val diagnostics = mutableListOf<DiagnosticCode>()
     val traces = mutableListOf<PerformanceTraceName>()
+    val performanceMeasurements = mutableListOf<PerformanceMeasurement>()
     var remoteConfigurationFetched = false
         private set
     var remoteUpdateStartCount = 0
@@ -206,6 +208,10 @@ internal class TestObservabilityBackend(
     override fun startTrace(name: PerformanceTraceName): PerformanceTrace {
         traces += name
         return PerformanceTrace.None
+    }
+
+    override fun recordPerformanceMeasurement(measurement: PerformanceMeasurement) {
+        performanceMeasurements += measurement
     }
 
     override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {

@@ -16,6 +16,7 @@ import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
 internal fun createAndroidObservabilityController(context: Context): AndroidObservabilityController =
@@ -121,6 +122,15 @@ private class FirebaseAndroidObservabilityBackend(
         return PerformanceTrace(trace::stop)
     }
 
+    override fun recordPerformanceMeasurement(measurement: PerformanceMeasurement) {
+        val trace = performance?.newTrace(measurement.traceName.wireName) ?: return
+        trace.start()
+        trace.putMetric(measurement.metricName.wireName, measurement.metricValue)
+        trace.putAttribute(PERFORMANCE_SAMPLE_KIND_ATTRIBUTE, measurement.sampleKind.wireName)
+        trace.putAttribute(PERFORMANCE_VIEWPORT_STATE_ATTRIBUTE, measurement.viewportState.wireName)
+        trace.stop()
+    }
+
     override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
         val config = remoteConfig ?: run {
             onResult(false)
@@ -171,3 +181,5 @@ private fun AnalyticsEvent.toBundle(): Bundle = Bundle().apply {
 
 private const val REMOTE_CONFIG_FETCH_INTERVAL_SECONDS = 43_200L
 private const val NOT_APPLICABLE = "not_applicable"
+private const val PERFORMANCE_SAMPLE_KIND_ATTRIBUTE = "sample_kind"
+private const val PERFORMANCE_VIEWPORT_STATE_ATTRIBUTE = "viewport_state"

@@ -30,8 +30,17 @@ struct KwaborApp: App {
         self.compositionRoot = compositionRoot
         let exploreStore = ExploreStore(
             controller: compositionRoot.exploreController,
-            onProtectedActionReplayed: observability.track
+            onProtectedActionReplayed: observability.track,
+            isPerformanceCollectionAllowed: { [weak observability] in
+                observability?.isPerformanceCollectionAllowed == true
+            },
+            recordPerformanceMeasurement: { [weak observability] measurement in
+                observability?.recordPerformanceMeasurement(measurement)
+            }
         )
+        observability.onPerformanceCollectionEligibilityChanged = { [weak exploreStore] _ in
+            exploreStore?.performanceCollectionEligibilityChanged()
+        }
         let catalogDetailStore = CatalogDetailStore(controller: compositionRoot.catalogDetailController)
         let favoritesStore = FavoritesStore(
             controller: compositionRoot.favoritesController,
@@ -109,8 +118,11 @@ struct KwaborApp: App {
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
+                        exploreStore.applicationBecameActive()
                         coordinator.applicationBecameActive()
                         compositionRoot.applicationBecameActive()
+                    } else {
+                        exploreStore.applicationBecameInactive()
                     }
                 }
         }

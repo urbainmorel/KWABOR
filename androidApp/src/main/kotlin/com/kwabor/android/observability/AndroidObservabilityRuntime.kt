@@ -3,6 +3,7 @@ package com.kwabor.android.observability
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
 internal class AndroidObservabilityRuntime(
@@ -10,6 +11,7 @@ internal class AndroidObservabilityRuntime(
     private val consentStore: ObservabilityConsentStore,
     stateLock: AndroidObservabilityStateLock,
     private val onPrivacyOperationFailed: (Boolean) -> Unit,
+    private val onPerformanceCollectionAllowedChanged: (Boolean) -> Unit,
 ) {
     private var desiredConsent = ObservabilityConsent()
     private var effectiveConsent = ObservabilityConsent()
@@ -68,6 +70,10 @@ internal class AndroidObservabilityRuntime(
     fun startTrace(name: PerformanceTraceName): PerformanceTrace =
         if (effectiveConsent.diagnosticsAllowed) backend.startTrace(name) else PerformanceTrace.None
 
+    fun recordPerformanceMeasurement(measurement: PerformanceMeasurement) {
+        if (effectiveConsent.diagnosticsAllowed) backend.recordPerformanceMeasurement(measurement)
+    }
+
     fun close() {
         remoteConfiguration.close()
     }
@@ -123,6 +129,7 @@ internal class AndroidObservabilityRuntime(
     private fun applyEffectiveConsent(updatedConsent: ObservabilityConsent) {
         val previousConsent = effectiveConsent
         effectiveConsent = updatedConsent
+        onPerformanceCollectionAllowedChanged(updatedConsent.diagnosticsAllowed)
         if (backend.isConfigured) backend.applyConsent(updatedConsent)
         remoteConfiguration.transition(previousConsent, updatedConsent)
     }

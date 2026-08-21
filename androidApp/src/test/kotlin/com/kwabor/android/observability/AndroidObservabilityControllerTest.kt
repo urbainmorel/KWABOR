@@ -4,7 +4,11 @@ import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
+import com.kwabor.shared.domain.observability.PerformanceMetricName
+import com.kwabor.shared.domain.observability.PerformanceSampleKind
 import com.kwabor.shared.domain.observability.PerformanceTraceName
+import com.kwabor.shared.domain.observability.PerformanceViewportState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -99,6 +103,38 @@ class AndroidObservabilityControllerTest {
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
         assertTrue(backend.remoteConfigurationFetched)
         assertEquals(1, backend.remoteUpdateStartCount)
+    }
+
+    @Test
+    fun performanceMeasurementRequiresEffectiveDiagnosticsConsentAtEmission() {
+        val backend = TestObservabilityBackend()
+        val controller = AndroidObservabilityController(
+            backend,
+            TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ObservabilityConsent(diagnosticsAllowed = true),
+            ),
+        )
+        val measurement = PerformanceMeasurement(
+            traceName = PerformanceTraceName.ExploreInitialLoad,
+            metricName = PerformanceMetricName.FirstUsableViewportMicroseconds,
+            metricValue = 1_250_000L,
+            sampleKind = PerformanceSampleKind.Cold,
+            viewportState = PerformanceViewportState.Content,
+        )
+        controller.start()
+
+        assertFalse(controller.performanceCollectionAllowed.value)
+        controller.recordPerformanceMeasurement(measurement)
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+        assertTrue(controller.performanceCollectionAllowed.value)
+        controller.recordPerformanceMeasurement(measurement)
+        assertTrue(controller.updateConsent(TEST_USER_ID, ObservabilityConsent()))
+        assertFalse(controller.performanceCollectionAllowed.value)
+        controller.recordPerformanceMeasurement(measurement)
+
+        assertEquals(listOf(measurement), backend.performanceMeasurements)
+        assertFalse(controller.performanceCollectionAllowed.value)
     }
 
     @Test

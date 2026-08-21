@@ -1,6 +1,7 @@
 package com.kwabor.android
 
 import android.app.Application
+import com.kwabor.android.observability.AndroidExploreFirstUsableViewportReporter
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.observability.createAndroidObservabilityController
 import com.kwabor.android.onboarding.FirstLaunchStore
@@ -20,6 +21,9 @@ class KwaborApplication : Application() {
 
     lateinit var observability: AndroidObservabilityController
         private set
+    internal val exploreFirstUsableViewportReporter by lazy(LazyThreadSafetyMode.NONE) {
+        AndroidExploreFirstUsableViewportReporter(observability)
+    }
     internal lateinit var firstLaunchStore: FirstLaunchStore
         private set
     private var legacyCleanupScope: CoroutineScope? = null

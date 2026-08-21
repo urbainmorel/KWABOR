@@ -20,6 +20,34 @@ enum class PerformanceTraceName(val wireName: String) {
     IntroVideoReady(wireName = "intro_video_ready"),
 }
 
+enum class PerformanceMetricName(val wireName: String) {
+    FirstUsableViewportMicroseconds(wireName = "first_usable_viewport_us"),
+}
+
+enum class PerformanceSampleKind(val wireName: String) {
+    Cold(wireName = "cold"),
+    Warm(wireName = "warm"),
+}
+
+enum class PerformanceViewportState(val wireName: String) {
+    Content(wireName = "content"),
+    Empty(wireName = "empty"),
+    Offline(wireName = "offline"),
+    Error(wireName = "error"),
+}
+
+data class PerformanceMeasurement(
+    val traceName: PerformanceTraceName,
+    val metricName: PerformanceMetricName,
+    val metricValue: Long,
+    val sampleKind: PerformanceSampleKind,
+    val viewportState: PerformanceViewportState,
+) {
+    init {
+        require(metricValue >= 0L) { "Performance metric values must be non-negative." }
+    }
+}
+
 enum class AnalyticsEventName(val wireName: String) {
     ViewCard(wireName = "view_card"),
     Like(wireName = "like"),
