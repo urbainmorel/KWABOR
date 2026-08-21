@@ -10,6 +10,11 @@ surface différée n'est déclarée terminée.
 
 ## Snapshot courant — 21 août 2026
 
+- REPO-GOV-001 est livré : le seul dépôt GitHub officiel et d'autorité est
+  [`urbainmorel/KWABOR`](https://github.com/urbainmorel/KWABOR). L'audit du compte confirme un seul
+  dépôt Kwabor, aucun fork et un remote `origin` unique ; la politique durable et le contrôle de
+  synchronisation sont définis dans [CONTRIBUTING.md](CONTRIBUTING.md#dépôt-github-dautorité) et
+  [docs/setup.md](docs/setup.md#1-vérifier-le-checkout).
 - La lignée fonctionnelle de ce lot inclut le commit de fusion
   `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`, avec le serveur et le raccord mobile
   EXPLORE-002B2, FAVORITES-001A de bout en bout,
@@ -45,18 +50,21 @@ surface différée n'est déclarée terminée.
   protégée via le pooler de session TLS a confirmé PostgreSQL 17, 21 migrations, le catalogue Auth /
   Storage attendu, 286 contraintes dont 65 clés étrangères, zéro contrainte non validée et aucune
   donnée Auth/Storage gérée. Quatre fixtures de développement restent publiées ; elles doivent être
-  archivées par le workflow exact et réversible avant le corpus de 60 fiches. Aucun projet Supabase
-  production distinct n'est encore créé ou approuvé.
-- Les Environments GitHub `staging`, `play-internal` et `testflight-internal` existent, interdisent le
-  bypass administrateur et l'auto-approbation, ciblent les branches protégées et exigent le second
-  reviewer désigné. Les variables Supabase de base et les secrets DB/Storage staging sont injectés ;
-  la référence production, les identités Firebase/OAuth, les signatures mobiles et les autorités
-  Store restent incomplètes.
-- La PR brouillon `#63` porte le tracker de sessions consenties, la sonde monotone du first usable
-  viewport Android/iOS et les garde-fous staging. Sa tête publiée `7bfdb0f` a une CI complète verte
-  après l'unique relance ciblée API 36 classée infrastructure. Le présent delta ajoute localement le
-  producteur B6.02 chiffré/restauré, le consommateur DB durci, la configuration Auth plan/apply/verify
-  et l'archivage exact des quatre fixtures ; il doit encore recevoir sa propre CI exact-head.
+  archivées par le workflow exact et réversible avant le corpus de 60 fiches.
+- L'autorité Supabase production distincte `KWABOR Production` est créée dans l'organisation choisie
+  par le propriétaire, en `eu-west-1`, saine et vide. Sa référence non secrète alimente les guards
+  GitHub ; aucun schéma, donnée ou réglage Auth de production n'y a été déployé.
+- Les Environments GitHub `staging`, `production`, `play-internal` et `testflight-internal` existent,
+  interdisent le bypass administrateur et ciblent les branches protégées. Aucun reviewer indépendant
+  n'est actuellement configuré ; toute opération protégée qui exige une approbation reste donc
+  bloquée jusqu'à désignation d'une autorité légitime. Les identités Firebase/OAuth, les signatures
+  mobiles, l'escrow B6.02 et les autorités Store restent incomplets.
+- La PR ouverte `#63` porte le tracker de sessions consenties, la sonde monotone du first usable
+  viewport Android/iOS et les garde-fous staging. Sa tête fonctionnelle auditée
+  `ba1738459896cda8e17318edb7d1ed7c5e1d4cc7` est propre, exactement synchronisée avec sa branche
+  distante et qualifiée par le run CI `32446975862` entièrement vert. Elle est fusionnable mais
+  bloquée par la règle générique d'une approbation indépendante ; aucun reviewer n'est demandé ou
+  configuré. Tout delta documentaire ultérieur doit recevoir sa propre qualification exact-head.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -66,8 +74,8 @@ surface différée n'est déclarée terminée.
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
-- La décision de release reste **no-go** : projet production distinct, escrow de sauvegarde à deux
-  personnes, exécution B6.02, migration distante, Auth/SMTP/OAuth, corpus, juridique, builds signés,
+- La décision de release reste **no-go** : escrow de sauvegarde à deux personnes, exécution B6.02,
+  migration distante, Auth/SMTP/OAuth, corpus, juridique, builds signés,
   appareils physiques, accessibilité, performance et rollback ne sont pas encore qualifiés.
 - Le PRD et le DESIGN conservent leur cible complète à cinq racines. ADR-0036 accepte un profil de
   bêta fermé distinct : navigation `Explorer · Compte`, catalogue de 60 fiches et report explicite
@@ -526,8 +534,8 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 BETA-STAGING-001 est le chemin critique. Le code, les 60 fiches, les 180 médias, les tests dynamiques
 Supabase sur base CI éphémère et les workflows de distribution sont fusionnés et qualifiés ; il reste
-à fusionner et qualifier le lot opérateur de la PR `#63`, provisionner l'escrow B6.02 et la référence
-du projet production distinct, exécuter la sauvegarde/restauration staging, appliquer puis vérifier la
+à fusionner le lot opérateur de la PR `#63`, désigner une autorité de revue indépendante légitime,
+provisionner l'escrow B6.02, exécuter la sauvegarde/restauration staging, appliquer puis vérifier la
 migration ACL, archiver les quatre fixtures, configurer Auth/SMTP/OAuth, publier puis vérifier Storage
 et le catalogue, produire les builds signés internes et exécuter le pilote. La checklist opérateur
 non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
@@ -542,8 +550,8 @@ exclusivement du harnais opérateur physique.
 - ADR-0036 autorise explicitement le profil transitoire de bêta fermée `Explorer · Compte` et le
   report de Social, `+`, Notifications, B2B, paiement et IA. Cette autorisation ne vaut ni
   achèvement de la V1 complète du PRD ni ouverture publique de production.
-- Le second reviewer et les protections GitHub fail-closed sont en place. Le déploiement reste
-  bloqué par la référence du projet production distinct, l'escrow age hors dépôt à deux personnes,
+- Les protections GitHub fail-closed sont en place, mais aucun reviewer indépendant n'est configuré.
+  Le déploiement reste bloqué par l'escrow age hors dépôt à deux personnes,
   l'exécution de la sauvegarde/restauration B6.02, les identités Firebase/OAuth/SMTP, les comptes
   Stores, certificats, profils et secrets fournisseurs à provisionner via
   [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61), jamais dans le dépôt ou dans un
@@ -566,8 +574,8 @@ exclusivement du harnais opérateur physique.
   réels ne sont pas exécutés.
 - L'ancien tier Supabase `development` est désormais désigné staging. Les inspections distantes
   non mutatives ont qualifié l'autorité DB, l'historique et les contraintes, mais elles ne remplacent
-  ni la sauvegarde/restauration B6.02 ni l'application de la migration ACL pending. Le projet
-  production distinct reste absent.
+  ni la sauvegarde/restauration B6.02 ni l'application de la migration ACL pending. L'autorité
+  production distincte existe désormais, mais reste volontairement vide et non déployée.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
 - OFFLINE-002 compile pour iOS X64 sous Windows et ouvre Room sous Robolectric dans le chemin Android
@@ -635,20 +643,24 @@ exclusivement du harnais opérateur physique.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - La vidéo d'intro ne dépend plus d'ENV-001B/OBS-001B, d'un CDN ou de Firebase. Chaque nouvelle révision exige toutefois provenance, droits de diffusion, approbation éditoriale, preuves Android/iOS, builds signés et publication Store.
 - ENV-001B dépend encore du propriétaire : staging Supabase existe et son accès DB protégé est
-  qualifié en lecture, mais production Supabase et les projets Firebase restent absents. L'activation
+  qualifié en lecture, l'autorité Supabase production distincte est créée, mais les projets Firebase
+  restent absents. L'activation
   Auth staging exige les identités Google et SMTP réelles ; aucune valeur fictive ne doit lever les
   guards. L'authentification Firebase CLI existante doit être réauthentifiée avant création des
   projets Firebase requis.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils d'Analytics, Crashlytics, Performance et Remote Config générique ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
-- Le projet Supabase production, les projets Firebase staging/production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
+- La configuration Supabase production, les projets Firebase staging/production, le compte FedaPay,
+  les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention
+  du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Le second reviewer et les protections Environments sont acquis. Résoudre
-[l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : terminer la PR `#63`, créer l'autorité
-Supabase production distincte, provisionner l'escrow age, exécuter B6.02, appliquer/vérifier la
+Les protections Environments et l'autorité Supabase production sont acquises. Résoudre
+[l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : désigner une autorité
+de revue indépendante légitime, fusionner la PR `#63`, qualifier sa CI `push/main`, provisionner
+l'escrow age, exécuter B6.02, appliquer/vérifier la
 migration ACL, archiver les quatre fixtures, configurer Auth, publier/vérifier les 180 médias puis les
 60 fiches, exécuter les smokes staging, produire l'AAB Play Internal et l'IPA TestFlight Internal,
 puis ouvrir le pilote de 10 appareils Android et 5 iPhone

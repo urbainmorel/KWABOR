@@ -48,6 +48,10 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Toute décision structurante doit être documentée par ADR.
 - Aucun secret, token, endpoint sensible ou clé API en dur.
 - Aucun message technique brut ne doit fuiter vers l'utilisateur final.
+- Avant toute opération GitHub, appliquer la politique du
+  [dépôt GitHub d'autorité](CONTRIBUTING.md#dépôt-github-dautorité). Ne jamais créer, promouvoir ou
+  utiliser un fork, miroir ou autre dépôt comme autorité du projet sans décision explicite du
+  propriétaire documentée dans le dépôt canonique.
 
 ## Architecture obligatoire
 

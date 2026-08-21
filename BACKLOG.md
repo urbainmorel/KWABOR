@@ -45,6 +45,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 
 ### Stabilisation du dépôt
 
+- [x] REPO-GOV-001 — Déclarer `urbainmorel/KWABOR` comme seul dépôt GitHub officiel et d'autorité,
+  vérifier l'absence de doublon/fork sous le compte et documenter le contrôle reproductible du
+  remote `origin`, de l'upstream, de la divergence et du worktree.
 - [x] STAB-001 — PR parallèle `#34` fermée sans fusion avec commentaire de supersession ; son parcours
   utile est déjà remplacé par AUTH-UX-001 intégré et STATE-001 resynchronise l'état documentaire.
 - [ ] STAB-002 — Retirer les messages techniques et désactiver visuellement toute action sans implémentation réelle après validation des racines V1.
@@ -81,9 +84,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     - [ ] ENV-001B-STAGING — Le projet Supabase existant est désigné staging ; pooler TLS, 21 migrations,
       catalogue Auth/Storage et contraintes sont qualifiés en lecture. Restent B6.02, migration ACL,
       archivage des quatre fixtures, Auth/SMTP/OAuth et corpus avant clôture.
-    - [ ] ENV-001B-PROD — Créer une autorité Supabase production distincte après confirmation explicite
-      du propriétaire sur l'organisation, la région et le coût, puis fournir uniquement sa référence
-      non secrète aux guards staging.
+    - [x] ENV-001B-PROD — Créer l'autorité Supabase `KWABOR Production` distincte dans l'organisation
+      choisie par le propriétaire en `eu-west-1`, vérifier qu'elle est saine et vide, puis fournir
+      uniquement sa référence non secrète aux guards staging ; configuration et déploiement restent
+      des étapes séparées.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
@@ -370,12 +374,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
   dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). La réussite du job CI
   `supabase_database` sur une base éphémère ne clôt pas ce ticket.
-  - [x] BETA-STAGING-001A — Protéger les Environments GitHub avec second reviewer, anti-bypass,
-    anti-auto-approbation et branches protégées ; qualifier l'accès staging via pooler TLS.
+  - [ ] BETA-STAGING-001A — Les Environments GitHub sont sans bypass administrateur et limités aux
+    branches protégées, et l'accès staging via pooler TLS est qualifié. Désigner encore un reviewer
+    indépendant légitime avant toute opération live exigeant une approbation.
   - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
     sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
-  - [ ] BETA-STAGING-001C — Provisionner l'escrow age hors dépôt et la référence production, fusionner
-    la PR exact-head, puis exécuter dans l'ordre B6.02, migration ACL, archivage, Auth et corpus.
+  - [ ] BETA-STAGING-001C — La référence production est provisionnée. Désigner l'autorité de revue,
+    fusionner la PR exact-head, provisionner l'escrow age hors dépôt, puis exécuter dans l'ordre
+    B6.02, migration ACL, archivage, Auth et corpus.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

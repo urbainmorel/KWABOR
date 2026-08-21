@@ -24,12 +24,42 @@ requis pour construire les applications mobiles.
 Depuis la racine du dépôt :
 
 ```powershell
-git status --short --branch
+$expectedOrigin = 'https://github.com/urbainmorel/KWABOR.git'
+$originFetch = [string](git remote get-url origin)
+$originPush = @(git remote get-url --push --all origin)
+
+if (
+    $originFetch -ne $expectedOrigin -or
+    $originPush.Count -ne 1 -or
+    $originPush[0] -ne $expectedOrigin
+) {
+    throw "origin doit cibler $expectedOrigin en fetch et en push."
+}
+
+git fetch --prune origin
+
+$upstream = [string](git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')
+if ($upstream -notlike 'origin/*') {
+    throw 'La branche doit suivre une branche origin/*.'
+}
+
+$counts = (([string](git rev-list --left-right --count 'HEAD...@{upstream}')).Trim() -split '\s+')
+if ($counts.Count -ne 2 -or $counts[0] -ne '0' -or $counts[1] -ne '0') {
+    throw 'HEAD et sa branche upstream ne sont pas synchronisés.'
+}
+
+if (git status --porcelain=v1) {
+    throw 'Le worktree contient des changements non synchronisés.'
+}
+
 python -B tools/verify-repository-integrity.py
 ```
 
-Le second contrôle vérifie notamment les templates, les fichiers sensibles ignorés et le wrapper
-Gradle. Il ne configure aucun fournisseur distant.
+Ce contrôle impose le [dépôt GitHub officiel](../CONTRIBUTING.md#dépôt-github-dautorité), une branche
+suivant `origin/*`, zéro commit divergent et un worktree propre. Il ne faut jamais corriger un écart
+par un reset destructif : préserver les changements locaux, les isoler dans une branche ou un
+worktree, puis les intégrer par pull request. Le dernier contrôle vérifie notamment les templates,
+les fichiers sensibles ignorés et le wrapper Gradle ; il ne configure aucun fournisseur distant.
 
 ## 2. Configurer Android localement
 
