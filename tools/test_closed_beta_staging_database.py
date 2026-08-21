@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -30,8 +31,8 @@ PRODUCTION_REF = "p" * 20
 STAGING_REF_SHA256 = hashlib.sha256(STAGING_REF.encode("utf-8")).hexdigest()
 DATABASE_PASSWORD = "safe%40database%21password"
 DATABASE_URL = (
-    f"postgresql://postgres:{DATABASE_PASSWORD}@"
-    f"db.{STAGING_REF}.supabase.co:5432/postgres"
+    f"postgresql://postgres.{STAGING_REF}:{DATABASE_PASSWORD}@"
+    "aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
 )
 
 
@@ -100,7 +101,7 @@ def valid_artifact(
         "created_at": "2026-08-20T12:00:00Z",
         "digest": f"sha256:{digest}",
         "expired": False,
-        "expires_at": "2099-11-18T12:00:00Z",
+        "expires_at": "2026-11-18T12:00:00Z",
         "id": artifact_id,
         "name": f"{name_prefix}-{EXPECTED_SHA}-{run_attempt}",
         "size_in_bytes": size_bytes,
@@ -190,22 +191,177 @@ def create_backup_archive(
     root: Path,
     *,
     receipt_mutation: dict[str, object] | None = None,
+    database_fingerprint_override: str | None = None,
+    ciphertext_project_prefix_override: str | None = None,
 ) -> tuple[Path, str]:
     target = valid_authority().public_evidence()
+    managed_tables = [
+        {
+            "exists": True,
+            "required": required,
+            "rowCount": 0,
+            "schema": schema,
+            "table": table,
+        }
+        for schema, table, required in database.MANAGED_DATA_TABLES
+    ]
+    migration_versions = ["20260820083427", "20260820084207"]
+    migration_payload = "\n".join(migration_versions) + "\n"
+    migration_sha256 = database.sha256_text(migration_payload)
+    managed_catalog = [
+        {"schema": schema, "table": table}
+        for schema, table in database.EXPECTED_MANAGED_SCHEMA_TABLES
+    ]
+    constraint_inventory_sha256 = "c" * 64
+    managed_proof = {
+        "constraintCount": 12,
+        "constraintInventorySha256": constraint_inventory_sha256,
+        "foreignKeyCount": 4,
+        "managedDataEmpty": True,
+        "managedSchemaTableCount": len(managed_catalog),
+        "managedSchemaTableSha256": database.sha256_bytes(
+            database.canonical_json_bytes(managed_catalog)
+        ),
+        "managedTables": managed_tables,
+        "migrationVersions": migration_versions,
+        "postgresMajor": 17,
+        "schemaVersion": 2,
+        "unvalidatedConstraintCount": 0,
+    }
+    logical_sha256 = "e" * 64
+    computed_fingerprint = database.sha256_bytes(
+        database.canonical_json_bytes(
+            {
+                "logicalSqlNormalizedSha256": logical_sha256,
+                "migrationPrefixSha256": migration_sha256,
+                "postgresMajor": 17,
+                "schemas": ["app_private", "public", "supabase_migrations"],
+            }
+        )
+    )
+    fingerprint = database_fingerprint_override or computed_fingerprint
+    ciphertext_project_prefix = (
+        ciphertext_project_prefix_override or target["projectRefSha256"][:16]
+    )
+    ciphertext_name = (
+        f"kwabor-staging-{ciphertext_project_prefix}-{fingerprint}.tar.gz.age"
+    )
+    ciphertext = b"age-encrypted-test-payload"
+    recipient_sha256 = "f" * 64
     receipt: dict[str, object] = {
+        "ageEscrow": {
+            "custodyMode": "offline-two-person",
+            "maxRecoveryTestAgeDays": 90,
+            "recipientSha256": recipient_sha256,
+            "recoveryTestedAt": "2026-08-19T12:00:00Z",
+            "status": "provisioned",
+            "validUntil": "2100-01-01T00:00:00Z",
+        },
+        "artifactPolicy": {
+            "actualDigestValidatedByConsumer": True,
+            "estimatedExpiresAt": "2026-11-18T12:00:00Z",
+            "expectedName": (
+                f"kwabor-gel-g5-staging-database-backup-{EXPECTED_SHA}-1"
+            ),
+            "expirationAuthority": "github-actions-artifact-api",
+            "retentionDays": 90,
+        },
+        "ci": {
+            "conclusion": "success",
+            "event": "push",
+            "headBranch": "main",
+            "headSha": EXPECTED_SHA,
+            "runAttempt": 1,
+            "runId": 100,
+            "runUrl": "https://github.com/urbainmorel/KWABOR/actions/runs/100",
+            "status": "completed",
+            "workflowPath": database.EXPECTED_CI_WORKFLOW,
+        },
+        "contributesTo": "G5",
+        "databaseScope": {
+            "dumpModes": ["roles", "single-consistent-application-dump"],
+            "managedAuthStorageDataIncluded": False,
+            "managedAuthStorageEmpty": True,
+            "schemas": ["app_private", "public", "supabase_migrations"],
+            "type": "targeted-logical",
+        },
+        "encryption": {
+            "algorithm": "age-x25519",
+            "ciphertextBytes": len(ciphertext),
+            "ciphertextFileName": ciphertext_name,
+            "ciphertextSha256": hashlib.sha256(ciphertext).hexdigest(),
+            "encryptedBeforeArtifactBoundary": True,
+            "plaintextArtifactCount": 0,
+            "recipientSha256": recipient_sha256,
+        },
+        "environmentEvidence": {
+            "canAdminsBypass": False,
+            "environmentId": 10,
+            "name": "staging",
+            "preventSelfReview": True,
+            "protectedBranchesOnly": True,
+            "reviewerCount": 1,
+            "schemaVersion": 1,
+            "updatedAt": "2026-08-20T11:00:00Z",
+        },
+        "errorCode": None,
         "expectedSha": EXPECTED_SHA,
         "operation": "backup",
+        "qualifiedAt": "2026-08-20T12:00:00Z",
+        "ref": "refs/heads/main",
         "repository": "urbainmorel/KWABOR",
         "restorable": True,
+        "restore": {
+            "allConstraintsValidated": True,
+            "constraintCount": 12,
+            "constraintInventorySha256": constraint_inventory_sha256,
+            "databaseFingerprintSha256": fingerprint,
+            "executionBoundary": "github-actions-disposable-supabase",
+            "fingerprintMatch": True,
+            "foreignKeyCount": 4,
+            "logicalSqlNormalizedSha256": logical_sha256,
+            "sessionReplicationRoleUsed": False,
+            "unvalidatedConstraintCount": 0,
+            "verified": True,
+        },
+        "rpo": {
+            "applyValidUntil": "2026-08-20T12:28:00Z",
+            "captureSeconds": 120,
+            "maxSeconds": 1800,
+            "met": True,
+        },
+        "rto": {"maxSeconds": 1800, "met": True, "observedSeconds": 90},
         "runAttempt": 1,
         "runId": 400,
         "runUrl": "https://github.com/urbainmorel/KWABOR/actions/runs/400",
+        "schemaVersion": 2,
+        "snapshot": {
+            "applicationDumpAndManagedProofShareSnapshot": True,
+            "exportedByDedicatedSession": True,
+            "identifierSha256": "a" * 64,
+            "isolation": "repeatable-read-read-only",
+            "mechanism": "pg-export-snapshot",
+            "snapshotEstablishedAt": "2026-08-20T11:58:00Z",
+        },
+        "source": {
+            "databaseFingerprintSha256": fingerprint,
+            "logicalSqlNormalizedSha256": logical_sha256,
+            "managedDataProof": managed_proof,
+            "managedDataProofSha256": hashlib.sha256(
+                database.canonical_json_bytes(managed_proof)
+            ).hexdigest(),
+            "migrationPrefixCount": len(migration_versions),
+            "migrationPrefixSha256": migration_sha256,
+            "postgresMajor": 17,
+        },
         "status": "succeeded",
         "target": target,
         "targetDigestSha256": hashlib.sha256(
             database.canonical_json_bytes(target)
         ).hexdigest(),
+        "taskId": "B6.02",
         "validatedCiRunId": 100,
+        "workflowPath": database.EXPECTED_BACKUP_WORKFLOW,
     }
     if receipt_mutation:
         receipt.update(receipt_mutation)
@@ -217,6 +373,7 @@ def create_backup_archive(
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as destination:
         destination.writestr(database.BACKUP_GEL_FILENAME, receipt_payload)
         destination.writestr(database.BACKUP_GEL_HASH_FILENAME, sidecar)
+        destination.writestr(ciphertext_name, ciphertext)
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     return archive, digest
 
@@ -252,6 +409,7 @@ def virgin_fresh_counts(**mutations: int) -> dict[str, int]:
         "applicationTypeCount": 0,
         "authRelevantRowCount": 0,
         "authUserCount": 0,
+        "managedSchemaTableDriftCount": 0,
         "publicSchemaCount": 1,
         "requiredSystemTableCount": 3,
         "storageBucketCount": 0,
@@ -356,15 +514,10 @@ class RequestAndProviderGuardTest(unittest.TestCase):
 
 
 class TargetAuthorityTest(unittest.TestCase):
-    def test_exact_direct_and_session_pooler_urls_are_accepted(self) -> None:
-        direct = valid_authority()
-        self.assertEqual(direct.database_endpoint_class, "direct")
-        pooler_url = (
-            f"postgresql://postgres.{STAGING_REF}:{DATABASE_PASSWORD}@"
-            "aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
-        )
-        pooler = valid_authority(pooler_url)
+    def test_only_tls_session_pooler_url_is_accepted(self) -> None:
+        pooler = valid_authority()
         self.assertEqual(pooler.database_endpoint_class, "session-pooler")
+        self.assertEqual(pooler.public_evidence()["tlsMode"], "require")
         self.assertNotIn(DATABASE_PASSWORD, json.dumps(pooler.public_evidence()))
 
     def test_production_identity_is_never_accepted(self) -> None:
@@ -384,8 +537,8 @@ class TargetAuthorityTest(unittest.TestCase):
             {"project_ref_sha256": "0" * 64},
             {
                 "database_url": (
-                    f"postgresql://postgres:{DATABASE_PASSWORD}@"
-                    f"db.{PRODUCTION_REF}.supabase.co:5432/postgres"
+                    f"postgresql://postgres.{PRODUCTION_REF}:{DATABASE_PASSWORD}@"
+                    "aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
                 )
             },
         )
@@ -403,28 +556,29 @@ class TargetAuthorityTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(database.StagingDatabaseError):
                 database.validate_target_authority(**values)
 
-    def test_query_host_hostaddr_service_and_other_overrides_are_rejected(self) -> None:
-        overrides = (
-            "?host=evil.example",
-            "?hostaddr=127.0.0.1",
-            "?service=production",
-            "?sslmode=disable",
-            "#host=evil.example",
+    def test_tls_query_direct_host_and_other_overrides_are_rejected(self) -> None:
+        invalid = (
+            DATABASE_URL.replace("?sslmode=require", ""),
+            DATABASE_URL.replace("sslmode=require", "sslmode=disable"),
+            DATABASE_URL + "&host=evil.example",
+            DATABASE_URL + "#host=evil.example",
+            (
+                f"postgresql://postgres:{DATABASE_PASSWORD}@db.{STAGING_REF}.supabase.co:"
+                "5432/postgres?sslmode=require"
+            ),
         )
-        for suffix in overrides:
-            with self.subTest(suffix=suffix), self.assertRaisesRegex(
-                database.StagingDatabaseError, "DATABASE_URL_OVERRIDE_FORBIDDEN"
-            ):
-                valid_authority(DATABASE_URL + suffix)
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(database.StagingDatabaseError):
+                valid_authority(value)
 
     def test_unsafe_database_shapes_are_rejected(self) -> None:
         unsafe_urls = (
             DATABASE_URL.replace(":5432/", ":6543/"),
-            DATABASE_URL.replace(f"db.{STAGING_REF}.supabase.co", "db.evil.example"),
+            DATABASE_URL.replace("aws-1-eu-west-1.pooler.supabase.com", "db.evil.example"),
             DATABASE_URL.replace("/postgres", "/template1"),
             DATABASE_URL.replace("postgresql://", "postgres://"),
             DATABASE_URL.replace(DATABASE_PASSWORD, "raw!password"),
-            DATABASE_URL.replace("postgres:", "admin:"),
+            DATABASE_URL.replace(f"postgres.{STAGING_REF}:", "admin:"),
         )
         for value in unsafe_urls:
             with self.subTest(value=value), self.assertRaises(database.StagingDatabaseError):
@@ -457,7 +611,7 @@ class TargetAuthorityTest(unittest.TestCase):
 
 
 class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
-    def test_apply_requires_exact_confirmation_and_plan_but_forbids_backup_override(self) -> None:
+    def test_apply_requires_exact_confirmation_plan_and_complete_optional_backup(self) -> None:
         valid = database.validate_operation_inputs(
             operation="apply",
             confirmation="APPLY-EXACT-STAGING-MIGRATIONS",
@@ -469,12 +623,29 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
             validated_plan_artifact_digest="c" * 64,
         )
         self.assertEqual(valid["planRunId"], 300)
+        self.assertIsNone(valid["backup"])
+        with_backup = database.validate_operation_inputs(
+            operation="apply",
+            confirmation="APPLY-EXACT-STAGING-MIGRATIONS",
+            backup_run_id="400",
+            backup_artifact_id="401",
+            backup_artifact_digest="b" * 64,
+            validated_plan_run_id="300",
+            validated_plan_artifact_id="301",
+            validated_plan_artifact_digest="c" * 64,
+        )
+        self.assertEqual(with_backup["backup"]["runId"], 400)
         unsafe = (
             {"confirmation": ""},
             {"confirmation": "APPLY-STAGING-MIGRATIONS"},
             {"backup_run_id": "400"},
             {"backup_artifact_id": "401"},
             {"backup_artifact_digest": "b" * 64},
+            {
+                "backup_run_id": "400",
+                "backup_artifact_id": "401",
+                "backup_artifact_digest": "B" * 64,
+            },
             {"validated_plan_run_id": ""},
             {"validated_plan_artifact_id": "0"},
             {"validated_plan_artifact_digest": "C" * 64},
@@ -583,10 +754,16 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
             "c.relkind in ('r','p','v','m','f')",
             "as application_type_count",
             "('auth','users','auth',true)",
+            "('auth','mfa_amr_claims','auth',false)",
+            "('auth','saml_providers','auth',false)",
             "('auth','oauth_authorizations','auth',false)",
+            "('auth','oauth_client_states','auth',false)",
             "('auth','webauthn_credentials','auth',false)",
             "('storage','objects','storage',true)",
             "('storage','buckets','storage',true)",
+            "('storage','buckets_analytics','storage',false)",
+            "('storage','buckets_vectors','storage',false)",
+            "managed_catalog_drift",
             "n.nspname in ('public','app_private')",
         ):
             self.assertIn(fragment, query)
@@ -595,13 +772,13 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
             r"(?i)\b(insert|update|delete|alter|drop|create|grant|revoke|truncate|call|do)\b",
         )
 
-    def test_apply_is_enabled_only_for_the_fresh_empty_exception(self) -> None:
-        self.assertFalse(database.BACKUP_PRODUCER_AVAILABLE)
+    def test_apply_accepts_only_fresh_empty_or_qualified_b602(self) -> None:
+        self.assertTrue(database.BACKUP_PRODUCER_AVAILABLE)
         self.assertEqual(
             database.EXPECTED_BACKUP_WORKFLOW,
             ".github/workflows/closed-beta-staging-database-backup.yml",
         )
-        self.assertFalse((REPOSITORY_ROOT / database.EXPECTED_BACKUP_WORKFLOW).exists())
+        self.assertTrue((REPOSITORY_ROOT / database.EXPECTED_BACKUP_WORKFLOW).exists())
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("PREPARED_NOT_EXECUTABLE", source)
         self.assertIn('["supabase", "db", "push", "--yes"', source)
@@ -612,44 +789,47 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
         authority = valid_authority()
         cases = (
             (
-                subprocess.CompletedProcess(
-                    args=[], returncode=0, stdout="applied\n", stderr=""
-                ),
+                0,
+                ("applied\n", ""),
                 None,
                 0,
                 False,
             ),
             (
-                subprocess.CompletedProcess(
-                    args=[], returncode=1, stdout="", stderr="push failed\n"
-                ),
+                1,
+                ("", "push failed\n"),
                 "SUPABASE_APPLY_FAILED",
                 1,
                 False,
             ),
             (
-                subprocess.TimeoutExpired(
-                    cmd=[],
-                    timeout=database.APPLY_TIMEOUT_SECONDS,
-                    output="partial stdout\n",
-                    stderr="partial stderr\n",
-                ),
+                None,
+                [
+                    subprocess.TimeoutExpired(
+                        cmd=[],
+                        timeout=database.APPLY_TIMEOUT_SECONDS,
+                        output="partial stdout\n",
+                        stderr="partial stderr\n",
+                    ),
+                    ("partial stdout\n", "partial stderr\n"),
+                ],
                 "SUPABASE_APPLY_TIMEOUT",
                 124,
                 True,
             ),
-            (FileNotFoundError(), "SUPABASE_APPLY_MISSING", 127, False),
-            (OSError(), "SUPABASE_APPLY_EXECUTION_FAILED", 126, False),
         )
-        for process_result, expected_error, expected_exit, expected_timeout in cases:
+        for returncode, communicate_result, expected_error, expected_exit, expected_timeout in cases:
             with self.subTest(expected_error=expected_error), tempfile.TemporaryDirectory() as temporary_directory:
                 evidence_path = Path(temporary_directory) / "apply.txt"
-                patch_arguments = (
-                    {"side_effect": process_result}
-                    if isinstance(process_result, BaseException)
-                    else {"return_value": process_result}
-                )
-                with mock.patch.object(database.subprocess, "run", **patch_arguments) as run:
+                process = mock.Mock()
+                process.returncode = returncode
+                if isinstance(communicate_result, list):
+                    process.communicate.side_effect = communicate_result
+                else:
+                    process.communicate.return_value = communicate_result
+                with mock.patch.object(
+                    database.subprocess, "Popen", return_value=process
+                ) as popen:
                     attempt = database.run_apply_mutation(
                         evidence_path=evidence_path,
                         authority=authority,
@@ -659,19 +839,58 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
                 self.assertEqual(attempt.error_code, expected_error)
                 self.assertEqual(attempt.exit_code, expected_exit)
                 self.assertEqual(attempt.timed_out, expected_timeout)
-                self.assertEqual(run.call_count, 1)
+                self.assertEqual(popen.call_count, 1)
                 self.assertEqual(
-                    run.call_args.args[0],
+                    popen.call_args.args[0],
                     ["supabase", "db", "push", "--yes", "--db-url", DATABASE_URL],
                 )
-                self.assertEqual(
-                    run.call_args.kwargs["timeout"], database.APPLY_TIMEOUT_SECONDS
-                )
+                process.communicate.assert_any_call(timeout=database.APPLY_TIMEOUT_SECONDS)
                 evidence = evidence_path.read_text(encoding="utf-8")
                 self.assertNotIn(DATABASE_URL, evidence)
                 self.assertNotIn(DATABASE_PASSWORD, evidence)
                 if expected_timeout:
                     self.assertIn("[command timed out]", evidence)
+
+        for spawn_error, expected_error, expected_exit in (
+            (FileNotFoundError(), "SUPABASE_APPLY_MISSING", 127),
+            (OSError(), "SUPABASE_APPLY_SPAWN_FAILED", 126),
+        ):
+            with self.subTest(expected_error=expected_error), tempfile.TemporaryDirectory() as temporary_directory:
+                evidence_path = Path(temporary_directory) / "apply.txt"
+                with mock.patch.object(
+                    database.subprocess,
+                    "Popen",
+                    side_effect=spawn_error,
+                ):
+                    attempt = database.run_apply_mutation(
+                        evidence_path=evidence_path,
+                        authority=authority,
+                        repository_root=REPOSITORY_ROOT,
+                    )
+                self.assertEqual(attempt.error_code, expected_error)
+                self.assertEqual(attempt.exit_code, expected_exit)
+                self.assertFalse(attempt.timed_out)
+
+    def test_apply_mutation_oserror_after_spawn_is_indeterminate(self) -> None:
+        authority = valid_authority()
+        process = mock.Mock()
+        process.returncode = None
+        process.communicate.side_effect = [OSError(), ("", "")]
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_path = Path(temporary_directory) / "apply.txt"
+            with mock.patch.object(database.subprocess, "Popen", return_value=process):
+                attempt = database.run_apply_mutation(
+                    evidence_path=evidence_path,
+                    authority=authority,
+                    repository_root=REPOSITORY_ROOT,
+                )
+        self.assertEqual(attempt.error_code, "SUPABASE_APPLY_EXECUTION_UNCERTAIN")
+        self.assertEqual(attempt.exit_code, 125)
+        self.assertFalse(attempt.timed_out)
+        self.assertNotIn(
+            attempt.error_code,
+            {"SUPABASE_APPLY_MISSING", "SUPABASE_APPLY_SPAWN_FAILED"},
+        )
 
     def test_apply_mutation_preserves_reconciliation_when_output_is_unsafe(self) -> None:
         authority = valid_authority()
@@ -681,16 +900,19 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temporary_directory:
             evidence_path = Path(temporary_directory) / "apply.txt"
+            process = mock.Mock()
+            process.returncode = result.returncode
+            process.communicate.return_value = (result.stdout, result.stderr)
             with mock.patch.object(
-                database.subprocess, "run", return_value=result
-            ) as run:
+                database.subprocess, "Popen", return_value=process
+            ) as popen:
                 attempt = database.run_apply_mutation(
                     evidence_path=evidence_path,
                     authority=authority,
                     repository_root=REPOSITORY_ROOT,
                 )
 
-            self.assertEqual(run.call_count, 1)
+            self.assertEqual(popen.call_count, 1)
             self.assertEqual(attempt.error_code, "SUPABASE_APPLY_FAILED")
             evidence = evidence_path.read_text(encoding="utf-8")
             self.assertIn("evidenceGuardError=JWT_IN_EVIDENCE", evidence)
@@ -929,6 +1151,7 @@ class GitHubArtifactProofTest(unittest.TestCase):
                 expected_sha=EXPECTED_SHA,
                 validated_ci_run_id=100,
                 target_evidence=valid_authority().public_evidence(),
+                now=datetime(2026, 8, 20, 12, 5, tzinfo=timezone.utc),
             )
             self.assertTrue(proof["restorable"])
 
@@ -937,6 +1160,27 @@ class GitHubArtifactProofTest(unittest.TestCase):
             {"target": {"environment": "production"}},
             {"targetDigestSha256": "0" * 64},
             {"restorable": False},
+            {"schemaVersion": 1},
+            {"workflowPath": ".github/workflows/ci.yml"},
+            {"databaseScope": {}},
+            {"snapshot": {}},
+            {
+                "snapshot": {
+                    "applicationDumpAndManagedProofShareSnapshot": True,
+                    "exportedByDedicatedSession": True,
+                    "identifierSha256": "a" * 64,
+                    "isolation": "repeatable-read-read-only",
+                    "mechanism": "pg-export-snapshot",
+                    "snapshotEstablishedAt": "2000-01-01T00:00:00Z",
+                }
+            },
+            {"source": {}},
+            {"restore": {}},
+            {"encryption": {}},
+            {"ageEscrow": {}},
+            {"rpo": {}},
+            {"rto": {}},
+            {"artifactPolicy": {}},
         ):
             with tempfile.TemporaryDirectory() as temporary_directory:
                 root = Path(temporary_directory)
@@ -966,23 +1210,162 @@ class GitHubArtifactProofTest(unittest.TestCase):
                         expected_sha=EXPECTED_SHA,
                         validated_ci_run_id=100,
                         target_evidence=valid_authority().public_evidence(),
+                        now=datetime(2026, 8, 20, 12, 5, tzinfo=timezone.utc),
                     )
+
+    def test_backup_bundle_recomputes_fingerprint_and_binds_ciphertext_name(self) -> None:
+        cases = (
+            (
+                {"database_fingerprint_override": "d" * 64},
+                "BACKUP_RECEIPT_SOURCE_FINGERPRINT_INVALID",
+            ),
+            (
+                {"ciphertext_project_prefix_override": "0" * 16},
+                "BACKUP_RECEIPT_CIPHERTEXT_NAME_INVALID",
+            ),
+        )
+        for archive_arguments, expected_error in cases:
+            with (
+                self.subTest(expected_error=expected_error),
+                tempfile.TemporaryDirectory() as temporary_directory,
+            ):
+                root = Path(temporary_directory)
+                archive, digest = create_backup_archive(root, **archive_arguments)
+                artifact = valid_artifact(
+                    artifact_id=401,
+                    run_id=400,
+                    run_attempt=1,
+                    name_prefix="kwabor-gel-g5-staging-database-backup",
+                    digest=digest,
+                    size_bytes=archive.stat().st_size,
+                )
+                with self.assertRaisesRegex(
+                    database.StagingDatabaseError,
+                    expected_error,
+                ):
+                    database.validate_backup_artifact_bundle(
+                        run_document=valid_supporting_run(
+                            run_id=400,
+                            workflow=database.EXPECTED_BACKUP_WORKFLOW,
+                            run_attempt=1,
+                        ),
+                        artifact_document=artifact,
+                        archive_path=archive,
+                        backup_run_id=400,
+                        backup_artifact_id=401,
+                        backup_artifact_digest=digest,
+                        expected_sha=EXPECTED_SHA,
+                        validated_ci_run_id=100,
+                        target_evidence=valid_authority().public_evidence(),
+                        now=datetime(2026, 8, 20, 12, 5, tzinfo=timezone.utc),
+                    )
+
+    def test_backup_managed_data_proof_requires_the_exact_catalog_and_sane_counts(self) -> None:
+        def valid_proof() -> dict[str, object]:
+            managed_catalog = [
+                {"schema": schema, "table": table}
+                for schema, table in database.EXPECTED_MANAGED_SCHEMA_TABLES
+            ]
+            return {
+                "constraintCount": 12,
+                "constraintInventorySha256": "c" * 64,
+                "foreignKeyCount": 4,
+                "managedDataEmpty": True,
+                "managedSchemaTableCount": len(managed_catalog),
+                "managedSchemaTableSha256": database.sha256_bytes(
+                    database.canonical_json_bytes(managed_catalog)
+                ),
+                "managedTables": [
+                    {
+                        "exists": True,
+                        "required": required,
+                        "rowCount": 0,
+                        "schema": schema,
+                        "table": table,
+                    }
+                    for schema, table, required in database.MANAGED_DATA_TABLES
+                ],
+                "migrationVersions": ["20260820083427", "20260820084207"],
+                "postgresMajor": 17,
+                "schemaVersion": 2,
+                "unvalidatedConstraintCount": 0,
+            }
+
+        self.assertTrue(database._validate_backup_managed_data_proof(valid_proof()))
+        missing = valid_proof()
+        missing["managedTables"] = missing["managedTables"][:-1]
+        unknown = valid_proof()
+        unknown["managedTables"][0] = {
+            "exists": True,
+            "required": False,
+            "rowCount": 0,
+            "schema": "auth",
+            "table": "unexpected_table",
+        }
+        missing_optional = valid_proof()
+        optional = next(
+            table for table in missing_optional["managedTables"] if not table["required"]
+        )
+        optional["exists"] = False
+        optional["rowCount"] = None
+        impossible_counts = valid_proof()
+        impossible_counts["foreignKeyCount"] = 13
+        for document in (missing, unknown, missing_optional, impossible_counts):
+            with self.subTest(document=document), self.assertRaises(
+                database.StagingDatabaseError
+            ):
+                database._validate_backup_managed_data_proof(document)
 
 
 class FreshEmptyAndReconciliationTest(unittest.TestCase):
+    def test_backup_scope_accepts_only_byte_reviewed_pending_migrations(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            migrations = root / "supabase" / "migrations"
+            migrations.mkdir(parents=True)
+            reviewed = migrations / "20260821012638_restrict_team_table_and_default_privileges.sql"
+            reviewed.write_bytes(
+                (
+                    REPOSITORY_ROOT
+                    / "supabase"
+                    / "migrations"
+                    / reviewed.name
+                ).read_bytes()
+            )
+            evidence = database.validate_pending_migration_scope(root, ["20260821012638"])
+            self.assertEqual(
+                evidence["policy"],
+                "reviewed-pending-migration-sha-allowlist-v2",
+            )
+
+            bypasses = (
+                "alter table only auth.users add column unsafe text;\n",
+                "set search_path=auth; delete from users;\n",
+                "copy auth.users from stdin;\n",
+                "alter default privileges in schema auth grant all on tables to anon;\n",
+                "do $$ begin execute 'delete from ' || 'auth.users'; end $$;\n",
+            )
+            for source in bypasses:
+                reviewed.write_text(source, encoding="utf-8")
+                with self.subTest(source=source), self.assertRaisesRegex(
+                    database.StagingDatabaseError,
+                    "BACKUP_PENDING_MIGRATION_NOT_REVIEWED_FOR_EXCLUDED_SCHEMAS",
+                ):
+                    database.validate_pending_migration_scope(root, ["20260821012638"])
+
     def test_fresh_empty_csv_requires_one_exact_non_negative_aggregate_row(self) -> None:
         header = ",".join(database.FRESH_EMPTY_CSV_COLUMNS)
         parsed = database.parse_fresh_empty_counts(
-            "informational line\n" + header + "\n1,3,0,0,0,0,0,0,0,0,0\n"
+            "informational line\n" + header + "\n1,0,3,0,0,0,0,0,0,0,0,0\n"
         )
         self.assertEqual(parsed, virgin_fresh_counts())
         invalid_outputs = (
             "",
-            header + "\n1,3,0,0,0,0,0,0,0,0\n",
-            header + "\n1,3,0,0,-1,0,0,0,0,0,0\n",
-            header + "\n1,3,0,0,0,0,0,0,0,0,0\n1,3,0,0,0,0,0,0,0,0,0\n",
+            header + "\n1,0,3,0,0,0,0,0,0,0,0\n",
+            header + "\n1,0,3,0,-1,0,0,0,0,0,0,0\n",
+            header + "\n1,0,3,0,0,0,0,0,0,0,0,0\n1,0,3,0,0,0,0,0,0,0,0,0\n",
             header.replace("auth_user_count", "email")
-            + "\n1,3,0,0,0,0,0,0,0,0,0\n",
+            + "\n1,0,3,0,0,0,0,0,0,0,0,0\n",
         )
         for output in invalid_outputs:
             with self.subTest(output=output), self.assertRaises(database.StagingDatabaseError):
@@ -997,6 +1380,7 @@ class FreshEmptyAndReconciliationTest(unittest.TestCase):
             "applicationRelationCount",
             "applicationRoutineCount",
             "applicationTypeCount",
+            "managedSchemaTableDriftCount",
             "authRelevantRowCount",
             "authUserCount",
             "storageBucketCount",
@@ -1149,6 +1533,30 @@ class FreshEmptyAndReconciliationTest(unittest.TestCase):
             ),
             fresh_empty=None,
         )
+        populated_baseline = database.migration_state_evidence(
+            local_versions=local,
+            remote_versions=local[:1],
+        )
+        pre_mutation_failure = database.classify_apply_reconciliation(
+            local_versions=local,
+            migration_state=populated_baseline,
+            fresh_empty=None,
+            pre_apply_migration_state=populated_baseline,
+            mutation_proven_impossible=True,
+        )
+        unproven_failure = database.classify_apply_reconciliation(
+            local_versions=local,
+            migration_state=populated_baseline,
+            fresh_empty=None,
+            pre_apply_migration_state=populated_baseline,
+            mutation_proven_impossible=False,
+        )
+        self.assertEqual(pre_mutation_failure["outcome"], "failed_safe")
+        self.assertEqual(
+            pre_mutation_failure["classification"],
+            "none_applied_pre_mutation_failure",
+        )
+        self.assertEqual(unproven_failure["outcome"], "indeterminate")
         unknown = database.classify_apply_reconciliation(
             local_versions=local,
             migration_state=None,
@@ -1377,6 +1785,77 @@ class PendingAndReceiptTest(unittest.TestCase):
             self.assertEqual(receipt["status"], "indeterminate")
             self.assertEqual(receipt["retryDisposition"], "DO_NOT_RETRY")
 
+    def test_pre_mutation_failure_receipt_is_explicitly_not_executed(self) -> None:
+        authority = valid_authority()
+        reconciliation = {
+            "classification": "none_applied_pre_mutation_failure",
+            "outcome": "failed_safe",
+            "mutationState": "not_committed",
+            "retryDisposition": "NEW_PLAN_AND_APPROVAL_REQUIRED",
+        }
+        request = {
+            "actor": "release-owner",
+            "expectedSha": EXPECTED_SHA,
+            "runAttempt": 1,
+            "runId": 200,
+            "runUrl": "https://github.com/urbainmorel/KWABOR/actions/runs/200",
+            "validatedCiRunId": 100,
+        }
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_directory = Path(temporary_directory)
+            (evidence_directory / "APPLY-RECONCILIATION.json").write_text(
+                json.dumps(reconciliation) + "\n",
+                encoding="utf-8",
+            )
+            receipt = database.write_gel_receipt(
+                evidence_directory=evidence_directory,
+                operation="apply",
+                status="failed",
+                request_evidence=request,
+                ci_evidence=database.validate_ci_run(
+                    valid_ci_run(), expected_run_id="100", expected_sha=EXPECTED_SHA
+                ),
+                target_evidence=authority.public_evidence(),
+                migration_manifest={"count": 2, "manifestSha256": "d" * 64},
+                backup_evidence=None,
+                reconciliation_evidence=reconciliation,
+                mutation_state="not_committed",
+                execution_disposition="EXECUTION_NOT_STARTED",
+                retry_disposition="NEW_PLAN_AND_APPROVAL_REQUIRED",
+                error_code="SUPABASE_APPLY_MISSING",
+                secret_values=authority.secret_values,
+            )
+            self.assertEqual(receipt["executionDisposition"], "EXECUTION_NOT_STARTED")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_directory = Path(temporary_directory)
+            (evidence_directory / "APPLY-RECONCILIATION.json").write_text(
+                json.dumps(reconciliation) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                database.StagingDatabaseError,
+                "NOT_COMMITTED_RECEIPT_INVALID",
+            ):
+                database.write_gel_receipt(
+                    evidence_directory=evidence_directory,
+                    operation="apply",
+                    status="failed",
+                    request_evidence=request,
+                    ci_evidence=database.validate_ci_run(
+                        valid_ci_run(), expected_run_id="100", expected_sha=EXPECTED_SHA
+                    ),
+                    target_evidence=authority.public_evidence(),
+                    migration_manifest={"count": 2, "manifestSha256": "d" * 64},
+                    backup_evidence=None,
+                    reconciliation_evidence=reconciliation,
+                    mutation_state="not_committed",
+                    execution_disposition="EXECUTED",
+                    retry_disposition="NEW_PLAN_AND_APPROVAL_REQUIRED",
+                    error_code="SUPABASE_APPLY_MISSING",
+                    secret_values=authority.secret_values,
+                )
+
     def test_sensitive_receipt_fields_and_values_are_rejected(self) -> None:
         for document in (
             {"databaseUrl": DATABASE_URL},
@@ -1458,9 +1937,11 @@ class WorkflowStaticPolicyTest(unittest.TestCase):
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.workflow)
-        self.assertIn("BACKUP_PRODUCER_AVAILABLE = False", self.runner)
+        self.assertIn("BACKUP_PRODUCER_AVAILABLE = True", self.runner)
         self.assertIn("PREPARED_NOT_EXECUTABLE", self.runner)
-        self.assertNotIn("$BACKUP_ARTIFACT_ID/zip", self.workflow)
+        self.assertIn("$BACKUP_ARTIFACT_ID/zip", self.workflow)
+        self.assertIn('fetch_id_json "runs" "$BACKUP_RUN_ID"', self.workflow)
+        self.assertIn('fetch_id_json "artifacts" "$BACKUP_ARTIFACT_ID"', self.workflow)
         self.assertIn('["supabase", "db", "push", "--yes"', self.runner)
         self.assertIn('prefix="PRE-APPLY"', self.runner)
         self.assertIn('f"{prefix}-FRESH-EMPTY-CHECK.json"', self.runner)

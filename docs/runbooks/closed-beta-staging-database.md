@@ -1,6 +1,6 @@
 # Base Supabase staging — migration et qualification protégées
 
-Ce runbook couvre `plan`, le premier `apply` sur un projet staging réellement vierge, et `verify`
+Ce runbook couvre `plan`, `apply` avec exception staging vierge ou backup B6.02 qualifié, et `verify`
 pour les migrations versionnées Kwabor. Il ne crée pas le projet Supabase, n’importe pas le catalogue
 de démonstration et ne ferme pas seul G5. Le reçu est une contribution
 `taskId=B6.01.database-migrations`, `contributesTo=G5`, avec `gateClosed=false`.
@@ -90,10 +90,12 @@ Une requête SQL agrégée, read-only et sans ligne utilisateur prend un même s
 - zéro relation, type applicatif et routine dans `public` / `app_private` ;
 - présence des trois tables système minimales `auth.users`, `storage.objects`, `storage.buckets` ;
 - `0 auth.users`, `0 storage.objects`, `0 storage.buckets` ;
+- catalogue des tables hébergées Auth/Storage exactement égal à l’allowlist revue du SHA ; toute
+  table inconnue, manquante ou renommée bloque la preuve ;
 - zéro ligne dans les surfaces Auth pertinentes disponibles : identities, sessions, refresh tokens,
-  MFA, one-time tokens, flow state, audit log, SAML relay, SSO, OAuth/OIDC et WebAuthn ;
-- zéro ligne dans les surfaces Storage pertinentes disponibles : prefixes, multipart uploads et
-  surfaces vectorielles, en plus des objects/buckets.
+  MFA/AMR, one-time tokens, flow state, audit log, SAML, SSO, OAuth/OIDC et WebAuthn ;
+- zéro ligne dans les surfaces Storage pertinentes disponibles : buckets Analytics/Vector,
+  multipart uploads et index Vector, en plus des objects/buckets.
 
 Seuls les compteurs, leur SHA-256 et le booléen `freshEmptyEligible` sont archivés. Aucune PII ni
 ligne métier ne sort de la base. Le compteur `applicationTypeCount` est inclus dans chaque preuve
@@ -133,11 +135,17 @@ staging non vierge, mais il n’autorise pas l’exception sans backup. Conserve
 l’`artifact-id` et le digest brut de 64 hexadécimaux renvoyé par `upload-artifact`. L’API GitHub expose
 le même digest sous `sha256:<digest>` ; le runner exige les deux représentations exactes.
 
-## Opération `apply` — premier staging vierge uniquement
+## Opération `apply` — staging vierge ou backup B6.02 qualifié
 
-Le workflow actuel n’accepte aucun backup : les trois inputs `backup_*` sont réservés à B6.02 et
-doivent rester vides. Si la base n’est pas strictement vierge, ne pas tenter de contourner ce chemin ;
-la tranche B6.02 doit fournir un producteur restaurable audité avant un apply ultérieur.
+Deux chemins exclusifs sont autorisés :
+
+1. `backup_*` tous vides et preuve `fresh empty` stricte ;
+2. `backup_*` tous renseignés depuis un run vert du workflow B6.02, conformément au
+   [runbook de sauvegarde](closed-beta-staging-database-backup.md).
+
+Un triplet backup partiel est refusé. Le producteur doit être sur le même repo/main/SHA/CI/cible,
+avoir restauré son ciphertext dans Supabase éphémère avec fingerprint identique et rester dans sa
+fenêtre RPO. L’artefact GitHub doit être non expiré et son escrow age couvrir son expiration réelle.
 
 Avant approbation, confirmer que ce projet neuf n’est routé vers aucun client, job, webhook ou
 opérateur SQL. Le groupe GitHub sérialise les workflows Kwabor, mais ne peut pas bloquer une écriture
@@ -159,23 +167,38 @@ gh workflow run closed-beta-staging-database.yml \
   -f validated_plan_artifact_digest=<plan-artifact-raw-sha256>
 ```
 
+Pour un staging non vierge, ajouter obligatoirement :
+
+```bash
+  -f backup_run_id=<qualified-b602-run-id> \
+  -f backup_artifact_id=<qualified-b602-artifact-id> \
+  -f backup_artifact_digest=<qualified-b602-raw-sha256>
+```
+
 Après approbation indépendante, le runner :
 
 1. relit par l’API GitHub le run de plan et sa métadonnée d’artefact ;
 2. vérifie dépôt, workflow, run, attempt, SHA, branche, statut, expiration, nom, taille et digest ;
 3. vérifie le ZIP, le reçu interne, son sidecar, la cible, le run CI, le manifeste, la liste pending et
    la preuve `fresh empty` ;
-4. exige un plan vierge : historique distant vide et toutes les migrations locales pending ;
+4. sans backup, exige un plan vierge : historique distant vide et toutes les migrations locales
+   pending ; avec backup, télécharge par ID le ZIP B6.02 et valide l’ensemble exact
+   ciphertext/GEL/sidecar, le digest/expiration API, snapshot partagé, Auth/Storage vide,
+   fingerprint source=restauré, contraintes, escrow et RPO/RTO ;
 5. relit l’historique distant et exige le digest exact du plan ;
 6. rejoue un dry-run sans seed ;
-7. reprend le snapshot agrégé `fresh empty` juste avant mutation et exige le même digest de compteurs ;
+7. reprend la preuve agrégée juste avant mutation ; le chemin vierge exige le même digest, le chemin
+   backup exige Auth/Storage toujours vides, préfixe distant égal au backup, fenêtre RPO active et
+   uniquement des migrations pending revues et épinglées byte-for-byte pour le périmètre B6.02
+   excluant les données `auth`/`storage` ;
 8. exécute uniquement `supabase db push --yes --db-url '<protected-staging-uri>'` ;
 9. archive la liste des migrations, les lints `public`/`app_private`, les advisors sécurité/performance,
    un second dry-run et la comparaison exacte de l’historique local/distant.
 
-Toute non-vacuité, dérive ou absence de preuve read-only avant l’étape 8 produit
-`status=prepared_not_executable`, `mutationState=not_started`,
-`retryDisposition=BACKUP_B6_02_REQUIRED`. La base n’est pas mutée.
+Toute non-vacuité sans backup, dérive ou absence de preuve read-only avant l’étape 8 produit un
+reçu rouge ou `status=prepared_not_executable`, `mutationState=not_started`. La base n’est pas
+mutée. Un backup expiré, une donnée Auth/Storage apparue ou un scope pending incompatible impose
+une nouvelle capture B6.02 ; aucune exception reconstructible n’existe.
 
 ## Réconciliation après erreur ou timeout
 
@@ -184,8 +207,9 @@ Le runner ne réessaie jamais `db push`. Après un code non nul ou un timeout, i
 | Preuve read-only | Reçu | Action opérateur |
 | --- | --- | --- |
 | aucune migration appliquée **et** base toujours strictement vierge | `failed`, `not_committed` | nouveau plan et nouvelle approbation requis |
-| liste distante complète et exactement égale au manifeste local | qualification post-apply, puis `succeeded`, `committed`, `EXECUTED_RECOVERED` | conserver l’erreur récupérée dans le reçu |
-| préfixe partiel, historique inconnu, objet sans historique ou réconciliation impossible | `indeterminate`, `mutationState=indeterminate`, `DO_NOT_RETRY` | geler les writers et investiguer humainement |
+| CLI absente ou impossible à lancer avant toute mutation, historique strictement identique au pré-apply | `failed`, `not_committed`, `EXECUTION_NOT_STARTED` | corriger le runner, puis nouveau plan et nouvelle approbation |
+| liste distante complète et exactement égale au manifeste local | qualification post-apply, puis `succeeded`, `committed`, `EXECUTED_RECOVERED` | conserver l'erreur récupérée dans le reçu |
+| code retour non nul/timeout, préfixe partiel, historique inconnu, objet sans historique ou réconciliation impossible | `indeterminate`, `mutationState=indeterminate`, `DO_NOT_RETRY` | geler les writers et investiguer humainement |
 
 Si la liste est complète mais qu’une qualification échoue, le reçu reste rouge avec
 `mutationState=committed_unqualified` et `DO_NOT_RETRY`. Ne jamais reset, réparer l’historique ou

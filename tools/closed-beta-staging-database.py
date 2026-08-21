@@ -11,7 +11,7 @@ import sys
 import urllib.parse
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -25,8 +25,8 @@ EXPECTED_DATABASE_WORKFLOW = ".github/workflows/closed-beta-staging-database.yml
 EXPECTED_BACKUP_WORKFLOW = ".github/workflows/closed-beta-staging-database-backup.yml"
 EXPECTED_SUPABASE_CLI_VERSION = "2.111.0"
 APPLY_CONFIRMATION = "APPLY-EXACT-STAGING-MIGRATIONS"
-BACKUP_PRODUCER_AVAILABLE = False
-FRESH_EMPTY_PROOF_POLICY = "zero-objects-and-types-public-app-private-v2"
+BACKUP_PRODUCER_AVAILABLE = True
+FRESH_EMPTY_PROOF_POLICY = "zero-objects-types-and-managed-catalog-v3"
 FRESH_EMPTY_REQUIRED_SYSTEM_TABLES = 3
 READ_ONLY_TIMEOUT_SECONDS = 180
 APPLY_TIMEOUT_SECONDS = 600
@@ -36,6 +36,15 @@ GEL_FILENAME = "GEL-G5-STAGING-DATABASE.json"
 GEL_HASH_FILENAME = f"{GEL_FILENAME}.sha256"
 BACKUP_GEL_FILENAME = "GEL-G5-STAGING-DATABASE-BACKUP.json"
 BACKUP_GEL_HASH_FILENAME = f"{BACKUP_GEL_FILENAME}.sha256"
+BACKUP_SCHEMA_VERSION = 2
+BACKUP_ARTIFACT_RETENTION_DAYS = 90
+# B6.02 intentionally excludes managed Auth/Storage rows. A lexical SQL filter
+# cannot prove absence of dynamic or search_path-based writes, so every pending
+# migration applied against a non-empty staging database must be reviewed and
+# pinned byte-for-byte here. Unknown or modified migrations fail closed.
+BACKUP_EXCLUDED_MANAGED_DATA_PENDING_ALLOWLIST = {
+    "20260821012638": "f5d307628db654c49464b607729df1a59776725070113e93e5cc9a8e372434fc",
+}
 REMOTE_MIGRATION_QUERY = (
     "select unnest(xpath('/table/row/version/text()', query_to_xml("
     "case when to_regclass('supabase_migrations.schema_migrations') is null "
@@ -44,27 +53,88 @@ REMOTE_MIGRATION_QUERY = (
     "supabase_migrations.schema_migrations order by version' end,"
     "true,false,'')))::text as version;"
 )
+EXPECTED_MANAGED_SCHEMA_TABLES = (
+    ("auth", "audit_log_entries"),
+    ("auth", "custom_oauth_providers"),
+    ("auth", "flow_state"),
+    ("auth", "identities"),
+    ("auth", "instances"),
+    ("auth", "mfa_amr_claims"),
+    ("auth", "mfa_challenges"),
+    ("auth", "mfa_factors"),
+    ("auth", "oauth_authorizations"),
+    ("auth", "oauth_client_states"),
+    ("auth", "oauth_clients"),
+    ("auth", "oauth_consents"),
+    ("auth", "one_time_tokens"),
+    ("auth", "refresh_tokens"),
+    ("auth", "saml_providers"),
+    ("auth", "saml_relay_states"),
+    ("auth", "schema_migrations"),
+    ("auth", "sessions"),
+    ("auth", "sso_domains"),
+    ("auth", "sso_providers"),
+    ("auth", "users"),
+    ("auth", "webauthn_challenges"),
+    ("auth", "webauthn_credentials"),
+    ("storage", "buckets"),
+    ("storage", "buckets_analytics"),
+    ("storage", "buckets_vectors"),
+    ("storage", "migrations"),
+    ("storage", "objects"),
+    ("storage", "s3_multipart_uploads"),
+    ("storage", "s3_multipart_uploads_parts"),
+    ("storage", "vector_indexes"),
+)
+REQUIRED_MANAGED_DATA_TABLES = frozenset(
+    {("auth", "users"), ("storage", "buckets"), ("storage", "objects")}
+)
+MANAGED_DATA_CATALOG_EXCLUSIONS = frozenset(
+    {
+        ("auth", "instances"),
+        ("auth", "schema_migrations"),
+        ("storage", "migrations"),
+    }
+)
+MANAGED_DATA_TABLES = tuple(
+    (schema, table, (schema, table) in REQUIRED_MANAGED_DATA_TABLES)
+    for schema, table in EXPECTED_MANAGED_SCHEMA_TABLES
+    if (schema, table) not in MANAGED_DATA_CATALOG_EXCLUSIONS
+)
+EXPECTED_MANAGED_SCHEMA_TABLE_VALUES_SQL = ",".join(
+    f"('{schema}','{table}')" for schema, table in EXPECTED_MANAGED_SCHEMA_TABLES
+)
 FRESH_EMPTY_QUERY = (
-    "with relevant_tables(schema_name,table_name,category,is_required) as (values "
+    "with expected_managed_tables(schema_name,table_name) as (values "
+    + EXPECTED_MANAGED_SCHEMA_TABLE_VALUES_SQL
+    + "), actual_managed_tables(schema_name,table_name) as (select n.nspname,c.relname "
+    "from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace "
+    "where n.nspname in ('auth','storage') and c.relkind in ('r','p')), "
+    "managed_catalog_drift as ((select * from expected_managed_tables except select * from "
+    "actual_managed_tables) union all (select * from actual_managed_tables except select * from "
+    "expected_managed_tables)), relevant_tables(schema_name,table_name,category,is_required) as (values "
     "('supabase_migrations','schema_migrations','migration',false),"
     "('auth','users','auth',true),('auth','identities','auth',false),"
     "('auth','sessions','auth',false),('auth','refresh_tokens','auth',false),"
     "('auth','mfa_factors','auth',false),('auth','mfa_challenges','auth',false),"
+    "('auth','mfa_amr_claims','auth',false),"
     "('auth','one_time_tokens','auth',false),('auth','flow_state','auth',false),"
     "('auth','audit_log_entries','auth',false),"
+    "('auth','saml_providers','auth',false),"
     "('auth','saml_relay_states','auth',false),('auth','sso_domains','auth',false),"
     "('auth','sso_providers','auth',false),"
     "('auth','oauth_clients','auth',false),"
+    "('auth','oauth_client_states','auth',false),"
     "('auth','oauth_authorizations','auth',false),"
     "('auth','oauth_consents','auth',false),"
     "('auth','custom_oauth_providers','auth',false),"
     "('auth','webauthn_credentials','auth',false),"
     "('auth','webauthn_challenges','auth',false),"
     "('storage','objects','storage',true),('storage','buckets','storage',true),"
-    "('storage','prefixes','storage',false),"
+    "('storage','buckets_analytics','storage',false),"
+    "('storage','buckets_vectors','storage',false),"
     "('storage','s3_multipart_uploads','storage',false),"
     "('storage','s3_multipart_uploads_parts','storage',false),"
-    "('storage','vector_buckets','storage',false),"
     "('storage','vector_indexes','storage',false)),"
     "relevant_counts as (select schema_name,table_name,category,is_required,"
     "to_regclass(format('%I.%I',schema_name,table_name)) is not null as relation_exists,"
@@ -75,6 +145,7 @@ FRESH_EMPTY_QUERY = (
     "from relevant_tables) select "
     "(select count(*)::bigint from pg_catalog.pg_namespace where nspname='public') "
     "as public_schema_count,"
+    "(select count(*)::bigint from managed_catalog_drift) as managed_schema_table_drift_count,"
     "(select count(*)::bigint from relevant_counts where is_required and relation_exists) "
     "as required_system_table_count,"
     "(select coalesce(sum(row_count),0)::bigint from relevant_counts "
@@ -103,6 +174,7 @@ FRESH_EMPTY_QUERY = (
 )
 FRESH_EMPTY_CSV_COLUMNS = (
     "public_schema_count",
+    "managed_schema_table_drift_count",
     "required_system_table_count",
     "application_migration_count",
     "application_relation_count",
@@ -116,6 +188,7 @@ FRESH_EMPTY_CSV_COLUMNS = (
 )
 FRESH_EMPTY_COUNT_KEYS = {
     "public_schema_count": "publicSchemaCount",
+    "managed_schema_table_drift_count": "managedSchemaTableDriftCount",
     "required_system_table_count": "requiredSystemTableCount",
     "application_migration_count": "applicationMigrationCount",
     "application_relation_count": "applicationRelationCount",
@@ -206,6 +279,10 @@ def parse_github_timestamp(value: object, code: str) -> datetime:
         raise StagingDatabaseError(code) from error
     require(parsed.tzinfo is not None, code)
     return parsed.astimezone(timezone.utc)
+
+
+def format_github_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -322,10 +399,21 @@ def validate_operation_inputs(
         return None
 
     require(confirmation == APPLY_CONFIRMATION, "APPLY_CONFIRMATION_INVALID")
-    require(
-        not any((backup_run_id, backup_artifact_id, backup_artifact_digest)),
-        "BACKUP_PROOF_UNSUPPORTED_WITH_FRESH_EMPTY_EXCEPTION",
-    )
+    backup_values = (backup_run_id, backup_artifact_id, backup_artifact_digest)
+    backup_authority: dict[str, Any] | None = None
+    if any(backup_values):
+        require(all(backup_values), "BACKUP_AUTHORITY_INCOMPLETE")
+        backup_authority = {
+            "artifactDigest": backup_artifact_digest,
+            "artifactId": validate_positive_integer(
+                backup_artifact_id, "BACKUP_ARTIFACT_ID_INVALID"
+            ),
+            "runId": validate_positive_integer(backup_run_id, "BACKUP_RUN_ID_INVALID"),
+        }
+        require(
+            ARTIFACT_DIGEST_PATTERN.fullmatch(backup_artifact_digest) is not None,
+            "BACKUP_ARTIFACT_DIGEST_INVALID",
+        )
     plan_run = validate_positive_integer(validated_plan_run_id, "PLAN_RUN_ID_INVALID")
     plan_artifact = validate_positive_integer(
         validated_plan_artifact_id, "PLAN_ARTIFACT_ID_INVALID"
@@ -335,6 +423,7 @@ def validate_operation_inputs(
         "PLAN_ARTIFACT_DIGEST_INVALID",
     )
     return {
+        "backup": backup_authority,
         "planArtifactDigest": validated_plan_artifact_digest,
         "planArtifactId": plan_artifact,
         "planRunId": plan_run,
@@ -503,9 +592,12 @@ def validate_artifact_metadata(
         "artifactName": expected_name,
         "artifactUrl": f"https://github.com/{EXPECTED_REPOSITORY}/actions/runs/"
         f"{expected_run_id}/artifacts/{expected_artifact_id}",
+        "createdAt": format_github_timestamp(created_at),
         "expired": False,
+        "expiresAt": format_github_timestamp(expires_at),
         "runId": expected_run_id,
         "sizeBytes": size_bytes,
+        "updatedAt": format_github_timestamp(updated_at),
     }
 
 
@@ -779,11 +871,121 @@ def validate_plan_artifact_bundle(
         "freshEmptyEvidenceSha256": sha256_bytes(canonical_json_bytes(fresh_empty)),
         "migrationStateEvidenceSha256": sha256_bytes(canonical_json_bytes(pending)),
         "pendingCount": pending["pendingCount"],
+        "pendingVersions": pending["pendingVersions"],
         "remoteCount": pending["remoteCount"],
         "pendingVersionsSha256": pending["pendingVersionsSha256"],
         "runAttempt": run_evidence["runAttempt"],
         "targetDigestSha256": target_digest,
     }
+
+
+def _validate_backup_managed_data_proof(document: object) -> dict[str, Any]:
+    require(isinstance(document, dict), "BACKUP_MANAGED_DATA_PROOF_INVALID")
+    expected_managed_catalog = [
+        {"schema": schema, "table": table}
+        for schema, table in EXPECTED_MANAGED_SCHEMA_TABLES
+    ]
+    require(
+        document.get("managedDataEmpty") is True
+        and document.get("postgresMajor") == 17
+        and document.get("schemaVersion") == 2
+        and document.get("managedSchemaTableCount") == len(expected_managed_catalog)
+        and document.get("managedSchemaTableSha256")
+        == sha256_bytes(canonical_json_bytes(expected_managed_catalog))
+        and type(document.get("constraintCount")) is int
+        and document["constraintCount"] > 0
+        and type(document.get("foreignKeyCount")) is int
+        and document["foreignKeyCount"] > 0
+        and document["foreignKeyCount"] <= document["constraintCount"]
+        and document.get("unvalidatedConstraintCount") == 0
+        and SHA256_PATTERN.fullmatch(
+            str(document.get("constraintInventorySha256", ""))
+        )
+        is not None,
+        "BACKUP_MANAGED_DATA_PROOF_INVALID",
+    )
+    versions = document.get("migrationVersions")
+    require(
+        isinstance(versions, list)
+        and all(
+            isinstance(version, str) and re.fullmatch(r"[0-9]{14}", version)
+            for version in versions
+        )
+        and versions == sorted(set(versions)),
+        "BACKUP_MIGRATION_PREFIX_INVALID",
+    )
+    managed_tables = document.get("managedTables")
+    expected_tables = {
+        (schema, table): required for schema, table, required in MANAGED_DATA_TABLES
+    }
+    require(
+        isinstance(managed_tables, list) and len(managed_tables) == len(expected_tables),
+        "BACKUP_MANAGED_DATA_PROOF_INVALID",
+    )
+    observed_tables: set[tuple[str, str]] = set()
+    for table in managed_tables:
+        require(isinstance(table, dict), "BACKUP_MANAGED_DATA_PROOF_INVALID")
+        key = (str(table.get("schema", "")), str(table.get("table", "")))
+        require(
+            key in expected_tables
+            and key not in observed_tables,
+            "BACKUP_MANAGED_DATA_PROOF_INVALID",
+        )
+        observed_tables.add(key)
+        exists = table.get("exists")
+        required = table.get("required")
+        row_count = table.get("rowCount")
+        require(
+            isinstance(exists, bool) and required is expected_tables[key],
+            "BACKUP_MANAGED_DATA_PROOF_INVALID",
+        )
+        if required:
+            require(exists, "BACKUP_MANAGED_REQUIRED_TABLE_MISSING")
+        require(
+            exists,
+            "BACKUP_MANAGED_SCHEMA_CATALOG_DRIFT",
+        )
+        require(
+            type(row_count) is int and row_count == 0,
+            "BACKUP_MANAGED_DATA_NOT_EMPTY",
+        )
+    require(observed_tables == set(expected_tables), "BACKUP_MANAGED_DATA_PROOF_INVALID")
+    return dict(document)
+
+
+def _validate_backup_ciphertext(
+    archive_path: Path,
+    *,
+    expected_name: str,
+    expected_sha256: str,
+    expected_bytes: int,
+) -> None:
+    require(
+        re.fullmatch(r"kwabor-staging-[0-9a-f]{16}-[0-9a-f]{64}\.tar\.gz\.age", expected_name)
+        is not None,
+        "BACKUP_CIPHERTEXT_NAME_INVALID",
+    )
+    require(SHA256_PATTERN.fullmatch(expected_sha256) is not None, "BACKUP_CIPHERTEXT_DIGEST_INVALID")
+    require(type(expected_bytes) is int and 0 < expected_bytes <= 1_900_000_000, "BACKUP_CIPHERTEXT_SIZE_INVALID")
+    try:
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            members = archive.infolist()
+            require(
+                {member.filename for member in members}
+                == {BACKUP_GEL_FILENAME, BACKUP_GEL_HASH_FILENAME, expected_name},
+                "BACKUP_ARTIFACT_CONTENT_SET_INVALID",
+            )
+            ciphertext = archive.getinfo(expected_name)
+            require(ciphertext.file_size == expected_bytes, "BACKUP_CIPHERTEXT_SIZE_DRIFT")
+            digest = hashlib.sha256()
+            with archive.open(ciphertext, "r") as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            require(digest.hexdigest() == expected_sha256, "BACKUP_CIPHERTEXT_DIGEST_DRIFT")
+    except StagingDatabaseError:
+        raise
+    except (OSError, KeyError, zipfile.BadZipFile, RuntimeError) as error:
+        raise StagingDatabaseError("BACKUP_ARTIFACT_INVALID") from error
 
 
 def validate_backup_artifact_bundle(
@@ -797,7 +999,9 @@ def validate_backup_artifact_bundle(
     expected_sha: str,
     validated_ci_run_id: int,
     target_evidence: Mapping[str, Any],
+    now: datetime | None = None,
 ) -> dict[str, Any]:
+    evaluation_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     run_evidence = validate_supporting_workflow_run(
         run_document,
         expected_run_id=backup_run_id,
@@ -821,13 +1025,10 @@ def validate_backup_artifact_bundle(
         expected_digest=backup_artifact_digest,
         required_entries=(BACKUP_GEL_FILENAME, BACKUP_GEL_HASH_FILENAME),
         max_archive_bytes=2_147_483_648,
-        max_total_uncompressed_bytes=8 * 1024 * 1024 * 1024,
+        max_total_uncompressed_bytes=2_000_000_000,
         allow_large_nonrequired_entries=True,
     )
-    require(
-        archive_path.stat().st_size == artifact_evidence["sizeBytes"],
-        "ARTIFACT_ARCHIVE_SIZE_DRIFT",
-    )
+    require(archive_path.stat().st_size == artifact_evidence["sizeBytes"], "ARTIFACT_ARCHIVE_SIZE_DRIFT")
     receipt_digest = _validate_internal_receipt_hash(
         entries,
         receipt_name=BACKUP_GEL_FILENAME,
@@ -835,9 +1036,14 @@ def validate_backup_artifact_bundle(
     )
     receipt = _load_internal_json(entries, BACKUP_GEL_FILENAME)
     target_digest = sha256_bytes(canonical_json_bytes(target_evidence))
+    require(receipt.get("schemaVersion") == BACKUP_SCHEMA_VERSION, "BACKUP_RECEIPT_SCHEMA_DRIFT")
+    require(receipt.get("taskId") == "B6.02" and receipt.get("contributesTo") == "G5", "BACKUP_RECEIPT_TASK_DRIFT")
     require(receipt.get("repository") == EXPECTED_REPOSITORY, "BACKUP_RECEIPT_REPOSITORY_DRIFT")
+    require(receipt.get("workflowPath") == EXPECTED_BACKUP_WORKFLOW, "BACKUP_RECEIPT_WORKFLOW_DRIFT")
+    require(receipt.get("ref") == EXPECTED_GITHUB_REF, "BACKUP_RECEIPT_REF_DRIFT")
     require(receipt.get("operation") == "backup", "BACKUP_RECEIPT_OPERATION_DRIFT")
     require(receipt.get("status") == "succeeded", "BACKUP_RECEIPT_NOT_SUCCESSFUL")
+    require(receipt.get("restorable") is True and receipt.get("errorCode") is None, "BACKUP_RECEIPT_NOT_RESTORABLE")
     require(receipt.get("expectedSha") == expected_sha, "BACKUP_RECEIPT_SHA_DRIFT")
     require(receipt.get("validatedCiRunId") == validated_ci_run_id, "BACKUP_RECEIPT_CI_DRIFT")
     require(
@@ -846,12 +1052,213 @@ def validate_backup_artifact_bundle(
         and receipt.get("runUrl") == run_evidence["runUrl"],
         "BACKUP_RECEIPT_RUN_DRIFT",
     )
+    receipt_ci = receipt.get("ci")
+    require(
+        isinstance(receipt_ci, dict)
+        and receipt_ci.get("runId") == validated_ci_run_id
+        and receipt_ci.get("headSha") == expected_sha
+        and receipt_ci.get("event") == "push"
+        and receipt_ci.get("headBranch") == "main"
+        and receipt_ci.get("workflowPath") == EXPECTED_CI_WORKFLOW
+        and receipt_ci.get("status") == "completed"
+        and receipt_ci.get("conclusion") == "success",
+        "BACKUP_RECEIPT_CI_DRIFT",
+    )
     require(receipt.get("target") == target_evidence, "BACKUP_RECEIPT_TARGET_DRIFT")
     require(receipt.get("targetDigestSha256") == target_digest, "BACKUP_RECEIPT_TARGET_DRIFT")
-    require(receipt.get("restorable") is True, "BACKUP_RECEIPT_NOT_RESTORABLE")
+    environment = receipt.get("environmentEvidence")
+    require(
+        isinstance(environment, dict)
+        and environment.get("name") == "staging"
+        and environment.get("canAdminsBypass") is False
+        and environment.get("preventSelfReview") is True
+        and environment.get("protectedBranchesOnly") is True,
+        "BACKUP_RECEIPT_ENVIRONMENT_DRIFT",
+    )
+    scope = receipt.get("databaseScope")
+    require(
+        scope
+        == {
+            "dumpModes": ["roles", "single-consistent-application-dump"],
+            "managedAuthStorageDataIncluded": False,
+            "managedAuthStorageEmpty": True,
+            "schemas": ["app_private", "public", "supabase_migrations"],
+            "type": "targeted-logical",
+        },
+        "BACKUP_RECEIPT_SCOPE_DRIFT",
+    )
+    qualified_at = parse_github_timestamp(
+        receipt.get("qualifiedAt"),
+        "BACKUP_RECEIPT_TIME_INVALID",
+    )
+    snapshot = receipt.get("snapshot")
+    require(
+        isinstance(snapshot, dict)
+        and snapshot.get("mechanism") == "pg-export-snapshot"
+        and snapshot.get("isolation") == "repeatable-read-read-only"
+        and snapshot.get("exportedByDedicatedSession") is True
+        and snapshot.get("applicationDumpAndManagedProofShareSnapshot") is True
+        and SHA256_PATTERN.fullmatch(str(snapshot.get("identifierSha256", ""))) is not None,
+        "BACKUP_RECEIPT_SNAPSHOT_DRIFT",
+    )
+    snapshot_established_at = parse_github_timestamp(
+        snapshot.get("snapshotEstablishedAt"),
+        "BACKUP_RECEIPT_SNAPSHOT_DRIFT",
+    )
+    require(snapshot_established_at <= qualified_at, "BACKUP_RECEIPT_SNAPSHOT_DRIFT")
+    source = receipt.get("source")
+    restore = receipt.get("restore")
+    require(isinstance(source, dict) and isinstance(restore, dict), "BACKUP_RECEIPT_RESTORE_INVALID")
+    source_fingerprint = str(source.get("databaseFingerprintSha256", ""))
+    source_logical = str(source.get("logicalSqlNormalizedSha256", ""))
+    migration_sha256 = str(source.get("migrationPrefixSha256", ""))
+    require(
+        source.get("postgresMajor") == 17
+        and type(source.get("migrationPrefixCount")) is int
+        and source["migrationPrefixCount"] >= 0
+        and SHA256_PATTERN.fullmatch(source_fingerprint) is not None
+        and SHA256_PATTERN.fullmatch(source_logical) is not None
+        and SHA256_PATTERN.fullmatch(migration_sha256) is not None,
+        "BACKUP_RECEIPT_SOURCE_INVALID",
+    )
+    managed_proof = _validate_backup_managed_data_proof(source.get("managedDataProof"))
+    require(
+        source.get("managedDataProofSha256") == sha256_bytes(canonical_json_bytes(managed_proof))
+        and source["migrationPrefixCount"] == len(managed_proof["migrationVersions"])
+        and migration_sha256
+        == sha256_text(
+            "\n".join(managed_proof["migrationVersions"])
+            + ("\n" if managed_proof["migrationVersions"] else "")
+        ),
+        "BACKUP_RECEIPT_SOURCE_INVALID",
+    )
+    expected_source_fingerprint = sha256_bytes(
+        canonical_json_bytes(
+            {
+                "logicalSqlNormalizedSha256": source_logical,
+                "migrationPrefixSha256": migration_sha256,
+                "postgresMajor": 17,
+                "schemas": ["app_private", "public", "supabase_migrations"],
+            }
+        )
+    )
+    require(
+        source_fingerprint == expected_source_fingerprint,
+        "BACKUP_RECEIPT_SOURCE_FINGERPRINT_INVALID",
+    )
+    require(
+        restore.get("verified") is True
+        and restore.get("executionBoundary") == "github-actions-disposable-supabase"
+        and restore.get("fingerprintMatch") is True
+        and restore.get("databaseFingerprintSha256") == source_fingerprint
+        and restore.get("logicalSqlNormalizedSha256") == source_logical
+        and restore.get("sessionReplicationRoleUsed") is False
+        and restore.get("allConstraintsValidated") is True
+        and restore.get("unvalidatedConstraintCount") == 0
+        and type(restore.get("constraintCount")) is int
+        and restore.get("constraintCount") == managed_proof["constraintCount"]
+        and type(restore.get("foreignKeyCount")) is int
+        and restore.get("foreignKeyCount") == managed_proof["foreignKeyCount"]
+        and restore.get("constraintInventorySha256")
+        == managed_proof["constraintInventorySha256"],
+        "BACKUP_RECEIPT_RESTORE_INVALID",
+    )
+    encryption = receipt.get("encryption")
+    require(isinstance(encryption, dict), "BACKUP_RECEIPT_ENCRYPTION_INVALID")
+    require(
+        encryption.get("algorithm") == "age-x25519"
+        and encryption.get("encryptedBeforeArtifactBoundary") is True
+        and encryption.get("plaintextArtifactCount") == 0
+        and SHA256_PATTERN.fullmatch(str(encryption.get("recipientSha256", ""))) is not None,
+        "BACKUP_RECEIPT_ENCRYPTION_INVALID",
+    )
+    expected_ciphertext_name = (
+        f"kwabor-staging-{target_evidence['projectRefSha256'][:16]}-"
+        f"{source_fingerprint}.tar.gz.age"
+    )
+    require(
+        encryption.get("ciphertextFileName") == expected_ciphertext_name,
+        "BACKUP_RECEIPT_CIPHERTEXT_NAME_INVALID",
+    )
+    _validate_backup_ciphertext(
+        archive_path,
+        expected_name=str(encryption.get("ciphertextFileName", "")),
+        expected_sha256=str(encryption.get("ciphertextSha256", "")),
+        expected_bytes=encryption.get("ciphertextBytes"),
+    )
+    escrow = receipt.get("ageEscrow")
+    require(
+        isinstance(escrow, dict)
+        and escrow.get("status") == "provisioned"
+        and escrow.get("custodyMode") == "offline-two-person"
+        and escrow.get("recipientSha256") == encryption.get("recipientSha256")
+        and escrow.get("maxRecoveryTestAgeDays") == 90,
+        "BACKUP_RECEIPT_ESCROW_INVALID",
+    )
+    recovery_tested_at = parse_github_timestamp(escrow.get("recoveryTestedAt"), "BACKUP_RECEIPT_ESCROW_INVALID")
+    escrow_valid_until = parse_github_timestamp(escrow.get("validUntil"), "BACKUP_RECEIPT_ESCROW_INVALID")
+    require(
+        recovery_tested_at <= qualified_at
+        and qualified_at - recovery_tested_at <= timedelta(days=90)
+        and escrow_valid_until > evaluation_time,
+        "BACKUP_RECEIPT_ESCROW_INVALID",
+    )
+    rpo = receipt.get("rpo")
+    rto = receipt.get("rto")
+    require(isinstance(rpo, dict) and isinstance(rto, dict), "BACKUP_RECEIPT_RECOVERY_OBJECTIVE_INVALID")
+    apply_valid_until = parse_github_timestamp(rpo.get("applyValidUntil"), "BACKUP_RECEIPT_RPO_INVALID")
+    require(
+        rpo.get("met") is True
+        and type(rpo.get("maxSeconds")) is int
+        and 60 <= rpo["maxSeconds"] <= 3600
+        and type(rpo.get("captureSeconds")) is int
+        and 0 < rpo["captureSeconds"] <= rpo["maxSeconds"]
+        and apply_valid_until
+        == snapshot_established_at + timedelta(seconds=rpo["maxSeconds"])
+        and qualified_at < apply_valid_until
+        and evaluation_time < apply_valid_until,
+        "BACKUP_RECEIPT_RPO_INVALID",
+    )
+    require(
+        rto.get("met") is True
+        and type(rto.get("maxSeconds")) is int
+        and 60 <= rto["maxSeconds"] <= 7200
+        and type(rto.get("observedSeconds")) is int
+        and 0 < rto["observedSeconds"] <= rto["maxSeconds"],
+        "BACKUP_RECEIPT_RTO_INVALID",
+    )
+    artifact_policy = receipt.get("artifactPolicy")
+    require(isinstance(artifact_policy, dict), "BACKUP_RECEIPT_ARTIFACT_POLICY_INVALID")
+    estimated_expiry = parse_github_timestamp(
+        artifact_policy.get("estimatedExpiresAt"), "BACKUP_RECEIPT_ARTIFACT_POLICY_INVALID"
+    )
+    actual_expiry = parse_github_timestamp(artifact_evidence["expiresAt"], "BACKUP_RECEIPT_ARTIFACT_POLICY_INVALID")
+    artifact_created_at = parse_github_timestamp(artifact_evidence["createdAt"], "BACKUP_RECEIPT_ARTIFACT_POLICY_INVALID")
+    require(
+        artifact_policy.get("expectedName") == expected_name
+        and artifact_policy.get("retentionDays") == BACKUP_ARTIFACT_RETENTION_DAYS
+        and artifact_policy.get("expirationAuthority") == "github-actions-artifact-api"
+        and artifact_policy.get("actualDigestValidatedByConsumer") is True
+        and qualified_at <= artifact_created_at
+        and abs(
+            (
+                actual_expiry
+                - (artifact_created_at + timedelta(days=BACKUP_ARTIFACT_RETENTION_DAYS))
+            ).total_seconds()
+        )
+        <= 300
+        and actual_expiry >= estimated_expiry
+        and actual_expiry > apply_valid_until
+        and escrow_valid_until >= actual_expiry,
+        "BACKUP_RECEIPT_ARTIFACT_POLICY_INVALID",
+    )
     return {
         **artifact_evidence,
+        "applyValidUntil": format_github_timestamp(apply_valid_until),
+        "databaseFingerprintSha256": source_fingerprint,
         "internalReceiptSha256": receipt_digest,
+        "migrationPrefixCount": source["migrationPrefixCount"],
+        "migrationPrefixSha256": migration_sha256,
         "restorable": True,
         "runAttempt": run_evidence["runAttempt"],
         "targetDigestSha256": target_digest,
@@ -935,6 +1342,7 @@ class TargetAuthority:
             "projectRef": self.project_ref,
             "projectRefSha256": self.project_ref_sha256,
             "schemaVersion": 1,
+            "tlsMode": "require",
         }
 
 
@@ -944,14 +1352,14 @@ def _parse_database_url(database_url: str, project_ref: str) -> tuple[str, str, 
     require(database_url.isascii(), "DATABASE_URL_INVALID")
     require(not any(character.isspace() or ord(character) < 32 for character in database_url), "DATABASE_URL_INVALID")
     require(database_url.count("@") == 1, "DATABASE_URL_INVALID")
-    require("?" not in database_url and "#" not in database_url, "DATABASE_URL_OVERRIDE_FORBIDDEN")
+    require("#" not in database_url, "DATABASE_URL_OVERRIDE_FORBIDDEN")
     try:
         parsed = urllib.parse.urlsplit(database_url)
         port = parsed.port
     except ValueError as error:
         raise StagingDatabaseError("DATABASE_URL_INVALID") from error
     require(parsed.scheme == "postgresql", "DATABASE_URL_SCHEME_INVALID")
-    require(parsed.query == "" and parsed.fragment == "", "DATABASE_URL_OVERRIDE_FORBIDDEN")
+    require(parsed.query == "sslmode=require" and parsed.fragment == "", "DATABASE_TLS_REQUIRED")
     require(parsed.path == "/postgres", "DATABASE_NAME_INVALID")
     require(port == 5432, "DATABASE_PORT_INVALID")
     hostname = parsed.hostname
@@ -974,14 +1382,10 @@ def _parse_database_url(database_url: str, project_ref: str) -> tuple[str, str, 
         "DATABASE_PASSWORD_INVALID",
     )
 
-    direct_host = f"db.{project_ref}.supabase.co"
-    if hostname == direct_host:
-        require(username == "postgres", "DATABASE_USERNAME_INVALID")
-        endpoint_class = "direct"
-    else:
-        require(POOLER_HOST_PATTERN.fullmatch(hostname) is not None, "DATABASE_HOST_INVALID")
-        require(username == f"postgres.{project_ref}", "DATABASE_USERNAME_INVALID")
-        endpoint_class = "session-pooler"
+    require(hostname != f"db.{project_ref}.supabase.co", "SESSION_POOLER_REQUIRED")
+    require(POOLER_HOST_PATTERN.fullmatch(hostname) is not None, "DATABASE_HOST_INVALID")
+    require(username == f"postgres.{project_ref}", "DATABASE_USERNAME_INVALID")
+    endpoint_class = "session-pooler"
     secret_values = tuple(
         dict.fromkeys(value for value in (database_url, raw_password, decoded_password) if value)
     )
@@ -1337,15 +1741,15 @@ def run_apply_mutation(
 ) -> MutationAttempt:
     command = build_command("apply", authority)
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             command,
             cwd=repository_root,
             env=sanitized_subprocess_environment(os.environ),
-            capture_output=True,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=APPLY_TIMEOUT_SECONDS,
         )
     except FileNotFoundError:
         result = subprocess.CompletedProcess(
@@ -1369,7 +1773,7 @@ def run_apply_mutation(
             args=command,
             returncode=126,
             stdout="",
-            stderr="[supabase CLI execution unavailable before mutation]",
+            stderr="[supabase CLI could not be spawned before mutation]",
         )
         write_mutation_process_evidence(
             evidence_path=evidence_path,
@@ -1377,17 +1781,27 @@ def run_apply_mutation(
             authority=authority,
         )
         return MutationAttempt(
-            error_code="SUPABASE_APPLY_EXECUTION_FAILED",
+            error_code="SUPABASE_APPLY_SPAWN_FAILED",
             exit_code=result.returncode,
             timed_out=False,
         )
+    try:
+        stdout, stderr = process.communicate(timeout=APPLY_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as error:
-        stdout = (
+        try:
+            process.kill()
+        except OSError:
+            pass
+        try:
+            final_stdout, final_stderr = process.communicate()
+        except OSError:
+            final_stdout, final_stderr = "", ""
+        stdout = final_stdout or (
             error.stdout.decode("utf-8", errors="replace")
             if isinstance(error.stdout, bytes)
             else (error.stdout or "")
         )
-        stderr = (
+        stderr = final_stderr or (
             error.stderr.decode("utf-8", errors="replace")
             if isinstance(error.stderr, bytes)
             else (error.stderr or "")
@@ -1408,6 +1822,57 @@ def run_apply_mutation(
             exit_code=result.returncode,
             timed_out=True,
         )
+    except OSError:
+        # Popen succeeded, so the child may already have mutated the database.
+        # Communication/wait failures must never be misreported as pre-spawn.
+        try:
+            process.kill()
+        except OSError:
+            pass
+        try:
+            stdout, stderr = process.communicate()
+        except OSError:
+            stdout, stderr = "", ""
+        result = subprocess.CompletedProcess(
+            args=command,
+            returncode=125,
+            stdout=stdout,
+            stderr=f"{stderr}\n[process state unavailable after launch]".strip(),
+        )
+        write_mutation_process_evidence(
+            evidence_path=evidence_path,
+            result=result,
+            authority=authority,
+        )
+        return MutationAttempt(
+            error_code="SUPABASE_APPLY_EXECUTION_UNCERTAIN",
+            exit_code=result.returncode,
+            timed_out=False,
+        )
+    returncode = process.returncode
+    if type(returncode) is not int:
+        result = subprocess.CompletedProcess(
+            args=command,
+            returncode=125,
+            stdout=stdout,
+            stderr=f"{stderr}\n[process exit status unavailable after launch]".strip(),
+        )
+        write_mutation_process_evidence(
+            evidence_path=evidence_path,
+            result=result,
+            authority=authority,
+        )
+        return MutationAttempt(
+            error_code="SUPABASE_APPLY_EXECUTION_UNCERTAIN",
+            exit_code=result.returncode,
+            timed_out=False,
+        )
+    result = subprocess.CompletedProcess(
+        args=command,
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
     write_mutation_process_evidence(
         evidence_path=evidence_path,
         result=result,
@@ -1489,6 +1954,49 @@ def local_migration_manifest(repository_root: Path) -> tuple[dict[str, Any], lis
     }
     manifest_payload["manifestSha256"] = sha256_bytes(canonical_json_bytes(manifest_payload))
     return manifest_payload, versions
+
+
+def validate_pending_migration_scope(
+    repository_root: Path,
+    pending_versions: Sequence[str],
+) -> dict[str, Any]:
+    versions = list(pending_versions)
+    require(
+        versions == sorted(set(versions))
+        and all(re.fullmatch(r"[0-9]{14}", version) for version in versions),
+        "BACKUP_PENDING_SCOPE_INVALID",
+    )
+    migration_directory = repository_root / "supabase" / "migrations"
+    checked: list[dict[str, Any]] = []
+    for version in versions:
+        candidates = sorted(migration_directory.glob(f"{version}_*.sql"))
+        require(len(candidates) == 1 and not candidates[0].is_symlink(), "BACKUP_PENDING_MIGRATION_MISSING")
+        try:
+            payload = candidates[0].read_bytes()
+            payload.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            raise StagingDatabaseError("BACKUP_PENDING_MIGRATION_INVALID") from error
+        digest = sha256_bytes(payload)
+        require(
+            BACKUP_EXCLUDED_MANAGED_DATA_PENDING_ALLOWLIST.get(version) == digest,
+            "BACKUP_PENDING_MIGRATION_NOT_REVIEWED_FOR_EXCLUDED_SCHEMAS",
+        )
+        checked.append(
+            {
+                "filename": candidates[0].name,
+                "sha256": digest,
+                "version": version,
+            }
+        )
+    return {
+        "checkedMigrations": checked,
+        "checkedVersionsSha256": sha256_text(
+            "\n".join(versions) + ("\n" if versions else "")
+        ),
+        "managedSchemas": ["auth", "storage"],
+        "policy": "reviewed-pending-migration-sha-allowlist-v2",
+        "schemaVersion": 2,
+    }
 
 
 def parse_remote_migration_versions(csv_output: str) -> list[str]:
@@ -1649,6 +2157,8 @@ def classify_apply_reconciliation(
     local_versions: Sequence[str],
     migration_state: Mapping[str, Any] | None,
     fresh_empty: Mapping[str, Any] | None,
+    pre_apply_migration_state: Mapping[str, Any] | None = None,
+    mutation_proven_impossible: bool = False,
 ) -> dict[str, Any]:
     local_count = len(local_versions)
     if migration_state is None:
@@ -1664,6 +2174,14 @@ def classify_apply_reconciliation(
         classification = "full_exact"
         mutation_state = "committed"
         outcome = "success_recovered"
+    elif (
+        mutation_proven_impossible
+        and pre_apply_migration_state is not None
+        and dict(migration_state) == dict(pre_apply_migration_state)
+    ):
+        classification = "none_applied_pre_mutation_failure"
+        mutation_state = "not_committed"
+        outcome = "failed_safe"
     elif (
         migration_state.get("remoteIsExactLocalPrefix") is True
         and migration_state.get("remoteCount") == 0
@@ -1686,7 +2204,13 @@ def classify_apply_reconciliation(
             else None
         ),
         "mutationState": mutation_state,
+        "mutationProvenImpossible": mutation_proven_impossible,
         "outcome": outcome,
+        "preApplyMigrationStateSha256": (
+            sha256_bytes(canonical_json_bytes(pre_apply_migration_state))
+            if pre_apply_migration_state is not None
+            else None
+        ),
         "retryDisposition": (
             "NEW_PLAN_AND_APPROVAL_REQUIRED"
             if outcome == "failed_safe"
@@ -1848,6 +2372,7 @@ def write_gel_receipt(
         in {
             "EXECUTED",
             "EXECUTED_RECOVERED",
+            "EXECUTION_NOT_STARTED",
             "INDETERMINATE",
             "REJECTED_PREFLIGHT",
             "PREPARED_NOT_EXECUTABLE",
@@ -1906,6 +2431,25 @@ def write_gel_receipt(
             and retry_disposition == "NEW_PLAN_AND_APPROVAL_REQUIRED"
             and isinstance(reconciliation_evidence, Mapping)
             and reconciliation_evidence.get("outcome") == "failed_safe",
+            "NOT_COMMITTED_RECEIPT_INVALID",
+        )
+        reconciliation_classification = reconciliation_evidence.get("classification")
+        if execution_disposition == "EXECUTION_NOT_STARTED":
+            require(
+                reconciliation_classification == "none_applied_pre_mutation_failure",
+                "NOT_COMMITTED_RECEIPT_INVALID",
+            )
+        else:
+            require(
+                execution_disposition == "EXECUTED"
+                and reconciliation_classification != "none_applied_pre_mutation_failure",
+                "NOT_COMMITTED_RECEIPT_INVALID",
+            )
+    if execution_disposition == "EXECUTION_NOT_STARTED":
+        require(
+            operation == "apply"
+            and status == "failed"
+            and mutation_state == "not_committed",
             "NOT_COMMITTED_RECEIPT_INVALID",
         )
     if mutation_state == "committed_unqualified":
@@ -2141,6 +2685,7 @@ def reconcile_apply_attempt(
     authority: TargetAuthority,
     repository_root: Path,
     local_versions: Sequence[str],
+    pre_apply_migration_state: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
     migration_state: dict[str, Any] | None = None
     fresh_empty: dict[str, Any] | None = None
@@ -2177,6 +2722,9 @@ def reconcile_apply_attempt(
         local_versions=local_versions,
         migration_state=migration_state,
         fresh_empty=fresh_empty,
+        pre_apply_migration_state=pre_apply_migration_state,
+        mutation_proven_impossible=attempt.error_code
+        in {"SUPABASE_APPLY_MISSING", "SUPABASE_APPLY_SPAWN_FAILED"},
     )
     reconciliation.update(
         {
@@ -2218,6 +2766,7 @@ def execute(args: argparse.Namespace) -> None:
     migration_manifest: dict[str, Any] | None = None
     authority: TargetAuthority | None = None
     plan_evidence: dict[str, Any] | None = None
+    backup_evidence: dict[str, Any] | None = None
     migration_state: dict[str, Any] | None = None
     fresh_empty_evidence: dict[str, Any] | None = None
     reconciliation_evidence: dict[str, Any] | None = None
@@ -2370,10 +2919,68 @@ def execute(args: argparse.Namespace) -> None:
                 plan_evidence,
                 secret_values=authority.secret_values,
             )
+            uses_fresh_empty_exception = apply_authority["backup"] is None
+            if not uses_fresh_empty_exception:
+                backup_authority = apply_authority["backup"]
+                require(isinstance(backup_authority, dict), "BACKUP_AUTHORITY_MISSING")
+                require(
+                    backup_authority["runId"]
+                    not in {request_evidence["runId"], apply_authority["planRunId"]},
+                    "BACKUP_RUN_ID_INVALID",
+                )
+                try:
+                    backup_evidence = validate_backup_artifact_bundle(
+                        run_document=load_json_object(Path(args.backup_run_json)),
+                        artifact_document=load_json_object(Path(args.backup_artifact_json)),
+                        archive_path=Path(args.backup_artifact_zip),
+                        backup_run_id=backup_authority["runId"],
+                        backup_artifact_id=backup_authority["artifactId"],
+                        backup_artifact_digest=backup_authority["artifactDigest"],
+                        expected_sha=args.expected_sha,
+                        validated_ci_run_id=request_evidence["validatedCiRunId"],
+                        target_evidence=target_evidence,
+                    )
+                except StagingDatabaseError as error:
+                    write_json_exclusive(
+                        evidence_directory / "BACKUP-PROOF-VALIDATION-FAILURE.json",
+                        {
+                            "errorCode": error.code,
+                            "executionDisposition": "PREPARED_NOT_EXECUTABLE",
+                            "schemaVersion": 1,
+                        },
+                        secret_values=authority.secret_values,
+                    )
+                    write_apply_prepared_not_executable(
+                        evidence_directory=evidence_directory,
+                        reason_code="VALIDATED_BACKUP_PROOF_UNAVAILABLE",
+                        request_evidence=request_evidence,
+                        ci_evidence=ci_evidence,
+                        target_evidence=target_evidence,
+                        migration_manifest=migration_manifest,
+                        plan_evidence=plan_evidence,
+                        migration_state=None,
+                        fresh_empty_evidence=None,
+                        secret_values=authority.secret_values,
+                    )
+                require(backup_evidence is not None, "VALIDATED_BACKUP_PROOF_UNAVAILABLE")
+                write_json_exclusive(
+                    evidence_directory / "VALIDATED-BACKUP-PROOF.json",
+                    backup_evidence,
+                    secret_values=authority.secret_values,
+                )
+                pending_scope = validate_pending_migration_scope(
+                    repository_root,
+                    plan_evidence["pendingVersions"],
+                )
+                write_json_exclusive(
+                    evidence_directory / "BACKUP-PENDING-MIGRATION-SCOPE.json",
+                    pending_scope,
+                    secret_values=authority.secret_values,
+                )
             plan_fresh_empty = validate_fresh_empty_evidence(
                 plan_evidence["freshEmptyEvidence"]
             )
-            if (
+            if uses_fresh_empty_exception and (
                 plan_fresh_empty["freshEmptyEligible"] is not True
                 or plan_evidence["remoteCount"] != 0
                 or plan_evidence["pendingCount"] != migration_manifest["count"]
@@ -2428,6 +3035,13 @@ def execute(args: argparse.Namespace) -> None:
                     fresh_empty_evidence=plan_fresh_empty,
                     secret_values=authority.secret_values,
                 )
+            if backup_evidence is not None:
+                require(
+                    backup_evidence["migrationPrefixCount"] == pre_apply_state["remoteCount"]
+                    and backup_evidence["migrationPrefixSha256"]
+                    == pre_apply_state["remoteVersionsSha256"],
+                    "BACKUP_MIGRATION_PREFIX_DRIFT",
+                )
             run_cli(
                 kind="plan",
                 evidence_path=evidence_directory / "PRE-APPLY-DRY-RUN.txt",
@@ -2462,7 +3076,7 @@ def execute(args: argparse.Namespace) -> None:
                 )
             require(current_fresh_empty is not None, "FRESH_EMPTY_RECHECK_UNAVAILABLE")
             fresh_empty_evidence = current_fresh_empty
-            if (
+            if uses_fresh_empty_exception and (
                 current_fresh_empty["freshEmptyEligible"] is not True
                 or current_fresh_empty["countsSha256"]
                 != plan_fresh_empty["countsSha256"]
@@ -2478,6 +3092,24 @@ def execute(args: argparse.Namespace) -> None:
                     migration_state=pre_apply_state,
                     fresh_empty_evidence=current_fresh_empty,
                     secret_values=authority.secret_values,
+                )
+            if backup_evidence is not None:
+                counts = current_fresh_empty["counts"]
+                require(
+                    counts["authUserCount"] == 0
+                    and counts["authRelevantRowCount"] == 0
+                    and counts["storageObjectCount"] == 0
+                    and counts["storageBucketCount"] == 0
+                    and counts["storageRelevantRowCount"] == 0,
+                    "BACKUP_MANAGED_DATA_DRIFT",
+                )
+                require(
+                    parse_github_timestamp(
+                        backup_evidence["applyValidUntil"],
+                        "BACKUP_RECEIPT_RPO_INVALID",
+                    )
+                    > datetime.now(timezone.utc),
+                    "BACKUP_RECEIPT_RPO_INVALID",
                 )
             attempt = run_apply_mutation(
                 evidence_path=evidence_directory / "APPLY-DB-PUSH.txt",
@@ -2495,9 +3127,16 @@ def execute(args: argparse.Namespace) -> None:
                     authority=authority,
                     repository_root=repository_root,
                     local_versions=local_versions,
+                    pre_apply_migration_state=pre_apply_state,
                 )
                 outcome = reconciliation_evidence["outcome"]
                 if outcome == "failed_safe":
+                    execution_disposition = (
+                        "EXECUTION_NOT_STARTED"
+                        if reconciliation_evidence.get("classification")
+                        == "none_applied_pre_mutation_failure"
+                        else "EXECUTED"
+                    )
                     write_gel_receipt(
                         evidence_directory=evidence_directory,
                         operation="apply",
@@ -2506,13 +3145,13 @@ def execute(args: argparse.Namespace) -> None:
                         ci_evidence=ci_evidence,
                         target_evidence=target_evidence,
                         migration_manifest=migration_manifest,
-                        backup_evidence=None,
+                        backup_evidence=backup_evidence,
                         plan_evidence=plan_evidence,
                         migration_state=migration_state,
                         fresh_empty_evidence=reconciled_fresh_empty,
                         reconciliation_evidence=reconciliation_evidence,
                         mutation_state="not_committed",
-                        execution_disposition="EXECUTED",
+                        execution_disposition=execution_disposition,
                         retry_disposition="NEW_PLAN_AND_APPROVAL_REQUIRED",
                         error_code=attempt.error_code,
                         secret_values=authority.secret_values,
@@ -2541,7 +3180,7 @@ def execute(args: argparse.Namespace) -> None:
                         ci_evidence=ci_evidence,
                         target_evidence=target_evidence,
                         migration_manifest=migration_manifest,
-                        backup_evidence=None,
+                        backup_evidence=backup_evidence,
                         plan_evidence=plan_evidence,
                         migration_state=migration_state,
                         fresh_empty_evidence=fresh_empty_evidence,
@@ -2561,7 +3200,7 @@ def execute(args: argparse.Namespace) -> None:
                     ci_evidence=ci_evidence,
                     target_evidence=target_evidence,
                     migration_manifest=migration_manifest,
-                    backup_evidence=None,
+                    backup_evidence=backup_evidence,
                     plan_evidence=plan_evidence,
                     migration_state=migration_state,
                     fresh_empty_evidence=reconciled_fresh_empty,
@@ -2613,7 +3252,7 @@ def execute(args: argparse.Namespace) -> None:
                     ci_evidence=ci_evidence,
                     target_evidence=target_evidence,
                     migration_manifest=migration_manifest,
-                    backup_evidence=None,
+                    backup_evidence=backup_evidence,
                     plan_evidence=plan_evidence,
                     migration_state=migration_state,
                     fresh_empty_evidence=fresh_empty_evidence,
@@ -2649,7 +3288,7 @@ def execute(args: argparse.Namespace) -> None:
         ci_evidence=ci_evidence,
         target_evidence=target_evidence,
         migration_manifest=migration_manifest,
-        backup_evidence=None,
+        backup_evidence=backup_evidence,
         plan_evidence=plan_evidence,
         migration_state=migration_state,
         fresh_empty_evidence=fresh_empty_evidence,
@@ -2683,6 +3322,9 @@ def build_parser() -> argparse.ArgumentParser:
     execute_parser.add_argument("--plan-run-json", required=True)
     execute_parser.add_argument("--plan-artifact-json", required=True)
     execute_parser.add_argument("--plan-artifact-zip", required=True)
+    execute_parser.add_argument("--backup-run-json", default="")
+    execute_parser.add_argument("--backup-artifact-json", default="")
+    execute_parser.add_argument("--backup-artifact-zip", default="")
     execute_parser.add_argument("--evidence-directory", required=True)
     execute_parser.set_defaults(handler=execute)
     return parser

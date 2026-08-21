@@ -8,7 +8,7 @@ applicatif et données est fusionné dans `main` : corpus reproductible de 60 fi
 workflows staging et distributions internes. La cible V1 complète du PRD reste post-bêta ; aucune
 surface différée n'est déclarée terminée.
 
-## Snapshot courant — 20 août 2026
+## Snapshot courant — 21 août 2026
 
 - La lignée fonctionnelle de ce lot inclut le commit de fusion
   `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`, avec le serveur et le raccord mobile
@@ -41,16 +41,22 @@ surface différée n'est déclarée terminée.
   `Supabase database` de ce run a créé une base jetable avec `supabase db start` ; cette preuve CI
   valide l'application des migrations et du seed, pgTAP, lint, advisors et les harnais du dépôt,
   mais ne cible ni ne qualifie un projet Supabase hébergé.
-- L'audit opérateur du 20 août a trouvé une configuration cliente publique pour le tier
-  `development`. Une lecture anonyme de la Data API a répondu `206 Partial Content` et retourné
-  quatre fixtures. C'est une preuve de joignabilité et de lecture seulement : l'historique
-  des migrations, le lint/advisors liés, les ACL négatives et les parcours admin ne sont pas prouvés,
-  car les opérations CLI liées nécessaires ont répondu `403`. `ENV-001B-DEV` reste donc ouvert ; les
-  projets Supabase staging et production restent absents.
-- Le présent worktree détaché intègre localement les workflows et preuves opérateur avec le tracker
-  de sessions consenties et la sonde monotone du first usable viewport Android/iOS. Ce delta n'est
-  ni publié ni validé par une CI exact-head ; aucune session de cohorte ni mesure P75 sur appareil
-  physique n'est donc déclarée acquise.
+- Le projet Supabase existant est désormais l'autorité **staging** de la bêta. Une lecture distante
+  protégée via le pooler de session TLS a confirmé PostgreSQL 17, 21 migrations, le catalogue Auth /
+  Storage attendu, 286 contraintes dont 65 clés étrangères, zéro contrainte non validée et aucune
+  donnée Auth/Storage gérée. Quatre fixtures de développement restent publiées ; elles doivent être
+  archivées par le workflow exact et réversible avant le corpus de 60 fiches. Aucun projet Supabase
+  production distinct n'est encore créé ou approuvé.
+- Les Environments GitHub `staging`, `play-internal` et `testflight-internal` existent, interdisent le
+  bypass administrateur et l'auto-approbation, ciblent les branches protégées et exigent le second
+  reviewer désigné. Les variables Supabase de base et les secrets DB/Storage staging sont injectés ;
+  la référence production, les identités Firebase/OAuth, les signatures mobiles et les autorités
+  Store restent incomplètes.
+- La PR brouillon `#63` porte le tracker de sessions consenties, la sonde monotone du first usable
+  viewport Android/iOS et les garde-fous staging. Sa tête publiée `7bfdb0f` a une CI complète verte
+  après l'unique relance ciblée API 36 classée infrastructure. Le présent delta ajoute localement le
+  producteur B6.02 chiffré/restauré, le consommateur DB durci, la configuration Auth plan/apply/verify
+  et l'archivage exact des quatre fixtures ; il doit encore recevoir sa propre CI exact-head.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -60,9 +66,9 @@ surface différée n'est déclarée terminée.
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
-- La décision de release reste **no-go** : projets Supabase staging/production absents, fournisseurs
-  réels, préflight des données, corpus, juridique, builds signés, appareils physiques, accessibilité,
-  performance, sauvegarde et rollback ne sont pas qualifiés.
+- La décision de release reste **no-go** : projet production distinct, escrow de sauvegarde à deux
+  personnes, exécution B6.02, migration distante, Auth/SMTP/OAuth, corpus, juridique, builds signés,
+  appareils physiques, accessibilité, performance et rollback ne sont pas encore qualifiés.
 - Le PRD et le DESIGN conservent leur cible complète à cinq racines. ADR-0036 accepte un profil de
   bêta fermé distinct : navigation `Explorer · Compte`, catalogue de 60 fiches et report explicite
   des surfaces incomplètes. Ce profil ne remplace pas la cible complète.
@@ -520,9 +526,10 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 BETA-STAGING-001 est le chemin critique. Le code, les 60 fiches, les 180 médias, les tests dynamiques
 Supabase sur base CI éphémère et les workflows de distribution sont fusionnés et qualifiés ; il reste
-à durcir l'Environment GitHub `staging`, créer `play-internal` et `testflight-internal`, compléter leurs
-variables et secrets avec les comptes fournisseurs, publier puis vérifier Storage et le catalogue sur
-le vrai staging, produire les builds signés internes et exécuter le pilote. La checklist opérateur
+à fusionner et qualifier le lot opérateur de la PR `#63`, provisionner l'escrow B6.02 et la référence
+du projet production distinct, exécuter la sauvegarde/restauration staging, appliquer puis vérifier la
+migration ACL, archiver les quatre fixtures, configurer Auth/SMTP/OAuth, publier puis vérifier Storage
+et le catalogue, produire les builds signés internes et exécuter le pilote. La checklist opérateur
 non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
 secret ne doit être publié dans GitHub Issues. Le dénominateur crash-free et la sonde first usable
 viewport sont prêts localement, mais leurs preuves Firebase, leurs valeurs réelles sur appareils et
@@ -535,10 +542,10 @@ exclusivement du harnais opérateur physique.
 - ADR-0036 autorise explicitement le profil transitoire de bêta fermée `Explorer · Compte` et le
   report de Social, `+`, Notifications, B2B, paiement et IA. Cette autorisation ne vaut ni
   achèvement de la V1 complète du PRD ni ouverture publique de production.
-- Le déploiement est bloqué en sécurité tant qu'un second reviewer GitHub de confiance n'est pas
-  désigné et que `staging`, `play-internal` et `testflight-internal` ne sont pas protégés sans bypass
-  admin, avec revue obligatoire et interdiction d'auto-approbation. Les projets Supabase/Firebase,
-  les comptes Stores, certificats, profils et secrets fournisseurs restent à provisionner via
+- Le second reviewer et les protections GitHub fail-closed sont en place. Le déploiement reste
+  bloqué par la référence du projet production distinct, l'escrow age hors dépôt à deux personnes,
+  l'exécution de la sauvegarde/restauration B6.02, les identités Firebase/OAuth/SMTP, les comptes
+  Stores, certificats, profils et secrets fournisseurs à provisionner via
   [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61), jamais dans le dépôt ou dans un
   commentaire.
 - Pour le texte actif HISTORY V1, la rétention serveur glissante proposée de 180 jours et les
@@ -557,10 +564,10 @@ exclusivement du harnais opérateur physique.
 - SEC-001A, ARCH-004 et STAB-003 sont intégrées dans `main`. SEC-001A ne protège cependant aucun
   environnement persistant tant que la préflight, le déploiement staging et les tests négatifs
   réels ne sont pas exécutés.
-- Le tier Supabase `development` est joignable avec sa configuration publique et expose quatre
-  fixtures en lecture Data API (`206`). Les opérations liées ont toutefois répondu `403` :
-  migrations, lint/advisors, ACL négatives et parcours admin restent sans preuve. Cette lecture ne
-  ferme ni `ENV-001B-DEV`, ni la préflight ; staging et production Supabase sont toujours absents.
+- L'ancien tier Supabase `development` est désormais désigné staging. Les inspections distantes
+  non mutatives ont qualifié l'autorité DB, l'historique et les contraintes, mais elles ne remplacent
+  ni la sauvegarde/restauration B6.02 ni l'application de la migration ACL pending. Le projet
+  production distinct reste absent.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
 - OFFLINE-002 compile pour iOS X64 sous Windows et ouvre Room sous Robolectric dans le chemin Android
@@ -627,20 +634,23 @@ exclusivement du harnais opérateur physique.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - La vidéo d'intro ne dépend plus d'ENV-001B/OBS-001B, d'un CDN ou de Firebase. Chaque nouvelle révision exige toutefois provenance, droits de diffusion, approbation éditoriale, preuves Android/iOS, builds signés et publication Store.
-- ENV-001B dépend du propriétaire : `development` est seulement joignable en lecture publique et
-  `ENV-001B-DEV` reste ouvert après les réponses CLI liées `403`; les projets Supabase staging et
-  production sont absents. L'authentification Firebase CLI existante est expirée et exige
-  `firebase login --reauth` avant création des projets Firebase requis.
+- ENV-001B dépend encore du propriétaire : staging Supabase existe et son accès DB protégé est
+  qualifié en lecture, mais production Supabase et les projets Firebase restent absents. L'activation
+  Auth staging exige les identités Google et SMTP réelles ; aucune valeur fictive ne doit lever les
+  guards. L'authentification Firebase CLI existante doit être réauthentifiée avant création des
+  projets Firebase requis.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils d'Analytics, Crashlytics, Performance et Remote Config générique ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
-- Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
+- Le projet Supabase production, les projets Firebase staging/production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 
-Résoudre [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : désigner le
-second reviewer, protéger et provisionner les trois Environments GitHub, publier puis vérifier les
-180 médias, publier puis vérifier les 60 fiches, exécuter les smokes staging, produire l'AAB Play
-Internal et l'IPA TestFlight Internal, puis ouvrir le pilote de 10 appareils Android et 5 iPhone
+Le second reviewer et les protections Environments sont acquis. Résoudre
+[l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : terminer la PR `#63`, créer l'autorité
+Supabase production distincte, provisionner l'escrow age, exécuter B6.02, appliquer/vérifier la
+migration ACL, archiver les quatre fixtures, configurer Auth, publier/vérifier les 180 médias puis les
+60 fiches, exécuter les smokes staging, produire l'AAB Play Internal et l'IPA TestFlight Internal,
+puis ouvrir le pilote de 10 appareils Android et 5 iPhone
 pendant sept jours. Le go/no-go exige zéro P0/P1 et au moins 99,5 % de sessions sans crash. Les lots
 post-bêta restent différés tant que cette preuve n'est pas acquise.

@@ -24,15 +24,15 @@ on:
         required: false
         type: string
       backup_run_id:
-        description: Reserved for B6.02; must be empty for the fresh-empty first-apply exception
+        description: Qualified B6.02 run ID; leave all backup inputs empty only for fresh-empty
         required: false
         type: string
       backup_artifact_id:
-        description: Reserved for B6.02; must be empty for the fresh-empty first-apply exception
+        description: Exact qualified B6.02 artifact ID
         required: false
         type: string
       backup_artifact_digest:
-        description: Reserved for B6.02; must be empty for the fresh-empty first-apply exception
+        description: Exact lowercase SHA-256 returned by the B6.02 upload
         required: false
         type: string
       validated_plan_run_id:
@@ -108,6 +108,9 @@ jobs:
           plan_run_json="$RUNNER_TEMP/kwabor-validated-plan-run.json"
           plan_artifact_json="$RUNNER_TEMP/kwabor-validated-plan-artifact.json"
           plan_artifact_zip="$RUNNER_TEMP/kwabor-validated-plan-artifact.zip"
+          backup_run_json="$RUNNER_TEMP/kwabor-validated-backup-run.json"
+          backup_artifact_json="$RUNNER_TEMP/kwabor-validated-backup-artifact.json"
+          backup_artifact_zip="$RUNNER_TEMP/kwabor-validated-backup-artifact.zip"
 
           fetch_json() {
             local endpoint="$1"
@@ -152,9 +155,24 @@ jobs:
                 "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$VALIDATED_PLAN_ARTIFACT_ID/zip" \
                 --output "$plan_artifact_zip" 2>/dev/null || rm -f "$plan_artifact_zip"
             fi
+            fetch_id_json "runs" "$BACKUP_RUN_ID" "$backup_run_json"
+            fetch_id_json "artifacts" "$BACKUP_ARTIFACT_ID" "$backup_artifact_json"
+            if [[ "$BACKUP_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] && \
+              python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); assert d.get("id") == int(sys.argv[2]) and 0 < d.get("size_in_bytes", 0) <= 2147483648' \
+                "$backup_artifact_json" "$BACKUP_ARTIFACT_ID" 2>/dev/null; then
+              curl --fail --silent --show-error --location \
+                --connect-timeout 15 --max-time 600 \
+                --header "Accept: application/vnd.github+json" \
+                --header "Authorization: Bearer $GH_TOKEN" \
+                --header "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$BACKUP_ARTIFACT_ID/zip" \
+                --output "$backup_artifact_zip" 2>/dev/null || rm -f "$backup_artifact_zip"
+            fi
           else
             printf '{"fetchStatus":"not-requested"}\n' > "$plan_run_json"
             printf '{"fetchStatus":"not-requested"}\n' > "$plan_artifact_json"
+            printf '{"fetchStatus":"not-requested"}\n' > "$backup_run_json"
+            printf '{"fetchStatus":"not-requested"}\n' > "$backup_artifact_json"
           fi
 
           echo "KWABOR_VALIDATED_CI_RUN_JSON=$ci_run_json" >> "$GITHUB_ENV"
@@ -162,6 +180,9 @@ jobs:
           echo "KWABOR_VALIDATED_PLAN_RUN_JSON=$plan_run_json" >> "$GITHUB_ENV"
           echo "KWABOR_VALIDATED_PLAN_ARTIFACT_JSON=$plan_artifact_json" >> "$GITHUB_ENV"
           echo "KWABOR_VALIDATED_PLAN_ARTIFACT_ZIP=$plan_artifact_zip" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_BACKUP_RUN_JSON=$backup_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_BACKUP_ARTIFACT_JSON=$backup_artifact_json" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_BACKUP_ARTIFACT_ZIP=$backup_artifact_zip" >> "$GITHUB_ENV"
 
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
@@ -190,6 +211,9 @@ jobs:
             --plan-run-json "$KWABOR_VALIDATED_PLAN_RUN_JSON" \
             --plan-artifact-json "$KWABOR_VALIDATED_PLAN_ARTIFACT_JSON" \
             --plan-artifact-zip "$KWABOR_VALIDATED_PLAN_ARTIFACT_ZIP" \
+            --backup-run-json "$KWABOR_VALIDATED_BACKUP_RUN_JSON" \
+            --backup-artifact-json "$KWABOR_VALIDATED_BACKUP_ARTIFACT_JSON" \
+            --backup-artifact-zip "$KWABOR_VALIDATED_BACKUP_ARTIFACT_ZIP" \
             --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-evidence"
 
       - name: Upload staging database GEL evidence

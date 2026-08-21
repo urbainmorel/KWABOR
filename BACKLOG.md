@@ -72,15 +72,18 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   séparément et la PR source `#36` est fermée avec commentaire de supersession.
 - [x] NAV-001 — Livrer navigation Android et SwiftUI natives avec routes et deep links typés.
 - [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
-- [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
+- [ ] ENV-001 — Terminer Supabase staging, créer Supabase production et Firebase staging/production,
+  puis relier les Environments GitHub et contrats de secrets sans valeur sensible.
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
-  - [ ] ENV-001B — Qualifier `development`, créer les projets Supabase/Firebase staging et production
-    dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations ;
-    aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
-    - [ ] ENV-001B-DEV — Terminer la qualification du projet Supabase `development`. La configuration
-      publique est présente et une lecture Data API a répondu `206` avec quatre fixtures, mais les
-      migrations, le lint, les ACL négatives et les parcours admin ne sont pas prouvés : les commandes
-      CLI liées nécessaires ont répondu `403`. Les projets staging et production restent absents.
+  - [ ] ENV-001B — Terminer le tier staging existant, créer les projets Supabase production et
+    Firebase staging/production dans les organisations choisies par le propriétaire, puis renseigner
+    leurs variables/configurations ; aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
+    - [ ] ENV-001B-STAGING — Le projet Supabase existant est désigné staging ; pooler TLS, 21 migrations,
+      catalogue Auth/Storage et contraintes sont qualifiés en lecture. Restent B6.02, migration ACL,
+      archivage des quatre fixtures, Auth/SMTP/OAuth et corpus avant clôture.
+    - [ ] ENV-001B-PROD — Créer une autorité Supabase production distincte après confirmation explicite
+      du propriétaire sur l'organisation, la région et le coût, puis fournir uniquement sa référence
+      non secrète aux guards staging.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
@@ -367,6 +370,12 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
   dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). La réussite du job CI
   `supabase_database` sur une base éphémère ne clôt pas ce ticket.
+  - [x] BETA-STAGING-001A — Protéger les Environments GitHub avec second reviewer, anti-bypass,
+    anti-auto-approbation et branches protégées ; qualifier l'accès staging via pooler TLS.
+  - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
+    sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
+  - [ ] BETA-STAGING-001C — Provisionner l'escrow age hors dépôt et la référence production, fusionner
+    la PR exact-head, puis exécuter dans l'ordre B6.02, migration ACL, archivage, Auth et corpus.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

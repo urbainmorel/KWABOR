@@ -77,11 +77,14 @@ def database_result(operation: str, mode: str = "published-and-verified") -> dic
 
 
 class ClosedBetaGelTest(unittest.TestCase):
-    def test_staging_writers_share_exact_group_and_database_uses_fresh_empty_v2(self) -> None:
+    def test_staging_operations_share_exact_group_and_database_uses_fresh_empty_v3(self) -> None:
         workflow_paths = (
             ".github/workflows/closed-beta-demo-storage.yml",
             ".github/workflows/closed-beta-demo-catalog.yml",
             ".github/workflows/closed-beta-staging-database.yml",
+            ".github/workflows/closed-beta-staging-database-backup.yml",
+            ".github/workflows/closed-beta-staging-fixture-archive.yml",
+            ".github/workflows/closed-beta-staging-auth.yml",
         )
         for workflow_path in workflow_paths:
             workflow = (REPOSITORY_ROOT / workflow_path).read_text(encoding="utf-8")
@@ -97,10 +100,14 @@ class ClosedBetaGelTest(unittest.TestCase):
             REPOSITORY_ROOT / "tools" / "closed-beta-staging-database.py"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'FRESH_EMPTY_PROOF_POLICY = "zero-objects-and-types-public-app-private-v2"',
+            'FRESH_EMPTY_PROOF_POLICY = "zero-objects-types-and-managed-catalog-v3"',
             database_runner,
         )
         self.assertIn('"application_type_count": "applicationTypeCount"', database_runner)
+        self.assertIn(
+            '"managed_schema_table_drift_count": "managedSchemaTableDriftCount"',
+            database_runner,
+        )
 
     def common(self, directory: Path, workflow: str, operation: str) -> dict[str, object]:
         self.write_json(
