@@ -1,0 +1,427 @@
+name: Closed-beta staging database backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Validate readiness or create and qualify one encrypted staging backup
+        required: true
+        type: choice
+        options:
+          - readiness
+          - backup
+      expected_sha:
+        description: Exact full lowercase SHA currently selected on main
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run ID for expected_sha
+        required: true
+        type: string
+      capture_confirmation:
+        description: For backup only, type CAPTURE-ENCRYPTED-STAGING-BACKUP
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  # Shared with every closed-beta staging mutation workflow; keep this literal identical.
+  group: closed-beta-demo-staging-operations
+  cancel-in-progress: false
+
+jobs:
+  staging_backup:
+    name: ${{ inputs.operation }} protected staging backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    environment: staging
+    env:
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      CAPTURE_CONFIRMATION: ${{ inputs.capture_confirmation }}
+      KWABOR_ENVIRONMENT: ${{ vars.KWABOR_ENVIRONMENT }}
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+      # Deliberately absent today. Keep false/unset until the runbook's external gates are met.
+      KWABOR_STAGING_BACKUP_LIVE_ENABLED: ${{ vars.KWABOR_STAGING_BACKUP_LIVE_ENABLED }}
+      KWABOR_STAGING_BACKUP_AGE_RECIPIENT: ${{ vars.KWABOR_STAGING_BACKUP_AGE_RECIPIENT }}
+      KWABOR_STAGING_BACKUP_OFFSITE_RETENTION_DAYS: ${{ vars.KWABOR_STAGING_BACKUP_OFFSITE_RETENTION_DAYS }}
+      KWABOR_STAGING_BACKUP_MAX_RPO_SECONDS: ${{ vars.KWABOR_STAGING_BACKUP_MAX_RPO_SECONDS }}
+      KWABOR_STAGING_BACKUP_MAX_RTO_SECONDS: ${{ vars.KWABOR_STAGING_BACKUP_MAX_RTO_SECONDS }}
+      KWABOR_STAGING_BACKUP_VAULT_REPOSITORY: ${{ vars.KWABOR_STAGING_BACKUP_VAULT_REPOSITORY }}
+      KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_ID: ${{ vars.KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_ID }}
+      KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_TAG: ${{ vars.KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_TAG }}
+      KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_ID: ${{ vars.KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_ID }}
+      KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_SHA256: ${{ vars.KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_SHA256 }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify backup producer and pure contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tools/closed-beta-staging-database-backup.py \
+            tools/test_closed_beta_staging_database_backup.py
+          python3 -B -m unittest tools.test_closed_beta_staging_database_backup
+          python3 -B tools/verify-repository-integrity.py
+
+      - name: Fetch immutable authority and escrow evidence
+        shell: bash
+        env:
+          SOURCE_GITHUB_TOKEN: ${{ github.token }}
+          KWABOR_BACKUP_VAULT_TOKEN: ${{ secrets.KWABOR_BACKUP_VAULT_TOKEN }}
+        run: |
+          set -euo pipefail
+          api_version=2026-03-10
+          source_repository_json="$RUNNER_TEMP/kwabor-source-repository.json"
+          ci_run_json="$RUNNER_TEMP/kwabor-validated-ci-run.json"
+          environment_json="$RUNNER_TEMP/kwabor-staging-environment.json"
+          vault_repository_json="$RUNNER_TEMP/kwabor-backup-vault-repository.json"
+          vault_immutable_json="$RUNNER_TEMP/kwabor-backup-vault-immutable.json"
+          escrow_release_json="$RUNNER_TEMP/kwabor-backup-escrow-release.json"
+          escrow_asset_json="$RUNNER_TEMP/kwabor-backup-escrow-asset.json"
+          escrow_receipt_json="$RUNNER_TEMP/kwabor-age-key-escrow.json"
+
+          fetch_json() {
+            local token="$1"
+            local endpoint="$2"
+            local destination="$3"
+            local temporary="${destination}.tmp"
+            if [[ -n "$token" ]] && curl --fail --silent --show-error --location \
+              --connect-timeout 15 --max-time 120 \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $token" \
+              --header "X-GitHub-Api-Version: $api_version" \
+              "https://api.github.com$endpoint" --output "$temporary" 2>/dev/null; then
+              mv "$temporary" "$destination"
+            else
+              rm -f "$temporary"
+              printf '{"fetchStatus":"failed"}\n' > "$destination"
+            fi
+          }
+
+          fetch_asset() {
+            local token="$1"
+            local repository="$2"
+            local asset_id="$3"
+            local destination="$4"
+            local temporary="${destination}.tmp"
+            if [[ -n "$token" && "$asset_id" =~ ^[1-9][0-9]*$ ]] && \
+              curl --fail --silent --show-error --location \
+                --connect-timeout 15 --max-time 120 \
+                --header 'Accept: application/octet-stream' \
+                --header "Authorization: Bearer $token" \
+                --header "X-GitHub-Api-Version: $api_version" \
+                "https://api.github.com/repos/$repository/releases/assets/$asset_id" \
+                --output "$temporary" 2>/dev/null && \
+              [[ -s "$temporary" && "$(stat --format='%s' "$temporary")" -le 1048576 ]]; then
+              mv "$temporary" "$destination"
+            else
+              rm -f "$temporary"
+              printf '{"fetchStatus":"failed"}\n' > "$destination"
+            fi
+          }
+
+          fetch_json "$SOURCE_GITHUB_TOKEN" "/repos/$GITHUB_REPOSITORY" "$source_repository_json"
+          if [[ "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            fetch_json "$SOURCE_GITHUB_TOKEN" \
+              "/repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" "$ci_run_json"
+          else
+            printf '{"fetchStatus":"invalid-identifier"}\n' > "$ci_run_json"
+          fi
+          fetch_json "$SOURCE_GITHUB_TOKEN" \
+            "/repos/$GITHUB_REPOSITORY/environments/staging" "$environment_json"
+
+          fetch_json "$KWABOR_BACKUP_VAULT_TOKEN" \
+            "/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY" "$vault_repository_json"
+          fetch_json "$KWABOR_BACKUP_VAULT_TOKEN" \
+            "/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/immutable-releases" "$vault_immutable_json"
+          if [[ "$KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_ID" =~ ^[1-9][0-9]*$ ]]; then
+            fetch_json "$KWABOR_BACKUP_VAULT_TOKEN" \
+              "/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/$KWABOR_STAGING_BACKUP_KEY_ESCROW_RELEASE_ID" \
+              "$escrow_release_json"
+          else
+            printf '{"fetchStatus":"invalid-identifier"}\n' > "$escrow_release_json"
+          fi
+          if [[ "$KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_ID" =~ ^[1-9][0-9]*$ ]]; then
+            fetch_json "$KWABOR_BACKUP_VAULT_TOKEN" \
+              "/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/assets/$KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_ID" \
+              "$escrow_asset_json"
+          else
+            printf '{"fetchStatus":"invalid-identifier"}\n' > "$escrow_asset_json"
+          fi
+          fetch_asset "$KWABOR_BACKUP_VAULT_TOKEN" \
+            "$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY" \
+            "$KWABOR_STAGING_BACKUP_KEY_ESCROW_ASSET_ID" "$escrow_receipt_json"
+
+          {
+            echo "KWABOR_SOURCE_REPOSITORY_JSON=$source_repository_json"
+            echo "KWABOR_VALIDATED_CI_RUN_JSON=$ci_run_json"
+            echo "KWABOR_STAGING_ENVIRONMENT_JSON=$environment_json"
+            echo "KWABOR_BACKUP_VAULT_REPOSITORY_JSON=$vault_repository_json"
+            echo "KWABOR_BACKUP_VAULT_IMMUTABLE_JSON=$vault_immutable_json"
+            echo "KWABOR_BACKUP_ESCROW_RELEASE_JSON=$escrow_release_json"
+            echo "KWABOR_BACKUP_ESCROW_ASSET_JSON=$escrow_asset_json"
+            echo "KWABOR_BACKUP_ESCROW_RECEIPT_JSON=$escrow_receipt_json"
+          } >> "$GITHUB_ENV"
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: 2.111.0
+          github-token: ${{ github.token }}
+
+      - name: Install restore prerequisites on the GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends age postgresql-client
+
+      - name: Enforce fail-closed backup preflight
+        shell: bash
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+          KWABOR_STAGING_BACKUP_AGE_IDENTITY: ${{ secrets.KWABOR_STAGING_BACKUP_AGE_IDENTITY }}
+          KWABOR_BACKUP_VAULT_TOKEN: ${{ secrets.KWABOR_BACKUP_VAULT_TOKEN }}
+        run: |
+          set -euo pipefail
+          evidence_directory="$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+          mkdir -p "$evidence_directory"
+          python3 -B tools/closed-beta-staging-database-backup.py preflight \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --capture-confirmation "$CAPTURE_CONFIRMATION" \
+            --head-sha "$(git rev-parse HEAD)" \
+            --github-repository "$GITHUB_REPOSITORY" \
+            --github-event-name "$GITHUB_EVENT_NAME" \
+            --github-ref "$GITHUB_REF" \
+            --github-sha "$GITHUB_SHA" \
+            --github-run-id "$GITHUB_RUN_ID" \
+            --github-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --github-workflow-ref "$GITHUB_WORKFLOW_REF" \
+            --source-repository-json "$KWABOR_SOURCE_REPOSITORY_JSON" \
+            --ci-run-json "$KWABOR_VALIDATED_CI_RUN_JSON" \
+            --environment-json "$KWABOR_STAGING_ENVIRONMENT_JSON" \
+            --vault-repository-json "$KWABOR_BACKUP_VAULT_REPOSITORY_JSON" \
+            --vault-immutable-json "$KWABOR_BACKUP_VAULT_IMMUTABLE_JSON" \
+            --escrow-release-json "$KWABOR_BACKUP_ESCROW_RELEASE_JSON" \
+            --escrow-asset-json "$KWABOR_BACKUP_ESCROW_ASSET_JSON" \
+            --escrow-receipt-json "$KWABOR_BACKUP_ESCROW_RECEIPT_JSON" \
+            --evidence-directory "$evidence_directory"
+
+      - name: Capture, encrypt, and prove a disposable restore
+        if: inputs.operation == 'backup'
+        shell: bash
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+          KWABOR_STAGING_BACKUP_AGE_IDENTITY: ${{ secrets.KWABOR_STAGING_BACKUP_AGE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-database-backup.py capture \
+            --expected-sha "$EXPECTED_SHA" \
+            --workspace "$GITHUB_WORKSPACE" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+
+      - name: Publish ciphertext and restore evidence to the immutable off-site vault
+        id: vault_publish
+        if: inputs.operation == 'backup'
+        shell: bash
+        env:
+          KWABOR_BACKUP_VAULT_TOKEN: ${{ secrets.KWABOR_BACKUP_VAULT_TOKEN }}
+        run: |
+          set -euo pipefail
+          api_version=2026-03-10
+          evidence_directory="$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+          release_tag="kwabor-staging-backup-${EXPECTED_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          release_name="Kwabor staging backup ${EXPECTED_SHA} run ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
+          release_payload="$RUNNER_TEMP/kwabor-vault-release-payload.json"
+          draft_release="$RUNNER_TEMP/kwabor-vault-draft-release.json"
+          vault_release="$RUNNER_TEMP/kwabor-vault-release.json"
+          default_branch="$(jq --raw-output '.default_branch // empty' "$KWABOR_BACKUP_VAULT_REPOSITORY_JSON")"
+          [[ -n "$default_branch" ]]
+          jq --null-input \
+            --arg tag "$release_tag" \
+            --arg target "$default_branch" \
+            --arg name "$release_name" \
+            '{tag_name:$tag,target_commitish:$target,name:$name,body:"Encrypted Kwabor B6.02 staging backup; see attached public manifest.",draft:true,prerelease:false}' \
+            > "$release_payload"
+          curl --fail --silent --show-error \
+            --connect-timeout 15 --max-time 120 \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+            --header "X-GitHub-Api-Version: $api_version" \
+            --header 'Content-Type: application/json' \
+            "https://api.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases" \
+            --data-binary "@$release_payload" --output "$draft_release"
+          release_id="$(jq --raw-output '.id // empty' "$draft_release")"
+          [[ "$release_id" =~ ^[1-9][0-9]*$ ]]
+
+          upload_asset() {
+            local source="$1"
+            local content_type="$2"
+            local destination="$3"
+            local asset_name
+            local encoded_name
+            asset_name="$(basename "$source")"
+            encoded_name="$(jq --null-input --raw-output --arg value "$asset_name" '$value|@uri')"
+            curl --fail --silent --show-error \
+              --connect-timeout 15 --max-time 1800 \
+              --request POST \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+              --header "X-GitHub-Api-Version: $api_version" \
+              --header "Content-Type: $content_type" \
+              "https://uploads.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/$release_id/assets?name=$encoded_name" \
+              --data-binary "@$source" --output "$destination"
+          }
+
+          bundle_path="$(find "$evidence_directory" -maxdepth 1 -type f -name '*.tar.gz.age')"
+          [[ -n "$bundle_path" && "$(printf '%s\n' "$bundle_path" | wc -l)" -eq 1 ]]
+          bundle_asset="$RUNNER_TEMP/kwabor-vault-bundle-asset-upload.json"
+          manifest_asset="$RUNNER_TEMP/kwabor-vault-manifest-asset-upload.json"
+          manifest_hash_asset="$RUNNER_TEMP/kwabor-vault-manifest-hash-asset-upload.json"
+          upload_asset "$bundle_path" application/octet-stream "$bundle_asset"
+          upload_asset "$evidence_directory/VAULT-G5-STAGING-DATABASE-BACKUP.json" \
+            application/json "$manifest_asset"
+          upload_asset "$evidence_directory/VAULT-G5-STAGING-DATABASE-BACKUP.json.sha256" \
+            text/plain "$manifest_hash_asset"
+
+          curl --fail --silent --show-error \
+            --connect-timeout 15 --max-time 120 \
+            --request PATCH \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+            --header "X-GitHub-Api-Version: $api_version" \
+            --header 'Content-Type: application/json' \
+            "https://api.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/$release_id" \
+            --data-binary '{"draft":false}' --output "$vault_release"
+
+          immutable=false
+          for _ in $(seq 1 12); do
+            curl --fail --silent --show-error \
+              --connect-timeout 15 --max-time 120 \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+              --header "X-GitHub-Api-Version: $api_version" \
+              "https://api.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/$release_id" \
+              --output "$vault_release"
+            immutable="$(jq --raw-output '.immutable // false' "$vault_release")"
+            [[ "$immutable" == true ]] && break
+            sleep 5
+          done
+          [[ "$immutable" == true ]]
+
+          refetch_asset() {
+            local upload_document="$1"
+            local destination="$2"
+            local asset_id
+            asset_id="$(jq --raw-output '.id // empty' "$upload_document")"
+            [[ "$asset_id" =~ ^[1-9][0-9]*$ ]]
+            curl --fail --silent --show-error \
+              --connect-timeout 15 --max-time 120 \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+              --header "X-GitHub-Api-Version: $api_version" \
+              "https://api.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/assets/$asset_id" \
+              --output "$destination"
+          }
+
+          final_bundle_asset="$RUNNER_TEMP/kwabor-vault-bundle-asset.json"
+          final_manifest_asset="$RUNNER_TEMP/kwabor-vault-manifest-asset.json"
+          final_manifest_hash_asset="$RUNNER_TEMP/kwabor-vault-manifest-hash-asset.json"
+          refetch_asset "$bundle_asset" "$final_bundle_asset"
+          refetch_asset "$manifest_asset" "$final_manifest_asset"
+          refetch_asset "$manifest_hash_asset" "$final_manifest_hash_asset"
+          bundle_asset_id="$(jq --raw-output '.id' "$final_bundle_asset")"
+          redownload="$RUNNER_TEMP/kwabor-vault-redownload.age"
+          curl --fail --silent --show-error --location \
+            --connect-timeout 15 --max-time 1800 \
+            --header 'Accept: application/octet-stream' \
+            --header "Authorization: Bearer $KWABOR_BACKUP_VAULT_TOKEN" \
+            --header "X-GitHub-Api-Version: $api_version" \
+            "https://api.github.com/repos/$KWABOR_STAGING_BACKUP_VAULT_REPOSITORY/releases/assets/$bundle_asset_id" \
+            --output "$redownload"
+
+          {
+            echo "KWABOR_VAULT_RELEASE_JSON=$vault_release"
+            echo "KWABOR_VAULT_BUNDLE_ASSET_JSON=$final_bundle_asset"
+            echo "KWABOR_VAULT_MANIFEST_ASSET_JSON=$final_manifest_asset"
+            echo "KWABOR_VAULT_MANIFEST_HASH_ASSET_JSON=$final_manifest_hash_asset"
+            echo "KWABOR_VAULT_REDOWNLOAD=$redownload"
+          } >> "$GITHUB_ENV"
+
+      - name: Record a failed off-site publication without claiming restorability
+        if: ${{ failure() && inputs.operation == 'backup' && steps.vault_publish.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-database-backup.py failure \
+            --expected-sha "$EXPECTED_SHA" \
+            --error-code OFFSITE_PUBLICATION_FAILED \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+
+      - name: Finalize the restorable GEL receipt
+        if: inputs.operation == 'backup'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-database-backup.py finalize \
+            --expected-sha "$EXPECTED_SHA" \
+            --vault-release-json "$KWABOR_VAULT_RELEASE_JSON" \
+            --vault-bundle-asset-json "$KWABOR_VAULT_BUNDLE_ASSET_JSON" \
+            --vault-manifest-asset-json "$KWABOR_VAULT_MANIFEST_ASSET_JSON" \
+            --vault-manifest-hash-asset-json "$KWABOR_VAULT_MANIFEST_HASH_ASSET_JSON" \
+            --vault-redownload-path "$KWABOR_VAULT_REDOWNLOAD" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+
+      - name: Upload qualified short-lived GEL evidence
+        id: qualified_artifact
+        if: inputs.operation == 'backup' && success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-gel-g5-staging-database-backup-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/closed-beta-staging-database-backup-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record immutable Actions evidence identity
+        if: inputs.operation == 'backup' && success()
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.qualified_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.qualified_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.qualified_artifact.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          {
+            echo '### B6.02 qualified evidence (short-lived)'
+            echo
+            echo "- Artifact ID: $ARTIFACT_ID"
+            echo "- Artifact digest (SHA-256): $ARTIFACT_DIGEST"
+            echo "- Artifact URL: $ARTIFACT_URL"
+            echo '- Durable backup: the separately validated immutable vault release referenced by the GEL.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload non-qualifying diagnostic evidence
+        if: ${{ always() && !(inputs.operation == 'backup' && success()) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-staging-database-backup-diagnostic-${{ inputs.operation }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/closed-beta-staging-database-backup-evidence
+          if-no-files-found: warn
+          retention-days: 30
