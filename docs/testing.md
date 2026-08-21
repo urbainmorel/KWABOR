@@ -5,10 +5,11 @@
 ## Stratégie rapide sans baisse de qualité
 
 Le cycle de développement commence par les contrôles directement liés aux fichiers modifiés :
-compilation de la cible, tests de la feature, Detekt du module et pgTAP du contrat concerné. Les
-commandes Gradle compatibles sont regroupées dans une seule invocation afin de réutiliser le daemon,
-le graphe configuré et le cache. Une gate globale n’est relancée localement qu’après stabilisation du
-lot, pas après chaque petite correction.
+compilation de la cible, tests de la feature et Detekt du module. Le contrat pgTAP concerné est ensuite
+validé dans GitHub Actions, car son exécution dépend de Docker. Les commandes Gradle compatibles sont
+regroupées dans une seule invocation afin de réutiliser le daemon, le graphe configuré et le cache.
+Une gate globale n’est relancée localement qu’après stabilisation du lot, pas après chaque petite
+correction.
 
 Le workflow GitHub répartit ensuite les preuves longues entre des workers indépendants : intégrité
 dépôt/médias, Gradle, Edge Function, base Supabase complète et préparation iOS. Les configurations
@@ -18,9 +19,11 @@ parallèle. Les checks protégés `quality`, `iOS simulator build` et
 succès du commit exact sur GitHub. La concurrence annule uniquement les anciens runs d’une même PR,
 jamais un run de `main`.
 
-En cas d’échec hébergé, ne relancer localement que la frontière en cause avant de republier : test
-Kotlin ciblé, fichier pgTAP, configuration Xcode concernée ou vérificateur média. Cette discipline
-évite les matrices locales répétées tout en conservant une preuve finale Android/iOS/Supabase.
+En cas d’échec hébergé, ne relancer localement que les contrôles sans Docker de la frontière en cause,
+par exemple un test Kotlin ciblé, une configuration Xcode ou un vérificateur média. Un fichier pgTAP,
+un harnais PostgreSQL ou un advisor Supabase reste validé par le job GitHub Actions correspondant.
+Cette discipline évite les matrices locales répétées tout en conservant une preuve finale
+Android/iOS/Supabase.
 
 ## Gate locale principale
 
@@ -118,24 +121,31 @@ exige le job `macos-15`, Xcode, les tests Swift et, avant release, un parcours s
 
 ## Supabase et PostgreSQL
 
-Avec Docker et Supabase CLI disponibles :
+Toute tâche Supabase qui dépend de Docker s'exécute exclusivement dans le job `supabase_database` du
+workflow GitHub Actions `CI`. Après publication de la branche, le workflow peut aussi être déclenché
+manuellement :
 
 ```powershell
-supabase db start
-supabase test db
-python -B tools/test-event-details-concurrency.py
-python -B tools/test-search-history-concurrency.py
-python -B tools/test-favorites-concurrency.py
+gh workflow run CI --ref <branche>
 ```
 
-Une modification de migration/RLS doit aussi passer un reset isolé et le lint Supabase adaptés au
-lot. Ne jamais utiliser un reset destructif sur staging ou production. Les harnais de concurrence
-événement, historique et favoris sont séparés de la suite pgTAP standard et exigent la stack locale
-attendue.
+Le runner jetable exécute `supabase db start` sur une base propre, applique les migrations et le seed,
+puis lance le lint, la suite pgTAP, les advisors et les harnais de concurrence événement, historique
+et favoris. Le job ne lie aucun projet hébergé. Une modification de migration ou RLS doit faire passer
+ce job sur son SHA exact.
 
-Sur ce poste Windows, les tâches qui nécessitent Docker sont déléguées à GitHub Actions. La preuve
-EXPLORE-002B2A exige un démarrage propre depuis toutes les migrations, la suite pgTAP, le lint, les
-advisors et les autres gates protégées sur le SHA exact de la PR.
+### Deux frontières de preuve
+
+- La preuve CI éphémère qualifie les migrations, contrats SQL et harnais versionnés du dépôt sur le
+  SHA testé. Elle ne qualifie aucun projet `development`, `staging` ou `production`.
+- La preuve distante qualifie un projet hébergé explicitement ciblé. Elle s'exécute depuis un
+  environnement GitHub protégé ou par un opérateur approuvé, après sauvegarde vérifiée, avec une
+  migration non destructive, puis des sorties archivées de l'historique de migrations, du lint, des
+  advisors, des ACL/RLS négatives et des smoke tests lecture/admin à données synthétiques.
+
+Aucune base persistante `development`, `staging` ou `production` ne doit être remise à zéro pour
+obtenir une preuve. EXPLORE-002B2A exige la preuve CI complète et, avant livraison sur un tier, la
+preuve distante séparée sur ce tier.
 
 ### Classement catalogue EXPLORE-002B2A
 
@@ -212,7 +222,7 @@ la qualification release sur appareil doit encore confirmer le comportement du f
 La CI Supabase doit en plus exécuter `set_listing_like_v1_test.sql` et le harnais de concurrence
 Favoris. Sont exigés : setter d'état idempotent, retrait après dépublication, wrappers v2 liés au
 compte JWT, ACL/RLS négatives, écriture directe protégée par le même verrou et absence de résurrection
-pendant une suppression de compte. Docker reste délégué à GitHub sur ce poste.
+pendant une suppression de compte. Docker reste exclusivement délégué à GitHub Actions.
 
 ## Recherche catalogue SEARCH-001A
 
@@ -222,18 +232,14 @@ et deux UI natives. Les validations doivent couvrir ces quatre frontières ; un 
 
 ### Contrat serveur
 
-Sur une stack Supabase locale jetable, reconstruire la base depuis toutes les migrations puis lancer
-la suite pgTAP complète :
+Publier la branche puis déclencher la base Supabase éphémère de la CI :
 
 ```powershell
-supabase db start
-supabase db reset --local --yes
-supabase test db
-supabase db lint --local --level warning
+gh workflow run CI --ref <branche>
 ```
 
-Le reset est destructif pour la base locale ciblée : vérifier le projet et les ports avant de
-l’exécuter, et ne jamais appliquer ce protocole à staging ou production. Le fichier
+Le job `supabase_database` démarre une base jetable avec `supabase db start`, puis exécute la suite
+pgTAP complète et le lint sur le SHA publié. Cette preuve ne cible aucun projet hébergé. Le fichier
 `supabase/tests/search_catalog_summaries_v1_test.sql` doit notamment prouver :
 
 - la signature stable, `security invoker`, le `search_path` fixé, les grants `anon`/`authenticated`
@@ -303,14 +309,15 @@ invités, l’import explicite et les signaux consentis pour l’Assistant IA et
 
 ## Edge Function `account-delete`
 
-SEC-001F utilise la porte ciblée suivante depuis la racine du dépôt avant toute validation hébergée :
+SEC-001F utilise les contrôles locaux sans Docker suivants depuis la racine du dépôt :
 
 ```powershell
 .\gradlew.bat :shared:testAndroidHostTest --tests "*AccountDeletion*" --console=plain
 .\gradlew.bat :shared:compileTestKotlinIosX64 --console=plain
-supabase db reset --local --yes
-supabase test db
 ```
+
+Les migrations et pgTAP correspondants sont validés séparément dans `supabase_database`, via une PR
+ou `gh workflow run CI --ref <branche>`.
 
 Depuis `supabase/functions/account-delete`, utiliser la même version Deno que la CI :
 
@@ -320,10 +327,9 @@ npx -y deno@2.9.4 check --config deno.json index.ts
 npx -y deno@2.9.4 test --config deno.json core_test.ts identity_test.ts
 ```
 
-La preuve locale du 3 août 2026 est verte : tests Kotlin ciblés Android, compilation des tests
-Kotlin/Native iOS X64, format/check Deno, 20/20 tests Edge, reset complet, lint
-`public`/`app_private` et 753 assertions pgTAP. Ce total est un instantané, pas une valeur à figer dans
-un script.
+Le run GitHub Actions exact constitue la preuve des tests Edge, du lint `public`/`app_private` et de
+pgTAP. Les totaux d'assertions sont des instantanés et ne doivent pas être figés dans un script ou
+dans cette documentation.
 
 Les tests de suppression doivent continuer à prouver cumulativement :
 
@@ -343,9 +349,10 @@ Les tests de suppression doivent continuer à prouver cumulativement :
 - après suppression Auth, nettoyage final et clôture directe ou par la réconciliation serveur
   idempotente.
 
-Ces tests locaux ne prouvent pas les AMR réellement émises par email, Google ou Apple sur staging,
-ni la politique de rétention/expurgation des en-têtes d'invocation ou des Log Drains. Ces deux preuves
-restent des gates hébergées avant activation de `account-delete`.
+Ces contrôles de code et tests CI éphémères ne prouvent pas les AMR réellement émises par email,
+Google ou Apple sur staging, ni la politique de rétention/expurgation des en-têtes d'invocation ou
+des Log Drains. Ces deux preuves restent des gates hébergées, protégées et non destructives avant
+activation de `account-delete`.
 
 ## Intégrité, marque et média
 

@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, develop]
@@ -135,19 +136,25 @@ jobs:
           python3 -B -m py_compile \
             tools/build-demo-catalog-contact-sheets.py \
             tools/build-demo-catalog-manifest.py \
+            tools/closed-beta-gel.py \
+            tools/closed-beta-staging-database.py \
             tools/compile-demo-catalog-seed.py \
             tools/ios-closed-beta-release.py \
             tools/prepare_android_release_bundle.py \
             tools/publish-demo-catalog-storage.py \
             tools/run-demo-catalog-database.py \
+            tools/validate-closed-beta-pilot-evidence.py \
             tools/verify-demo-catalog.py
           python3 -B -m unittest \
             tools.test_compile_demo_catalog_seed \
             tools.test_android_release_workflow \
+            tools.test_closed_beta_gel \
+            tools.test_closed_beta_staging_database \
             tools.test_ios_closed_beta_release \
             tools.test_prepare_android_release_bundle \
             tools.test_publish_demo_catalog_storage \
-            tools.test_run_demo_catalog_database
+            tools.test_run_demo_catalog_database \
+            tools.test_validate_closed_beta_pilot_evidence
           python3 -B tools/verify-demo-catalog.py --require-media
           python3 -B tools/build-demo-catalog-manifest.py --check
           python3 -B tools/compile-demo-catalog-seed.py --check
@@ -200,7 +207,8 @@ jobs:
           deno test core_test.ts identity_test.ts
 
   supabase_database:
-    name: Supabase database
+    # Docker-backed and disposable: this job never links to a hosted Supabase project.
+    name: Supabase database (ephemeral CI)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -211,7 +219,7 @@ jobs:
           version: 2.111.0
           github-token: ${{ github.token }}
 
-      - name: Start and validate Supabase
+      - name: Start and validate ephemeral Supabase
         run: |
           supabase db start
           supabase db lint --local --schema public,app_private --level warning --fail-on warning
