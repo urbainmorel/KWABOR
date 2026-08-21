@@ -7,10 +7,10 @@ import com.kwabor.shared.domain.auth.PromoterActivationResult
 import com.kwabor.shared.domain.auth.SocialSignInRequest
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeCoordinator
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.initialAuthUiState
-import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -58,11 +58,11 @@ class IosAuthController internal constructor(
     internal constructor(
         presenter: AuthPresenter?,
         dispatcherProvider: DispatcherProvider,
-        interactionCoordinator: InteractionCoordinator? = null,
+        purgeCoordinator: AccountPrivateDataPurgeCoordinator? = null,
     ) : this(
         presenter = presenter,
         dispatcherProvider = dispatcherProvider,
-        accountDeletionInteractionLifecycle = IosAccountDeletionInteractionLifecycle(interactionCoordinator),
+        accountDeletionInteractionLifecycle = IosAccountDeletionInteractionLifecycle(purgeCoordinator),
     )
 
     val isConfigured: Boolean get() = presenter != null

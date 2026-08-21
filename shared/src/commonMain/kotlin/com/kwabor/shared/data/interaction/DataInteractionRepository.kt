@@ -151,11 +151,6 @@ class DataInteractionRepository internal constructor(
         rearmedCount
     }
 
-    override suspend fun purge(accountId: String): DomainResult<Int> = runInteractionDataCall {
-        outbox.requireDurableStorage()
-        outbox.purgeAccount(accountId.toCanonicalInteractionUuid("account_id"))
-    }
-
     private suspend fun processOperation(
         operation: InteractionOutboxOperation,
         scope: InteractionAccountScope,

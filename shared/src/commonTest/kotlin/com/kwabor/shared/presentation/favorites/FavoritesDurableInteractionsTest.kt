@@ -24,8 +24,8 @@ import com.kwabor.shared.domain.interaction.InteractionSubmitOutcome
 import com.kwabor.shared.domain.interaction.PendingInteraction
 import com.kwabor.shared.domain.interaction.PendingInteractionStatus
 import com.kwabor.shared.i18n.stringsFor
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
+import com.kwabor.shared.presentation.interaction.commitAccountDeletionBlock
 import com.kwabor.shared.presentation.interaction.InteractionCoordinatorEvent
 import com.kwabor.shared.presentation.interaction.InteractionReconciliationConsumer
 import com.kwabor.shared.presentation.interaction.InteractionReconciliationSignal
@@ -430,6 +430,35 @@ class FavoritesDurableOverflowAccumulatorTest {
 
 class FavoritesDurablePurgeTest {
     @Test
+    fun removalQueuedBeforePurgeCannotSubmitAfterSameScopeResume() = runTest {
+        val interactions = DurableInteractionRepository()
+        val pages = DurableFavoritesRepository(
+            initialFavoriteIds = listOf(FAVORITE_ID, OVERTAKE_FAVORITE_ID),
+        )
+        val harness = durableHarness(pages, interactions)
+        val submitGate = CompletableDeferred<Unit>()
+        val submitStarted = CompletableDeferred<Unit>()
+        interactions.submitGate = submitGate
+        interactions.submitStarted = submitStarted
+
+        harness.runtime.dispatch(FavoritesIntent.RemoveFavorite(FAVORITE_ID))
+        runCurrent()
+        assertTrue(submitStarted.isCompleted)
+        harness.runtime.dispatch(FavoritesIntent.RemoveFavorite(OVERTAKE_FAVORITE_ID))
+        val purge = async { harness.coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
+        runCurrent()
+        assertFalse(purge.isCompleted)
+
+        submitGate.complete(Unit)
+        purge.await()
+        assertTrue(harness.coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A))
+        advanceUntilIdle()
+
+        assertEquals(listOf(FAVORITE_ID), interactions.submittedCommands.map(InteractionCommand::listingId))
+        harness.close()
+    }
+
+    @Test
     fun directSubmitResultCapturedBeforePurgeCannotApplyRemovalAfterSameScopeResumeAndSignalAck() = runTest {
         val tracker = ViewerSessionScopeTracker()
         val viewerScope = tracker.update(ACCOUNT_ID_A, accountSetupComplete = true)
@@ -440,11 +469,7 @@ class FavoritesDurablePurgeTest {
         )
         submitQueuedFavoriteRemoval(coordinator, listingId = FAVORITE_ID)
 
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
+        coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A)
         coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
         coordinator.acknowledgeAllReconciliationConsumers()
         assertEquals(null, coordinator.reconciliationSignals.value)
@@ -474,12 +499,10 @@ class FavoritesDurablePurgeTest {
         runCurrent()
         val refreshCallsBeforePurge = pages.listCalls
 
-        val purge = async { harness.coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purge = async { harness.coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
         assertTrue(purge.isCompleted)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         assertEquals(originalScope, harness.tracker.currentScope)
         interactions.loadPendingFailuresRemaining = 1
         harness.coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
@@ -945,6 +968,8 @@ private class DurableInteractionRepository : InteractionRepository {
     private val drainQueue = ArrayDeque<List<InteractionOperationOutcome>>()
     private var nextOperationId = 0L
     var submitFailure: DomainError? = null
+    var submitGate: CompletableDeferred<Unit>? = null
+    var submitStarted: CompletableDeferred<Unit>? = null
     var loadPendingFailuresRemaining: Int = 0
     var loadPendingGate: CompletableDeferred<Unit>? = null
     var loadPendingStarted: CompletableDeferred<Unit>? = null
@@ -952,8 +977,16 @@ private class DurableInteractionRepository : InteractionRepository {
         private set
     val hydrationRequests = mutableListOf<List<String>>()
     val retryCalls = mutableListOf<Pair<InteractionAccountScope, Boolean>>()
+    val submittedCommands = mutableListOf<InteractionCommand>()
 
     override suspend fun submit(command: InteractionCommand): DomainResult<InteractionSubmitOutcome> {
+        submittedCommands += command
+        submitGate?.also { gate ->
+            submitGate = null
+            submitStarted?.complete(Unit)
+            submitStarted = null
+            gate.await()
+        }
         submitFailure?.let { error -> return DomainResult.Failure(error) }
         val key = command.listingId to command.kind
         val current = pendingByKey[key]
@@ -1009,12 +1042,6 @@ private class DurableInteractionRepository : InteractionRepository {
     ): DomainResult<Int> {
         retryCalls += scope to includeManualFailures
         return DomainResult.Success(0)
-    }
-
-    override suspend fun purge(accountId: String): DomainResult<Int> {
-        val keys = pendingByKey.filterValues { pending -> pending.accountId == accountId }.keys
-        keys.forEach(pendingByKey::remove)
-        return DomainResult.Success(keys.size)
     }
 
     fun putPending(pending: PendingInteraction) {

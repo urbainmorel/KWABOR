@@ -1,9 +1,13 @@
 package com.kwabor.shared.presentation.detail
 
 import com.kwabor.shared.domain.money.MoneyXof
+import kotlinx.coroutines.flow.MutableStateFlow
 
 sealed interface CatalogDetailIntent {
-    data class Open(val listingId: String) : CatalogDetailIntent
+    data class Open(
+        val listingId: String,
+        val openRequestId: CatalogDetailOpenRequestId? = null,
+    ) : CatalogDetailIntent
 
     data object Retry : CatalogDetailIntent
 
@@ -14,29 +18,91 @@ sealed interface CatalogDetailIntent {
     data object ToggleDescription : CatalogDetailIntent
 }
 
+/**
+ * Correlates one logical request to open the catalog detail sheet.
+ *
+ * Runtime-generated requests use even values while caller-correlated requests use odd values. This
+ * prevents a notification ticket from matching content left behind by an unrelated open request.
+ */
+class CatalogDetailOpenRequestId private constructor(
+    val value: Long,
+) {
+    init {
+        require(value > 0L) { "Catalog detail open request id must be positive." }
+    }
+
+    override fun equals(other: Any?): Boolean = other is CatalogDetailOpenRequestId && value == other.value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = "CatalogDetailOpenRequestId(value=$value)"
+
+    companion object {
+        fun correlated(sequence: Long): CatalogDetailOpenRequestId {
+            require(sequence in 1L..MAX_SEQUENCE) { "Catalog detail correlation sequence is out of range." }
+            return CatalogDetailOpenRequestId(sequence * 2L - 1L)
+        }
+
+        internal fun generated(sequence: Long): CatalogDetailOpenRequestId {
+            require(sequence in 1L..MAX_SEQUENCE) { "Catalog detail generated sequence is out of range." }
+            return CatalogDetailOpenRequestId(sequence * 2L)
+        }
+
+        internal const val MAX_SEQUENCE: Long = Long.MAX_VALUE / 2L
+    }
+}
+
+internal class CatalogDetailOpenRequestIdGenerator(
+    initialSequence: Long = 0L,
+) {
+    private val sequence = MutableStateFlow(initialSequence)
+
+    init {
+        require(initialSequence in 0L..CatalogDetailOpenRequestId.MAX_SEQUENCE) {
+            "Catalog detail generated sequence is out of range."
+        }
+    }
+
+    fun next(): CatalogDetailOpenRequestId? {
+        while (true) {
+            val current = sequence.value
+            if (current == CatalogDetailOpenRequestId.MAX_SEQUENCE) return null
+            val next = current + 1L
+            if (sequence.compareAndSet(current, next)) return CatalogDetailOpenRequestId.generated(next)
+        }
+    }
+}
+
 sealed interface CatalogDetailUiState {
     data object Closed : CatalogDetailUiState
 
-    data class Loading(val listingId: String) : CatalogDetailUiState
+    data class Loading(
+        val listingId: String,
+        val openRequestId: CatalogDetailOpenRequestId,
+    ) : CatalogDetailUiState
 
     data class Content(
         val model: CatalogDetailUiModel,
+        val openRequestId: CatalogDetailOpenRequestId,
         val selectedMediaIndex: Int,
         val isDescriptionExpanded: Boolean = false,
     ) : CatalogDetailUiState
 
     data class NotFound(
         val listingId: String,
+        val openRequestId: CatalogDetailOpenRequestId,
         val message: String,
     ) : CatalogDetailUiState
 
     data class OfflineFailure(
         val listingId: String,
+        val openRequestId: CatalogDetailOpenRequestId,
         val message: String,
     ) : CatalogDetailUiState
 
     data class Failure(
         val listingId: String,
+        val openRequestId: CatalogDetailOpenRequestId,
         val message: String,
     ) : CatalogDetailUiState
 }

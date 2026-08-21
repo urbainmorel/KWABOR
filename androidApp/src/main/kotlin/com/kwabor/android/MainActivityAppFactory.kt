@@ -25,8 +25,6 @@ import com.kwabor.android.presentation.onboarding.OnboardingViewModel
 import com.kwabor.android.presentation.search.SearchViewModel
 import com.kwabor.shared.app.DispatcherProvider
 import com.kwabor.shared.app.KwaborCompositionRoot
-import com.kwabor.shared.domain.core.DomainError
-import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
@@ -77,12 +75,18 @@ internal class MainActivityAppFactory(
         accountDeletionPurgeRegistry = applicationState.accountDeletionPurgeRegistry,
         track = applicationState.observability::track,
         revokeObservabilityConsent = applicationState.observability::revokeAllConsent,
-        purgeInteractionsForAccountDeletion = { accountId ->
-            compositionRoot.interactionCoordinator?.purgeForAccountDeletion(accountId)
-                ?: DomainResult.Failure(DomainError.LocalStorageUnavailable())
+        purgePrivateDataForAccountDeletion = { accountId ->
+            checkNotNull(compositionRoot.accountPrivateDataPurgeCoordinator) {
+                "Account private-data purge is unavailable."
+            }.purgeForAccountDeletion(accountId)
         },
-        resumeInteractionsAfterAccountDeletionFailure = { accountId ->
-            compositionRoot.interactionCoordinator?.resumeAfterAccountDeletionFailure(accountId)
+        resumePrivateDataAfterAccountDeletionFailure = { ownership ->
+            compositionRoot.accountPrivateDataPurgeCoordinator
+                ?.resumeAfterAccountDeletionFailure(ownership) == true
+        },
+        retainPrivateDataBlockAfterAccountDeletion = { ownership ->
+            compositionRoot.accountPrivateDataPurgeCoordinator
+                ?.retainBlockAfterAccountDeletion(ownership) == true
         },
     )
 

@@ -6,6 +6,7 @@ import com.kwabor.shared.domain.catalog.nearestCity
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
+import com.kwabor.shared.presentation.interaction.InteractionQueuedCommandFence
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -103,6 +104,7 @@ sealed interface ExploreEffect {
 private data class QueuedExploreIntent(
     val intent: ExploreIntent,
     val sourceScope: ViewerSessionScope?,
+    val interactionFence: InteractionQueuedCommandFence,
 )
 
 class ExploreRuntime(
@@ -178,7 +180,17 @@ class ExploreRuntime(
             is ExploreIntent.ViewerContextChanged,
             -> null
         }
-        intentChannel.trySend(QueuedExploreIntent(intent = intent, sourceScope = sourceScope))
+        val interactionFence = sourceScope
+            ?.toInteractionAccountScopeOrNull()
+            ?.let { scope -> interactionCoordinator?.deliveryCommitGate?.captureQueuedCommandFence(scope) }
+            ?: InteractionQueuedCommandFence.NotRequired
+        intentChannel.trySend(
+            QueuedExploreIntent(
+                intent = intent,
+                sourceScope = sourceScope,
+                interactionFence = interactionFence,
+            ),
+        )
     }
 
     fun close() {
@@ -188,6 +200,23 @@ class ExploreRuntime(
     }
 
     private suspend fun handleIntent(queuedIntent: QueuedExploreIntent) {
+        val captured = queuedIntent.interactionFence as? InteractionQueuedCommandFence.Captured
+        if (captured != null) {
+            val sourceScope = queuedIntent.sourceScope ?: return
+            val interactionScope = sourceScope.toInteractionAccountScopeOrNull() ?: return
+            interactionCoordinator?.deliveryCommitGate?.runIfQueuedCommandFenceCurrent(
+                scope = interactionScope,
+                fence = captured,
+            ) {
+                handleAcceptedIntent(queuedIntent)
+            }
+            return
+        }
+        if (queuedIntent.interactionFence == InteractionQueuedCommandFence.Blocked) return
+        handleAcceptedIntent(queuedIntent)
+    }
+
+    private suspend fun handleAcceptedIntent(queuedIntent: QueuedExploreIntent) {
         val intent = queuedIntent.intent
         when (intent) {
             is ExploreIntent.Feed -> handleFeedIntent(intent, queuedIntent.sourceScope)

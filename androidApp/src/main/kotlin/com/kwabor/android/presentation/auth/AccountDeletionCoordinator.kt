@@ -48,8 +48,8 @@ internal class AccountDeletionCoordinator(
         purgeWorker = AccountDeletionPurgeWorker(
             workerScope = dependencies.accountDeletionWorkerScope,
             registry = dependencies.accountDeletionPurgeRegistry,
-            purge = dependencies.purgeInteractionsForAccountDeletion,
-            resume = dependencies.resumeInteractionsAfterAccountDeletionFailure,
+            purge = dependencies.purgePrivateDataForAccountDeletion,
+            resume = dependencies.resumePrivateDataAfterAccountDeletionFailure,
         ),
         unexpectedErrorMessage = runtime.strings.authFederatedUnavailable,
     )

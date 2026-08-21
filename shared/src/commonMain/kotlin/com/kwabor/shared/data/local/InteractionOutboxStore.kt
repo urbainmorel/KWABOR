@@ -230,11 +230,6 @@ internal class InteractionOutboxStore(
         ) > 0
     }
 
-    suspend fun purgeAccount(accountId: String): Int {
-        accountId.requireCanonicalOutboxUuid("accountId")
-        return dao.purgeAccount(accountId)
-    }
-
     private suspend fun validateOrEvict(entities: List<InteractionOutboxEntity>): List<InteractionOutboxOperation> {
         val operations = ArrayList<InteractionOutboxOperation>(entities.size)
         entities.forEach { entity ->

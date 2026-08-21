@@ -5,9 +5,13 @@ import UIKit
 struct CatalogDetailSheet: View {
     @ObservedObject var store: CatalogDetailStore
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @State private var presentedContact: CatalogDetailContactUiModel?
     @State private var externalActionFailed = false
     @State private var contactExternalActionFailed = false
+    @State private var pendingContentPresentation: CatalogDetailPresentationCandidate?
+    @State private var deliveredContentPresentation: CatalogDetailPresentationCandidate?
+    var onContentPresented: @MainActor (CatalogDetailOpenRequestId, String) -> Void = { _, _ in }
 
     var body: some View {
         GeometryReader { proxy in
@@ -22,8 +26,11 @@ struct CatalogDetailSheet: View {
                         onOpenExternal: openExternal,
                         onContactRequested: { contact in
                             presentedContact = contact
-                        }
+                        },
+                        onPresented: contentPresented,
+                        onDismissed: contentDismissed
                     )
+                    .id("\(content.openRequestId.value):\(content.model.id)")
                 } else if let failure = failureContent(store.state, strings: store.strings.detail) {
                     CatalogDetailFailureState(
                         failure: failure,
@@ -45,6 +52,11 @@ struct CatalogDetailSheet: View {
         .onAppear(perform: announceLatestState)
         .onChange(of: store.announcementRevision) { _, _ in
             announceLatestState()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                deliverPendingContentPresentationIfPossible()
+            }
         }
         .sheet(
             isPresented: Binding(
@@ -87,6 +99,37 @@ struct CatalogDetailSheet: View {
     private func announceLatestState() {
         guard let announcement = store.latestAnnouncement else { return }
         UIAccessibility.post(notification: .announcement, argument: announcement)
+    }
+
+    @MainActor
+    private func contentPresented(_ state: CatalogDetailUiStateContent) {
+        pendingContentPresentation = CatalogDetailPresentationCandidate(
+            openRequestId: state.openRequestId,
+            listingID: state.model.id
+        )
+        deliverPendingContentPresentationIfPossible()
+    }
+
+    @MainActor
+    private func contentDismissed(_ state: CatalogDetailUiStateContent) {
+        let candidate = CatalogDetailPresentationCandidate(
+            openRequestId: state.openRequestId,
+            listingID: state.model.id
+        )
+        if pendingContentPresentation == candidate {
+            pendingContentPresentation = nil
+        }
+    }
+
+    @MainActor
+    private func deliverPendingContentPresentationIfPossible() {
+        guard scenePhase == .active,
+              let candidate = pendingContentPresentation,
+              candidate != deliveredContentPresentation else {
+            return
+        }
+        deliveredContentPresentation = candidate
+        onContentPresented(candidate.openRequestId, candidate.listingID)
     }
 
     @MainActor
@@ -198,6 +241,8 @@ private struct CatalogDetailContentView: View {
     let sheetHeight: CGFloat
     let onOpenExternal: @MainActor (CatalogDetailExternalURLTarget) -> Void
     let onContactRequested: @MainActor (CatalogDetailContactUiModel) -> Void
+    let onPresented: @MainActor (CatalogDetailUiStateContent) -> Void
+    let onDismissed: @MainActor (CatalogDetailUiStateContent) -> Void
 
     private var visibleMedia: [VisibleCatalogDetailMedia] {
         visibleCatalogDetailMedia(state.model.media)
@@ -326,6 +371,8 @@ private struct CatalogDetailContentView: View {
                 )
             }
         }
+        .onAppear { onPresented(state) }
+        .onDisappear { onDismissed(state) }
     }
 
     private var primaryAction: CatalogDetailPrimaryAction? {
@@ -396,6 +443,18 @@ private struct CatalogDetailCloseRow: View {
         .overlay(alignment: .bottom) {
             Divider()
         }
+    }
+}
+
+private struct CatalogDetailPresentationCandidate: Equatable {
+    let openRequestId: CatalogDetailOpenRequestId
+    let listingID: String
+
+    static func == (
+        lhs: CatalogDetailPresentationCandidate,
+        rhs: CatalogDetailPresentationCandidate
+    ) -> Bool {
+        lhs.openRequestId.value == rhs.openRequestId.value && lhs.listingID == rhs.listingID
     }
 }
 

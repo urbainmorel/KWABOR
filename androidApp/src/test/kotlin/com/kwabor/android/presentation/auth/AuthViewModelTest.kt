@@ -11,6 +11,7 @@ import com.kwabor.shared.domain.auth.AccountDeletionOutcome
 import com.kwabor.shared.domain.auth.AccountDeletionPreTransportCancellation
 import com.kwabor.shared.domain.auth.AccountDeletionPreTransportCleanupPendingCancellation
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
+import com.kwabor.shared.domain.auth.AccountPrivateDataPurgeResult
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
@@ -38,13 +39,14 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOwnership
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.PasswordRecoveryStep
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.RegistrationReducer
 import com.kwabor.shared.presentation.auth.RegistrationStep
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -64,7 +66,9 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -553,10 +557,12 @@ class AuthViewModelAccountDeletionSafetyTest {
         assertEquals(listOf(TEST_ACCOUNT_ID), interactions.purgedAccountIds)
         assertEquals(TEST_ACCOUNT_ID, deletion.requests.single().expectedAccountId)
         assertTrue(interactions.resumedAccountIds.isEmpty())
+        assertEquals(listOf(TEST_ACCOUNT_ID), interactions.retainedAccountIds)
+        assertSame(interactions.acquiredOwnerships.single(), interactions.retainedOwnerships.single())
     }
 
     @Test
-    fun accountDeletionStopsBeforeRemoteWhenInteractionPurgeFails() = runTest {
+    fun accountDeletionStopsBeforeRemoteWhenPrivateDataPurgeFails() = runTest {
         val deletion = AccountDeletionProbe()
         val interactions = AccountDeletionInteractionLifecycleProbe(
             purgeResult = DomainResult.Failure(DomainError.LocalStorageUnavailable()),
@@ -571,6 +577,32 @@ class AuthViewModelAccountDeletionSafetyTest {
         assertTrue(interactions.resumedAccountIds.isEmpty())
         assertTrue(deletion.requests.isEmpty())
         assertEquals(0, deletion.generatedKeyCount)
+        assertEquals(
+            strings.settings.privacyPersistenceError,
+            viewModel.accessState.value.accountDeletionErrorMessage,
+        )
+    }
+
+    @Test
+    fun postCommitRecoveryRequiredResumesExactOwnershipAndNeverStartsRemoteDeletion() = runTest {
+        val operations = mutableListOf<String>()
+        val ownership = AccountPrivateDataPurgeOwnership(TEST_ACCOUNT_ID)
+        val deletion = AccountDeletionProbe(operationEvents = operations)
+        val interactions = AccountDeletionInteractionLifecycleProbe(
+            purgeResult = DomainResult.Success(
+                AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired(ownership),
+            ),
+            operationEvents = operations,
+        )
+        val viewModel = createAccountDeletionViewModel(deletion, interactionLifecycle = interactions)
+        advanceUntilIdle()
+
+        viewModel.onIntent(AuthIntent.RequestAccountDeletion)
+        submitPasswordAccountDeletion(viewModel, strings.authDeleteAccountConfirmationPhrase)
+
+        assertEquals(listOf("purge:$TEST_ACCOUNT_ID", "resume:$TEST_ACCOUNT_ID"), operations)
+        assertTrue(deletion.requests.isEmpty())
+        assertEquals(listOf(ownership), interactions.resumedOwnerships)
         assertEquals(
             strings.settings.privacyPersistenceError,
             viewModel.accessState.value.accountDeletionErrorMessage,
@@ -593,6 +625,8 @@ class AuthViewModelAccountDeletionSafetyTest {
             operations,
         )
         assertEquals(listOf(TEST_ACCOUNT_ID), interactions.resumedAccountIds)
+        assertTrue(interactions.retainedAccountIds.isEmpty())
+        assertSame(interactions.acquiredOwnerships.single(), interactions.resumedOwnerships.single())
         assertFalse(viewModel.accessState.value.accountDeletionInProgress)
     }
 
@@ -601,7 +635,7 @@ class AuthViewModelAccountDeletionSafetyTest {
         val operations = mutableListOf<String>()
         val interactions = AccountDeletionInteractionLifecycleProbe(
             subsequentPurgeResult = DomainResult.Success(
-                InteractionAccountDeletionPurgeOutcome.AlreadyBlocked,
+                AccountPrivateDataPurgeOutcome.AlreadyBlocked,
             ),
             operationEvents = operations,
         )
@@ -626,6 +660,8 @@ class AuthViewModelAccountDeletionSafetyTest {
             operations,
         )
         assertTrue(interactions.resumedAccountIds.isEmpty())
+        assertEquals(listOf(TEST_ACCOUNT_ID), interactions.retainedAccountIds)
+        assertSame(interactions.acquiredOwnerships.single(), interactions.retainedOwnerships.single())
         assertTrue(secondDeletion.requests.isEmpty())
         assertEquals(
             strings.authAccountDeletionOutcomeUnknown,
@@ -834,8 +870,9 @@ class AccountDeletionUnexpectedFailureSafetyTest {
                 idempotencyKeyProvider = IdempotencyKeyProvider {
                     throw IllegalStateException("raw pre-boundary detail")
                 },
-                purgeInteractionsForAccountDeletion = interactions::purge,
-                resumeInteractionsAfterAccountDeletionFailure = interactions::resume,
+                purgePrivateDataForAccountDeletion = interactions::purge,
+                resumePrivateDataAfterAccountDeletionFailure = interactions::resume,
+                retainPrivateDataBlockAfterAccountDeletion = interactions::retain,
             ),
         )
         advanceUntilIdle()
@@ -873,6 +910,8 @@ class AccountDeletionUnexpectedFailureSafetyTest {
         assertEquals(1, deletion.requests.size)
         assertTrue(store.pending)
         assertTrue(interactions.resumedAccountIds.isEmpty())
+        assertEquals(listOf(TEST_ACCOUNT_ID), interactions.retainedAccountIds)
+        assertSame(interactions.acquiredOwnerships.single(), interactions.retainedOwnerships.single())
         assertEquals(0, google.clearCredentialStateCallCount)
         assertFalse(viewModel.accessState.value.accountDeletionInProgress)
         assertEquals(AuthSessionRestoreStatus.Failed, viewModel.sessionRestoreStatus.value)
@@ -1235,25 +1274,40 @@ class AccountDeletionPurgeRegistrySafetyTest {
     fun registryRemainsOwnedUntilLateResumeCompletes() = runTest {
         val resumeStarted = CompletableDeferred<Unit>()
         val allowResume = CompletableDeferred<Unit>()
+        val issuedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
+        val resumedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
         val worker = AccountDeletionPurgeWorker(
             workerScope = backgroundScope,
             registry = AccountDeletionPurgeRegistry(),
             purge = {
-                DomainResult.Success(InteractionAccountDeletionPurgeOutcome.Acquired(0))
+                val ownership = AccountPrivateDataPurgeOwnership(TEST_ACCOUNT_ID)
+                issuedOwnerships += ownership
+                DomainResult.Success(
+                    AccountPrivateDataPurgeOutcome.Acquired(
+                        result = emptyAccountPrivateDataPurgeResult(),
+                        ownership = ownership,
+                    ),
+                )
             },
-            resume = {
+            resume = { ownership ->
+                resumedOwnerships += ownership
                 resumeStarted.complete(Unit)
                 allowResume.await()
+                true
             },
         )
 
         val firstHandoff = worker.start(TEST_ACCOUNT_ID)
         runCurrent()
-        assertEquals(AccountDeletionPurgeWorkerResult.Acquired, firstHandoff.awaitResult())
-        assertTrue(firstHandoff.abandon())
-        worker.resumeAbandonedAcquisition(TEST_ACCOUNT_ID, firstHandoff)
+        val firstResult = assertIs<AccountDeletionPurgeWorkerResult.Acquired>(firstHandoff.awaitResult())
+        val abandonedOwnership = firstHandoff.abandon()
+        assertSame(firstResult.ownership, abandonedOwnership)
+        assertNull(firstHandoff.abandon())
+        worker.resumeAbandonedAcquisition(requireNotNull(abandonedOwnership), firstHandoff)
         runCurrent()
         assertTrue(resumeStarted.isCompleted)
+        assertEquals(1, resumedOwnerships.size)
+        assertSame(firstResult.ownership, resumedOwnerships.single())
 
         val blockedHandoff = worker.start(TEST_ACCOUNT_ID)
         assertEquals(AccountDeletionPurgeWorkerResult.AlreadyBlocked, blockedHandoff.awaitResult())
@@ -1262,7 +1316,9 @@ class AccountDeletionPurgeRegistrySafetyTest {
         runCurrent()
         val nextHandoff = worker.start(TEST_ACCOUNT_ID)
         runCurrent()
-        assertEquals(AccountDeletionPurgeWorkerResult.Acquired, nextHandoff.awaitResult())
+        val nextResult = assertIs<AccountDeletionPurgeWorkerResult.Acquired>(nextHandoff.awaitResult())
+        assertSame(issuedOwnerships.last(), nextResult.ownership)
+        assertFalse(firstResult.ownership === nextResult.ownership)
         assertTrue(nextHandoff.claimAcquisition())
     }
 }
@@ -1307,6 +1363,8 @@ class AccountDeletionRemoteCancellationSafetyTest {
             operations,
         )
         assertTrue(interactions.resumedAccountIds.isEmpty())
+        assertEquals(listOf(TEST_ACCOUNT_ID), interactions.retainedAccountIds)
+        assertSame(interactions.acquiredOwnerships.single(), interactions.retainedOwnerships.single())
         assertTrue(providerCleanupStore.pending)
         assertEquals(0, googleIdentityProvider.clearCredentialStateCallCount)
         assertEquals(AuthSessionRestoreStatus.Failed, fixture.runtime.sessionRestoreStatus.value)
@@ -1370,6 +1428,8 @@ class AccountDeletionRemoteCancellationSafetyTest {
 
         assertEquals(TEST_ACCOUNT_ID, deletion.requests.single().expectedAccountId)
         assertTrue(interactions.resumedAccountIds.isEmpty())
+        assertEquals(listOf(TEST_ACCOUNT_ID), interactions.retainedAccountIds)
+        assertSame(interactions.acquiredOwnerships.single(), interactions.retainedOwnerships.single())
         assertFalse(fixture.runtime.accessState.value.accountDeletionInProgress)
         assertEquals(AuthEffect.AccountDeleted, fixture.runtime.effectChannel.tryReceive().getOrNull())
         assertTrue(providerCleanupStore.pending)
@@ -3026,27 +3086,69 @@ private class AccountDeletionProbe(
 }
 
 private class AccountDeletionInteractionLifecycleProbe(
-    private val purgeResult: DomainResult<InteractionAccountDeletionPurgeOutcome> =
-        DomainResult.Success(InteractionAccountDeletionPurgeOutcome.Acquired(0)),
-    private val subsequentPurgeResult: DomainResult<InteractionAccountDeletionPurgeOutcome>? = null,
+    private val purgeResult: DomainResult<AccountPrivateDataPurgeOutcome>? = null,
+    private val subsequentPurgeResult: DomainResult<AccountPrivateDataPurgeOutcome>? = null,
     private val operationEvents: MutableList<String>? = null,
     private val afterPurge: suspend () -> Unit = {},
 ) {
+    private val activeOwnerships = mutableMapOf<AccountPrivateDataPurgeOwnership, String>()
+
     val purgedAccountIds = mutableListOf<String>()
     val resumedAccountIds = mutableListOf<String>()
+    val retainedAccountIds = mutableListOf<String>()
+    val acquiredOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
+    val resumedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
+    val retainedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
 
-    suspend fun purge(accountId: String): DomainResult<InteractionAccountDeletionPurgeOutcome> {
+    suspend fun purge(accountId: String): DomainResult<AccountPrivateDataPurgeOutcome> {
         operationEvents?.add("purge:$accountId")
         purgedAccountIds += accountId
         afterPurge()
-        return if (purgedAccountIds.size > 1) subsequentPurgeResult ?: purgeResult else purgeResult
+        val configuredResult = if (purgedAccountIds.size > 1) subsequentPurgeResult ?: purgeResult else purgeResult
+        val result = configuredResult ?: DomainResult.Success(acquiredAccountPrivateDataPurge(accountId))
+        val ownership = when (val outcome = (result as? DomainResult.Success)?.value) {
+            is AccountPrivateDataPurgeOutcome.Acquired -> outcome.ownership
+            is AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired -> outcome.ownership
+            AccountPrivateDataPurgeOutcome.AlreadyBlocked,
+            null,
+            -> null
+        }
+        ownership?.let { current ->
+            activeOwnerships[current] = accountId
+            acquiredOwnerships += current
+        }
+        return result
     }
 
-    suspend fun resume(accountId: String) {
+    suspend fun resume(ownership: AccountPrivateDataPurgeOwnership): Boolean {
+        val accountId = activeOwnerships.remove(ownership) ?: return false
         operationEvents?.add("resume:$accountId")
         resumedAccountIds += accountId
+        resumedOwnerships += ownership
+        return true
+    }
+
+    suspend fun retain(ownership: AccountPrivateDataPurgeOwnership): Boolean {
+        val accountId = activeOwnerships.remove(ownership) ?: return false
+        retainedAccountIds += accountId
+        retainedOwnerships += ownership
+        return true
     }
 }
+
+private fun acquiredAccountPrivateDataPurge(accountId: String): AccountPrivateDataPurgeOutcome.Acquired =
+    AccountPrivateDataPurgeOutcome.Acquired(
+        result = emptyAccountPrivateDataPurgeResult(),
+        ownership = AccountPrivateDataPurgeOwnership(accountId),
+    )
+
+private fun emptyAccountPrivateDataPurgeResult() = AccountPrivateDataPurgeResult(
+    interactionOperationCount = 0,
+    notificationItemCount = 0,
+    notificationSnapshotCount = 0,
+    notificationOperationCount = 0,
+    notificationPreferenceCount = 0,
+)
 
 private fun TestScope.createAccountDeletionViewModel(
     probe: AccountDeletionProbe,
@@ -3067,8 +3169,9 @@ private fun TestScope.createAccountDeletionViewModel(
         revokeConsent = revokeConsent,
         googleIdentityProvider = googleIdentityProvider,
         accountDeletionProviderCleanupStore = providerCleanupStore,
-        purgeInteractionsForAccountDeletion = interactionLifecycle::purge,
-        resumeInteractionsAfterAccountDeletionFailure = interactionLifecycle::resume,
+        purgePrivateDataForAccountDeletion = interactionLifecycle::purge,
+        resumePrivateDataAfterAccountDeletionFailure = interactionLifecycle::resume,
+        retainPrivateDataBlockAfterAccountDeletion = interactionLifecycle::retain,
     ),
 )
 
@@ -3132,8 +3235,9 @@ private fun TestScope.createAccountDeletionCoordinatorFixture(
         accountDeletionPurgeRegistry = purgeRegistry,
         track = {},
         revokeObservabilityConsent = { true },
-        purgeInteractionsForAccountDeletion = interactionLifecycle::purge,
-        resumeInteractionsAfterAccountDeletionFailure = interactionLifecycle::resume,
+        purgePrivateDataForAccountDeletion = interactionLifecycle::purge,
+        resumePrivateDataAfterAccountDeletionFailure = interactionLifecycle::resume,
+        retainPrivateDataBlockAfterAccountDeletion = interactionLifecycle::retain,
     )
     return AccountDeletionCoordinatorFixture(
         coordinator = AccountDeletionCoordinator(
@@ -3278,9 +3382,10 @@ private fun TestScope.createViewModel(
             accountDeletionPurgeRegistry = overrides.accountDeletionPurgeRegistry,
             track = overrides.track,
             revokeObservabilityConsent = overrides.revokeConsent,
-            purgeInteractionsForAccountDeletion = overrides.purgeInteractionsForAccountDeletion,
-            resumeInteractionsAfterAccountDeletionFailure =
-            overrides.resumeInteractionsAfterAccountDeletionFailure,
+            purgePrivateDataForAccountDeletion = overrides.purgePrivateDataForAccountDeletion,
+            resumePrivateDataAfterAccountDeletionFailure =
+            overrides.resumePrivateDataAfterAccountDeletionFailure,
+            retainPrivateDataBlockAfterAccountDeletion = overrides.retainPrivateDataBlockAfterAccountDeletion,
         ),
         strings = stringsFor(AppLocale.French),
         coroutineScope = lifecycleTestScope(),
@@ -3326,11 +3431,16 @@ private data class AuthTestOverrides(
     val accountDeletionPurgeRegistry: AccountDeletionPurgeRegistry = AccountDeletionPurgeRegistry(),
     val revokeConsent: () -> Boolean = { true },
     val track: (com.kwabor.shared.domain.observability.AnalyticsEvent) -> Unit = {},
-    val purgeInteractionsForAccountDeletion:
-    suspend (String) -> DomainResult<InteractionAccountDeletionPurgeOutcome> = {
-        DomainResult.Success(InteractionAccountDeletionPurgeOutcome.Acquired(0))
+    val purgePrivateDataForAccountDeletion:
+    suspend (String) -> DomainResult<AccountPrivateDataPurgeOutcome> = { accountId ->
+        DomainResult.Success(acquiredAccountPrivateDataPurge(accountId))
     },
-    val resumeInteractionsAfterAccountDeletionFailure: suspend (String) -> Unit = {},
+    val resumePrivateDataAfterAccountDeletionFailure: suspend (AccountPrivateDataPurgeOwnership) -> Boolean = {
+        true
+    },
+    val retainPrivateDataBlockAfterAccountDeletion: suspend (AccountPrivateDataPurgeOwnership) -> Boolean = {
+        true
+    },
 )
 
 private class RecordingCoroutineDispatcher(

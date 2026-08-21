@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.Storage
 import androidx.datastore.preferences.core.Preferences
 import androidx.room.RoomDatabase
+import com.kwabor.shared.data.auth.DataAccountPrivateDataPurgeRepository
 import com.kwabor.shared.data.local.ExploreCacheStore
 import com.kwabor.shared.data.local.ExploreFeedPersistenceStore
 import com.kwabor.shared.data.local.ExplorePersistenceWatermarkStore
@@ -13,8 +14,14 @@ import com.kwabor.shared.data.local.KwaborDatabase
 import com.kwabor.shared.data.local.KwaborDatabaseBuilderResult
 import com.kwabor.shared.data.local.SearchCacheStore
 import com.kwabor.shared.data.local.buildKwaborDatabase
+import com.kwabor.shared.data.notification.NotificationInboxStore
+import com.kwabor.shared.data.notification.NotificationOutboxSettlementStore
+import com.kwabor.shared.data.notification.NotificationOutboxStore
+import com.kwabor.shared.data.notification.NotificationPreferencesStore
+import com.kwabor.shared.data.notification.NotificationStoreLock
 import com.kwabor.shared.data.preferences.DataStoreAppPreferencesRepository
 import com.kwabor.shared.data.preferences.createAppPreferencesDataStore
+import com.kwabor.shared.domain.auth.AccountPrivateDataPurgeRepository
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -45,7 +52,49 @@ internal fun persistenceModule(configuration: KwaborPersistenceConfiguration): M
 
     registerExplorePersistenceStores()
     single { InteractionOutboxStore(dao = get<KwaborDatabase>().interactionOutboxDao()) }
-
+    single { NotificationStoreLock() }
+    single<AccountPrivateDataPurgeRepository> {
+        val builderResult = get<KwaborDatabaseBuilderResult>()
+        DataAccountPrivateDataPurgeRepository(
+            daoFactory = { get<KwaborDatabase>().accountPrivateDataPurgeDao() },
+            isDurable = builderResult.supportsDurableInteractionOutbox &&
+                builderResult.supportsDurableNotificationStorage,
+            lock = get(),
+        )
+    }
+    single {
+        val builderResult = get<KwaborDatabaseBuilderResult>()
+        NotificationInboxStore(
+            daoFactory = { get<KwaborDatabase>().notificationInboxDao() },
+            isDurable = builderResult.supportsDurableNotificationStorage,
+            lock = get(),
+        )
+    }
+    single {
+        val builderResult = get<KwaborDatabaseBuilderResult>()
+        NotificationPreferencesStore(
+            daoFactory = { get<KwaborDatabase>().notificationPreferencesDao() },
+            isDurable = builderResult.supportsDurableNotificationStorage,
+            lock = get(),
+        )
+    }
+    single {
+        val builderResult = get<KwaborDatabaseBuilderResult>()
+        NotificationOutboxStore(
+            daoFactory = { get<KwaborDatabase>().notificationOutboxDao() },
+            isDurable = builderResult.supportsDurableNotificationStorage,
+            lock = get(),
+        )
+    }
+    single {
+        val builderResult = get<KwaborDatabaseBuilderResult>()
+        NotificationOutboxSettlementStore(
+            daoFactory = { get<KwaborDatabase>().notificationOutboxDao() },
+            confirmationDaoFactory = { get<KwaborDatabase>().notificationConfirmationSettlementDao() },
+            isDurable = builderResult.supportsDurableNotificationStorage,
+            lock = get(),
+        )
+    }
     single<CoroutineScope>(qualifier = appPreferencesDataStoreScopeQualifier) {
         CoroutineScope(SupervisorJob() + get<DispatcherProvider>().io)
     } onClose { scope -> scope?.cancel() }

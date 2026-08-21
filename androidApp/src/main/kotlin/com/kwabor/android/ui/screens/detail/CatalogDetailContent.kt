@@ -10,19 +10,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.kwabor.android.R
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.media.ListingMediaUrlPolicy
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.detail.CatalogDetailContentUiModel
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
+import kotlinx.coroutines.awaitCancellation
 
 private data class DetailContentData(
     val state: CatalogDetailUiState.Content,
@@ -36,6 +48,7 @@ internal data class CatalogDetailContentResources(
     val mediaUrlPolicy: ListingMediaUrlPolicy,
     val actions: CatalogDetailSheetActions,
     val externalActionCallbacks: CatalogDetailExternalActionCallbacks,
+    val onContentPresented: (CatalogDetailOpenRequestId, String) -> Unit,
     val heroHeight: Dp,
 )
 
@@ -45,6 +58,12 @@ internal fun CatalogDetailContent(
     resources: CatalogDetailContentResources,
     modifier: Modifier,
 ) {
+    var hasBeenPlaced by remember(state.openRequestId, state.model.id) { mutableStateOf(false) }
+    ReportCatalogDetailContentPresentation(
+        state = state,
+        hasBeenPlaced = hasBeenPlaced,
+        onContentPresented = resources.onContentPresented,
+    )
     val visibleMedia = remember(state.model.media, resources.mediaUrlPolicy) {
         visibleOfficialImages(state.model.media, resources.mediaUrlPolicy)
     }
@@ -57,6 +76,9 @@ internal fun CatalogDetailContent(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .onGloballyPositioned { coordinates ->
+                if (coordinates.size.width > 0 && coordinates.size.height > 0) hasBeenPlaced = true
+            }
             .semantics { isTraversalGroup = true },
     ) {
         LazyColumn(
@@ -76,6 +98,30 @@ internal fun CatalogDetailContent(
             callbacks = resources.externalActionCallbacks,
             modifier = Modifier.semantics { traversalIndex = DETAIL_PRIMARY_ACTION_TRAVERSAL_INDEX },
         )
+    }
+}
+
+@Composable
+private fun ReportCatalogDetailContentPresentation(
+    state: CatalogDetailUiState.Content,
+    hasBeenPlaced: Boolean,
+    onContentPresented: (CatalogDetailOpenRequestId, String) -> Unit,
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentCallback = rememberUpdatedState(onContentPresented)
+    var hasReported by remember(state.openRequestId, state.model.id) { mutableStateOf(false) }
+    LaunchedEffect(lifecycleOwner, state.openRequestId, state.model.id, hasBeenPlaced) {
+        if (!hasBeenPlaced) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (!hasReported) {
+                withFrameNanos { frameTimeNanos -> frameTimeNanos }
+                if (!hasReported) {
+                    hasReported = true
+                    currentCallback.value(state.openRequestId, state.model.id)
+                }
+            }
+            awaitCancellation()
+        }
     }
 }
 

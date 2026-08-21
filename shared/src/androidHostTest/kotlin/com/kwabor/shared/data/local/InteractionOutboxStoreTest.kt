@@ -120,7 +120,10 @@ class InteractionOutboxStoreTest {
                 listOf(delayed.operationId),
                 store.listForAccountAndListingIds(ACCOUNT_A, listOf(LISTING_B)).map { it.operationId },
             )
-            assertEquals(ACCOUNT_A_OPERATION_COUNT, store.purgeAccount(ACCOUNT_A))
+            assertEquals(
+                ACCOUNT_A_OPERATION_COUNT,
+                database.accountPrivateDataPurgeDao().purgeAccount(ACCOUNT_A).interactionOperationCount,
+            )
             assertEquals(1, store.listForAccount(ACCOUNT_B).size)
         }
     }
@@ -246,7 +249,7 @@ class InteractionOutboxStoreTest {
             assertEquals(listOf(healthy), store.listForAccount(ACCOUNT_A, limit = 10))
             assertEquals(1, dao.countForAccount(ACCOUNT_A))
 
-            store.purgeAccount(ACCOUNT_A)
+            database.accountPrivateDataPurgeDao().purgeAccount(ACCOUNT_A)
             dao.insert(corruptEntity(listingId = LISTING_A, attemptCount = -1))
             assertFailsWith<IllegalStateException> {
                 store.enqueue(ACCOUNT_A, LISTING_A, InteractionOutboxKind.Like, true, 2)

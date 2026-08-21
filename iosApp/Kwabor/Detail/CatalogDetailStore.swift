@@ -29,7 +29,15 @@ final class CatalogDetailStore: ObservableObject {
     }
 
     func open(listingID: String) {
-        controller.actions.open(listingId: listingID)
+        _ = controller.actions.open(listingId: listingID)
+    }
+
+    @discardableResult
+    func openCorrelated(listingID: String, correlationSequence: Int64) -> Int64 {
+        controller.actions.openCorrelated(
+            listingId: listingID,
+            correlationSequence: correlationSequence
+        )
     }
 
     func retry() {

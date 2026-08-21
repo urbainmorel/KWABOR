@@ -38,6 +38,7 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.MoneyXof
 import com.kwabor.shared.i18n.CatalogDetailStrings
+import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -803,9 +804,15 @@ private fun detailMoney(amount: Long): MoneyXof = when (val result = MoneyXof.fr
 private fun unexpectedCatalogCall(): Nothing = error("Unexpected catalog query in detail test")
 
 internal val DETAIL_TEST_NOW: Long = Instant.parse("2026-08-03T10:00:00Z").toEpochMilliseconds()
+internal val DETAIL_TEST_OPEN_REQUEST_ID: CatalogDetailOpenRequestId = CatalogDetailOpenRequestId.correlated(1L)
 private val DETAIL_EVENT_START: Long = Instant.parse("2026-08-10T18:00:00Z").toEpochMilliseconds()
 private val DETAIL_EVENT_END: Long = Instant.parse("2026-08-10T22:00:00Z").toEpochMilliseconds()
 internal const val DETAIL_COVER_URL = "https://cdn.kwabor.test/cover.jpg"
 internal const val DETAIL_GALLERY_URL = "https://cdn.kwabor.test/gallery.jpg"
 private const val DETAIL_VIDEO_URL = "https://cdn.kwabor.test/official.mp4"
 private const val MINUTES_PER_HOUR = 60
+
+private suspend fun CatalogDetailPresenter.load(
+    listingId: String,
+    strings: KwaborStrings,
+): CatalogDetailUiState = load(listingId, DETAIL_TEST_OPEN_REQUEST_ID, strings)

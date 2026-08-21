@@ -4,6 +4,8 @@ import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.i18n.stringsFor
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestIdGenerator
 import com.kwabor.shared.presentation.detail.CatalogDetailPresenter
 import com.kwabor.shared.presentation.detail.CatalogDetailRuntime
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
@@ -17,8 +19,18 @@ import kotlinx.coroutines.launch
 class IosCatalogDetailActions internal constructor(
     private val dispatch: (CatalogDetailIntent) -> Unit,
 ) {
-    fun open(listingId: String) {
-        dispatch(CatalogDetailIntent.Open(listingId))
+    private val openRequestIdGenerator = CatalogDetailOpenRequestIdGenerator()
+
+    fun open(listingId: String): Long? {
+        val openRequestId = openRequestIdGenerator.next() ?: return null
+        dispatch(CatalogDetailIntent.Open(listingId, openRequestId))
+        return openRequestId.value
+    }
+
+    fun openCorrelated(listingId: String, correlationSequence: Long): Long {
+        val openRequestId = CatalogDetailOpenRequestId.correlated(correlationSequence)
+        dispatch(CatalogDetailIntent.Open(listingId, openRequestId))
+        return openRequestId.value
     }
 
     fun retry() {
@@ -164,6 +176,7 @@ class IosCatalogDetailController private constructor(
         val updatedState = when (intent) {
             is CatalogDetailIntent.Open -> CatalogDetailUiState.Failure(
                 listingId = intent.listingId.trim(),
+                openRequestId = requireNotNull(intent.openRequestId),
                 message = strings.configurationUnavailable,
             )
             CatalogDetailIntent.Close -> CatalogDetailUiState.Closed

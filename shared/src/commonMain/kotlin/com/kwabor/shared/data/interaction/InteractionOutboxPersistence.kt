@@ -59,8 +59,6 @@ internal abstract class InteractionOutboxPersistence {
     ): Boolean
 
     abstract suspend fun nextAttemptAtForAccount(accountId: String): Long?
-
-    abstract suspend fun purgeAccount(accountId: String): Int
 }
 
 internal class RoomInteractionOutboxPersistence(
@@ -155,8 +153,6 @@ internal class RoomInteractionOutboxPersistence(
     )
 
     override suspend fun nextAttemptAtForAccount(accountId: String): Long? = store.nextAttemptAtForAccount(accountId)
-
-    override suspend fun purgeAccount(accountId: String): Int = store.purgeAccount(accountId)
 }
 
 internal class UnavailableInteractionOutboxPersistence : InteractionOutboxPersistence() {
@@ -214,8 +210,6 @@ internal class UnavailableInteractionOutboxPersistence : InteractionOutboxPersis
     ): Boolean = unavailable()
 
     override suspend fun nextAttemptAtForAccount(accountId: String): Long? = unavailable()
-
-    override suspend fun purgeAccount(accountId: String): Int = unavailable()
 
     private fun unavailable(): Nothing = error("Durable interaction storage is unavailable.")
 }

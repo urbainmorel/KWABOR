@@ -121,6 +121,43 @@ class KwaborDatabaseMigrationTest {
             context.deleteDatabase(MIGRATION_DATABASE_NAME)
         }
     }
+
+    @Test
+    fun autoMigrationFromFourToFivePreservesExploreAndInteractionDataAndCreatesEmptyNotificationTables() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(NOTIFICATION_PREVIOUS_DATABASE_VERSION).use { database ->
+                database.seedExploreCache()
+                database.seedInteractionOutbox()
+            }
+
+            migrationHelper.runMigrationsAndValidate(version = 5, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+                database.assertInteractionOutboxIsPreserved()
+                database.assertNotificationTablesAreEmpty()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
+
+    @Test
+    fun autoMigrationFromOneToFiveIsNonDestructive() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(1).use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 5, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertExploreV2ColumnsAreNullForLegacyRows()
+                database.assertInteractionOutboxIsEmpty()
+                database.assertNotificationTablesAreEmpty()
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
 }
 
 private fun SQLiteConnection.seedExploreCache() {
@@ -174,6 +211,40 @@ private fun SQLiteConnection.assertInteractionOutboxIsEmpty() {
     assertEquals(0L, singleLong("SELECT COUNT(*) FROM interaction_outbox_operations"))
 }
 
+private fun SQLiteConnection.seedInteractionOutbox() {
+    execSQL(INSERT_INTERACTION_OUTBOX_OPERATION)
+}
+
+private fun SQLiteConnection.assertInteractionOutboxIsPreserved() {
+    assertEquals(1L, singleLong("SELECT COUNT(*) FROM interaction_outbox_operations"))
+    assertEquals(
+        1L,
+        singleLong(
+            """
+            SELECT COUNT(*)
+            FROM interaction_outbox_operations
+            WHERE account_id = '10000000-0000-4000-8000-000000000001'
+              AND listing_id = '20000000-0000-4000-8000-000000000001'
+              AND kind = 'favorite'
+              AND desired_selected = 1
+              AND attempt_count = 1
+              AND next_attempt_at_epoch_milliseconds = 2000
+            """.trimIndent(),
+        ),
+    )
+}
+
+private fun SQLiteConnection.assertNotificationTablesAreEmpty() {
+    listOf(
+        "notification_inbox_snapshots",
+        "notification_inbox_items",
+        "notification_sync_operations",
+        "notification_preferences_cache",
+    ).forEach { table ->
+        assertEquals(0L, singleLong("SELECT COUNT(*) FROM $table"), table)
+    }
+}
+
 private fun SQLiteConnection.singleLong(query: String): Long = prepare(query).use { statement ->
     check(statement.step()) { "Migration verification query returned no row." }
     statement.getLong(0)
@@ -181,6 +252,7 @@ private fun SQLiteConnection.singleLong(query: String): Long = prepare(query).us
 
 private const val MIGRATION_DATABASE_NAME = "kwabor-room-migration"
 private const val INTERACTION_OUTBOX_PREVIOUS_DATABASE_VERSION = 3
+private const val NOTIFICATION_PREVIOUS_DATABASE_VERSION = 4
 
 private val INSERT_EXPLORE_SNAPSHOT =
     """
@@ -235,4 +307,27 @@ private val INSERT_EXPLORE_SNAPSHOT_ITEM =
         position,
         is_sponsored_placement
     ) VALUES ('explore:migration', 'listing-migration', 0, NULL)
+    """.trimIndent()
+
+private val INSERT_INTERACTION_OUTBOX_OPERATION =
+    """
+    INSERT INTO interaction_outbox_operations (
+        account_id,
+        listing_id,
+        kind,
+        desired_selected,
+        enqueued_at_epoch_milliseconds,
+        attempt_count,
+        next_attempt_at_epoch_milliseconds,
+        terminal_error_code
+    ) VALUES (
+        '10000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        'favorite',
+        1,
+        1000,
+        1,
+        2000,
+        NULL
+    )
     """.trimIndent()

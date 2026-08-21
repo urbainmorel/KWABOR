@@ -19,7 +19,9 @@ import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -42,13 +44,14 @@ class CatalogDetailRuntimeTest {
 
         runtime.dispatch(CatalogDetailIntent.Open("detail-retry"))
         advanceUntilIdle()
-        assertIs<CatalogDetailUiState.OfflineFailure>(runtime.state.value)
+        val failure = assertIs<CatalogDetailUiState.OfflineFailure>(runtime.state.value)
 
         runtime.dispatch(CatalogDetailIntent.Retry)
         advanceUntilIdle()
 
         val content = assertIs<CatalogDetailUiState.Content>(runtime.state.value)
         assertEquals("detail-retry", content.model.id)
+        assertEquals(failure.openRequestId, content.openRequestId)
         assertEquals(listOf("detail-retry", "detail-retry"), repository.requestedListingIds)
         runtime.close()
     }
@@ -99,11 +102,13 @@ class CatalogDetailRuntimeTest {
         runtime.dispatch(CatalogDetailIntent.Open("detail-first"))
         runCurrent()
         assertTrue(firstRequestStarted.isCompleted)
+        val firstOpenRequestId = assertIs<CatalogDetailUiState.Loading>(runtime.state.value).openRequestId
         runtime.dispatch(CatalogDetailIntent.Open("detail-second"))
         advanceUntilIdle()
 
         var content = assertIs<CatalogDetailUiState.Content>(runtime.state.value)
         assertEquals("detail-second", content.model.id)
+        assertFalse(firstOpenRequestId == content.openRequestId)
 
         firstResult.complete(DomainResult.Success(catalogDetailFixture(id = "detail-first")))
         advanceUntilIdle()
@@ -113,6 +118,63 @@ class CatalogDetailRuntimeTest {
         assertEquals("detail-second", content.model.id)
         assertEquals(listOf("detail-first", "detail-second"), repository.requestedListingIds)
         runtime.close()
+    }
+
+    @Test
+    fun correlatedOpen_preservesTheCallerIdentityAcrossLoadingContentAndTemporalRefresh() = runTest {
+        val source = catalogDetailFixture(id = "detail-correlated")
+        val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val runtime = runtime(
+            repository = FakeDetailCatalogQueryRepository { DomainResult.Success(source) },
+            temporalTicks = ticks,
+        )
+        val requestId = CatalogDetailOpenRequestId.correlated(42L)
+
+        runtime.dispatch(CatalogDetailIntent.Open(source.common.id, requestId))
+        runCurrent()
+
+        assertEquals(requestId, assertIs<CatalogDetailUiState.Content>(runtime.state.value).openRequestId)
+        assertTrue(ticks.tryEmit(Unit))
+        runCurrent()
+        assertEquals(requestId, assertIs<CatalogDetailUiState.Content>(runtime.state.value).openRequestId)
+        runtime.close()
+    }
+
+    @Test
+    fun callerAndRuntimeGeneratedRequestIds_useDisjointNamespaces() = runTest {
+        val requestGate = CompletableDeferred<DomainResult<com.kwabor.shared.domain.catalog.CatalogDetail>>()
+        val runtime = runtime(FakeDetailCatalogQueryRepository { requestGate.await() })
+
+        runtime.dispatch(CatalogDetailIntent.Open("detail-generated"))
+        runCurrent()
+
+        val generated = assertIs<CatalogDetailUiState.Loading>(runtime.state.value).openRequestId
+        val correlated = CatalogDetailOpenRequestId.correlated(1L)
+        assertTrue(generated.value % 2L == 0L)
+        assertTrue(correlated.value % 2L == 1L)
+        assertFalse(generated == correlated)
+        runtime.close()
+    }
+
+    @Test
+    fun generatedRequestIds_neverWrapAfterExhaustion() {
+        val generator = CatalogDetailOpenRequestIdGenerator(CatalogDetailOpenRequestId.MAX_SEQUENCE - 1L)
+
+        assertEquals(CatalogDetailOpenRequestId.generated(CatalogDetailOpenRequestId.MAX_SEQUENCE), generator.next())
+        assertNull(generator.next())
+        assertNull(generator.next())
+    }
+
+    @Test
+    fun correlatedOpenRequestId_rejectsValuesOutsideItsNonCollidingNamespace() {
+        assertFailsWith<IllegalArgumentException> { CatalogDetailOpenRequestId.correlated(0L) }
+        assertEquals(
+            Long.MAX_VALUE - 2L,
+            CatalogDetailOpenRequestId.correlated(CatalogDetailOpenRequestId.MAX_SEQUENCE).value,
+        )
+        assertFailsWith<IllegalArgumentException> {
+            CatalogDetailOpenRequestId.correlated(CatalogDetailOpenRequestId.MAX_SEQUENCE + 1L)
+        }
     }
 
     @Test

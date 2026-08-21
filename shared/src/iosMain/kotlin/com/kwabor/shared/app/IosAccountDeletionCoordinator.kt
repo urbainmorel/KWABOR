@@ -9,12 +9,13 @@ import com.kwabor.shared.domain.auth.AccountDeletionRequest
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeCoordinator
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOwnership
 import com.kwabor.shared.presentation.auth.AccountDeletionActionResult
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.AuthUiState
 import com.kwabor.shared.presentation.auth.initialAuthUiState
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
-import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -28,43 +29,68 @@ import kotlinx.coroutines.withTimeoutOrNull
 private const val ACCOUNT_DELETION_PURGE_TIMEOUT_MILLISECONDS = 5_000L
 
 internal class IosAccountDeletionInteractionLifecycle(
-    private val purgeAction: suspend (String, () -> Unit) -> DomainResult<InteractionAccountDeletionPurgeOutcome>,
-    private val resumeAction: suspend (String) -> Unit,
+    private val purgeAction:
+    suspend (String, (AccountPrivateDataPurgeOwnership) -> Unit) -> DomainResult<AccountPrivateDataPurgeOutcome>,
+    private val resumeAction: suspend (AccountPrivateDataPurgeOwnership) -> Boolean,
+    private val retainAction: suspend (AccountPrivateDataPurgeOwnership) -> Boolean,
 ) {
-    constructor(interactionCoordinator: InteractionCoordinator?) : this(
+    constructor(purgeCoordinator: AccountPrivateDataPurgeCoordinator?) : this(
         purgeAction = { accountId, onAcquired ->
-            interactionCoordinator?.purgeForAccountDeletion(accountId, onAcquired)
+            purgeCoordinator?.purgeForAccountDeletion(accountId, onAcquired)
                 ?: DomainResult.Failure(DomainError.LocalStorageUnavailable())
         },
-        resumeAction = { accountId ->
-            interactionCoordinator?.resumeAfterAccountDeletionFailure(accountId)
+        resumeAction = { ownership ->
+            purgeCoordinator?.resumeAfterAccountDeletionFailure(ownership) == true
+        },
+        retainAction = { ownership ->
+            purgeCoordinator?.retainBlockAfterAccountDeletion(ownership) == true
         },
     )
 
-    suspend fun purge(accountId: String, onAcquired: () -> Unit): IosAccountDeletionPurgeResult {
+    suspend fun purge(
+        accountId: String,
+        onAcquired: (AccountPrivateDataPurgeOwnership) -> Unit,
+    ): IosAccountDeletionPurgeResult {
         val result = purgeAction(accountId, onAcquired)
         return when (result) {
             is DomainResult.Failure -> IosAccountDeletionPurgeResult.Failed
             is DomainResult.Success -> when (result.value) {
-                InteractionAccountDeletionPurgeOutcome.AlreadyBlocked ->
+                AccountPrivateDataPurgeOutcome.AlreadyBlocked ->
                     IosAccountDeletionPurgeResult.AlreadyBlocked
 
-                is InteractionAccountDeletionPurgeOutcome.Acquired -> IosAccountDeletionPurgeResult.Acquired
+                is AccountPrivateDataPurgeOutcome.Acquired ->
+                    IosAccountDeletionPurgeResult.Acquired(result.value.ownership)
+
+                is AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired -> {
+                    IosAccountDeletionPurgeResult.Recovery(
+                        ownership = result.value.ownership,
+                        resumed = resume(result.value.ownership),
+                    )
+                }
             }
         }
     }
 
-    suspend fun resume(accountId: String) {
-        withContext(NonCancellable) {
-            resumeAction(accountId)
-        }
+    suspend fun resume(ownership: AccountPrivateDataPurgeOwnership): Boolean = withContext(NonCancellable) {
+        resumeAction(ownership)
+    }
+
+    suspend fun retain(ownership: AccountPrivateDataPurgeOwnership): Boolean = withContext(NonCancellable) {
+        retainAction(ownership)
     }
 }
 
-internal enum class IosAccountDeletionPurgeResult {
-    Acquired,
-    AlreadyBlocked,
-    Failed,
+internal sealed interface IosAccountDeletionPurgeResult {
+    data class Acquired(val ownership: AccountPrivateDataPurgeOwnership) : IosAccountDeletionPurgeResult
+
+    data class Recovery(
+        val ownership: AccountPrivateDataPurgeOwnership,
+        val resumed: Boolean,
+    ) : IosAccountDeletionPurgeResult
+
+    data object AlreadyBlocked : IosAccountDeletionPurgeResult
+
+    data object Failed : IosAccountDeletionPurgeResult
 }
 
 internal class IosAccountDeletionHost(
@@ -85,6 +111,7 @@ internal class IosAccountDeletionCoordinator(
     private var preparedAccountId: String? = null
     private var activePreparation: IosFederatedDeletionPreparation? = null
     private val ambiguousAccountIds = mutableSetOf<String>()
+    private val ownedPrivateDataBlocks = mutableMapOf<String, AccountPrivateDataPurgeOwnership>()
 
     fun prepareFederated(onCompleted: (Boolean) -> Unit) {
         val accountId = accountIdForNewDeletion(onCompleted) ?: return
@@ -124,7 +151,9 @@ internal class IosAccountDeletionCoordinator(
             activePreparation !== preparation || ownerJob?.isActive != true
         val accountChanged = !host.currentState().isCurrentAuthenticatedAccount(accountId)
         when {
-            purgeResult == IosAccountDeletionPurgeResult.Acquired && !cancelled && !accountChanged -> {
+            purgeResult is IosAccountDeletionPurgeResult.Acquired && !cancelled && !accountChanged -> {
+                purgeAttempt.accept(purgeResult.ownership)
+                claimPrivateDataBlock(accountId, purgeResult.ownership)
                 preparedAccountId = accountId
                 finishPreparation(preparation, prepared = true, errorMessage = null)
             }
@@ -135,10 +164,22 @@ internal class IosAccountDeletionCoordinator(
                 errorMessage = strings.authAccountDeletionOutcomeUnknown,
             )
 
-            purgeResult == IosAccountDeletionPurgeResult.Acquired -> {
+            purgeResult is IosAccountDeletionPurgeResult.Acquired -> {
+                purgeAttempt.accept(purgeResult.ownership)
                 purgeAttempt.releaseIfAcquired()
                 val errorMessage = if (accountChanged && !cancelled) strings.authSessionExpired else null
                 finishPreparation(preparation, prepared = false, errorMessage = errorMessage)
+            }
+
+            purgeResult is IosAccountDeletionPurgeResult.Recovery -> {
+                clearRecoveredPrivateDataBlock(purgeResult)
+                purgeAttempt.acceptRecovery(purgeResult)
+                purgeAttempt.releaseIfAcquired()
+                finishPreparation(
+                    preparation,
+                    prepared = false,
+                    errorMessage = strings.settings.privacyPersistenceError,
+                )
             }
 
             else -> {
@@ -166,7 +207,7 @@ internal class IosAccountDeletionCoordinator(
             return
         }
         coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            interactionLifecycle.resume(accountId)
+            releasePrivateDataBlock(accountId)
             if (!host.currentState().isLoading) host.publishState(host.currentState().toAccountDeletionReadyState())
             onCompleted.completeUnless(host.isClosed(), true)
         }
@@ -211,6 +252,7 @@ internal class IosAccountDeletionCoordinator(
                 )
             }
             if (!deletionMayStart) return
+            claimPrivateDataBlock(command.accountId, purgeAttempt.requireOwnership())
             performDeletion(command.toDeletionExecution { remoteAttemptStarted = true })
         } catch (cancellation: CancellationException) {
             if (!remoteAttemptStarted) {
@@ -241,7 +283,7 @@ internal class IosAccountDeletionCoordinator(
         if (host.currentState().isLoading) {
             preparedAccountId = null
             coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                interactionLifecycle.resume(accountId)
+                releasePrivateDataBlock(accountId)
                 onCompleted.completeUnless(host.isClosed(), false)
             }
             return
@@ -289,7 +331,7 @@ internal class IosAccountDeletionCoordinator(
         when (failure) {
             is AccountDeletionPreTransportCleanupPendingCancellation -> withContext(NonCancellable) {
                 host.onLocalCleanupPending()
-                interactionLifecycle.resume(accountId)
+                releasePrivateDataBlock(accountId)
                 host.publishState(
                     initialAuthUiState().copy(errorMessage = strings.settings.privacyPersistenceError),
                 )
@@ -297,7 +339,7 @@ internal class IosAccountDeletionCoordinator(
             }
 
             is AccountDeletionPreTransportCancellation -> withContext(NonCancellable) {
-                interactionLifecycle.resume(accountId)
+                releasePrivateDataBlock(accountId)
                 host.publishState(host.currentState().toAccountDeletionReadyState())
                 onCompleted.completeUnless(host.isClosed(), false)
             }
@@ -325,6 +367,7 @@ internal class IosAccountDeletionCoordinator(
     ) {
         when (result) {
             AccountDeletionActionResult.Deleted -> {
+                retainPrivateDataBlock(accountId)
                 host.publishState(initialAuthUiState().copy(noticeMessage = strings.authAccountDeleted))
                 onCompleted.completeUnless(host.isClosed(), true)
             }
@@ -338,13 +381,13 @@ internal class IosAccountDeletionCoordinator(
 
             is AccountDeletionActionResult.RejectedCleanupPending -> {
                 host.onLocalCleanupPending()
-                interactionLifecycle.resume(accountId)
+                releasePrivateDataBlock(accountId)
                 host.publishState(initialAuthUiState().copy(errorMessage = result.errorMessage))
                 onCompleted.completeUnless(host.isClosed(), false)
             }
 
             is AccountDeletionActionResult.Rejected -> {
-                interactionLifecycle.resume(accountId)
+                releasePrivateDataBlock(accountId)
                 host.publishState(host.currentState().toAccountDeletionFailureState(result.errorMessage))
                 onCompleted.completeUnless(host.isClosed(), false)
             }
@@ -354,16 +397,45 @@ internal class IosAccountDeletionCoordinator(
     private suspend fun validatePreparedAccount(accountId: String, onCompleted: (Boolean) -> Unit): Boolean {
         if (host.currentState().isCurrentAuthenticatedAccount(accountId)) return true
         preparedAccountId = null
-        interactionLifecycle.resume(accountId)
+        releasePrivateDataBlock(accountId)
         host.publishState(host.currentState().toAccountDeletionFailureState(strings.authSessionExpired))
         onCompleted.completeUnless(host.isClosed(), false)
         return false
     }
 
-    private fun finishAmbiguousDeletion(accountId: String, onCompleted: (Boolean) -> Unit) {
+    private suspend fun finishAmbiguousDeletion(accountId: String, onCompleted: (Boolean) -> Unit) {
+        retainPrivateDataBlock(accountId)
         ambiguousAccountIds += accountId
         host.publishState(initialAuthUiState().copy(errorMessage = strings.authAccountDeletionOutcomeUnknown))
         onCompleted.completeUnless(host.isClosed(), false)
+    }
+
+    private fun claimPrivateDataBlock(accountId: String, ownership: AccountPrivateDataPurgeOwnership) {
+        check(ownedPrivateDataBlocks.put(accountId, ownership) == null) {
+            "An account private-data block is already owned."
+        }
+    }
+
+    private fun clearRecoveredPrivateDataBlock(recovery: IosAccountDeletionPurgeResult.Recovery) {
+        if (!recovery.resumed) return
+        val accountId = recovery.ownership.accountId
+        if (ownedPrivateDataBlocks[accountId] === recovery.ownership) {
+            ownedPrivateDataBlocks.remove(accountId)
+        }
+    }
+
+    private suspend fun releasePrivateDataBlock(accountId: String) {
+        val ownership = ownedPrivateDataBlocks[accountId] ?: return
+        if (interactionLifecycle.resume(ownership) && ownedPrivateDataBlocks[accountId] === ownership) {
+            ownedPrivateDataBlocks.remove(accountId)
+        }
+    }
+
+    private suspend fun retainPrivateDataBlock(accountId: String) {
+        val ownership = ownedPrivateDataBlocks[accountId] ?: return
+        if (interactionLifecycle.retain(ownership) && ownedPrivateDataBlocks[accountId] === ownership) {
+            ownedPrivateDataBlocks.remove(accountId)
+        }
     }
 
     private fun finishPreparation(
@@ -426,19 +498,33 @@ private class IosAccountDeletionPurgeAttempt(
     private val lifecycle: IosAccountDeletionInteractionLifecycle,
     private val host: IosAccountDeletionHost,
 ) {
-    private var acquired = false
+    private var ownership: AccountPrivateDataPurgeOwnership? = null
     private var released = false
 
     suspend fun await(): IosAccountDeletionPurgeResult? = withTimeoutOrNull(host.purgeTimeoutMilliseconds) {
-        lifecycle.purge(accountId) {
-            acquired = true
-        }
+        lifecycle.purge(accountId) { acquiredOwnership -> accept(acquiredOwnership) }
+    }
+
+    fun accept(ownership: AccountPrivateDataPurgeOwnership) {
+        if (this.ownership === ownership) return
+        check(this.ownership == null) { "Account private-data purge ownership was already accepted." }
+        this.ownership = ownership
+    }
+
+    fun requireOwnership(): AccountPrivateDataPurgeOwnership = checkNotNull(ownership) {
+        "Account private-data purge ownership is unavailable."
+    }
+
+    fun acceptRecovery(recovery: IosAccountDeletionPurgeResult.Recovery) {
+        accept(recovery.ownership)
+        if (recovery.resumed) released = true
     }
 
     suspend fun releaseIfAcquired() {
-        if (!acquired || released) return
+        val currentOwnership = ownership ?: return
+        if (released) return
         released = true
-        lifecycle.resume(accountId)
+        lifecycle.resume(currentOwnership)
     }
 }
 
@@ -480,10 +566,22 @@ private suspend fun settlePasswordPurge(
     purgeResult: IosAccountDeletionPurgeResult?,
     settlement: IosPasswordPurgeSettlement,
 ): Boolean {
-    if (purgeResult == IosAccountDeletionPurgeResult.Acquired) {
+    if (purgeResult is IosAccountDeletionPurgeResult.Acquired) {
+        settlement.purgeAttempt.accept(purgeResult.ownership)
         if (settlement.ownerJob?.isActive == true) return true
         settlement.purgeAttempt.releaseIfAcquired()
         settlement.host.publishState(settlement.host.currentState().toAccountDeletionReadyState())
+        settlement.command.onCompleted.completeUnless(settlement.host.isClosed(), false)
+        return false
+    }
+    if (purgeResult is IosAccountDeletionPurgeResult.Recovery) {
+        settlement.purgeAttempt.acceptRecovery(purgeResult)
+        settlement.purgeAttempt.releaseIfAcquired()
+        settlement.host.publishState(
+            settlement.host.currentState().toAccountDeletionFailureState(
+                settlement.strings.settings.privacyPersistenceError,
+            ),
+        )
         settlement.command.onCompleted.completeUnless(settlement.host.isClosed(), false)
         return false
     }

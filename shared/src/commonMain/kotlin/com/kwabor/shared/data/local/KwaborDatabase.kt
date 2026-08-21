@@ -23,6 +23,9 @@ internal data class KwaborDatabaseBuilderResult(
     val supportsDurableInteractionOutbox: Boolean
         get() = storageMode == KwaborDatabaseStorageMode.Durable
 
+    val supportsDurableNotificationStorage: Boolean
+        get() = storageMode == KwaborDatabaseStorageMode.Durable
+
     fun createBuilder(): RoomDatabase.Builder<KwaborDatabase> = builderFactory()
 }
 
@@ -35,13 +38,18 @@ internal data class KwaborDatabaseBuilderResult(
         ExploreReferenceCityEntity::class,
         ExploreReferenceCategoryEntity::class,
         InteractionOutboxEntity::class,
+        NotificationInboxSnapshotEntity::class,
+        NotificationInboxItemEntity::class,
+        NotificationSyncOperationEntity::class,
+        NotificationPreferenceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
         AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
     ],
 )
 @ConstructedBy(KwaborDatabaseConstructor::class)
@@ -57,6 +65,16 @@ internal abstract class KwaborDatabase : RoomDatabase() {
     internal abstract fun searchCacheDao(): SearchCacheDao
 
     internal abstract fun interactionOutboxDao(): InteractionOutboxDao
+
+    internal abstract fun notificationInboxDao(): NotificationInboxDao
+
+    internal abstract fun notificationPreferencesDao(): NotificationPreferencesDao
+
+    internal abstract fun notificationOutboxDao(): NotificationOutboxDao
+
+    internal abstract fun notificationConfirmationSettlementDao(): NotificationConfirmationSettlementDao
+
+    internal abstract fun accountPrivateDataPurgeDao(): AccountPrivateDataPurgeDao
 }
 
 internal expect object KwaborDatabaseConstructor : RoomDatabaseConstructor<KwaborDatabase>

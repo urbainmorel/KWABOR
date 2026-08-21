@@ -2,17 +2,18 @@
 
 ## Phase actuelle
 
-Livraison V1 incrémentale — le raccord mobile Explore v2 est intégré dans `main` et le présent lot
-termine SYNC-001 : outbox Room v4 Like/Favori, drain partagé Android/iOS, RPC account-fenced et
-suppression de compte coordonnée. La PR `#59` est validée exact-head et attend sa revue/fusion. Le
-drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
+Livraison V1 incrémentale — SYNC-001 est intégré dans `main` : outbox Room v4 Like/Favori, drain
+partagé Android/iOS, RPC account-fenced et suppression de compte coordonnée. Le lot actif
+NOTIF-001A construit maintenant l'autorité propriétaire et le centre de notifications offline-first
+Android/iOS, sans remise FCM/APNs. Le drawer de filtres avancés reste séparé et soumis à arbitrage
+Produit.
 
 ## Snapshot courant — 10 août 2026
 
-- La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
-  Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
-  l'autorité HISTORY-001A, ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de
-  `#52` et l'intégration V1 de `#50`.
+- La base de NOTIF-001A est le commit de fusion `0f7850621896e88d5d5738b67c42878de86e46bc`
+  de la PR `#59`. Elle inclut SYNC-001, le serveur et le raccord mobile EXPLORE-002B2,
+  FAVORITES-001A de bout en bout, l'autorité HISTORY-001A, ADR-0031 proposé, la fondation domaine
+  de `#51`, l'optimisation CI de `#52` et l'intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
   supersession ; leurs têtes sont toutes ancêtres de `main` via `#50` et ne doivent pas être
   fusionnées une seconde fois.
@@ -25,16 +26,17 @@ drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
   l'intégrité, Gradle, Supabase, l'Edge Function et Xcode simulateur Debug/Staging/Release. CI-001
   force toujours iOS sur `main` et ne l'omet en PR que pour les périmètres explicitement sûrs ; tout
   chemin inconnu reste fail-safe.
-- La PR `#59` porte SYNC-001 au commit exact `a81ea8f0cc65be8d4e785040b97569999e6f7324`.
-  Le run `31370227545` passe ses 16 jobs : intégrité, Gradle, Supabase/pgTAP et concurrence,
-  Edge Function, Android API 30/31/36, Swift policies, XCFrameworks et Xcode 16.4 simulateur
-  Debug/Staging/Release. La PR est `CLEAN` et reste ouverte jusqu'à revue/fusion.
+- La PR `#59` a fusionné SYNC-001 dans `main` au commit
+  `0f7850621896e88d5d5738b67c42878de86e46bc`. Le run exact-head `31374360536`, tentative 2,
+  passe ses 16 jobs, dont Android API 31/36 et Xcode Debug/Staging/Release. Le run post-fusion
+  `31378013483` est vert avec 11 jobs réussis, trois jobs de preuve conditionnels ignorés et aucun
+  échec.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
   Android/iOS, détail natif, actions externes, découverte des guides, deep link interne de fiche et
   Profil → Favoris natif.
-- Ne sont pas terminés : racines Social/Ajouter/Notifications,
+- Ne sont pas terminés : racines Social/Ajouter/Notifications (NOTIF-001A est en cours),
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
@@ -495,7 +497,7 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-SYNC-001 est terminé et validé exact-head dans la PR `#59` ; seule sa revue/fusion reste ouverte. Il
+SYNC-001 est terminé, validé exact-head et fusionné dans `main` par la PR `#59`. Il
 n'ajoute ni moniteur réseau plateforme ni ordre global multi-appareils. Aucun nouveau lot fonctionnel
 n'est engagé silencieusement : EXPLORE-002B2B2 attend l'arbitrage Produit du drawer avancé,
 HISTORY-001B attend les gates d'ADR-0031, et STAB-002B reste suspendu à la décision structurante sur

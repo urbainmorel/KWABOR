@@ -49,6 +49,7 @@ import com.kwabor.android.detail.DetailExternalActionLauncher
 import com.kwabor.android.ui.components.KwaborLoadingState
 import com.kwabor.android.ui.components.KwaborStateMessage
 import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -60,6 +61,7 @@ internal fun CatalogDetailSheet(
     strings: KwaborStrings,
     platformDependencies: CatalogDetailPlatformDependencies,
     actions: CatalogDetailSheetActions,
+    onContentPresented: (CatalogDetailOpenRequestId, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     if (state == CatalogDetailUiState.Closed) return
@@ -79,6 +81,7 @@ internal fun CatalogDetailSheet(
             mediaUrlPolicy = platformDependencies.mediaUrlPolicy,
             actions = contentActions,
             externalActionCallbacks = externalActionState.callbacks,
+            onContentPresented = onContentPresented,
             heroHeight = heroHeight,
         )
         CatalogDetailPrimaryBottomSheet(

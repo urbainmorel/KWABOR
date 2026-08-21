@@ -95,7 +95,6 @@ private object NoOpInteractionRepository : InteractionRepository {
         includeManualFailures: Boolean,
     ): DomainResult<Int> = DomainResult.Success(0)
 
-    override suspend fun purge(accountId: String): DomainResult<Int> = DomainResult.Success(0)
 }
 
 private object IosInteractionClock : ClockProvider {

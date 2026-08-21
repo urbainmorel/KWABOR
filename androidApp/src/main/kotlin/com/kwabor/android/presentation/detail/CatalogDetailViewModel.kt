@@ -3,6 +3,7 @@ package com.kwabor.android.presentation.detail
 import androidx.lifecycle.ViewModel
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailPresenter
 import com.kwabor.shared.presentation.detail.CatalogDetailRuntime
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
@@ -37,6 +38,12 @@ internal class CatalogDetailViewModel internal constructor(
 
     fun onIntent(intent: CatalogDetailIntent) {
         runtime.dispatch(intent)
+    }
+
+    fun openCorrelated(listingId: String, correlationSequence: Long): CatalogDetailOpenRequestId {
+        val openRequestId = CatalogDetailOpenRequestId.correlated(correlationSequence)
+        runtime.dispatch(CatalogDetailIntent.Open(listingId, openRequestId))
+        return openRequestId
     }
 
     override fun onCleared() {

@@ -18,7 +18,6 @@ import com.kwabor.shared.domain.interaction.PendingInteraction
 import com.kwabor.shared.domain.interaction.PendingInteractionStatus
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -28,7 +27,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -190,13 +188,11 @@ class InteractionCoordinatorSubmissionAndEventsTest {
 
         coordinator.onForeground()
         runCurrent()
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
 
         assertTrue(purge.isCompleted)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         releaseCollector.complete(Unit)
         collector.cancel()
     }
@@ -224,312 +220,9 @@ class InteractionCoordinatorSubmissionAndEventsTest {
         collector.cancel()
     }
 
-    @Test
-    fun accountDeletionPurgeWaitsForInflightSubmitThenRemovesItsRow() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val submitGate = CompletableDeferred<Unit>()
-        repository.submitReturnGate = submitGate
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        val submission = async {
-            coordinator.submit(A_SCOPE, LISTING_ID_ONE, InteractionKind.Like, desiredSelected = true)
-        }
-        runCurrent()
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        runCurrent()
-
-        assertEquals(1, repository.pending.size)
-        assertFalse(purge.isCompleted)
-        submitGate.complete(Unit)
-        assertIs<InteractionSubmitOutcome.Superseded>(
-            assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission.await()).value,
-        )
-        val purgeOutcome = assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value
-        assertEquals(1, assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(purgeOutcome).purgedCount)
-        assertEquals(emptyList(), repository.pending)
-    }
-
-    @Test
-    fun blockedHydrationOutsideCommitLeaseDoesNotDelayPurgeAndLateCommitIsRejected() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        val generation = requireNotNull(coordinator.deliveryCommitGate.captureLifecycleGeneration(A_SCOPE))
-        val hydrationStarted = CompletableDeferred<Unit>()
-        val releaseHydration = CompletableDeferred<Unit>()
-        var committed = false
-        val lateCommit = async {
-            hydrationStarted.complete(Unit)
-            releaseHydration.await()
-            coordinator.deliveryCommitGate.runIfLifecycleGenerationCurrent(A_SCOPE, generation) {
-                committed = true
-            }
-        }
-        hydrationStarted.await()
-
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
-        coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
-        releaseHydration.complete(Unit)
-
-        assertFalse(lateCommit.await())
-        assertFalse(committed)
-    }
-
-    @Test
-    fun purgeRejectsBlankNormalizesAccountAndBlocksEveryLaterSubmit() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        val blank = coordinator.purgeForAccountDeletion("   ")
-        assertEquals(
-            DomainError.Validation("error.interaction.account_id_invalid"),
-            assertIs<DomainResult.Failure>(blank).error,
-        )
-        assertEquals(emptyList(), repository.purgeCalls)
-
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion("  ${ACCOUNT_ID_A.uppercase()}  "),
-            ).value,
-        )
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Favorite,
-            desiredSelected = true,
-        )
-        assertIs<DomainError.AuthenticationRequired>(assertIs<DomainResult.Failure>(submission).error)
-        assertEquals(listOf(ACCOUNT_ID_A), repository.purgeCalls)
-        assertEquals(emptyList(), repository.submittedCommands)
-    }
-
-    @Test
-    fun purgeDomainFailureAutomaticallyUnblocksFutureSubmit() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository().apply {
-            purgeFailure = DomainError.LocalStorageUnavailable("error.interaction.purge_failed")
-        }
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        assertIs<DomainResult.Failure>(coordinator.purgeForAccountDeletion(ACCOUNT_ID_A))
-        repository.purgeFailure = null
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Like,
-            desiredSelected = true,
-        )
-
-        assertIs<InteractionSubmitOutcome.Queued>(
-            assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission).value,
-        )
-        assertEquals(1, repository.pending.size)
-    }
-
-    @Test
-    fun explicitResumeAfterRemoteDeletionFailureIsIdempotentAndAllowsSubmitAgain() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
-
-        coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A.uppercase())
-        coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Like,
-            desiredSelected = true,
-        )
-
-        assertIs<InteractionSubmitOutcome.Queued>(
-            assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission).value,
-        )
-    }
 }
 
 class InteractionCoordinatorPurgeTest {
-    @Test
-    fun purgeExceptionAlsoUnblocksFutureSubmit() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository().apply {
-            purgeThrowable = IllegalStateException("storage unavailable")
-        }
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        assertFailsWith<IllegalStateException> {
-            coordinator.purgeForAccountDeletion(ACCOUNT_ID_A)
-        }
-        repository.purgeThrowable = null
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Like,
-            desiredSelected = true,
-        )
-
-        assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission)
-    }
-
-    @Test
-    fun purgeCancellationAlsoUnblocksFutureSubmit() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val purgeGate = CompletableDeferred<Unit>()
-        repository.purgeGate = purgeGate
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        runCurrent()
-        purge.cancel()
-        runCurrent()
-        assertTrue(purge.isCancelled)
-        purgeGate.complete(Unit)
-        settleCoordinatorBackgroundWork()
-
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Like,
-            desiredSelected = true,
-        )
-        assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission)
-    }
-
-    @Test
-    fun cancelledPurgeOwnerDoesNotLeakALateRepositoryException() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val purgeGate = CompletableDeferred<Unit>()
-        repository.purgeGate = purgeGate
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        runCurrent()
-        purge.cancel()
-        repository.purgeThrowable = IllegalStateException("storage unavailable")
-        purgeGate.complete(Unit)
-        settleCoordinatorBackgroundWork()
-
-        assertTrue(purge.isCancelled)
-        val submission = coordinator.submit(
-            A_SCOPE,
-            LISTING_ID_ONE,
-            InteractionKind.Like,
-            desiredSelected = true,
-        )
-        assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submission)
-        assertEquals(listOf(ACCOUNT_ID_A), repository.purgeCalls)
-    }
-
-    @Test
-    fun cancellationAfterLocalPurgeStillInvalidatesBufferedDeliveryAndResumesOnce() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val purgeEffectCompleted = CompletableDeferred<Unit>()
-        val purgeReturnGate = CompletableDeferred<Unit>()
-        repository.purgeEffectCompleted = purgeEffectCompleted
-        repository.purgeReturnGate = purgeReturnGate
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        val collector = blockFirstInteractionEvent(coordinator)
-        assertIs<DomainResult.Success<InteractionSubmitOutcome>>(
-            coordinator.submit(A_SCOPE, LISTING_ID_ONE, InteractionKind.Like, desiredSelected = true),
-        )
-        runCurrent()
-        val queuedBeforePurge = assertIs<InteractionCoordinatorEvent.Queued>(collector.captured.await())
-
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        purgeEffectCompleted.await()
-        purge.cancel()
-        runCurrent()
-        assertTrue(purge.isCancelled)
-        purgeReturnGate.complete(Unit)
-        settleCoordinatorBackgroundWork()
-
-        val purgeSignal = requireNotNull(coordinator.reconciliationSignals.value)
-        assertTrue(purgeSignal.requiresPendingValidation)
-        assertTrue(purgeSignal.deliveryWatermark >= queuedBeforePurge.deliverySequence)
-        var staleCommitted = false
-        val accepted = coordinator.deliveryCommitGate.runIfEventDeliveryValid(queuedBeforePurge) {
-            staleCommitted = true
-        }
-        assertFalse(accepted)
-        assertFalse(staleCommitted)
-        assertIs<DomainResult.Success<InteractionSubmitOutcome>>(
-            coordinator.submit(A_SCOPE, LISTING_ID_ONE, InteractionKind.Like, desiredSelected = true),
-        )
-        assertEquals(listOf(ACCOUNT_ID_A), repository.purgeCalls)
-        collector.close()
-    }
-
-    @Test
-    fun acquiredCallbackPublishesOwnershipBeforeCallerCancellationCanLoseTheResult() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-        val acquired = CompletableDeferred<Unit>()
-
-        val purge = launch {
-            val ownerJob = coroutineContext[Job] ?: error("Missing purge owner job")
-            coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) {
-                acquired.complete(Unit)
-                ownerJob.cancel()
-            }
-        }
-        acquired.await()
-        purge.join()
-
-        val secondOutcome = assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-            coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-        ).value
-        assertIs<InteractionAccountDeletionPurgeOutcome.AlreadyBlocked>(secondOutcome)
-        assertEquals(listOf(ACCOUNT_ID_A), repository.purgeCalls)
-    }
-
-    @Test
-    fun concurrentPurgesShareOneStorageOperation() = runTest {
-        val tracker = authenticatedTracker()
-        val repository = FakeInteractionRepository()
-        val purgeGate = CompletableDeferred<Unit>()
-        repository.purgeGate = purgeGate
-        val coordinator = InteractionCoordinator(repository, tracker, FixedClock(100L), backgroundScope)
-        runCurrent()
-
-        val first = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        runCurrent()
-        val second = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
-        runCurrent()
-
-        assertFalse(first.isCompleted)
-        assertFalse(second.isCompleted)
-        purgeGate.complete(Unit)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(first.await()).value,
-        )
-        assertIs<InteractionAccountDeletionPurgeOutcome.AlreadyBlocked>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(second.await()).value,
-        )
-        assertEquals(listOf(ACCOUNT_ID_A), repository.purgeCalls)
-    }
-
     @Test
     fun confirmationFinishingAfterPurgeIsNotPublished() = runTest {
         val tracker = authenticatedTracker()
@@ -545,13 +238,11 @@ class InteractionCoordinatorPurgeTest {
 
         coordinator.onForeground()
         runCurrent()
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
         assertFalse(purge.isCompleted)
         drainGate.complete(Unit)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         advanceUntilIdle()
 
         assertEquals(emptyList(), received.filterIsInstance<InteractionCoordinatorEvent.Confirmed>())
@@ -583,18 +274,16 @@ class InteractionCoordinatorPurgeTest {
         runCurrent()
         assertEquals(1, repository.loadPendingCalls.size)
 
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
-        coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
+        runCurrent()
+        assertFalse(purge.isCompleted)
         repository.loadPendingGate?.complete(Unit)
 
         assertIs<DomainError.AuthenticationRequired>(
             assertIs<DomainResult.Failure>(hydration.await()).error,
         )
-        assertEquals(emptyList(), repository.pending)
+        purge.await()
+        assertTrue(coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A))
     }
 
     @Test
@@ -608,7 +297,7 @@ class InteractionCoordinatorPurgeTest {
 
         coordinator.onForeground()
         runCurrent()
-        val purgeA = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purgeA = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
         assertFalse(purgeA.isCompleted)
         tracker.update(accountId = ACCOUNT_ID_B, accountSetupComplete = true)
@@ -623,9 +312,7 @@ class InteractionCoordinatorPurgeTest {
             assertIs<DomainResult.Success<InteractionSubmitOutcome>>(submissionB).value,
         )
         drainGate.complete(Unit)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purgeA.await()).value,
-        )
+        purgeA.await()
         assertEquals(listOf(ACCOUNT_ID_B), repository.pending.map(PendingInteraction::accountId))
     }
 
@@ -707,12 +394,8 @@ class InteractionCoordinatorEventSaturationTest {
         runCurrent()
         val capturedSignal = requireNotNull(coordinator.reconciliationSignals.value)
 
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
-        coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A)
+        coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A)
+        assertTrue(coordinator.resumeAfterAccountDeletionFailure(ACCOUNT_ID_A))
         var committed = false
 
         val accepted = coordinator.deliveryCommitGate.runIfReconciliationCurrent(capturedSignal) {
@@ -752,13 +435,11 @@ class InteractionCoordinatorEventSaturationTest {
             lastConfirmation.confirmation.operationId,
             signal.terminalWatermark(lastConfirmation.command.listingId, lastConfirmation.command.kind),
         )
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
 
         assertTrue(purge.isCompleted)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         val purgeSignal = requireNotNull(coordinator.reconciliationSignals.value)
         assertTrue(purgeSignal.requiresPendingValidation)
         assertTrue(purgeSignal.stateVersion > signal.stateVersion)
@@ -785,13 +466,11 @@ class InteractionCoordinatorEventSaturationTest {
         assertTrue(signal.revision > 0L)
         assertEquals(102L, signal.deliveryWatermark)
         assertEquals(102L, signal.terminalWatermark(LISTING_ID_ONE, InteractionKind.Favorite))
-        val purge = async { coordinator.purgeForAccountDeletion(ACCOUNT_ID_A) }
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
         runCurrent()
 
         assertTrue(purge.isCompleted)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         val purgeSignal = requireNotNull(coordinator.reconciliationSignals.value)
         assertTrue(purgeSignal.requiresPendingValidation)
         assertTrue(purgeSignal.stateVersion > signal.stateVersion)
@@ -805,7 +484,6 @@ internal class FakeInteractionRepository : InteractionRepository {
     val drainCalls = mutableListOf<InteractionAccountScope>()
     val retryCalls = mutableListOf<Pair<InteractionAccountScope, Boolean>>()
     val loadPendingCalls = mutableListOf<Pair<String, List<String>>>()
-    val purgeCalls = mutableListOf<String>()
     val drainOutcomes = ArrayDeque<List<InteractionOperationOutcome>>()
     val nextAttemptAtResults = mutableListOf<Long?>()
     var pending: List<PendingInteraction> = emptyList()
@@ -813,12 +491,7 @@ internal class FakeInteractionRepository : InteractionRepository {
     var drainGate: CompletableDeferred<Unit>? = null
     var loadPendingGate: CompletableDeferred<Unit>? = null
     var captureLoadPendingBeforeGate: Boolean = false
-    var purgeGate: CompletableDeferred<Unit>? = null
-    var purgeEffectCompleted: CompletableDeferred<Unit>? = null
-    var purgeReturnGate: CompletableDeferred<Unit>? = null
-    var purgeFailure: DomainError? = null
     var drainFailure: DomainError? = null
-    var purgeThrowable: Throwable? = null
     var submitReturnGate: CompletableDeferred<Unit>? = null
     var afterLoadPending: ((Int) -> Unit)? = null
     private var operationId = 0L
@@ -885,18 +558,6 @@ internal class FakeInteractionRepository : InteractionRepository {
         return DomainResult.Success(0)
     }
 
-    override suspend fun purge(accountId: String): DomainResult<Int> {
-        purgeCalls += accountId
-        purgeGate?.await()
-        purgeThrowable?.let { throwable -> throw throwable }
-        purgeFailure?.let { error -> return DomainResult.Failure(error) }
-        val retained = pending.filterNot { interaction -> interaction.accountId == accountId }
-        val purged = pending.size - retained.size
-        pending = retained
-        purgeEffectCompleted?.complete(Unit)
-        purgeReturnGate?.await()
-        return DomainResult.Success(purged)
-    }
 }
 
 internal class FixedClock(private val now: Long) : ClockProvider {
@@ -923,32 +584,6 @@ internal fun pending(
     attemptCount = attemptCount,
     status = status,
 )
-
-private data class BlockedInteractionEventCollector(
-    val captured: CompletableDeferred<InteractionCoordinatorEvent>,
-    private val release: CompletableDeferred<Unit>,
-    private val job: Job,
-) {
-    fun close() {
-        release.complete(Unit)
-        job.cancel()
-    }
-}
-
-private suspend fun TestScope.blockFirstInteractionEvent(
-    coordinator: InteractionCoordinator,
-): BlockedInteractionEventCollector {
-    val captured = CompletableDeferred<InteractionCoordinatorEvent>()
-    val release = CompletableDeferred<Unit>()
-    val job = backgroundScope.launch {
-        coordinator.events.collect { event ->
-            captured.complete(event)
-            release.await()
-        }
-    }
-    runCurrent()
-    return BlockedInteractionEventCollector(captured, release, job)
-}
 
 private fun TestScope.settleCoordinatorBackgroundWork() {
     runCurrent()

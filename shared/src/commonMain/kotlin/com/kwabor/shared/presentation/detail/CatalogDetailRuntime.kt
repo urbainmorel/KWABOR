@@ -34,6 +34,7 @@ class CatalogDetailRuntime(
     private var temporalJob: Job? = null
     private var sourceDetail: CatalogDetail? = null
     private var generation = 0L
+    private val openRequestIdGenerator = CatalogDetailOpenRequestIdGenerator()
 
     init {
         runtimeScope.launch {
@@ -54,7 +55,7 @@ class CatalogDetailRuntime(
 
     private suspend fun handle(intent: CatalogDetailIntent) {
         when (intent) {
-            is CatalogDetailIntent.Open -> startLoad(intent.listingId)
+            is CatalogDetailIntent.Open -> startLoad(intent.listingId, intent.openRequestId)
             CatalogDetailIntent.Retry -> retry()
             CatalogDetailIntent.Close -> dismiss()
             is CatalogDetailIntent.SelectMedia -> selectMedia(intent.index)
@@ -62,18 +63,27 @@ class CatalogDetailRuntime(
         }
     }
 
-    private suspend fun startLoad(listingId: String) {
+    private suspend fun startLoad(
+        listingId: String,
+        requestedOpenRequestId: CatalogDetailOpenRequestId?,
+    ) {
         val request = lifecycleMutex.withLock {
+            val openRequestId = requestedOpenRequestId ?: openRequestIdGenerator.next() ?: return@withLock null
             loadJob?.cancel()
             temporalJob?.cancel()
             temporalJob = null
             val nextGeneration = ++generation
+            val normalizedListingId = listingId.trim()
             sourceDetail = null
-            mutableState.value = CatalogDetailUiState.Loading(listingId)
-            LoadRequest(generation = nextGeneration, listingId = listingId)
-        }
+            mutableState.value = CatalogDetailUiState.Loading(normalizedListingId, openRequestId)
+            LoadRequest(
+                generation = nextGeneration,
+                listingId = normalizedListingId,
+                openRequestId = openRequestId,
+            )
+        } ?: return
         loadJob = runtimeScope.launch {
-            val presentation = presenter.loadPresentation(request.listingId, strings)
+            val presentation = presenter.loadPresentation(request.listingId, request.openRequestId, strings)
             lifecycleMutex.withLock {
                 if (request.generation == generation && mutableState.value !is CatalogDetailUiState.Closed) {
                     sourceDetail = presentation.source
@@ -88,19 +98,19 @@ class CatalogDetailRuntime(
     }
 
     private suspend fun retry() {
-        val listingId = lifecycleMutex.withLock {
+        val retryRequest = lifecycleMutex.withLock {
             when (val current = mutableState.value) {
-                is CatalogDetailUiState.Failure -> current.listingId
-                is CatalogDetailUiState.NotFound -> current.listingId
-                is CatalogDetailUiState.OfflineFailure -> current.listingId
+                is CatalogDetailUiState.Failure -> RetryRequest(current.listingId, current.openRequestId)
+                is CatalogDetailUiState.NotFound -> RetryRequest(current.listingId, current.openRequestId)
+                is CatalogDetailUiState.OfflineFailure -> RetryRequest(current.listingId, current.openRequestId)
                 CatalogDetailUiState.Closed,
                 is CatalogDetailUiState.Content,
                 is CatalogDetailUiState.Loading,
                 -> null
             }
         }
-        if (listingId != null) {
-            startLoad(listingId)
+        if (retryRequest != null) {
+            startLoad(retryRequest.listingId, retryRequest.openRequestId)
         }
     }
 
@@ -137,7 +147,7 @@ class CatalogDetailRuntime(
         lifecycleMutex.withLock {
             val source = sourceDetail ?: return@withLock
             val current = mutableState.value as? CatalogDetailUiState.Content ?: return@withLock
-            val refreshed = presenter.present(source, strings)
+            val refreshed = presenter.present(source, current.openRequestId, strings)
             mutableState.value = current.copy(model = refreshed.model)
         }
     }
@@ -155,4 +165,10 @@ class CatalogDetailRuntime(
 private data class LoadRequest(
     val generation: Long,
     val listingId: String,
+    val openRequestId: CatalogDetailOpenRequestId,
+)
+
+private data class RetryRequest(
+    val listingId: String,
+    val openRequestId: CatalogDetailOpenRequestId,
 )

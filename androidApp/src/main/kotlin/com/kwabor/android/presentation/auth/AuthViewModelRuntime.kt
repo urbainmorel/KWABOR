@@ -4,12 +4,13 @@ import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOwnership
 import com.kwabor.shared.presentation.auth.RegistrationIntent
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.initialAuthUiState
 import com.kwabor.shared.presentation.auth.initialPasswordRecoveryUiState
 import com.kwabor.shared.presentation.auth.initialRegistrationUiState
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -78,7 +79,8 @@ internal data class AuthViewModelDependencies(
     val accountDeletionPurgeRegistry: AccountDeletionPurgeRegistry,
     val track: (com.kwabor.shared.domain.observability.AnalyticsEvent) -> Unit,
     val revokeObservabilityConsent: () -> Boolean,
-    val purgeInteractionsForAccountDeletion:
-    suspend (String) -> DomainResult<InteractionAccountDeletionPurgeOutcome>,
-    val resumeInteractionsAfterAccountDeletionFailure: suspend (String) -> Unit,
+    val purgePrivateDataForAccountDeletion:
+    suspend (String) -> DomainResult<AccountPrivateDataPurgeOutcome>,
+    val resumePrivateDataAfterAccountDeletionFailure: suspend (AccountPrivateDataPurgeOwnership) -> Boolean,
+    val retainPrivateDataBlockAfterAccountDeletion: suspend (AccountPrivateDataPurgeOwnership) -> Boolean,
 )

@@ -166,9 +166,6 @@ internal abstract class InteractionOutboxDao : InteractionOutboxReader {
     )
     abstract suspend fun rearm(operationId: Long, expectedDesiredSelected: Long, rearmedAtEpochMilliseconds: Long): Int
 
-    @Query("DELETE FROM interaction_outbox_operations WHERE account_id = :accountId")
-    abstract suspend fun purgeAccount(accountId: String): Int
-
     @Transaction
     open suspend fun enqueueCoalesced(
         operation: InteractionOutboxEntity,

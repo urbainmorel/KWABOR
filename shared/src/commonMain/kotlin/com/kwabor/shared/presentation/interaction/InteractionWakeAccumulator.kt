@@ -12,6 +12,14 @@ internal class InteractionWakeAccumulator {
         pending.value = null
     }
 
+    fun clearAccount(accountId: String) {
+        while (true) {
+            val current = pending.value ?: return
+            if (current.scope.accountId != accountId) return
+            if (pending.compareAndSet(current, null)) return
+        }
+    }
+
     fun offer(request: InteractionWakeRequest, currentScope: InteractionAccountScope?) {
         if (request.scope != currentScope) return
         while (true) {

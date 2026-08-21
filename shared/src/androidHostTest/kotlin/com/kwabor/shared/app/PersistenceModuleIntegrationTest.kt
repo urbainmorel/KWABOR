@@ -24,10 +24,28 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE)
 class PersistenceModuleIntegrationTest {
+    @Test
+    fun notificationRuntimeRemainsAvailableWhenOfflinePersistenceIsAbsent() {
+        val root = assertNotNull(
+            createKwaborCompositionRootOrNull(
+                supabaseUrl = "https://example.invalid",
+                supabasePublishableKey = "publishable-key",
+            ),
+        )
+
+        try {
+            assertSame(root.notificationRuntime, root.notificationRuntime)
+            assertNull(root.accountPrivateDataPurgeCoordinator)
+        } finally {
+            root.close()
+        }
+    }
+
     @Test
     fun compositionRootResolvesEachPersistenceResourceLazilyOnce() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -64,6 +82,8 @@ class PersistenceModuleIntegrationTest {
 
         try {
             assertNotNull(root.interactionCoordinator)
+            assertNotNull(root.accountPrivateDataPurgeCoordinator)
+            assertSame(root.notificationRuntime, root.notificationRuntime)
             assertEquals(1, requests.databaseConfiguration)
             assertEquals(0, requests.databaseBuilder)
             assertEquals(0, requests.preferencesStorage)
@@ -85,6 +105,7 @@ class PersistenceModuleIntegrationTest {
 
         try {
             val coordinator = assertNotNull(root.interactionCoordinator)
+            val purgeCoordinator = assertNotNull(root.accountPrivateDataPurgeCoordinator)
             val viewerScope = root.viewerSessionScopeTracker.update(
                 accountId = TEST_ACCOUNT_ID,
                 accountSetupComplete = true,
@@ -93,7 +114,6 @@ class PersistenceModuleIntegrationTest {
                 accountId = TEST_ACCOUNT_ID,
                 epoch = viewerScope.epoch,
             )
-
             val submit = coordinator.submit(
                 expectedScope = interactionScope,
                 listingId = TEST_LISTING_ID,
@@ -101,7 +121,7 @@ class PersistenceModuleIntegrationTest {
                 desiredSelected = true,
             )
             val hydrate = coordinator.hydrate(interactionScope, listOf(TEST_LISTING_ID))
-            val purge = coordinator.purgeForAccountDeletion(TEST_ACCOUNT_ID)
+            val purge = purgeCoordinator.purgeForAccountDeletion(TEST_ACCOUNT_ID)
 
             assertIs<DomainError.LocalStorageUnavailable>(assertIs<DomainResult.Failure>(submit).error)
             assertIs<DomainError.LocalStorageUnavailable>(assertIs<DomainResult.Failure>(hydrate).error)

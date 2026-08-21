@@ -160,7 +160,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     cloisonnés par compte et epoch de session.
   - [x] Bloquer et purger l'outbox avant toute suppression de compte, y compris avant le sélecteur
     d'identité sociale, sans pouvoir cibler un autre compte après une course de session.
-- [ ] PR-SYNC-001 — Faire relire puis fusionner la PR `#59`, validée sur son exact-head `a81ea8f`
+- [x] PR-SYNC-001 — PR `#59` relue puis fusionnée dans `main` au commit `0f785062`, avec run
+  post-fusion `31378013483` vert.
   par le run `31370227545` (16/16 jobs verts).
 - [ ] DRAFT-001 — Synchroniser les brouillons avec version optimiste et conservation des deux versions en conflit.
 - [ ] MEDIA-001 — Créer buckets/RLS, uploads temporaires, validation, downsampling, dérivés et Edge Function `media-finalize`.
@@ -319,10 +320,33 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [ ] MOD-001 — Livrer `moderate-content` : validation, déduplication/GPS, texte/image, risque et quarantaine fail-closed.
 - [ ] MOD-OPS-001 — Ajouter RPC opérateur sécurisés, journal d'audit et recours sans nouveau client applicatif.
 - [ ] TRANSLATION-001 — Traduire à l'affichage avec cache serveur en conservant toujours le texte source.
-- [ ] NOTIF-001 — Ajouter préférences, tokens device, campagnes, lecture/masquage et RLS.
-- [ ] NOTIF-002 — Livrer `notifications-dispatch`, remise FCM/APNs, quotas sponsorisés, silence nocturne, retry et deep links.
-- [ ] NOTIF-003 — Livrer le centre et les réglages de notifications Android.
-- [ ] NOTIF-IOS-001 — Livrer le centre et les réglages de notifications SwiftUI.
+- [ ] NOTIF-001 — Livrer l'autorité propriétaire, les préférences, la lecture/masquage et les
+  centres de notifications natifs.
+  - [ ] NOTIF-001A — Livrer la boîte proactive propriétaire Android/iOS, offline-first et sans
+    producteur push distant.
+    - [ ] Faire accepter [ADR-0036](docs/adr/0036-owner-notification-inbox-and-offline-state.md) :
+      quatre familles V1 en opt-in désactivé, legacy non reclassé, badge `seenThrough` distinct de
+      `readAt`/`hiddenAt`, séquence serveur et snapshot keyset.
+    - [ ] Ajouter l'autorité Supabase additive, ses préférences, ses RPC account-fenced, ses RLS et
+      ses tests de curseur, IDOR, concurrence, suppression de compte et compatibilité legacy.
+    - [ ] Migrer Room `4 → 5` sans perte, puis ajouter un miroir privé limité à 200 notifications et
+      une outbox durable limitée à 512 commandes logiques pour ouverture, lecture, « Tout marquer
+      comme lu », masquage et préférences ; conserver ces données cloisonnées après déconnexion et
+      les purger uniquement lors de la suppression explicite du compte.
+    - [ ] Raccorder le repository, le runtime UDF et le coordinateur KMP au
+      `NotificationAccountScope` exact compte/epoch, avec cache offline, pagination, refresh et
+      rejet des réponses obsolètes, sans persister l'epoch dans les payloads Room.
+    - [ ] Remplacer la racine factice par les centres Android Compose et iOS SwiftUI : groupes en
+      heure du Bénin, badge navbar, non-lu, badge texte « Sponsorisé », détail, préférences et états
+      skeleton/vide/erreur/offline accessibles.
+    - [ ] Émettre `notification_opened` uniquement après ouverture confirmée du détail et consentement
+      Analytics, sans simuler `notification_received`, FCM, APNs ni producteur distant.
+    - [ ] Décider et tester la rétention serveur des notifications et receipts d'idempotence avant
+      tout producteur NOTIF-002, sans annoncer de purge automatique dans NOTIF-001A.
+    - [ ] Exécuter les tests SQL/KMP/Android/iOS, les migrations Room et la matrice CI exact-head,
+      puis faire relire sécurité, session, offline et accessibilité sans cocher ce lot avant preuve.
+- [ ] NOTIF-002 — Ajouter tokens device et campagnes, puis livrer `notifications-dispatch`, remise
+  FCM/APNs, quotas sponsorisés, silence nocturne, retry et deep links système.
 
 ### Organisations, promotion, paiement et IA
 

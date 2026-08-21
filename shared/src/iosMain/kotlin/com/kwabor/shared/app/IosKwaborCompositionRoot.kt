@@ -55,7 +55,7 @@ class IosKwaborCompositionRoot(
     val authController = IosAuthController(
         presenter = sharedRoot?.authPresenter,
         dispatcherProvider = dispatcherProvider,
-        interactionCoordinator = sharedRoot?.interactionCoordinator,
+        purgeCoordinator = sharedRoot?.accountPrivateDataPurgeCoordinator,
     )
     val registrationController = IosRegistrationController(
         presenter = sharedRoot?.registrationPresenter,

@@ -187,16 +187,15 @@ class InteractionCoordinatorHydrationAndWakeTest {
 
         val hydration = async { coordinator.hydrate(A_SCOPE, listOf(LISTING_ID_ONE)) }
         runCurrent()
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-                coordinator.purgeForAccountDeletion(ACCOUNT_ID_A),
-            ).value,
-        )
+        val purge = async { coordinator.commitAccountDeletionBlock(ACCOUNT_ID_A) }
+        runCurrent()
+        assertFalse(purge.isCompleted)
         loadGate.complete(Unit)
 
         assertIs<DomainError.AuthenticationRequired>(
             assertIs<DomainResult.Failure>(hydration.await()).error,
         )
+        purge.await()
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.kwabor.shared.domain.auth.AccountDeletionOutcome
 import com.kwabor.shared.domain.auth.AccountDeletionPreTransportCancellation
 import com.kwabor.shared.domain.auth.AccountDeletionPreTransportCleanupPendingCancellation
 import com.kwabor.shared.domain.auth.AccountDeletionRequest
+import com.kwabor.shared.domain.auth.AccountPrivateDataPurgeResult
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthRepository
 import com.kwabor.shared.domain.auth.AuthSession
@@ -19,9 +20,10 @@ import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.i18n.stringsFor
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOwnership
 import com.kwabor.shared.presentation.auth.AuthPresenter
 import com.kwabor.shared.presentation.auth.AuthUiState
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -38,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IosAuthControllerTest {
@@ -59,6 +62,7 @@ class IosAuthControllerTest {
         assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A"), events)
         assertEquals(ACCOUNT_A, repository.deletionRequests.single().expectedAccountId)
         assertTrue(lifecycle.resumedAccountIds.isEmpty())
+        assertSingleOwnershipRetained(lifecycle, ACCOUNT_A)
         controller.close()
     }
 
@@ -84,6 +88,37 @@ class IosAuthControllerTest {
         assertFalse(completed)
         assertEquals(listOf("purge:$ACCOUNT_A"), events)
         assertTrue(repository.deletionRequests.isEmpty())
+        assertTrue(lifecycle.acquiredOwnerships.isEmpty())
+        assertEquals(stringsFor(AppLocale.French).settings.privacyPersistenceError, observedState?.errorMessage)
+        controller.close()
+    }
+
+    @Test
+    fun postCommitRecoveryRequiredResumesExactOwnershipAndNeverStartsRemoteDeletion() {
+        val events = mutableListOf<String>()
+        val ownership = AccountPrivateDataPurgeOwnership(ACCOUNT_A)
+        val repository = IosAccountDeletionAuthRepository(events = events)
+        val lifecycle = RecordingAccountDeletionLifecycle(
+            events = events,
+            purgeResult = DomainResult.Success(
+                AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired(ownership),
+            ),
+        )
+        val controller = configuredController(repository, lifecycle)
+        var observedState: AuthUiState? = null
+        controller.observe { state -> observedState = state }
+        restore(controller)
+        var completed = true
+
+        controller.deleteAccountWithPassword(
+            password = "valid-password",
+            idempotencyKey = "delete-password-recovery",
+        ) { success -> completed = success }
+
+        assertFalse(completed)
+        assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
+        assertTrue(repository.deletionRequests.isEmpty())
+        assertEquals(listOf(ownership), lifecycle.resumedOwnerships)
         assertEquals(stringsFor(AppLocale.French).settings.privacyPersistenceError, observedState?.errorMessage)
         controller.close()
     }
@@ -94,7 +129,7 @@ class IosAuthControllerTest {
         val repository = IosAccountDeletionAuthRepository(events = events)
         val lifecycle = RecordingAccountDeletionLifecycle(
             events = events,
-            purgeResult = DomainResult.Success(InteractionAccountDeletionPurgeOutcome.AlreadyBlocked),
+            purgeResult = DomainResult.Success(AccountPrivateDataPurgeOutcome.AlreadyBlocked),
         )
         val controller = configuredController(repository, lifecycle)
         var observedState: AuthUiState? = null
@@ -110,6 +145,7 @@ class IosAuthControllerTest {
 
         assertEquals(false, prepared)
         assertEquals(listOf("purge:$ACCOUNT_A", "purge:$ACCOUNT_A"), events)
+        assertTrue(lifecycle.acquiredOwnerships.isEmpty())
         assertTrue(lifecycle.resumedAccountIds.isEmpty())
         assertTrue(repository.deletionRequests.isEmpty())
         assertEquals(stringsFor(AppLocale.French).authAccountDeletionOutcomeUnknown, observedState?.errorMessage)
@@ -138,6 +174,7 @@ class IosAuthControllerTest {
         assertFalse(completed)
         assertTrue(repository.deletionRequests.isEmpty())
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         controller.close()
     }
@@ -163,6 +200,7 @@ class IosAuthControllerTest {
         assertFalse(completed)
         assertEquals(ACCOUNT_A, repository.deletionRequests.single().expectedAccountId)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         assertEquals(
             listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A", "resume:$ACCOUNT_A"),
             events,
@@ -189,6 +227,7 @@ class IosAuthControllerTest {
 
         assertTrue(completed)
         assertTrue(lifecycle.resumedAccountIds.isEmpty())
+        assertSingleOwnershipRetained(lifecycle, ACCOUNT_A)
         assertNull(observedState?.currentSession)
         assertEquals(stringsFor(AppLocale.French).authAccountDeleted, observedState?.noticeMessage)
         controller.close()
@@ -214,6 +253,7 @@ class IosAuthControllerTest {
         assertEquals(false, signedIn)
         assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A"), events)
         assertTrue(lifecycle.resumedAccountIds.isEmpty())
+        assertSingleOwnershipRetained(lifecycle, ACCOUNT_A)
         assertEquals(0, repository.signInWithEmailCalls)
 
         repository.currentSessionError = DomainError.LocalStorageUnavailable()
@@ -246,6 +286,7 @@ class IosAuthControllerTest {
 
         assertTrue(cancelled)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         controller.close()
     }
@@ -269,6 +310,7 @@ class IosAuthControllerTest {
         assertEquals(true, cancellation)
         assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         var deletionCompleted: Boolean? = null
         controller.deleteAccountWithSocial(
             request = socialRequest(),
@@ -307,6 +349,7 @@ class IosAuthControllerTest {
         assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         assertTrue(repository.deletionRequests.isEmpty())
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
     }
 
     @Test
@@ -328,6 +371,7 @@ class IosAuthControllerTest {
         assertEquals(false, completed)
         assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         controller.close()
     }
 
@@ -377,6 +421,8 @@ class IosAuthControllerTest {
 
         assertEquals(eventsBeforeReturningToA, events)
         assertTrue(lifecycle.resumedAccountIds.isEmpty())
+        assertSingleOwnershipRetained(lifecycle, ACCOUNT_A)
+        assertSingleOwnershipRetained(lifecycle, ACCOUNT_B)
         assertEquals(2, repository.deletionRequests.size)
     }
 
@@ -473,6 +519,7 @@ class IosRejectedCleanupPendingTest {
         assertEquals(listOf(false), deletionCompletions)
         assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         controller.close()
     }
 
@@ -513,6 +560,7 @@ class IosRejectedCleanupPendingTest {
         assertEquals(listOf(false), deletionCompletions)
         assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
         assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+        assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
         controller.close()
     }
 }
@@ -594,6 +642,7 @@ private fun assertPurgeWasReleasedWithoutRemote(
 ) {
     assertEquals(listOf("purge:$ACCOUNT_A", "resume:$ACCOUNT_A"), events)
     assertEquals(listOf(ACCOUNT_A), lifecycle.resumedAccountIds)
+    assertSingleOwnershipResumed(lifecycle, ACCOUNT_A)
     assertTrue(repository.deletionRequests.isEmpty())
 }
 
@@ -607,6 +656,7 @@ private fun assertAmbiguousDeletionState(
     assertEquals(false, completion)
     assertEquals(listOf("purge:$ACCOUNT_A", "remote:$ACCOUNT_A"), events)
     assertTrue(lifecycle.resumedAccountIds.isEmpty())
+    assertSingleOwnershipRetained(lifecycle, ACCOUNT_A)
     assertTrue(unhandledExceptions.isEmpty())
     assertFalse(state.isLoading)
     assertEquals(stringsFor(AppLocale.French).authAccountDeletionOutcomeUnknown, state.errorMessage)
@@ -627,32 +677,105 @@ private fun assertSecondDeletionAttemptRemainsBlocked(
     assertTrue(lifecycle.resumedAccountIds.isEmpty())
 }
 
+private fun assertSingleOwnershipResumed(
+    lifecycle: RecordingAccountDeletionLifecycle,
+    accountId: String,
+) {
+    val acquired = lifecycle.acquiredOwnerships.single { ownership ->
+        lifecycle.accountIdFor(ownership) == accountId
+    }
+    val resumed = lifecycle.resumedOwnerships.filter { ownership ->
+        lifecycle.accountIdFor(ownership) == accountId
+    }
+    assertEquals(1, resumed.size)
+    assertSame(acquired, resumed.single())
+    assertTrue(lifecycle.retainedOwnerships.none { ownership -> ownership === acquired })
+}
+
+private fun assertSingleOwnershipRetained(
+    lifecycle: RecordingAccountDeletionLifecycle,
+    accountId: String,
+) {
+    val acquired = lifecycle.acquiredOwnerships.single { ownership ->
+        lifecycle.accountIdFor(ownership) == accountId
+    }
+    val retained = lifecycle.retainedOwnerships.filter { ownership ->
+        lifecycle.accountIdFor(ownership) == accountId
+    }
+    assertEquals(1, retained.size)
+    assertSame(acquired, retained.single())
+    assertTrue(lifecycle.resumedOwnerships.none { ownership -> ownership === acquired })
+}
+
 private class RecordingAccountDeletionLifecycle(
     private val events: MutableList<String>,
-    purgeResult: DomainResult<InteractionAccountDeletionPurgeOutcome> =
-        DomainResult.Success(InteractionAccountDeletionPurgeOutcome.Acquired(0)),
+    private val purgeResult: DomainResult<AccountPrivateDataPurgeOutcome>? = null,
     purgeGate: CompletableDeferred<Unit>? = null,
     afterAcquiredGate: CompletableDeferred<Unit>? = null,
 ) {
+    private val ownershipAccountIds = mutableMapOf<AccountPrivateDataPurgeOwnership, String>()
+    val acquiredOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
+    val resumedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
+    val retainedOwnerships = mutableListOf<AccountPrivateDataPurgeOwnership>()
     val resumedAccountIds = mutableListOf<String>()
     val delegate = IosAccountDeletionInteractionLifecycle(
         purgeAction = { accountId, onAcquired ->
             events += "purge:$accountId"
             purgeGate?.await()
-            if (
-                purgeResult is DomainResult.Success &&
-                purgeResult.value is InteractionAccountDeletionPurgeOutcome.Acquired
-            ) {
-                onAcquired()
-                afterAcquiredGate?.await()
+            val currentResult: DomainResult<AccountPrivateDataPurgeOutcome> = purgeResult
+                ?: DomainResult.Success(
+                    AccountPrivateDataPurgeOutcome.Acquired(
+                        result = AccountPrivateDataPurgeResult(
+                            interactionOperationCount = 0,
+                            notificationItemCount = 0,
+                            notificationSnapshotCount = 0,
+                            notificationOperationCount = 0,
+                            notificationPreferenceCount = 0,
+                        ),
+                        ownership = AccountPrivateDataPurgeOwnership(accountId),
+                    ),
+                )
+            val acquiredOwnership = when (currentResult) {
+                is DomainResult.Failure -> null
+                is DomainResult.Success -> when (val outcome = currentResult.value) {
+                    AccountPrivateDataPurgeOutcome.AlreadyBlocked -> null
+                    is AccountPrivateDataPurgeOutcome.Acquired -> outcome.ownership
+                    is AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired -> outcome.ownership
+                }
             }
-            purgeResult
+            if (acquiredOwnership != null) {
+                ownershipAccountIds[acquiredOwnership] = accountId
+                acquiredOwnerships += acquiredOwnership
+                onAcquired(acquiredOwnership)
+                try {
+                    afterAcquiredGate?.await()
+                } catch (cancellation: CancellationException) {
+                    recordResume(acquiredOwnership)
+                    throw cancellation
+                }
+            }
+            currentResult
         },
-        resumeAction = { accountId ->
-            resumedAccountIds += accountId
-            events += "resume:$accountId"
+        resumeAction = { ownership ->
+            recordResume(ownership)
+            true
+        },
+        retainAction = { ownership ->
+            accountIdFor(ownership)
+            retainedOwnerships += ownership
+            true
         },
     )
+
+    fun accountIdFor(ownership: AccountPrivateDataPurgeOwnership): String =
+        checkNotNull(ownershipAccountIds[ownership]) { "Unknown private-data purge ownership." }
+
+    private fun recordResume(ownership: AccountPrivateDataPurgeOwnership) {
+        val accountId = accountIdFor(ownership)
+        resumedOwnerships += ownership
+        resumedAccountIds += accountId
+        events += "resume:$accountId"
+    }
 }
 
 private class IosAccountDeletionAuthRepository(

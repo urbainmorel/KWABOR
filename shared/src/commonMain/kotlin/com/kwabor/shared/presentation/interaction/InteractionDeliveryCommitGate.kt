@@ -32,6 +32,39 @@ internal class InteractionDeliveryCommitGate(
             currentScope = viewerSessionScopeTracker.currentInteractionScope(),
         )
 
+    fun captureQueuedCommandFence(scope: InteractionAccountScope): InteractionQueuedCommandFence =
+        lifecycleGate.captureQueuedCommandFence(
+            expectedScope = scope,
+            currentScope = viewerSessionScopeTracker.currentInteractionScope(),
+        )
+
+    suspend fun runIfQueuedCommandFenceCurrent(
+        scope: InteractionAccountScope,
+        fence: InteractionQueuedCommandFence,
+        action: suspend () -> Unit,
+    ): Boolean {
+        return when (fence) {
+            InteractionQueuedCommandFence.NotRequired -> {
+                action()
+                true
+            }
+            InteractionQueuedCommandFence.Blocked -> false
+            is InteractionQueuedCommandFence.Captured -> {
+                val lease = lifecycleGate.beginOperation(
+                    expectedScope = scope,
+                    currentScope = viewerSessionScopeTracker.currentInteractionScope(),
+                ) ?: return false
+                try {
+                    if (lease.generation.revision != fence.revision) return false
+                    action()
+                    true
+                } finally {
+                    lifecycleGate.endOperation(lease)
+                }
+            }
+        }
+    }
+
     suspend fun runIfLifecycleGenerationCurrent(
         scope: InteractionAccountScope,
         generation: InteractionAccountLifecycleGeneration,

@@ -71,8 +71,8 @@ internal class AccountDeletionOwnedBlockRunner(
                     if (attempt.localOwnershipClaimed) {
                         interactionLifecycle.discardLocalOwnership(expectedAccountId)
                     }
-                    if (handoff.abandon()) {
-                        purgeWorker.resumeAbandonedAcquisition(expectedAccountId, handoff)
+                    handoff.abandon()?.let { ownership ->
+                        purgeWorker.resumeAbandonedAcquisition(ownership, handoff)
                     }
                 }
             }
@@ -86,10 +86,10 @@ internal class AccountDeletionOwnedBlockRunner(
         handoff: AccountDeletionPurgeHandoff,
         result: AccountDeletionPurgeWorkerResult,
     ): Boolean = withContext(NonCancellable) {
-        if (result != AccountDeletionPurgeWorkerResult.Acquired) {
+        if (result !is AccountDeletionPurgeWorkerResult.Acquired) {
             return@withContext interactionLifecycle.acceptNonAcquiredPurgeResult(result)
         }
-        if (!interactionLifecycle.claimLocalOwnership(expectedAccountId)) return@withContext false
+        if (!interactionLifecycle.claimLocalOwnership(expectedAccountId, result.ownership)) return@withContext false
         attempt.localOwnershipClaimed = true
         if (!handoff.claimAcquisition()) {
             interactionLifecycle.discardLocalOwnership(expectedAccountId)

@@ -1,7 +1,8 @@
 package com.kwabor.android.presentation.auth
 
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOutcome
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeOwnership
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -13,8 +14,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 internal class AccountDeletionPurgeWorker(
     private val workerScope: CoroutineScope,
     private val registry: AccountDeletionPurgeRegistry,
-    private val purge: suspend (String) -> DomainResult<InteractionAccountDeletionPurgeOutcome>,
-    private val resume: suspend (String) -> Unit,
+    private val purge: suspend (String) -> DomainResult<AccountPrivateDataPurgeOutcome>,
+    private val resume: suspend (AccountPrivateDataPurgeOwnership) -> Boolean,
 ) {
     fun start(accountId: String): AccountDeletionPurgeHandoff {
         val registration = registry.tryStart(accountId)
@@ -28,25 +29,34 @@ internal class AccountDeletionPurgeWorker(
         )
         workerScope.launch {
             val result = runPurge(accountId)
-            if (handoff.complete(result)) resumeLateAcquisitionAndRelease(accountId, handoff)
+            if (handoff.complete(result)) {
+                resumeLateAcquisitionAndRelease(checkNotNull(result.ownershipOrNull()), handoff)
+            }
         }
         return handoff
     }
 
-    fun resumeAbandonedAcquisition(accountId: String, handoff: AccountDeletionPurgeHandoff) {
+    fun resumeAbandonedAcquisition(ownership: AccountPrivateDataPurgeOwnership, handoff: AccountDeletionPurgeHandoff) {
         workerScope.launch {
-            resumeLateAcquisitionAndRelease(accountId, handoff)
+            resumeLateAcquisitionAndRelease(ownership, handoff)
         }
     }
 
     private suspend fun runPurge(accountId: String): AccountDeletionPurgeWorkerResult = try {
         when (val result = purge(accountId)) {
             is DomainResult.Failure -> AccountDeletionPurgeWorkerResult.Failed
-            is DomainResult.Success -> when (result.value) {
-                InteractionAccountDeletionPurgeOutcome.AlreadyBlocked ->
+            is DomainResult.Success -> when (val outcome = result.value) {
+                AccountPrivateDataPurgeOutcome.AlreadyBlocked ->
                     AccountDeletionPurgeWorkerResult.AlreadyBlocked
-                is InteractionAccountDeletionPurgeOutcome.Acquired ->
-                    AccountDeletionPurgeWorkerResult.Acquired
+                is AccountPrivateDataPurgeOutcome.Acquired ->
+                    AccountDeletionPurgeWorkerResult.Acquired(outcome.ownership)
+                is AccountPrivateDataPurgeOutcome.PostCommitRecoveryRequired -> {
+                    val resumed = withContext(NonCancellable) { resume(outcome.ownership) }
+                    AccountDeletionPurgeWorkerResult.Recovery(
+                        ownership = outcome.ownership,
+                        resumed = resumed,
+                    )
+                }
             }
         }
     } catch (_: CancellationException) {
@@ -55,13 +65,12 @@ internal class AccountDeletionPurgeWorker(
         AccountDeletionPurgeWorkerResult.Failed
     }
 
-    private suspend fun resumeLateAcquisition(accountId: String) = withContext(NonCancellable) {
-        resume(accountId)
-    }
-
-    private suspend fun resumeLateAcquisitionAndRelease(accountId: String, handoff: AccountDeletionPurgeHandoff) {
+    private suspend fun resumeLateAcquisitionAndRelease(
+        ownership: AccountPrivateDataPurgeOwnership,
+        handoff: AccountDeletionPurgeHandoff,
+    ) {
         try {
-            resumeLateAcquisition(accountId)
+            withContext(NonCancellable) { resume(ownership) }
         } finally {
             handoff.releaseRegistration()
         }
@@ -110,7 +119,7 @@ internal class AccountDeletionPurgeHandoff(
             check(completedResult == null)
             completedResult = result
             if (
-                result == AccountDeletionPurgeWorkerResult.Acquired &&
+                result is AccountDeletionPurgeWorkerResult.Acquired &&
                 ownerState == AccountDeletionPurgeOwnerState.Abandoned
             ) {
                 ownerState = AccountDeletionPurgeOwnerState.Released
@@ -120,14 +129,14 @@ internal class AccountDeletionPurgeHandoff(
             }
         }
         completion.complete(result)
-        if (result != AccountDeletionPurgeWorkerResult.Acquired) releaseRegistration()
+        if (result !is AccountDeletionPurgeWorkerResult.Acquired) releaseRegistration()
         return releaseLateAcquisition
     }
 
     fun claimAcquisition(): Boolean {
         val claimed = synchronized(stateLock) {
             if (
-                completedResult != AccountDeletionPurgeWorkerResult.Acquired ||
+                completedResult !is AccountDeletionPurgeWorkerResult.Acquired ||
                 ownerState != AccountDeletionPurgeOwnerState.Waiting
             ) {
                 false
@@ -140,21 +149,22 @@ internal class AccountDeletionPurgeHandoff(
         return claimed
     }
 
-    fun abandon(): Boolean = synchronized(stateLock) {
+    fun abandon(): AccountPrivateDataPurgeOwnership? = synchronized(stateLock) {
         when (ownerState) {
             AccountDeletionPurgeOwnerState.Waiting -> {
-                if (completedResult == AccountDeletionPurgeWorkerResult.Acquired) {
+                val acquired = completedResult as? AccountDeletionPurgeWorkerResult.Acquired
+                if (acquired != null) {
                     ownerState = AccountDeletionPurgeOwnerState.Released
-                    true
+                    acquired.ownership
                 } else {
                     ownerState = AccountDeletionPurgeOwnerState.Abandoned
-                    false
+                    null
                 }
             }
             AccountDeletionPurgeOwnerState.Claimed,
             AccountDeletionPurgeOwnerState.Abandoned,
             AccountDeletionPurgeOwnerState.Released,
-            -> false
+            -> null
         }
     }
 
@@ -171,11 +181,21 @@ internal class AccountDeletionPurgeHandoff(
     }
 }
 
-internal enum class AccountDeletionPurgeWorkerResult {
-    Acquired,
-    AlreadyBlocked,
-    Failed,
+internal sealed interface AccountDeletionPurgeWorkerResult {
+    data class Acquired(val ownership: AccountPrivateDataPurgeOwnership) : AccountDeletionPurgeWorkerResult
+
+    data class Recovery(
+        val ownership: AccountPrivateDataPurgeOwnership,
+        val resumed: Boolean,
+    ) : AccountDeletionPurgeWorkerResult
+
+    data object AlreadyBlocked : AccountDeletionPurgeWorkerResult
+
+    data object Failed : AccountDeletionPurgeWorkerResult
 }
+
+private fun AccountDeletionPurgeWorkerResult.ownershipOrNull(): AccountPrivateDataPurgeOwnership? =
+    (this as? AccountDeletionPurgeWorkerResult.Acquired)?.ownership
 
 private enum class AccountDeletionPurgeOwnerState {
     Waiting,

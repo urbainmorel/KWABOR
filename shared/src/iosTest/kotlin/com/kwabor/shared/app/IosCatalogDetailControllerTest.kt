@@ -1,6 +1,7 @@
 package com.kwabor.shared.app
 
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,7 @@ class IosCatalogDetailControllerTest {
 
         assertFalse(controller.isConfigured)
         assertEquals("listing-1", failure.listingId)
+        assertEquals(CatalogDetailOpenRequestId.generated(1L), failure.openRequestId)
         assertEquals(controller.strings.configurationUnavailable, failure.message)
         assertEquals(failure, observedStates.last())
 
@@ -49,7 +51,8 @@ class IosCatalogDetailControllerTest {
         val runtime = FakeIosCatalogDetailRuntime()
         val controller = configuredDetailController(runtime, testScheduler)
 
-        controller.actions.open("listing-1")
+        val generatedRequestId = controller.actions.open("listing-1")
+        val correlatedRequestId = controller.actions.openCorrelated("listing-2", correlationSequence = 7L)
         controller.actions.retry()
         controller.actions.selectMedia(-1)
         controller.actions.selectMedia(2)
@@ -59,7 +62,8 @@ class IosCatalogDetailControllerTest {
 
         assertEquals(
             listOf(
-                CatalogDetailIntent.Open("listing-1"),
+                CatalogDetailIntent.Open("listing-1", CatalogDetailOpenRequestId.generated(1L)),
+                CatalogDetailIntent.Open("listing-2", CatalogDetailOpenRequestId.correlated(7L)),
                 CatalogDetailIntent.Retry,
                 CatalogDetailIntent.SelectMedia(-1),
                 CatalogDetailIntent.SelectMedia(2),
@@ -69,6 +73,8 @@ class IosCatalogDetailControllerTest {
             ),
             runtime.dispatchedIntents,
         )
+        assertEquals(CatalogDetailOpenRequestId.generated(1L).value, generatedRequestId)
+        assertEquals(CatalogDetailOpenRequestId.correlated(7L).value, correlatedRequestId)
         controller.close()
     }
 
@@ -83,14 +89,14 @@ class IosCatalogDetailControllerTest {
         runCurrent()
         controller.observe { secondObserverCalls += 1 }
         runCurrent()
-        runtime.publishState(CatalogDetailUiState.Loading("listing-1"))
+        runtime.publishState(CatalogDetailUiState.Loading("listing-1", TEST_OPEN_REQUEST_ID))
         runCurrent()
 
         assertEquals(1, firstObserverCalls)
         assertEquals(2, secondObserverCalls)
 
         controller.unobserve()
-        runtime.publishState(CatalogDetailUiState.NotFound("listing-1", "missing"))
+        runtime.publishState(CatalogDetailUiState.NotFound("listing-1", TEST_OPEN_REQUEST_ID, "missing"))
         runCurrent()
 
         assertEquals(1, firstObserverCalls)
@@ -108,7 +114,7 @@ class IosCatalogDetailControllerTest {
 
         controller.close()
         controller.close()
-        runtime.publishState(CatalogDetailUiState.Loading("listing-1"))
+        runtime.publishState(CatalogDetailUiState.Loading("listing-1", TEST_OPEN_REQUEST_ID))
         controller.actions.open("listing-2")
         runCurrent()
 
@@ -154,3 +160,5 @@ private fun detailTestDispatcherProvider(scheduler: TestCoroutineScheduler): Dis
         override val main: CoroutineDispatcher = dispatcher
     }
 }
+
+private val TEST_OPEN_REQUEST_ID = CatalogDetailOpenRequestId.correlated(1L)

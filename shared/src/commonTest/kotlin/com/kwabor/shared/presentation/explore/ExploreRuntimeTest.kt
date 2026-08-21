@@ -40,8 +40,8 @@ import com.kwabor.shared.domain.observability.AnalyticsSessionSource
 import com.kwabor.shared.domain.preferences.AppPreferences
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.i18n.stringsFor
-import com.kwabor.shared.presentation.interaction.InteractionAccountDeletionPurgeOutcome
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
+import com.kwabor.shared.presentation.interaction.commitAccountDeletionBlock
 import com.kwabor.shared.presentation.interaction.InteractionReconciliationConsumer
 import com.kwabor.shared.presentation.interaction.terminalWatermark
 import com.kwabor.shared.presentation.session.ViewerSessionScope
@@ -1418,6 +1418,39 @@ class ExploreRuntimeDurableReconciliationTest {
 
 class ExploreRuntimeDurablePurgeTest {
     @Test
+    fun viewerIntentQueuedBeforePurgeCannotSubmitAfterSameScopeResume() = runTest {
+        val feedRepository = RuntimeFeedRepository(
+            refreshSnapshot = runtimeSnapshot(
+                items = listOf(runtimeListing(), runtimeListing(RUNTIME_OVERTAKE_LISTING_ID)),
+            ),
+        )
+        val harness = durableExploreHarness(feedRepository = feedRepository)
+        val submitGate = CompletableDeferred<Unit>()
+        val submitStarted = CompletableDeferred<Unit>()
+        harness.durableRepository.submitGate = submitGate
+        harness.durableRepository.submitStarted = submitStarted
+
+        harness.runtime.dispatch(ExploreIntent.ToggleFavorite(RUNTIME_LISTING_ID))
+        runCurrent()
+        assertTrue(submitStarted.isCompleted)
+        harness.runtime.dispatch(ExploreIntent.ToggleLike(RUNTIME_OVERTAKE_LISTING_ID))
+        val purge = async { harness.coordinator.commitAccountDeletionBlock(RUNTIME_ACCOUNT_ID) }
+        runCurrent()
+        assertFalse(purge.isCompleted)
+
+        submitGate.complete(Unit)
+        purge.await()
+        assertTrue(harness.coordinator.resumeAfterAccountDeletionFailure(RUNTIME_ACCOUNT_ID))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(RUNTIME_LISTING_ID to InteractionKind.Favorite),
+            harness.durableRepository.submittedCommands.map { command -> command.listingId to command.kind },
+        )
+        harness.close()
+    }
+
+    @Test
     fun terminalBeyondWatermarkCapacityForcesAuthoritativeVisibleReload() = runTest {
         val feedRepository = RuntimeFeedRepository()
         val viewerInteractions = RuntimeInteractionRepository()
@@ -1471,12 +1504,10 @@ class ExploreRuntimeDurablePurgeTest {
         runCurrent()
         val refreshCallsBeforePurge = feedRepository.refreshCalls
 
-        val purge = async { harness.coordinator.purgeForAccountDeletion(RUNTIME_ACCOUNT_ID) }
+        val purge = async { harness.coordinator.commitAccountDeletionBlock(RUNTIME_ACCOUNT_ID) }
         runCurrent()
         assertTrue(purge.isCompleted)
-        assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-            assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(purge.await()).value,
-        )
+        purge.await()
         assertEquals(originalScope, harness.tracker.currentScope)
         harness.durableRepository.loadPendingFailuresRemaining = 1
         harness.coordinator.resumeAfterAccountDeletionFailure(RUNTIME_ACCOUNT_ID)
@@ -1918,11 +1949,7 @@ private suspend fun submitQueuedLike(
 )
 
 private suspend fun InteractionCoordinator.purgeResumeAndAcknowledge(accountId: String) {
-    assertIs<InteractionAccountDeletionPurgeOutcome.Acquired>(
-        assertIs<DomainResult.Success<InteractionAccountDeletionPurgeOutcome>>(
-            purgeForAccountDeletion(accountId),
-        ).value,
-    )
+    commitAccountDeletionBlock(accountId)
     resumeAfterAccountDeletionFailure(accountId)
     deliveryCommitGate.acknowledgeReconciliation(
         requireNotNull(reconciliationSignals.value),
@@ -2162,6 +2189,8 @@ private class RuntimeDurableInteractionRepository : InteractionRepository {
     val submittedCommands = mutableListOf<InteractionCommand>()
     val retryCalls = mutableListOf<Pair<InteractionAccountScope, Boolean>>()
     val loadPendingRequests = mutableListOf<List<String>>()
+    var submitGate: CompletableDeferred<Unit>? = null
+    var submitStarted: CompletableDeferred<Unit>? = null
     var pending: List<PendingInteraction> = emptyList()
         private set
     var submitFailure: DomainError? = null
@@ -2176,6 +2205,12 @@ private class RuntimeDurableInteractionRepository : InteractionRepository {
 
     override suspend fun submit(command: InteractionCommand): DomainResult<InteractionSubmitOutcome> {
         submittedCommands += command
+        submitGate?.also { gate ->
+            submitGate = null
+            submitStarted?.complete(Unit)
+            submitStarted = null
+            gate.await()
+        }
         submitFailure?.let { error -> return DomainResult.Failure(error) }
         val existing = pending.firstOrNull { interaction ->
             interaction.accountId == command.scope.accountId &&
@@ -2245,13 +2280,6 @@ private class RuntimeDurableInteractionRepository : InteractionRepository {
     ): DomainResult<Int> {
         retryCalls += scope to includeManualFailures
         return DomainResult.Success(0)
-    }
-
-    override suspend fun purge(accountId: String): DomainResult<Int> {
-        val retained = pending.filterNot { interaction -> interaction.accountId == accountId }
-        val removed = pending.size - retained.size
-        pending = retained
-        return DomainResult.Success(removed)
     }
 
     fun enqueueDrain(vararg outcomes: InteractionOperationOutcome) {

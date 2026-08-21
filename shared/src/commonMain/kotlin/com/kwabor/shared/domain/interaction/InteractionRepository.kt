@@ -15,8 +15,6 @@ interface InteractionRepository {
     suspend fun nextAttemptAt(accountId: String): DomainResult<Long?>
 
     suspend fun retryAccount(scope: InteractionAccountScope, includeManualFailures: Boolean = false): DomainResult<Int>
-
-    suspend fun purge(accountId: String): DomainResult<Int>
 }
 
 fun interface ActiveInteractionScopeProvider {

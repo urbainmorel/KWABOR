@@ -6,6 +6,7 @@ import com.kwabor.shared.presentation.detail.CatalogDetailContentUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailLocationUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailMediaUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailMetricsUiModel
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailPriceUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailTicketingUiModel
 import com.kwabor.shared.presentation.detail.CatalogDetailUiModel
@@ -74,19 +75,19 @@ class CatalogDetailSheetPolicyTest {
         assertNull(CatalogDetailUiState.Closed.announcementOrNull())
         assertEquals(
             CatalogDetailAnnouncement.Loading,
-            CatalogDetailUiState.Loading(TEST_LISTING_ID).announcementOrNull(),
+            CatalogDetailUiState.Loading(TEST_LISTING_ID, TEST_OPEN_REQUEST_ID).announcementOrNull(),
         )
         assertEquals(
             CatalogDetailAnnouncement.NotFound,
-            CatalogDetailUiState.NotFound(TEST_LISTING_ID, "indisponible").announcementOrNull(),
+            CatalogDetailUiState.NotFound(TEST_LISTING_ID, TEST_OPEN_REQUEST_ID, "indisponible").announcementOrNull(),
         )
         assertEquals(
             CatalogDetailAnnouncement.Offline,
-            CatalogDetailUiState.OfflineFailure(TEST_LISTING_ID, "hors ligne").announcementOrNull(),
+            CatalogDetailUiState.OfflineFailure(TEST_LISTING_ID, TEST_OPEN_REQUEST_ID, "hors ligne").announcementOrNull(),
         )
         assertEquals(
             CatalogDetailAnnouncement.Failure,
-            CatalogDetailUiState.Failure(TEST_LISTING_ID, "échec").announcementOrNull(),
+            CatalogDetailUiState.Failure(TEST_LISTING_ID, TEST_OPEN_REQUEST_ID, "échec").announcementOrNull(),
         )
         assertEquals(
             CatalogDetailAnnouncement.EventEnded,
@@ -136,6 +137,7 @@ private fun detailContentState(content: CatalogDetailContentUiModel): CatalogDet
             tags = emptyList(),
             content = content,
         ),
+        openRequestId = TEST_OPEN_REQUEST_ID,
         selectedMediaIndex = 0,
     )
 
@@ -158,3 +160,4 @@ private fun placeContent(): CatalogDetailContentUiModel.Place = CatalogDetailCon
 )
 
 private const val TEST_LISTING_ID = "00000000-0000-4000-8000-000000000001"
+private val TEST_OPEN_REQUEST_ID = CatalogDetailOpenRequestId.correlated(1L)

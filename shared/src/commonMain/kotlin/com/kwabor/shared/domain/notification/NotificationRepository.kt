@@ -1,11 +1,42 @@
 package com.kwabor.shared.domain.notification
 
 import com.kwabor.shared.domain.core.DomainResult
-import com.kwabor.shared.domain.core.PageRequest
-import com.kwabor.shared.domain.core.PageResult
 
-interface NotificationRepository {
-    suspend fun listNotifications(page: PageRequest = PageRequest()): DomainResult<PageResult<KwaborNotification>>
+interface NotificationInboxRepository {
+    suspend fun getStatus(expectedScope: NotificationAccountScope): DomainResult<NotificationInboxStatus>
 
-    suspend fun markAsRead(notificationId: String): DomainResult<Unit>
+    suspend fun listInbox(
+        expectedScope: NotificationAccountScope,
+        page: NotificationPageRequest = NotificationPageRequest(),
+    ): DomainResult<NotificationInboxPage>
+
+    suspend fun markSeenThrough(
+        expectedScope: NotificationAccountScope,
+        throughSequence: Long,
+    ): DomainResult<NotificationInboxStatus>
+
+    suspend fun markRead(
+        expectedScope: NotificationAccountScope,
+        notificationId: String,
+    ): DomainResult<NotificationItemMutation>
+
+    suspend fun markAllReadThrough(
+        expectedScope: NotificationAccountScope,
+        throughSequence: Long,
+    ): DomainResult<NotificationMarkAllReadConfirmation>
+
+    suspend fun hide(
+        expectedScope: NotificationAccountScope,
+        notificationId: String,
+    ): DomainResult<NotificationItemMutation>
+}
+
+interface NotificationPreferencesRepository {
+    suspend fun getPreferences(expectedScope: NotificationAccountScope): DomainResult<NotificationPreferences>
+
+    suspend fun setPreference(
+        expectedScope: NotificationAccountScope,
+        family: NotificationPreferenceFamily,
+        enabled: Boolean,
+    ): DomainResult<NotificationFamilyPreference>
 }

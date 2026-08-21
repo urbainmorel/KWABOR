@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.kwabor.shared.presentation.detail.CatalogDetailIntent
+import com.kwabor.shared.presentation.detail.CatalogDetailOpenRequestId
 import com.kwabor.shared.presentation.detail.CatalogDetailUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -57,6 +58,22 @@ class CatalogDetailViewModelTest {
 
         assertTrue(runtime.closed)
         assertFalse(scopeJob.isActive)
+    }
+
+    @Test
+    fun correlatedOpen_returnsAndDispatchesTheNamespacedRequestIdentity() {
+        val runtime = FakeCatalogDetailRuntime()
+        val scopeJob = SupervisorJob()
+        val viewModel = CatalogDetailViewModel(runtime, CoroutineScope(scopeJob))
+
+        val openRequestId = viewModel.openCorrelated(TEST_LISTING_ID, correlationSequence = 42L)
+
+        assertEquals(CatalogDetailOpenRequestId.correlated(42L), openRequestId)
+        assertEquals(
+            listOf(CatalogDetailIntent.Open(TEST_LISTING_ID, openRequestId)),
+            runtime.dispatchedIntents,
+        )
+        scopeJob.cancel()
     }
 }
 

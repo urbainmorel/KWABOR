@@ -241,7 +241,6 @@ class DataInteractionRepositoryTest {
             fixture.repository.drainDue(ACCOUNT_SCOPE_A_ONE),
             fixture.repository.nextAttemptAt(ACCOUNT_ID_A),
             fixture.repository.retryAccount(ACCOUNT_SCOPE_A_ONE),
-            fixture.repository.purge(ACCOUNT_ID_A),
         )
 
         results.forEach { result ->
@@ -562,12 +561,6 @@ private class FakeInteractionOutboxPersistence(
     override suspend fun nextAttemptAtForAccount(accountId: String): Long? = operations.values
         .filter { operation -> operation.accountId == accountId && operation.terminalErrorCode == null }
         .minOfOrNull(InteractionOutboxOperation::nextAttemptAtEpochMilliseconds)
-
-    override suspend fun purgeAccount(accountId: String): Int {
-        val keys = operations.filterValues { operation -> operation.accountId == accountId }.keys.toList()
-        keys.forEach(operations::remove)
-        return keys.size
-    }
 
     fun snapshot(accountId: String): List<InteractionOutboxOperation> =
         sortedOperations().filter { operation -> operation.accountId == accountId }

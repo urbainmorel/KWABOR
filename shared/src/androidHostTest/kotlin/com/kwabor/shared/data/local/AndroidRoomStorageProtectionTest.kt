@@ -51,6 +51,7 @@ class AndroidRoomStorageProtectionTest {
         val builderResult = createAndroidKwaborDatabaseBuilder(context)
         assertEquals(KwaborDatabaseStorageMode.Durable, builderResult.storageMode)
         assertTrue(builderResult.supportsDurableInteractionOutbox)
+        assertTrue(builderResult.supportsDurableNotificationStorage)
         val database = buildKwaborDatabase(
             builder = builderResult.createBuilder(),
             queryCoroutineContext = coroutineContext,
@@ -77,6 +78,7 @@ class AndroidRoomStorageProtectionTest {
         val builderResult = createAndroidKwaborDatabaseBuilder(context)
         assertEquals(KwaborDatabaseStorageMode.MemoryOnly, builderResult.storageMode)
         assertFalse(builderResult.supportsDurableInteractionOutbox)
+        assertFalse(builderResult.supportsDurableNotificationStorage)
         val database = buildKwaborDatabase(
             builder = builderResult.createBuilder(),
             queryCoroutineContext = coroutineContext,

@@ -10,6 +10,7 @@ import com.kwabor.shared.data.favorites.favoritesDataModule
 import com.kwabor.shared.data.guide.guideDiscoveryDataModule
 import com.kwabor.shared.data.interaction.interactionDataModule
 import com.kwabor.shared.data.local.ExploreCacheStore
+import com.kwabor.shared.data.notification.notificationDataModule
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.data.search.searchDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -17,9 +18,13 @@ import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.guide.GuideDiscoveryRepository
+import com.kwabor.shared.domain.notification.ActiveNotificationAccountProvider
+import com.kwabor.shared.domain.notification.NotificationAccountScope
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
+import com.kwabor.shared.presentation.auth.AccountPrivateDataPurgeCoordinator
 import com.kwabor.shared.presentation.auth.AuthPresenter
+import com.kwabor.shared.presentation.auth.accountPrivateDataPurgePresentationModule
 import com.kwabor.shared.presentation.auth.PasswordRecoveryPresenter
 import com.kwabor.shared.presentation.auth.RegistrationPresenter
 import com.kwabor.shared.presentation.auth.authPresentationModule
@@ -33,6 +38,8 @@ import com.kwabor.shared.presentation.guide.GuideDiscoveryPresenter
 import com.kwabor.shared.presentation.guide.guideDiscoveryPresentationModule
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.interaction.interactionPresentationModule
+import com.kwabor.shared.presentation.notification.NotificationRuntime
+import com.kwabor.shared.presentation.notification.notificationPresentationModule
 import com.kwabor.shared.presentation.search.SearchPresenter
 import com.kwabor.shared.presentation.search.searchPresentationModule
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
@@ -53,6 +60,7 @@ class KwaborCompositionRoot internal constructor(
     val favoritesRepository: FavoritesRepository = application.koin.get()
     val guideDiscoveryRepository: GuideDiscoveryRepository = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
+    val notificationRuntime: NotificationRuntime by lazy { application.koin.get() }
     val viewerSessionScopeTracker: ViewerSessionScopeTracker = application.koin.get()
     val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
     val favoritesPresenter: FavoritesPresenter by lazy { application.koin.get() }
@@ -64,6 +72,8 @@ class KwaborCompositionRoot internal constructor(
     val passwordRecoveryPresenter: PasswordRecoveryPresenter? = if (hasAuthentication) application.koin.get() else null
     val registrationPresenter: RegistrationPresenter? = if (hasAuthentication) application.koin.get() else null
     val interactionCoordinator: InteractionCoordinator? =
+        if (hasAuthentication && hasPersistence) application.koin.get() else null
+    val accountPrivateDataPurgeCoordinator: AccountPrivateDataPurgeCoordinator? =
         if (hasAuthentication && hasPersistence) application.koin.get() else null
     val appPreferencesRepository: AppPreferencesRepository?
         get() = if (hasPersistence) application.koin.get() else null
@@ -114,6 +124,15 @@ private fun createRootModule(
 ): Module = module {
     single<DispatcherProvider> { DefaultDispatcherProvider() }
     single { ViewerSessionScopeTracker() }
+    single<ActiveNotificationAccountProvider> {
+        val tracker = get<ViewerSessionScopeTracker>()
+        ActiveNotificationAccountProvider {
+            val current = tracker.currentScope
+            current.accountId?.let { accountId ->
+                NotificationAccountScope(accountId = accountId.trim().lowercase(), epoch = current.epoch)
+            }
+        }
+    }
     includes(
         coreDataModule(
             environment = environment,
@@ -130,6 +149,8 @@ private fun createRootModule(
         catalogDetailPresentationModule,
         guideDiscoveryPresentationModule,
         organizationDataModule,
+        notificationDataModule(hasPersistence = persistenceConfiguration != null),
+        notificationPresentationModule(hasPersistence = persistenceConfiguration != null),
     )
     if (authSessionManager != null) {
         includes(authDataModule, authPresentationModule)
@@ -138,7 +159,11 @@ private fun createRootModule(
         includes(persistenceModule(persistenceConfiguration))
     }
     if (authSessionManager != null && persistenceConfiguration != null) {
-        includes(interactionDataModule, interactionPresentationModule)
+        includes(
+            interactionDataModule,
+            interactionPresentationModule,
+            accountPrivateDataPurgePresentationModule,
+        )
     }
 }
 

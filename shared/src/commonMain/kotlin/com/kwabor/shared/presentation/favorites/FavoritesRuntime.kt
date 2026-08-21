@@ -3,6 +3,7 @@ package com.kwabor.shared.presentation.favorites
 import com.kwabor.shared.i18n.FavoritesStrings
 import com.kwabor.shared.presentation.interaction.InteractionCoordinator
 import com.kwabor.shared.presentation.interaction.InteractionCoordinatorEvent
+import com.kwabor.shared.presentation.interaction.InteractionQueuedCommandFence
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -122,7 +123,11 @@ class FavoritesRuntime(
                 } else {
                     null
                 }
-                commandChannel.trySend(FavoritesRuntimeCommand.Intent(intent, sourceScope))
+                val interactionFence = sourceScope
+                    ?.toInteractionScopeOrNull()
+                    ?.let { scope -> interactionCoordinator?.deliveryCommitGate?.captureQueuedCommandFence(scope) }
+                    ?: InteractionQueuedCommandFence.NotRequired
+                commandChannel.trySend(FavoritesRuntimeCommand.Intent(intent, sourceScope, interactionFence))
             }
         }
     }
@@ -136,7 +141,17 @@ class FavoritesRuntime(
     private suspend fun handle(command: FavoritesRuntimeCommand) {
         when (command) {
             is FavoritesRuntimeCommand.ViewerChanged -> updateViewerContext(command.scope)
-            is FavoritesRuntimeCommand.Intent -> handleIntent(command.intent, command.sourceScope)
+            is FavoritesRuntimeCommand.Intent -> {
+                val captured = command.interactionFence as? InteractionQueuedCommandFence.Captured
+                if (captured != null) {
+                    val scope = command.sourceScope?.toInteractionScopeOrNull() ?: return
+                    interactionCoordinator?.deliveryCommitGate?.runIfQueuedCommandFenceCurrent(scope, captured) {
+                        handleIntent(command.intent, command.sourceScope)
+                    }
+                } else if (command.interactionFence != InteractionQueuedCommandFence.Blocked) {
+                    handleIntent(command.intent, command.sourceScope)
+                }
+            }
         }
     }
 
@@ -263,6 +278,7 @@ private sealed interface FavoritesRuntimeCommand {
     data class Intent(
         val intent: FavoritesIntent,
         val sourceScope: ViewerSessionScope?,
+        val interactionFence: InteractionQueuedCommandFence,
     ) : FavoritesRuntimeCommand
 
     data class ViewerChanged(val scope: ViewerSessionScope) : FavoritesRuntimeCommand
