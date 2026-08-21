@@ -30,7 +30,7 @@ internal class AndroidObservabilityRuntime(
         consentStore = consentStore,
         stateLock = stateLock,
         onPrivacyOperationFailed = callbacks.onPrivacyOperationFailed,
-        onReconcile = ::reconcileLatest,
+        onReconcile = callbacks.onMaintenanceChanged,
         suspendCollection = { applyEffectiveConsent(ObservabilityConsent()) },
     )
     private val diagnosticsReports = AndroidDiagnosticsReportCoordinator(
@@ -38,7 +38,7 @@ internal class AndroidObservabilityRuntime(
         consentStore = consentStore,
         stateLock = stateLock,
         onPrivacyOperationFailed = callbacks.onPrivacyOperationFailed,
-        onReconcile = ::reconcileLatest,
+        onReconcile = callbacks.onMaintenanceChanged,
         isDiagnosticsAllowed = { effectiveConsent.diagnosticsAllowed },
     )
 
@@ -158,6 +158,7 @@ internal class AndroidObservabilityRuntime(
 internal data class AndroidObservabilityRuntimeCallbacks(
     val onPrivacyOperationFailed: (Boolean) -> Unit,
     val onPerformanceCollectionAllowedChanged: (Boolean) -> Unit,
+    val onMaintenanceChanged: () -> Unit,
     val onMaintenanceReady: () -> Boolean,
 )
 

@@ -38,6 +38,7 @@ class AndroidObservabilityController internal constructor(
             onPerformanceCollectionAllowedChanged = { allowed ->
                 mutablePerformanceCollectionAllowed.value = allowed
             },
+            onMaintenanceChanged = { reconcileRuntime() },
             onMaintenanceReady = ::activateStagedConsentIfReady,
         ),
     )
