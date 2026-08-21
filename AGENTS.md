@@ -96,6 +96,20 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Logs sans PII ni données sensibles.
 - Entrées utilisateur, deep links et payloads validés.
 
+## Docker et preuves Supabase
+
+- Docker n'est jamais exécuté sur les postes de travail Kwabor. Toute commande Supabase qui dépend
+  de Docker — `supabase start`, `supabase db start`, `supabase db reset`, `supabase test db`, lint ou
+  advisors locaux et harnais de concurrence — passe exclusivement par le job GitHub Actions
+  `supabase_database`, via une pull request, un push autorisé ou le `workflow_dispatch` du workflow
+  `CI`.
+- Le job `supabase_database` crée une base jetable avec `supabase db start`, applique les migrations,
+  charge le seed, puis exécute lint, pgTAP, advisors et harnais. Il ne fait pas de `db reset`, ne se
+  lie à aucun projet hébergé et ne qualifie donc ni `development`, ni `staging`, ni `production`.
+- Une preuve distante exige un projet explicitement ciblé, un GitHub Environment protégé, une
+  sauvegarde vérifiée, une migration non destructive approuvée et des contrôles lecture/ACL/smoke
+  archivés. Aucun reset destructif n'est autorisé sur un projet Supabase persistant.
+
 ## Offline, performance et contexte local
 
 - Concevoir pour réseau lent/intermittent et Android low/mid-range.

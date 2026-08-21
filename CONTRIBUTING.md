@@ -34,6 +34,10 @@ options et obtenir la validation nécessaire.
 5. Mettre à jour documentation, `PROJECT_STATE.md` et `BACKLOG.md`.
 6. Auto-relire le diff avant commit.
 
+Les validations Supabase dépendant de Docker ne sont jamais exécutées sur un poste local. Pousser la
+branche ou déclencher manuellement le workflow `CI`, puis inspecter le job `Supabase database
+(ephemeral CI)` sur le SHA exact.
+
 ## Gates de qualité
 
 Gate de base Windows :
@@ -47,7 +51,8 @@ Ajouter selon le lot :
 
 - APK Android et compilation Kotlin iOS pour une verticale mobile ;
 - tests Swift/Xcode sous macOS pour toute modification iOS ;
-- reset isolé, pgTAP, lint et grants/RLS pour Supabase ;
+- job CI éphémère `supabase_database` pour migrations, pgTAP, lint, advisors et grants/RLS ;
+- preuve distante protégée et non destructive séparée lorsqu'un projet Supabase hébergé est concerné ;
 - vérificateurs marque/média lorsque ces assets changent ;
 - tests sur appareils, accessibilité et performance avant release.
 
