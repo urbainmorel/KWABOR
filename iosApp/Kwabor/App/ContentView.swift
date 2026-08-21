@@ -38,6 +38,7 @@ struct ContentView: View {
     let isCatalogDetailDeepLinkCurrent: (CatalogDetailDeepLinkDelivery) -> Bool
     let onCatalogDetailDeepLinkAcknowledged: (CatalogDetailDeepLinkDelivery) -> Bool
     @State private var selectedDestination = RootDestination.home
+    @State private var catalogDetailSheetPresentation: ExploreSheetPresentation?
 
     private var isClosedBetaCatalog: Bool { bridge.isClosedBetaCatalog }
 
@@ -144,6 +145,9 @@ struct ContentView: View {
                             isSigningOutAccount: isSigningOutAccount,
                             accountSignOutErrorMessage: accountSignOutErrorMessage,
                             isClosedBetaCatalog: isClosedBetaCatalog,
+                            isExploreSurfaceObscured:
+                                catalogDetailStore.isPresented ||
+                                selectedDestination != .home,
                             onExploreAuthenticationRequired: onExploreAuthenticationRequired,
                             onListingOpen: catalogDetailStore.open,
                             onSignOut: onSignOut,
@@ -166,7 +170,7 @@ struct ContentView: View {
                     .tag(destination)
                 }
             }
-            .sheet(isPresented: catalogDetailPresentationBinding) {
+            .sheet(item: catalogDetailPresentationBinding) { presentation in
                 CatalogDetailSheet(store: catalogDetailStore)
                     .presentationDetents([
                         .fraction(
@@ -176,9 +180,20 @@ struct ContentView: View {
                         ),
                     ])
                     .presentationContentInteraction(.scrolls)
+                    .background {
+                        ExploreSheetDismissalObserver(
+                            token: presentation.token,
+                            onAttached: exploreStore.surfacePresentationAttached,
+                            onRemoved: catalogDetailPresentationDidRemove
+                        )
+                        .id(presentation.id)
+                    }
             }
             .onAppear(perform: replayPendingDestinationAfterAuthentication)
             .onAppear(perform: applyPendingCatalogDetailDeepLink)
+            .onAppear {
+                reconcileCatalogDetailPresentation(catalogDetailStore.isPresented)
+            }
             .onChange(of: rootDeepLinkDelivery) { _, _ in
                 replayPendingDestinationAfterAuthentication()
             }
@@ -187,6 +202,9 @@ struct ContentView: View {
             }
             .onChange(of: catalogDetailDeepLinkDelivery) { _, _ in
                 applyPendingCatalogDetailDeepLink()
+            }
+            .onChange(of: catalogDetailStore.isPresented) { _, isPresented in
+                reconcileCatalogDetailPresentation(isPresented)
             }
             .onChange(of: isGuestSession) { _, isGuest in
                 if isGuest {
@@ -198,19 +216,45 @@ struct ContentView: View {
             .onChange(of: accountSessionIdentity) { _, _ in
                 searchStore.close()
             }
-            .onDisappear(perform: catalogDetailStore.dismiss)
+            .onDisappear {
+                dismissCatalogDetailSheetPresentation()
+                catalogDetailStore.dismiss()
+            }
         }
     }
 
-    private var catalogDetailPresentationBinding: Binding<Bool> {
+    private var catalogDetailPresentationBinding: Binding<ExploreSheetPresentation?> {
         Binding(
-            get: { catalogDetailStore.isPresented },
-            set: { isPresented in
-                if !isPresented {
+            get: { catalogDetailSheetPresentation },
+            set: { presentation in
+                if let presentation {
+                    catalogDetailSheetPresentation = presentation
+                } else {
+                    dismissCatalogDetailSheetPresentation()
                     catalogDetailStore.dismiss()
                 }
             }
         )
+    }
+
+    private func reconcileCatalogDetailPresentation(_ isPresented: Bool) {
+        if isPresented {
+            guard catalogDetailSheetPresentation == nil else { return }
+            let token = exploreStore.surfacePresentationStarted(.catalogDetail)
+            catalogDetailSheetPresentation = ExploreSheetPresentation(token: token)
+        } else {
+            dismissCatalogDetailSheetPresentation()
+        }
+    }
+
+    private func dismissCatalogDetailSheetPresentation() {
+        guard let presentation = catalogDetailSheetPresentation else { return }
+        exploreStore.surfacePresentationDismissRequested(presentation.token)
+        catalogDetailSheetPresentation = nil
+    }
+
+    private func catalogDetailPresentationDidRemove(_ token: ExploreSurfacePresentationToken) {
+        exploreStore.surfacePresentationRemoved(token)
     }
 
     private var destinationBinding: Binding<RootDestination> {
@@ -321,6 +365,7 @@ private struct RootDestinationContent: View {
     let isSigningOutAccount: Bool
     let accountSignOutErrorMessage: String?
     let isClosedBetaCatalog: Bool
+    let isExploreSurfaceObscured: Bool
     let onExploreAuthenticationRequired: (ExploreAuthenticationRequest) -> Void
     let onListingOpen: (String) -> Void
     let onSignOut: () -> Void
@@ -340,7 +385,9 @@ private struct RootDestinationContent: View {
                     onListingOpen: onListingOpen,
                     onAuthenticationRequired: onExploreAuthenticationRequired,
                     showsClosedBetaDisclosure: isClosedBetaCatalog,
-                    showsGuideDiscoveryEntry: !isClosedBetaCatalog
+                    showsGuideDiscoveryEntry: !isClosedBetaCatalog,
+                    isObscured: isExploreSurfaceObscured,
+                    performanceCollectionRequested: observabilityConsent.diagnosticsAllowed
                 )
                 .toolbar(.hidden, for: .navigationBar)
             } else if destination == .profile {

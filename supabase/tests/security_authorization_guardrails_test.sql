@@ -109,7 +109,100 @@ exception
 end;
 $$;
 
-select plan(74);
+select plan(78);
+
+-- The canonical local stack does not currently define this hosted-only helper.
+-- When it is absent, these conditional assertions prove only that migrations
+-- and tests remain reset-safe; they do not prove that the hosted revoke branch
+-- ran. The same assertions must therefore be collected from staging where the
+-- function exists.
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_proc procedure
+    cross join lateral aclexplode(
+      coalesce(
+        procedure.proacl,
+        acldefault('f', procedure.proowner)
+      )
+    ) privilege
+    left join pg_catalog.pg_roles grantee
+      on grantee.oid = privilege.grantee
+    where procedure.oid = to_regprocedure('public.rls_auto_enable()')
+      and privilege.privilege_type = 'EXECUTE'
+      and (
+        privilege.grantee = 0
+        or grantee.rolname in ('anon', 'authenticated', 'service_role')
+      )
+  ),
+  0::bigint,
+  'hosted rls_auto_enable has no direct API-role EXECUTE grants when present'
+);
+
+select ok(
+  to_regprocedure('public.rls_auto_enable()') is null
+  or (
+    not has_function_privilege(
+      'anon',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+    and not has_function_privilege(
+      'service_role',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+  ),
+  'hosted rls_auto_enable is not callable by API roles when present'
+);
+
+select is(
+  (
+    select string_agg(
+      coalesce(grantee.rolname, 'PUBLIC'),
+      ',' order by coalesce(grantee.rolname, 'PUBLIC')
+    )
+    from pg_catalog.pg_proc procedure
+    cross join lateral aclexplode(
+      coalesce(
+        procedure.proacl,
+        acldefault('f', procedure.proowner)
+      )
+    ) privilege
+    left join pg_catalog.pg_roles grantee
+      on grantee.oid = privilege.grantee
+    where procedure.oid =
+      'public.accept_organization_invite(text)'::regprocedure
+      and privilege.privilege_type = 'EXECUTE'
+      and privilege.grantee <> procedure.proowner
+  ),
+  'authenticated',
+  'only authenticated has a direct non-owner invite-acceptance EXECUTE grant'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.accept_organization_invite(text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.accept_organization_invite(text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'public.accept_organization_invite(text)',
+    'execute'
+  ),
+  'only authenticated API callers can execute invite acceptance'
+);
 
 insert into auth.users (
   id,

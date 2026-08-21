@@ -29,6 +29,7 @@ EXPECTED_CONTENT_TYPE = "image/jpeg"
 EXPECTED_CACHE_CONTROL = "public,max-age=31536000,immutable"
 EXPECTED_FILE_SIZE_LIMIT = 512 * 1024
 STORAGE_REMOVE_BATCH_LIMIT = 1_000
+MUTATING_METHODS = frozenset({"DELETE", "PATCH", "POST", "PUT"})
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 PROJECT_HOST_PATTERN = re.compile(r"^(?P<ref>[a-z0-9]{20})\.supabase\.co$")
 
@@ -38,7 +39,11 @@ class PublicationError(RuntimeError):
 
 
 class StorageRequestUncertain(PublicationError):
-    """Raised when the server may have committed a request before transport loss."""
+    """Raised when a request cannot prove the remote state safely."""
+
+
+class StorageMutationConflict(PublicationError):
+    """Raised when a mutation response contradicts the exact requested target set."""
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,29 @@ class CatalogContract:
 class StorageResponse:
     body: bytes
     headers: Message
+
+
+def _validate_upload_acknowledgement(
+    response: StorageResponse,
+    bucket: str,
+    path: str,
+) -> None:
+    try:
+        acknowledgement = json.loads(response.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise StorageRequestUncertain(
+            "Storage POST returned an unreadable JSON upload acknowledgement; "
+            "outcome is uncertain"
+        ) from error
+    expected_key = f"{bucket}/{path}"
+    if (
+        not isinstance(acknowledgement, dict)
+        or acknowledgement.get("Key") != expected_key
+    ):
+        raise StorageRequestUncertain(
+            "Storage POST upload acknowledgement was not bound to the exact "
+            "bucket/path; outcome is uncertain"
+        )
 
 
 @dataclass(frozen=True)
@@ -104,7 +132,7 @@ class StorageClient:
             raise PublicationError(f"Local size changed before upload: {media.path}")
         if hashlib.sha256(payload).hexdigest() != media.sha256:
             raise PublicationError(f"Local SHA-256 changed before upload: {media.path}")
-        self._request(
+        response = self._request(
             "POST",
             f"object/{_quote_segment(bucket)}/{_quote_path(media.path)}",
             payload,
@@ -114,6 +142,7 @@ class StorageClient:
                 "x-upsert": "false",
             },
         )
+        _validate_upload_acknowledgement(response, bucket, media.path)
 
     def download_public(self, bucket: str, path: str) -> DownloadedObject:
         response = self._request(
@@ -158,36 +187,35 @@ class StorageClient:
             f"Storage deletion exceeds the {STORAGE_REMOVE_BATCH_LIMIT}-object API limit",
         )
         _require(len(paths) == len(set(paths)), "Storage deletion paths are duplicated")
-        try:
-            result = self._request_json(
-                "DELETE",
-                f"object/{_quote_segment(bucket)}",
-                {"prefixes": paths},
+        result = self._request_json(
+            "DELETE",
+            f"object/{_quote_segment(bucket)}",
+            {"prefixes": paths},
+        )
+        if not isinstance(result, list):
+            raise StorageRequestUncertain(
+                "Storage DELETE response did not prove an exact committed target set"
             )
-        except StorageRequestUncertain as deletion_error:
-            remaining = [path for path in paths if self.object_exists(bucket, path)]
-            if remaining:
-                raise PublicationError(
-                    "Storage DELETE response was lost and exact-path reconciliation "
-                    f"found {len(remaining)} remaining object(s): {remaining[0]}"
-                ) from deletion_error
-            return tuple(paths)
-
-        _require(isinstance(result, list), "Storage deletion returned invalid metadata")
         deleted_paths: list[str] = []
         for item in result:
-            _require(isinstance(item, dict), "Storage deletion returned invalid object metadata")
+            if not isinstance(item, dict):
+                raise StorageRequestUncertain(
+                    "Storage DELETE response contained unreadable object metadata"
+                )
             deleted_path = item.get("name")
-            _require(isinstance(deleted_path, str), "Storage deletion metadata omits object name")
+            if not isinstance(deleted_path, str):
+                raise StorageRequestUncertain(
+                    "Storage DELETE response omitted an exact object name"
+                )
             deleted_paths.append(deleted_path)
-        _require(
-            len(deleted_paths) == len(set(deleted_paths)),
-            "Storage deletion metadata contains duplicate object names",
-        )
-        _require(
-            set(deleted_paths) == set(paths),
-            "Storage deletion metadata does not match the exact requested paths",
-        )
+        if len(deleted_paths) != len(set(deleted_paths)):
+            raise StorageMutationConflict(
+                "Storage DELETE response contains duplicate object names"
+            )
+        if set(deleted_paths) != set(paths):
+            raise StorageMutationConflict(
+                "Storage DELETE response does not match the exact requested paths"
+            )
         return tuple(deleted_paths)
 
     def _request_json(
@@ -204,7 +232,13 @@ class StorageClient:
         try:
             return json.loads(response.body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise PublicationError(f"Storage returned invalid JSON for {method} {path}") from error
+            if method.upper() in MUTATING_METHODS:
+                raise StorageRequestUncertain(
+                    f"Storage returned invalid JSON for {method} {path}; outcome is uncertain"
+                ) from error
+            raise PublicationError(
+                f"Storage returned invalid JSON for {method} {path}"
+            ) from error
 
     def _request(
         self,
@@ -236,7 +270,13 @@ class StorageClient:
             ) as response:
                 return StorageResponse(response.read(), response.headers)
         except urllib.error.HTTPError as error:
+            if method.upper() in MUTATING_METHODS and 500 <= error.code <= 599:
+                error.close()
+                raise StorageRequestUncertain(
+                    f"Storage {method} returned HTTP {error.code}; server outcome is uncertain"
+                ) from error
             detail = error.read(4096).decode("utf-8", errors="replace")
+            error.close()
             raise PublicationError(
                 f"Storage {method} failed with HTTP {error.code}: {detail}"
             ) from error
@@ -448,29 +488,74 @@ def _verify_object(client: StorageClient, contract: CatalogContract, media: Medi
 
 def _delete_exact_batches(
     client: StorageClient,
-    bucket: str,
+    contract: CatalogContract,
     paths: list[str],
 ) -> tuple[str, ...]:
+    expected_by_path = {media.path: media for media in contract.objects}
+    _require(
+        set(paths).issubset(expected_by_path),
+        "Storage deletion contains a path outside the exact manifest",
+    )
     deleted: list[str] = []
     for offset in range(0, len(paths), STORAGE_REMOVE_BATCH_LIMIT):
         batch = paths[offset : offset + STORAGE_REMOVE_BATCH_LIMIT]
-        deleted.extend(client.remove_exact(bucket, batch))
+        try:
+            deleted.extend(client.remove_exact(contract.bucket, batch))
+        except (StorageRequestUncertain, StorageMutationConflict) as deletion_error:
+            remaining: list[str] = []
+            for path in batch:
+                if not client.object_exists(contract.bucket, path):
+                    continue
+                try:
+                    _verify_object(client, contract, expected_by_path[path])
+                except PublicationError as conflict_error:
+                    raise PublicationError(
+                        "Storage DELETE reconciliation found a conflicting exact path; "
+                        f"no further deletion was attempted: {path}"
+                    ) from conflict_error
+                remaining.append(path)
+            if isinstance(deletion_error, StorageMutationConflict):
+                raise PublicationError(
+                    "Storage DELETE response contradicted the requested exact paths; "
+                    "reconciliation completed without retry"
+                ) from deletion_error
+            if remaining:
+                raise PublicationError(
+                    "Storage DELETE outcome is uncertain and reconciliation found "
+                    f"{len(remaining)} exact expected object(s) still present: {remaining[0]}"
+                ) from deletion_error
+            deleted.extend(batch)
     _require(
         len(deleted) == len(paths) and set(deleted) == set(paths),
         "Exact-path rollback confirmation is incomplete",
     )
     for path in paths:
         _require(
-            not client.object_exists(bucket, path),
+            not client.object_exists(contract.bucket, path),
             f"Rollback left object metadata present: {path}",
         )
     return tuple(deleted)
 
 
-def _publish(client: StorageClient, contract: CatalogContract) -> None:
+def _publish(client: StorageClient, contract: CatalogContract) -> dict[str, Any]:
     bucket = client.get_bucket(contract.bucket)
     if bucket is None:
-        client.create_bucket(contract.bucket)
+        try:
+            client.create_bucket(contract.bucket)
+        except StorageRequestUncertain as creation_error:
+            bucket = client.get_bucket(contract.bucket)
+            if bucket is None:
+                raise PublicationError(
+                    "Storage bucket creation outcome was uncertain and reconciliation "
+                    "proved the bucket absent"
+                ) from creation_error
+            try:
+                _assert_bucket_contract(bucket)
+            except PublicationError as conflict_error:
+                raise PublicationError(
+                    "Storage bucket creation outcome was uncertain and reconciliation "
+                    "found a conflicting bucket; no cleanup was attempted"
+                ) from conflict_error
         bucket = client.get_bucket(contract.bucket)
     _require(bucket is not None, "Demo bucket is unavailable after creation")
     _assert_bucket_contract(bucket)
@@ -490,22 +575,35 @@ def _publish(client: StorageClient, contract: CatalogContract) -> None:
             try:
                 client.upload(contract.bucket, media, contract.cache_control)
             except StorageRequestUncertain as upload_error:
-                if client.object_exists(contract.bucket, media.path):
-                    _download_verified_bytes(client, contract, media)
-                    verified_created.append(media.path)
+                if not client.object_exists(contract.bucket, media.path):
+                    raise PublicationError(
+                        "Storage upload outcome was uncertain and exact-path "
+                        "reconciliation proved the object absent; the path was not "
+                        "scheduled for deletion"
+                    ) from upload_error
+                try:
+                    _verify_object(client, contract, media)
+                except PublicationError as conflict_error:
+                    raise PublicationError(
+                        "Storage upload outcome was uncertain and exact-path "
+                        "reconciliation found conflicting bytes or metadata; "
+                        "the path was not scheduled for deletion: "
+                        f"{conflict_error}"
+                    ) from conflict_error
+                verified_created.append(media.path)
                 raise PublicationError(
-                    "Upload response was lost; the attempted path was reconciled and "
-                    "publication is being rolled back"
+                    "Storage upload outcome was uncertain; exact-path reconciliation "
+                    "classified the exact object as committed for compensating rollback"
                 ) from upload_error
-            verified_created.append(media.path)
             _verify_object(client, contract, media)
+            verified_created.append(media.path)
             print(f"published-and-verified {index}/{len(contract.objects)} {media.path}")
     except Exception as publication_error:
         if verified_created:
             try:
                 _delete_exact_batches(
                     client,
-                    contract.bucket,
+                    contract,
                     list(reversed(verified_created)),
                 )
             except Exception as rollback_error:
@@ -514,18 +612,35 @@ def _publish(client: StorageClient, contract: CatalogContract) -> None:
                     f"{rollback_error}"
                 ) from publication_error
         raise
+    return _operation_result(
+        "publish",
+        "published-and-verified",
+        manifest_objects=len(contract.objects),
+        created_objects=len(verified_created),
+        verified_objects=len(verified_created),
+    )
 
 
-def _verify(client: StorageClient, contract: CatalogContract) -> None:
+def _verify(client: StorageClient, contract: CatalogContract) -> dict[str, Any]:
     bucket = client.get_bucket(contract.bucket)
     _require(bucket is not None, "Demo bucket does not exist")
     _assert_bucket_contract(bucket)
     for index, media in enumerate(contract.objects, start=1):
         _verify_object(client, contract, media)
         print(f"verified {index}/{len(contract.objects)} {media.path}")
+    return _operation_result(
+        "verify",
+        "verified",
+        manifest_objects=len(contract.objects),
+        verified_objects=len(contract.objects),
+    )
 
 
-def _rollback(client: StorageClient, contract: CatalogContract, confirmation: str | None) -> None:
+def _rollback(
+    client: StorageClient,
+    contract: CatalogContract,
+    confirmation: str | None,
+) -> dict[str, Any]:
     _require(confirmation == "DELETE-EXACT-DEMO-MANIFEST", "Rollback confirmation is missing")
     bucket = client.get_bucket(contract.bucket)
     _require(bucket is not None, "Demo bucket does not exist")
@@ -539,10 +654,53 @@ def _rollback(client: StorageClient, contract: CatalogContract, confirmation: st
         else:
             already_absent += 1
     paths = [media.path for media in reversed(verified_existing)]
-    deleted = _delete_exact_batches(client, contract.bucket, paths)
+    deleted = _delete_exact_batches(client, contract, paths)
     print(
         f"rolled-back {len(deleted)} exact verified manifest paths; "
         f"{already_absent} already absent; bucket retained"
+    )
+    return _operation_result(
+        "rollback",
+        "rolled-back-exact-manifest",
+        manifest_objects=len(contract.objects),
+        verified_objects=len(verified_existing),
+        deleted_objects=len(deleted),
+        already_absent_objects=already_absent,
+    )
+
+
+def _operation_result(
+    operation: str,
+    mode: str,
+    *,
+    manifest_objects: int,
+    created_objects: int = 0,
+    verified_objects: int = 0,
+    deleted_objects: int = 0,
+    already_absent_objects: int = 0,
+) -> dict[str, Any]:
+    return {
+        "counts": {
+            "alreadyAbsentObjects": already_absent_objects,
+            "createdObjects": created_objects,
+            "deletedObjects": deleted_objects,
+            "manifestObjects": manifest_objects,
+            "verifiedObjects": verified_objects,
+        },
+        "kind": "demo-storage-operation",
+        "mode": mode,
+        "operation": operation,
+        "outcome": "succeeded",
+        "schemaVersion": 1,
+    }
+
+
+def _write_result(path: Path, result: dict[str, Any]) -> None:
+    _require(not path.is_symlink(), "Storage result output must not be a symbolic link")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
 
 
@@ -552,6 +710,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--confirm-rollback")
+    parser.add_argument("--result-json", type=Path)
     return parser.parse_args()
 
 
@@ -571,11 +730,13 @@ def main() -> None:
     contract = _load_contract(args.manifest.resolve())
     client = StorageClient(safe_url, service_key, args.timeout)
     if args.command == "publish":
-        _publish(client, contract)
+        result = _publish(client, contract)
     elif args.command == "verify":
-        _verify(client, contract)
+        result = _verify(client, contract)
     else:
-        _rollback(client, contract, args.confirm_rollback)
+        result = _rollback(client, contract, args.confirm_rollback)
+    if args.result_json is not None:
+        _write_result(args.result_json, result)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,66 @@ def load_verifier() -> ModuleType:
 
 
 VERIFIER = load_verifier()
+EXPECTED_FUV_CRITICAL_SOURCES = {
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreModels.kt",
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreFirstUsableViewportProbe.kt",
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationGate.kt",
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationRegistry.kt",
+    "androidApp/src/main/kotlin/com/kwabor/android/observability/AndroidExploreFirstUsableViewportReporter.kt",
+    "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/explore/ExploreViewportPerformanceBinding.kt",
+    "androidApp/src/main/kotlin/com/kwabor/android/app/ExploreAppRoute.kt",
+    "iosApp/Kwabor/Explore/ExploreStore.swift",
+    "iosApp/Kwabor/Explore/ExploreView.swift",
+    "iosApp/Kwabor/App/ContentView.swift",
+}
+
+
+def read_observed_app_session_sources() -> dict[str, str]:
+    return {
+        source_path: (REPOSITORY_ROOT / source_path).read_text(encoding="utf-8")
+        for source_path in VERIFIER.OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256
+    }
+
+
+def read_fuv_critical_sources() -> dict[str, str]:
+    return {
+        source_path: (REPOSITORY_ROOT / source_path).read_text(encoding="utf-8")
+        for source_path in VERIFIER.FUV_CRITICAL_SOURCE_SHA256
+    }
+
+
+class FuvCriticalSourceValidationTest(unittest.TestCase):
+    def test_inventory_and_every_audited_source_are_locked(self) -> None:
+        sources = read_fuv_critical_sources()
+        VERIFIER.validate_fuv_critical_source_contract(sources)
+        self.assertEqual(EXPECTED_FUV_CRITICAL_SOURCES, set(sources))
+        self.assertEqual(EXPECTED_FUV_CRITICAL_SOURCES, set(VERIFIER.FUV_CRITICAL_SOURCE_SHA256))
+
+        missing_source = dict(sources)
+        missing_source.pop(next(iter(VERIFIER.FUV_CRITICAL_SOURCE_SHA256)))
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "FUV critical-source inventory changed",
+        ):
+            VERIFIER.validate_fuv_critical_source_contract(missing_source)
+
+        for source_path in sorted(sources):
+            with self.subTest(fuv_source_drift=source_path):
+                changed_sources = dict(sources)
+                changed_sources[source_path] += "\n// audited drift"
+                with self.assertRaisesRegex(
+                    VERIFIER.RepositoryIntegrityError,
+                    "changed outside its audited FUV snapshot",
+                ):
+                    VERIFIER.validate_fuv_critical_source_contract(changed_sources)
+
+    def test_newline_representation_does_not_create_false_drift(self) -> None:
+        sources = read_fuv_critical_sources()
+        crlf_sources = {
+            source_path: source.replace("\n", "\r\n")
+            for source_path, source in sources.items()
+        }
+        VERIFIER.validate_fuv_critical_source_contract(crlf_sources)
 
 
 class IosPrivacyManifestValidationTest(unittest.TestCase):
@@ -179,6 +239,26 @@ class IosObservabilityPrivacyValidationTest(unittest.TestCase):
     def test_current_observability_contract_is_accepted(self) -> None:
         self.validate()
 
+    def test_fuv_measurement_adapter_remains_diagnostics_gated(self) -> None:
+        changed = self.observability_source.replace(
+            "func recordPerformanceMeasurement(_ measurement: PerformanceMeasurement)",
+            "func recordUncheckedPerformanceMeasurement(_ measurement: PerformanceMeasurement)",
+            1,
+        )
+        self.assertNotEqual(changed, self.observability_source)
+        with self.assertRaises(VERIFIER.RepositoryIntegrityError):
+            self.validate(observability_source=changed)
+
+    def test_fuv_surface_request_cannot_bypass_diagnostics_consent(self) -> None:
+        changed = self.content_view_source.replace(
+            "performanceCollectionRequested: observabilityConsent.diagnosticsAllowed",
+            "performanceCollectionRequested: true",
+            1,
+        )
+        self.assertNotEqual(changed, self.content_view_source)
+        with self.assertRaises(VERIFIER.RepositoryIntegrityError):
+            self.validate(content_view_source=changed)
+
     def test_dynamic_crashlytics_collection_is_rejected(self) -> None:
         changed = self.observability_source.replace(
             "setCrashlyticsCollectionEnabled(false)",
@@ -314,29 +394,32 @@ class IosObservabilityPrivacyValidationTest(unittest.TestCase):
 
     def test_neutralized_pre_persistence_purge_is_rejected(self) -> None:
         changed = self.observability_source.replace(
-            "if !persistConsentBeforePurge,",
-            "if false,",
+            "diagnosticsPurgePending: requiresDiagnosticsReportPurge,",
+            "diagnosticsPurgePending: false,",
             1,
         )
+        self.assertNotEqual(changed, self.observability_source)
         with self.assertRaises(VERIFIER.RepositoryIntegrityError):
             self.validate(observability_source=changed)
 
     def test_neutralized_post_persistence_purge_is_rejected(self) -> None:
-        changed = self.observability_source.replace(
-            "if persistConsentBeforePurge,",
-            "if false,",
-            1,
+        changed = self.replace_after(
+            "private func attemptConsentRevocation() -> Bool",
+            "diagnosticsPurgePending: true,",
+            "diagnosticsPurgePending: false,",
         )
         with self.assertRaises(VERIFIER.RepositoryIntegrityError):
             self.validate(observability_source=changed)
 
     def test_full_revocation_without_installation_deletion_is_rejected(self) -> None:
         changed = self.observability_source.replace(
-            "if remoteConfigurationRevoked || allCollectionRevoked || "
-            "installationDeletionState.isPending {",
-            "if remoteConfigurationRevoked || installationDeletionState.isPending {",
+            "let requiresInstallationDeletion = remoteConfigurationRevoked ||\n"
+            "            allCollectionRevoked || installationDeletionState.isPending",
+            "let requiresInstallationDeletion = remoteConfigurationRevoked ||\n"
+            "            installationDeletionState.isPending",
             1,
         )
+        self.assertNotEqual(changed, self.observability_source)
         with self.assertRaises(VERIFIER.RepositoryIntegrityError):
             self.validate(observability_source=changed)
 
@@ -476,15 +559,17 @@ class IosObservabilityPrivacyValidationTest(unittest.TestCase):
         with self.assertRaises(VERIFIER.RepositoryIntegrityError):
             self.validate(observability_source=changed)
 
-    def test_authenticated_runtime_gate_is_required(self) -> None:
-        changed = self.observability_source.replace(
+    def test_authenticated_runtime_and_pending_mutation_gates_are_required(self) -> None:
+        guarded_expressions = (
             "authenticatedSessionBound &&\n"
             "            !runtimeCollectionSuspended &&\n",
-            "",
-            1,
+            "            pendingConsentMutation == nil &&\n",
         )
-        with self.assertRaises(VERIFIER.RepositoryIntegrityError):
-            self.validate(observability_source=changed)
+        for guarded_expression in guarded_expressions:
+            with self.subTest(guarded_expression=guarded_expression.strip()):
+                changed = self.observability_source.replace(guarded_expression, "", 1)
+                with self.assertRaises(VERIFIER.RepositoryIntegrityError):
+                    self.validate(observability_source=changed)
 
     def test_effective_analytics_getter_cannot_return_true(self) -> None:
         changed = self.replace_after(
@@ -1221,6 +1306,64 @@ class AndroidFirebasePrivacyValidationTest(unittest.TestCase):
 
     def test_current_android_contract_is_accepted(self) -> None:
         self.validate()
+        observed_session_sources = read_observed_app_session_sources()
+        VERIFIER.validate_observed_app_session_source_contract(observed_session_sources)
+        self.assertEqual(
+            set(observed_session_sources),
+            set(VERIFIER.OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256),
+        )
+        missing_source = dict(observed_session_sources)
+        missing_source.pop(VERIFIER.OBSERVED_APP_SESSION_TRACKER_PATH)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "critical-source inventory changed",
+        ):
+            VERIFIER.validate_observed_app_session_source_contract(missing_source)
+        for source_path in sorted(observed_session_sources):
+            with self.subTest(observed_session_source_drift=source_path):
+                changed_sources = dict(observed_session_sources)
+                changed_sources[source_path] += "\n"
+                with self.assertRaisesRegex(
+                    VERIFIER.RepositoryIntegrityError,
+                    "changed outside its audited observed-session snapshot",
+                ):
+                    VERIFIER.validate_observed_app_session_source_contract(changed_sources)
+
+    def test_fuv_measurement_cannot_bypass_effective_diagnostics_consent(self) -> None:
+        changed = self.controller_source.replace(
+            "if (isCollectionAllowed()) backend.recordPerformanceMeasurement(measurement)",
+            "backend.recordPerformanceMeasurement(measurement)",
+            1,
+        )
+        self.assertNotEqual(changed, self.controller_source)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "missing durable privacy controls",
+        ):
+            self.validate(controller_source=changed)
+
+    def test_ios_checkpoint_backup_exclusion_cannot_be_bypassed(self) -> None:
+        observed_session_sources = read_observed_app_session_sources()
+        ios_store_source = observed_session_sources[
+            VERIFIER.IOS_OBSERVED_APP_SESSION_STORE_PATH
+        ]
+        changed = ios_store_source.replace(
+            "!directoryCreated || "
+            "!backupExclusionApplicator.exclude(directoryUrl, backupKey)",
+            "!directoryCreated",
+            1,
+        )
+        self.assertNotEqual(changed, ios_store_source)
+        observed_session_sources[
+            VERIFIER.IOS_OBSERVED_APP_SESSION_STORE_PATH
+        ] = changed
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "backup-excluded before persistence",
+        ):
+            VERIFIER.validate_observed_app_session_source_contract(
+                observed_session_sources
+            )
 
     def test_firebase_init_provider_removal_is_required(self) -> None:
         changed = self.manifest_source.replace(
@@ -1526,7 +1669,7 @@ class AndroidFirebasePrivacyValidationTest(unittest.TestCase):
         self.assertNotEqual(changed, self.main_activity_source)
         with self.assertRaisesRegex(
             VERIFIER.RepositoryIntegrityError,
-            "must retry durable Firebase maintenance on foreground",
+            "must retry maintenance and forward observed-session lifecycle",
         ):
             self.validate(main_activity_source=changed)
 

@@ -97,6 +97,7 @@ internal class MainActivityAppFactory(
         onboardingViewModel = createOnboardingViewModel(),
         legalDocumentLauncher = AndroidLegalDocumentLauncher(activity.applicationContext),
         observabilityController = applicationState.observability,
+        exploreFirstUsableViewportReporter = applicationState.exploreFirstUsableViewportReporter,
         listingMediaUrlPolicy = PublicHttpsListingMediaUrlPolicy,
         detailExternalActionLauncher = AndroidDetailExternalActionLauncher(activity.applicationContext),
         rootNavigationProfile = compositionRoot.rootNavigationProfile,

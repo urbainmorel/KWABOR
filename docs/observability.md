@@ -103,6 +103,16 @@ Avant chaque relecture du Keychain lors d'une liaison, d'un changement de choix,
 d'un retry, le runtime désactive les SDK déjà configurés et invalide Remote Config. Une erreur de
 lecture ou d'écriture ne peut donc pas laisser l'ancien état effectif actif en mémoire.
 
+Limite P2 de la bêta fermée : sur un processus iOS froid, si un override Firebase historique inconnu
+exige une configuration préalable pour être neutralisé, l'app ne configure pas le SDK avec un
+consentement désactivé. L'observabilité reste alors en quarantaine OFF, la transaction et l'erreur
+restent retryables au premier plan, et tout regrant est refusé tant que le cleanup n'est pas prouvé.
+Cette quarantaine ne bloque ni la restauration Auth, ni le catalogue. Sa reprise doit être qualifiée
+sur macOS/appareil avant de fermer G3. Dans l'implémentation actuelle, les retries ne franchissent pas
+la phase `requiresSafeConfiguration` sur ce chemin froid : un mécanisme sûr reste à concevoir et
+prouver. Aucune configuration de maintenance non documentée n'est utilisée pour contourner les
+overrides persistants.
+
 Une installation réellement neuve repart de la phase neutralisée et efface les consentements et
 marqueurs Keychain survivants avant toute restauration Auth. L'ancien FID serveur d'une app déjà
 désinstallée n'est plus adressable depuis le nouveau sandbox ; l'app ne crée donc pas un nouvel
@@ -110,6 +120,31 @@ identifiant uniquement pour tenter de supprimer l'ancien. C'est l'unique chemin 
 un marqueur FID sans appeler l'API : il s'exécute seulement avant toute configuration Firebase et
 refuse de courir si une suppression est déjà en vol. Aucune permission ou collecte de remplacement
 n'est déclenchée par l'inscription avant l'accueil.
+
+## Sessions observées de bêta fermée
+
+Le dénominateur crash-free utilise un tracker possédé par l'application, distinct du catalogue fermé
+d'événements produit. Il émet uniquement `observed_session_started`, sans paramètre, identifiant de
+session, compte ou autre donnée personnelle. L'émission exige simultanément les consentements
+Analytics et Diagnostics effectivement actifs ; une suspension de maintenance ferme la porte sans
+créer d'événement.
+
+Le premier foreground éligible ouvre une session observée. Un foreground suivant n'en ouvre une
+nouvelle qu'après un background enregistré depuis au moins 30 minutes : 29 min 59 s reprend la même
+session et 30 min 00 s en crée une. Le checkpoint local non-PII contient seulement l'état
+`foreground`, ou les temps wall et monotone avec l'identité/ancre de boot du dernier passage en
+arrière-plan. À boot certain, le monotone est autoritaire, y compris après un saut d'horloge wall ;
+un reboot, une régression monotone ou une ancre inter-processus incertaine reprend la session sans en
+émettre une nouvelle. Une relance après un processus arrêté en foreground ne prétend donc jamais
+avoir observé une inactivité qui n'a pas été enregistrée.
+
+Le retrait de l'un des deux consentements, la révocation globale et un changement de compte effacent
+ce checkpoint avant toute reprise. Android le conserve dans un fichier `SharedPreferences` privé et
+synchrone, couvert par l'exclusion globale de sauvegarde ; iOS dans un fichier Application Support
+borné et remplacé atomiquement, sans identifiant. Une écriture ou suppression non acquittée échoue
+fermée. Le reset de première installation et chaque révocation effacent aussi le fichier et son
+temporaire. La source wall/monotone, le stockage et les signaux de cycle de vie sont injectés dans le
+tracker partagé ; les adaptateurs Firebase natifs ne font que relayer l'événement déjà admis.
 
 ## Contrat Analytics
 
@@ -204,6 +239,30 @@ la [référence Firebase Performance](https://firebase.google.com/docs/reference
 ne garantit une modification complète à chaud que lorsqu'elle intervient avant la configuration. Les
 mesures Performance livrées sont uniquement des traces personnalisées ouvertes sous consentement
 diagnostics ; leur envoi s'arrête dès que ce consentement n'est plus effectif.
+
+### First usable viewport Explore
+
+La bêta fermée instrumente `explore_initial_load` sur Android et iOS avec l'horloge monotone de la
+plateforme. Le départ correspond au point de cycle de vie éligible d'Explore au premier plan ; le
+premier échantillon éligible du processus est `first_process_explore`, puis chaque retour après
+masquage, navigation ou arrière-plan est `subsequent_explore`. Ces valeurs décrivent uniquement
+l'ordre des apparitions Explore dans le processus courant ; elles ne qualifient jamais un démarrage
+`cold` ou `warm`. Une recherche ou une fiche qui recouvre Explore annule l'échantillon.
+
+La mesure ne se termine qu'après confirmation d'un rendu de taille positive, postérieur aux
+skeletons, pour un contenu tactile et scrollable ou un état terminal vide, offline ou erreur. Les
+callbacks de rendu portent une génération : un callback obsolète ou dupliqué ne peut rien publier.
+Un retrait du consentement, un passage en arrière-plan ou une navigation annule localement la mesure
+et aucune trace partielle n'est remise à Firebase.
+
+La trace terminée contient uniquement la métrique entière `first_usable_viewport_us` et deux
+attributs à vocabulaire fermé : `process_explore_kind` (`first_process_explore` ou
+`subsequent_explore`) et `viewport_state` (`content`, `empty`, `offline` ou `error`). Aucun
+identifiant, texte libre, ville, URL ou contenu de fiche n'est attaché. Cette instrumentation ne
+constitue pas la preuve B7.10 : seul le harnais opérateur attribue `cold` après force-stop et lancement
+direct ou `warm` après retour contrôlé dans le même processus. Les 10 mesures cold et 20 warm sur
+chacun des appareils physiques de référence, sous le profil réseau gelé, restent à exécuter et à
+archiver sans inventer de valeurs.
 
 Les erreurs non fatales acceptent seulement un `DiagnosticCode` fermé. Aucun message d'exception amont, payload, token, URL fournisseur ou donnée utilisateur n'est joint aux rapports.
 

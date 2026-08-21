@@ -8,10 +8,11 @@ applicatif et données est fusionné dans `main` : corpus reproductible de 60 fi
 workflows staging et distributions internes. La cible V1 complète du PRD reste post-bêta ; aucune
 surface différée n'est déclarée terminée.
 
-## Snapshot courant — 13 août 2026
+## Snapshot courant — 20 août 2026
 
-- La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
-  Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
+- La lignée fonctionnelle de ce lot inclut le commit de fusion
+  `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`, avec le serveur et le raccord mobile
+  EXPLORE-002B2, FAVORITES-001A de bout en bout,
   l'autorité HISTORY-001A, ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de
   `#52` et l'intégration V1 de `#50`.
 - La PR de sécurité `#35` est fusionnée. Les PR `#36` à `#48` sont fermées avec commentaires de
@@ -35,6 +36,21 @@ surface différée n'est déclarée terminée.
   l'unique reprise ciblée autorisée d'une acquisition screencap API 36 classée infrastructure ; le
   run post-fusion `31654557932` est également vert pour intégrité/médias, Gradle, Supabase, Edge
   Function et Xcode simulateur Debug/Staging/Release.
+- La PR documentaire `#62` est fusionnée au commit
+  `d34e6b8441194c3ebb5eb989465118c81ba4a13a`. Son run post-fusion `31656716006` est vert. Le job
+  `Supabase database` de ce run a créé une base jetable avec `supabase db start` ; cette preuve CI
+  valide l'application des migrations et du seed, pgTAP, lint, advisors et les harnais du dépôt,
+  mais ne cible ni ne qualifie un projet Supabase hébergé.
+- L'audit opérateur du 20 août a trouvé une configuration cliente publique pour le tier
+  `development`. Une lecture anonyme de la Data API a répondu `206 Partial Content` et retourné
+  quatre fixtures. C'est une preuve de joignabilité et de lecture seulement : l'historique
+  des migrations, le lint/advisors liés, les ACL négatives et les parcours admin ne sont pas prouvés,
+  car les opérations CLI liées nécessaires ont répondu `403`. `ENV-001B-DEV` reste donc ouvert ; les
+  projets Supabase staging et production restent absents.
+- Le présent worktree détaché intègre localement les workflows et preuves opérateur avec le tracker
+  de sessions consenties et la sonde monotone du first usable viewport Android/iOS. Ce delta n'est
+  ni publié ni validé par une CI exact-head ; aucune session de cohorte ni mesure P75 sur appareil
+  physique n'est donc déclarée acquise.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -44,9 +60,9 @@ surface différée n'est déclarée terminée.
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
-- La décision de release reste **no-go** : staging/production, fournisseurs réels, préflight des
-  données, corpus, juridique, builds signés, appareils physiques, accessibilité, performance,
-  sauvegarde et rollback ne sont pas qualifiés.
+- La décision de release reste **no-go** : projets Supabase staging/production absents, fournisseurs
+  réels, préflight des données, corpus, juridique, builds signés, appareils physiques, accessibilité,
+  performance, sauvegarde et rollback ne sont pas qualifiés.
 - Le PRD et le DESIGN conservent leur cible complète à cinq racines. ADR-0036 accepte un profil de
   bêta fermé distinct : navigation `Explorer · Compte`, catalogue de 60 fiches et report explicite
   des surfaces incomplètes. Ce profil ne remplace pas la cible complète.
@@ -247,7 +263,7 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 - L'activation Promoteur vérifie l'email confirmé de l'invitation, ne remplace jamais une session existante et borne l'attribution à Promoteur vérifié + Éditeur d'organisation. La fiche est rattachée à l'organisation sans transfert de propriété ni élévation Propriétaire/Gestionnaire/Admin.
 - La suppression exige `SUPPRIMER` et une identité fraîche identique au bearer, refuse les conflits de propriété/Storage, révoque les sessions, efface l'utilisateur Auth et conserve un tombstone serveur privé sans PII métier. Une fonction privilégiée réconcilie quotidiennement les opérations interrompues puis purge les tombstones complétés après 30 jours.
 - ADR-0017 et les runbooks environnement/onboarding documentent le provisionnement propriétaire OAuth/Supabase/Apple, les frontières de confidentialité et la réconciliation des suppressions interrompues.
-- Validation locale AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; reset Supabase complet, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente.
+- Validation AUTH-005 : 112 tests Android et 180 tests partagés sans échec, Spotless, Detekt, lint, `check`, APK debug et compilation des sources/tests Kotlin iOS Simulator verts ; base Supabase éphémère, 240 assertions pgTAP, lint `public`/`app_private`, 19 tests Deno, vérifications brand/média/YAML et `git diff --check` verts. La revue croisée a en plus verrouillé la restauration iOS en échec, la priorité de la suppression de compte sur les callbacks Promoteur, le nettoyage fail-closed des sessions provisoires, la ré-authentification du même utilisateur et la preuve AMR serveur récente.
 - Les premiers builds Xcode de la PR `#33` ont détecté l'export incomplet des chaînes AUTH-005 vers Swift, le nom importé du code d'annulation Google Sign-In et un masquage de propriété Promoteur. Les correctifs conservent un pont KMP typé sans texte dupliqué ; le run final `30294633454` du commit `578f8c4` a passé `quality`/pgTAP en 4 min 43 s, puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release sous Xcode 16.4 en 19 min 27 s.
 - L'audit V1 du 30 juillet 2026 confronte code, PRD/DESIGN, données, tests, CI, distribution et
   exploitation dans `docs/audits/2026-07-30-v1-production-readiness.md`. Il estimait alors
@@ -255,7 +271,7 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
   historiques ne sont plus utilisés comme mesure courante après `#50`.
 - SEC-001A est implémentée localement sur `codex/sec-001-authorization-guardrails` : onboarding Google/Apple, grants Social/équipes/claims/signalements, RPC de modération, cohérence taxonomique et matrice Guide/Promoteur/Institution sont durcis par migrations forward-only séparées.
 - Le hotfix OAuth/ACL ne dépend plus de la validation taxonomique fail-closed. Le runbook `docs/runbooks/security-authorization-preflight.md` impose sauvegarde, audit humain des anciennes lignes d’autorité et validation de la taxonomie avant tout déploiement persistant.
-- Validation SEC-001A : 2 migrations appliquées localement, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. Les commits `f6593d4`/`4b9e3fd`/`12ddba2` sont publiés dans la PR brouillon `#35` ; le run final `30557976298` a passé `quality` puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release.
+- Validation SEC-001A : 2 migrations appliquées sur base éphémère, 7 suites et 316 assertions pgTAP vertes, lint sans diagnostic dans `public`/`app_private`, `spotlessCheck`, `detekt`, `check` et `git diff --check` verts. Les commits `f6593d4`/`4b9e3fd`/`12ddba2` sont publiés dans la PR brouillon `#35` ; le run final `30557976298` a passé `quality` puis les XCFrameworks et les configurations simulateur iOS Debug/Staging/Release.
 - ARCH-004 est implémentée dans la PR brouillon empilée `#36` : le contrat et l'implémentation de dispatchers quittent le domaine pour `shared.app`, le binding Koin appartient désormais à la composition root et les consommateurs Android/iOS conservent la même injection déterministe.
 - La gate `verifyDomainPurity`, rattachée à `check`, refuse tout fichier domaine dans un source set plateforme et tout import autre que Kotlin ou intra-domain. Un test négatif contrôlé a prouvé les deux refus avant suppression des probes.
 - Validation locale ARCH-004 : 180 tests partagés et 112 tests JVM Android sans échec, compilation Kotlin iOS Simulator, `spotlessCheck`, `detekt`, lint, `check`, APK debug et `git diff --check` verts ; deux re-revues indépendantes ne relèvent aucun P0/P1/P2.
@@ -274,7 +290,7 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 - CATALOG-002 est implémentée sur `codex/catalog-002-paginated-summary` : liste et recherche utilisent un unique RPC `security invoker`, un DTO carte plat et un curseur opaque lié aux filtres. La couverture est sélectionnée par jointure latérale déterministe ; les appels média par fiche et le faux `nextOffset` terminal sont supprimés.
 - Le RPC reste publié uniquement même pour un propriétaire authentifié, borne ses grants à `anon`/`authenticated` et expose l'état sponsorisé calculé avec le même snapshot serveur que le classement. Le badge jaune ne dépend donc plus de l'horloge appareil pour ce parcours.
 - ADR-0018 trace le choix RPC/keyset et la conservation de la pagination offset générique hors catalogue. CATALOG-002 n'ajoute volontairement aucun chargement suivant visible : la consommation du curseur, le refresh et les tris métier appartiennent à EXPLORE-002.
-- Validation locale CATALOG-002 : migration appliquée, 371 assertions pgTAP sur huit fichiers, lint Supabase sans erreur, tests shared/Android, Spotless, Detekt, lint Android, `check`, APK debug et compilation Kotlin iOS Simulator verts. Le plan interne anon mesuré sur le seed exécute la requête en 2,688 ms/27 buffers ; aucun réglage JIT ni index de ranking non prouvé n'a été ajouté.
+- Validation CATALOG-002 sur base éphémère : migration appliquée, 371 assertions pgTAP sur huit fichiers, lint Supabase sans erreur, tests shared/Android, Spotless, Detekt, lint Android, `check`, APK debug et compilation Kotlin iOS Simulator verts. Le plan interne anon mesuré sur le seed exécute la requête en 2,688 ms/27 buffers ; aucun réglage JIT ni index de ranking non prouvé n'a été ajouté.
 - La PR brouillon CATALOG-002 `#39` est publiée au-dessus de `#38`. Le run `30692610347` a passé `quality` en 5 min 45 s puis les XCFrameworks et les configurations iOS simulateur Debug/Staging/Release en 16 min 30 s.
 - OFFLINE-001 est implémentée sur `codex/offline-001-room-foundation`, empilée sur CATALOG-002 : Room KMP v1 normalise snapshots Explore, fiches canoniques et positions sponsorisées, avec transactions, clés étrangères, éviction ciblée des corruptions, maximum de 50 fiches par snapshot et rétention bornée aux 64 snapshots les plus récents.
 - DataStore KMP conserve uniquement la ville Explore, la locale et la devise d'affichage. Les erreurs I/O deviennent `LocalStorageUnavailable`, les valeurs inconnues retombent sur des défauts sûrs et aucune session, consentement, outbox ni donnée synchronisable n'y est placée.
@@ -291,7 +307,7 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 - La PR brouillon EXPLORE-002A `#41` est publiée au-dessus d'OFFLINE-001 `#40`. Le run GitHub Actions `30723036248` est entièrement vert : `quality` en 6 min 39 s, build simulateur iOS en 20 min 25 s, preuves de lancement Android API 30/31/36 et gate agrégé validés.
 - EXPLORE-002B1 ajoute la fondation relationnelle `event_details` sans modifier le RPC catalogue : dates `timestamptz`, lieu rattaché ou adresse/GPS, organisateur, billetterie, capacité, enum fermée, indexes ciblés, grants Data API explicites et RLS par rôle.
 - ADR-0020 verrouille les invariants parent/enfant et la borne d'écriture actuelle : onboarding terminé, gestionnaire autorisé et fiche `brouillon`/`en_attente`, sauf Admin vérifié pour l'insertion/mise à jour. Un événement ne peut entrer en revue ou être publié sans détails ni avec un lieu non publié ; ceux d'un parent en attente/publié ne peuvent être supprimés directement, même par Admin, et leur lieu ne peut être dépublié. La migration échoue si des événements actifs historiques sont incomplets et les verrous parent/lieu sérialisent soumission, suppression, localisation et conversion concurrentes. Les gardes trigger privilégiées restent dans `app_private`, avec `search_path` vide, contrôle explicite de l'acteur et exécution publique révoquée.
-- Validation locale EXPLORE-002B1 : reset Supabase complet, 57 assertions événementielles et 428 assertions pgTAP standard vertes sur neuf fichiers. Le harnais multi-connexion, retiré de la suite distante et borné par un runner localhost explicite, ajoute 12 assertions concurrentes vertes. La couverture prouve notamment la transition vers modération, la suppression Admin, les courses parent/enfant/lieu, la confidentialité et la publication obligatoire des lieux actifs, l'intégrité privilégiée, le cascade parent, HTTPS, capacité, normalisation et localisation. Le lint `public`/`app_private`, la requête directe du seed, l'historique local des migrations, l'intégrité du dépôt et la porte Gradle `spotlessCheck detekt check` sont verts. Le seul projet Supabase visible par le compte connecté n'est pas un environnement Kwabor, donc ses advisors ne constituent pas une preuve de ce schéma local.
+- Validation EXPLORE-002B1 sur base éphémère : 57 assertions événementielles et 428 assertions pgTAP standard vertes sur neuf fichiers. Le harnais multi-connexion, retiré de toute suite distante et borné par un runner jetable explicite, ajoute 12 assertions concurrentes vertes. La couverture prouve notamment la transition vers modération, la suppression Admin, les courses parent/enfant/lieu, la confidentialité et la publication obligatoire des lieux actifs, l'intégrité privilégiée, le cascade parent, HTTPS, capacité, normalisation et localisation. Le lint `public`/`app_private`, la requête directe du seed, l'historique des migrations éphémères, l'intégrité du dépôt et la porte Gradle `spotlessCheck detekt check` sont verts. Cette preuve ne qualifie aucun projet Supabase hébergé.
 - La PR brouillon EXPLORE-002B1 `#42` est publiée au-dessus d'EXPLORE-002A `#41`. Son run
   `30729830885` est entièrement vert ; sa tête sera ensuite intégrée dans `main` via `#50` et sa PR
   source deviendra supersédée.
@@ -386,10 +402,10 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
   même compte permet une nouvelle ré-authentification éphémère depuis la Danger Zone. Si l'utilisateur
   Auth a déjà disparu, seule la réconciliation serveur idempotente peut marquer `completed` ; aucune
   suppression DBA n'est autorisée.
-- Validation locale SEC-001F : 389 tests partagés Android host et 196 tests Android app sans échec,
+- Validation SEC-001F : 389 tests partagés Android host et 196 tests Android app sans échec,
   compilation des tests Kotlin/Native iOS X64, `spotlessCheck`, `detekt` et `check` verts ; format/check
-  Deno et 20/20 tests Edge verts ; reset Supabase, lint `public`/`app_private` et 753 assertions pgTAP
-  verts. Ce reset a aussi intégré les correctifs SQL
+  Deno et 20/20 tests Edge verts ; base Supabase éphémère, lint `public`/`app_private` et 753 assertions
+  pgTAP vertes. Cette reconstruction a aussi intégré les correctifs SQL
   préexistants de GUIDE-001B (transaction de migration, alias historiques et assertions typées).
 - STAB-002A retire les formulations internes visibles sur le nettoyage de session et l'annulation
   d'invitation Android. Les consentements partagés décrivent désormais les statistiques, pannes,
@@ -503,11 +519,16 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 ## Tâche en cours
 
 BETA-STAGING-001 est le chemin critique. Le code, les 60 fiches, les 180 médias, les tests dynamiques
-Supabase et les workflows de distribution sont fusionnés et qualifiés ; il reste à provisionner les
-Environments GitHub et les comptes fournisseurs, publier puis vérifier Storage et le catalogue sur
+Supabase sur base CI éphémère et les workflows de distribution sont fusionnés et qualifiés ; il reste
+à durcir l'Environment GitHub `staging`, créer `play-internal` et `testflight-internal`, compléter leurs
+variables et secrets avec les comptes fournisseurs, publier puis vérifier Storage et le catalogue sur
 le vrai staging, produire les builds signés internes et exécuter le pilote. La checklist opérateur
 non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
-secret ne doit être publié dans GitHub Issues.
+secret ne doit être publié dans GitHub Issues. Le dénominateur crash-free et la sonde first usable
+viewport sont prêts localement, mais leurs preuves Firebase, leurs valeurs réelles sur appareils et
+leurs validations CI exact-head restent incluses dans les gates ouvertes G4 à G7. La sonde décrit
+seulement `first_process_explore`/`subsequent_explore` ; le mode B7.10 `cold`/`warm` relève
+exclusivement du harnais opérateur physique.
 
 ## Blocages / limites
 
@@ -536,6 +557,10 @@ secret ne doit être publié dans GitHub Issues.
 - SEC-001A, ARCH-004 et STAB-003 sont intégrées dans `main`. SEC-001A ne protège cependant aucun
   environnement persistant tant que la préflight, le déploiement staging et les tests négatifs
   réels ne sont pas exécutés.
+- Le tier Supabase `development` est joignable avec sa configuration publique et expose quatre
+  fixtures en lecture Data API (`206`). Les opérations liées ont toutefois répondu `403` :
+  migrations, lint/advisors, ACL négatives et parcours admin restent sans preuve. Cette lecture ne
+  ferme ni `ENV-001B-DEV`, ni la préflight ; staging et production Supabase sont toujours absents.
 - Les ACL forward-only ne prouvent pas la légitimité d’anciennes décisions ou adhésions ; la préflight et une éventuelle quarantaine approuvée sont obligatoires avant déploiement sur une base persistante.
 - La compilation Xcode complète ne peut pas être exécutée sur ce poste Windows ; les configurations simulateur Debug/Staging/Release, les tests Swift, le runtime iOS et les XCFrameworks de DETAIL-IOS-001 sont confirmés par le run GitHub Actions macOS exact-head `30780564021` sous Xcode 16.4.
 - OFFLINE-002 compile pour iOS X64 sous Windows et ouvre Room sous Robolectric dans le chemin Android
@@ -543,9 +568,9 @@ secret ne doit être publié dans GitHub Issues.
   observable de Room par l’application. L’exclusion/protection iOS doit encore être exécutée sur
   simulateur macOS et appareil réel. Android exige encore `bmgr` API 31/36.1 et un transfert OEM ; les
   règles de sauvegarde plateforme ne sont pas une preuve cryptographique de liaison à l’appareil.
-- SEARCH-001A, GUIDE-001B, ACTIONS-001C1 et SETTINGS-001A/B sont intégrées dans `main`. Le reset
-  Supabase, les advisors, les tests Swift et les builds Xcode simulateur ont été exécutés par la CI
-  exact-head de `#50`. Les parcours connectés, TalkBack et VoiceOver restent à prouver sur appareils
+- SEARCH-001A, GUIDE-001B, ACTIONS-001C1 et SETTINGS-001A/B sont intégrées dans `main`. La base
+  Supabase éphémère démarrée par `supabase db start`, les advisors, les tests Swift et les builds
+  Xcode simulateur ont été exécutés par la CI exact-head de `#50`. Les parcours connectés, TalkBack et VoiceOver restent à prouver sur appareils
   configurés avant release.
 - La première distribution Android/iOS avec Firebase réel exige une installation staging propre et la preuve
   qu'aucune ancienne build Firebase automatique n'a été diffusée. Une ancienne collecte Crashlytics automatique
@@ -574,7 +599,9 @@ secret ne doit être publié dans GitHub Issues.
   des filtres Explore/Search avant EXPLORE-002B2B2 ; aucun filtrage client de substitution n'est
   autorisé entre-temps.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
-- Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
+- Aucun secret Supabase n'est commité. Un clone sans injection publique reste sur l'état vide initial ;
+  la présence d'une URL et d'une clé publishable `development` ne donne aucun privilège serveur et ne
+  constitue pas une qualification de sécurité.
 - L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
   mais pas l'affichage connecté de la fiche : l'APK n'a pas de configuration Supabase et les ANR
   observés concernent les processus système de l'AVD, pas KWABOR.
@@ -600,7 +627,10 @@ secret ne doit être publié dans GitHub Issues.
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - La vidéo d'intro ne dépend plus d'ENV-001B/OBS-001B, d'un CDN ou de Firebase. Chaque nouvelle révision exige toutefois provenance, droits de diffusion, approbation éditoriale, preuves Android/iOS, builds signés et publication Store.
-- ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
+- ENV-001B dépend du propriétaire : `development` est seulement joignable en lecture publique et
+  `ENV-001B-DEV` reste ouvert après les réponses CLI liées `403`; les projets Supabase staging et
+  production sont absents. L'authentification Firebase CLI existante est expirée et exige
+  `firebase login --reauth` avant création des projets Firebase requis.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils d'Analytics, Crashlytics, Performance et Remote Config générique ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.

@@ -74,7 +74,13 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] PR-NAV-001 — PR `#24` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
-  - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations ; aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
+  - [ ] ENV-001B — Qualifier `development`, créer les projets Supabase/Firebase staging et production
+    dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations ;
+    aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
+    - [ ] ENV-001B-DEV — Terminer la qualification du projet Supabase `development`. La configuration
+      publique est présente et une lecture Data API a répondu `206` avec quatre fixtures, mais les
+      migrations, le lint, les ACL négatives et les parcours admin ne sont pas prouvés : les commandes
+      CLI liées nécessaires ont répondu `403`. Les projets staging et production restent absents.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.
@@ -123,7 +129,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [ ] Valider perceptuellement le raccord complet sur appareils Android Pixel/Samsung et iOS.
 - [x] AUTH-005 — Intégrer Google Android/iOS, Apple iOS, activation Promoteur, ré-authentification et Edge Function `account-delete`.
   - [x] Implémentation fonctionnelle et documentation terminées sur la branche atomique.
-  - [x] Validations locales finales, reset Supabase, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
+  - [x] Validations finales, base Supabase éphémère, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
   - [x] Build Xcode macOS, PR et CI validés avant fusion.
 - [x] AUTH-UX-001 — Réduire l'inscription à quatre écrans email/un profil fédéré, rendre l'intro interactive, contextualiser la softwall et différer toute permission avant l'accueil ; portage local validé sur la ligne avancée Store-only.
 - [x] PR-AUTH-UX-001 — AUTH-UX-001 intégrée dans `main` via `#50`, avec tests Swift et builds
@@ -266,7 +272,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] GUIDE-001B — Livrer la découverte publique « Trouver un guide » : contrat RPC
     versionné, filtres destination/langue/spécialité, pagination, cartes et ouverture du détail sur
     Android Compose et iOS SwiftUI, sans nouvel onglet racine ni sponsoring.
-  - [x] PR-GUIDE-001B — GUIDE-001B intégrée dans `main` via `#50` après reset Supabase et builds
+  - [x] PR-GUIDE-001B — GUIDE-001B intégrée dans `main` via `#50` après validation sur base Supabase
+    éphémère et builds
     Xcode simulateur exact-head verts ; la preuve VoiceOver/appareil reste ouverte.
   - [x] ACTIONS-001C1 — Livrer la route interne stricte de fiche Android/iOS : validation
     UUID partagée, dernier lien valide restaurable, attente intro/bootstrap/E3, ouverture Accueil puis
@@ -352,13 +359,18 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   staging sans écriture client, un upload immuable et les tests prouvant exactement 60 fiches.
 - [x] BETA-NAV-001 — Restreindre Android/iOS à l'allowlist `Explorer · Compte`, retirer les
   placeholders et traiter les deep links des racines différées sans écran mort.
+- [x] BETA-OBS-001 — Instrumenter localement le dénominateur crash-free par session applicative
+  sans PII, uniquement avec Analytics et Diagnostics consentis, avec seuil d'inactivité de
+  30 minutes, révocation durable et parité de cycle de vie Android/iOS. La preuve Firebase sur
+  staging et les sessions réelles de cohorte restent ouvertes.
 - [ ] BETA-STAGING-001 — Charger le corpus en staging, prouver rollback, offline, performances,
   accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
-  dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61).
+  dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). La réussite du job CI
+  `supabase_database` sur une base éphémère ne clôt pas ce ticket.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.
-  - [x] SEC-001A — Fermer les contournements OAuth/onboarding, Social, membres, claims, signalements et classification des fiches ; hotfix ACL séparé de la taxonomie et 316 assertions pgTAP locales vertes.
+  - [x] SEC-001A — Fermer les contournements OAuth/onboarding, Social, membres, claims, signalements et classification des fiches ; hotfix ACL séparé de la taxonomie et 316 assertions pgTAP sur base éphémère vertes.
   - [x] SEC-001B — Faire deux revues techniques, publier la PR brouillon `#35` et obtenir `quality` + `iOS simulator build` verts.
   - [x] SEC-001C — PR `#35` fusionnée dans `main` le 4 août 2026 ; déploiement et preflight restent
     couverts séparément par SEC-001D/E.
@@ -371,9 +383,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     pseudonymisée, privée et non modifiable, puis utilise une nouvelle session éphémère si Auth
     existe encore ; après suppression Auth, seule la réconciliation serveur termine le tombstone.
     Tests Kotlin ciblés Android et compilation des tests Kotlin/Native iOS X64 verts, Deno 20/20,
-    reset Supabase et 753 assertions pgTAP ainsi que la porte globale `spotlessCheck detekt check`
-    verts.
+    base Supabase éphémère et 753 assertions pgTAP ainsi que la porte globale
+    `spotlessCheck detekt check` vertes.
 - [ ] PERF-A11Y-001 — Prouver P75 Explore, AA, TalkBack/VoiceOver, mémoire et consommation data.
+  - [x] PERF-A11Y-001A — Instrumenter localement le first usable viewport Explore Android/iOS avec
+    horloge monotone, confirmation de rendu, générations anti-doublon et consentement diagnostics
+    fail-closed.
+  - [ ] PERF-A11Y-001B — Exécuter et archiver B7.10 sur appareils physiques : par plateforme,
+    10 mesures cold et 20 warm sous le profil réseau gelé, sans mesure simulée.
 - [x] DOC-001 — Livrer README, index, setup, architecture, data model, testing, environment, deployment et contribution.
 - [ ] OPS-001 — Livrer runbooks auth, push, paiement, sauvegarde/PITR, incident et rollback.
   - [x] OPS-001A — Livrer le runbook Auth/session/suppression avec diagnostics en lecture seule,

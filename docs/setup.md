@@ -13,7 +13,7 @@
 | macOS + Xcode | iOS 17 minimum ; CI sur macOS 15 | SwiftUI, simulateur et archives iOS |
 | Python 3 | Version courante supportée | Vérificateurs du dépôt et tests concurrents |
 | FFmpeg/ffprobe | `ffprobe` accessible dans le PATH | Qualification de la vidéo embarquée |
-| Docker + Supabase CLI | CLI 2.84.2 en CI, PostgreSQL local 17 | Migrations et pgTAP |
+| GitHub Actions + Supabase CLI | CLI 2.111.0 dans le job CI `supabase_database` | Migrations, pgTAP et contrôles PostgreSQL éphémères |
 | Deno | 2.9.4 en CI | Edge Function `account-delete` |
 
 Les versions CI sont la référence reproductible. Aucun gestionnaire de paquets JavaScript n'est
@@ -100,21 +100,24 @@ xcodebuild \
 Les configurations `Staging` et `Release` utilisent le XCFramework release. Voir
 [iosApp/README.md](../iosApp/README.md) et [ios-release.md](ios-release.md).
 
-## 5. Démarrer Supabase localement
+## 5. Déclencher la validation Supabase dans GitHub Actions
 
-Docker doit être disponible. Depuis la racine :
+Docker n'est pas un prérequis local Kwabor. Toute validation qui en dépend s'exécute dans le job
+`supabase_database` du workflow `CI`, depuis une pull request ou par déclenchement manuel :
 
 ```powershell
-supabase start
-supabase test db
-supabase status
+gh workflow run CI --ref <branche>
 ```
 
-`supabase start` lance la pile locale nécessaire à l'application, notamment Auth, PostgREST et la
-base. La CI utilise `supabase db start` lorsqu'elle n'a besoin que de PostgreSQL pour les tests. La
-configuration locale utilise PostgreSQL 17, applique les migrations ordonnées de
-`supabase/migrations/` et charge `supabase/seed.sql`. Les tests pgTAP sont dans `supabase/tests/`.
-Ne jamais exécuter de reset destructif contre staging ou production.
+Le même déclenchement est disponible dans GitHub, sous **Actions > CI > Run workflow**. Le job crée
+un runner jetable, exécute `supabase db start`, applique les migrations et le seed, puis lance le
+lint, pgTAP, les advisors et les harnais de concurrence versionnés. Il ne lie aucun projet hébergé et
+n'effectue aucune remise à zéro d'un environnement distant.
+
+Cette preuve CI qualifie l'état du dépôt sur le SHA testé. Elle ne qualifie ni `development`, ni
+`staging`, ni `production`. La qualification d'un projet hébergé reste une procédure protégée,
+explicitement ciblée et non destructive ; voir
+[environment-configuration.md](environment-configuration.md).
 
 ## 6. Vérifier l'Edge Function locale
 
@@ -147,7 +150,8 @@ sélectionnée.
 
 ### Les tests Supabase ne démarrent pas
 
-Vérifier Docker et `supabase status`. Ne pas réutiliser ni arrêter un moteur Docker appartenant à un
-autre projet sans confirmer son identité.
+Ouvrir le run du workflow `CI`, vérifier le SHA et consulter les logs du job `supabase_database`.
+Ne pas tenter de reproduire localement une commande dépendante de Docker. Un échec de qualification
+d'un projet hébergé se traite séparément, sur la cible protégée et sans opération destructive.
 
 Étape suivante : [comprendre l'architecture](architecture.md).

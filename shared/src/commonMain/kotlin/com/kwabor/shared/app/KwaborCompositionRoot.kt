@@ -11,6 +11,8 @@ import com.kwabor.shared.data.favorites.favoritesDataModule
 import com.kwabor.shared.data.guide.guideDiscoveryDataModule
 import com.kwabor.shared.data.interaction.interactionDataModule
 import com.kwabor.shared.data.local.ExploreCacheStore
+import com.kwabor.shared.data.observability.InMemoryObservedAppSessionStore
+import com.kwabor.shared.data.observability.UnavailableObservedAppSessionTimeSource
 import com.kwabor.shared.data.organization.organizationDataModule
 import com.kwabor.shared.data.search.searchDataModule
 import com.kwabor.shared.domain.auth.AuthRepository
@@ -18,6 +20,9 @@ import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.favorites.FavoritesRepository
 import com.kwabor.shared.domain.guide.GuideDiscoveryRepository
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
+import com.kwabor.shared.domain.observability.ObservedAppSessionStore
+import com.kwabor.shared.domain.observability.ObservedAppSessionTimeSource
 import com.kwabor.shared.domain.organization.OrganizationRepository
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import com.kwabor.shared.presentation.auth.AuthPresenter
@@ -56,6 +61,7 @@ class KwaborCompositionRoot internal constructor(
     val favoritesRepository: FavoritesRepository = application.koin.get()
     val guideDiscoveryRepository: GuideDiscoveryRepository = application.koin.get()
     val organizationRepository: OrganizationRepository = application.koin.get()
+    val consentedAppSessionTracker: ConsentedAppSessionTracker = application.koin.get()
     val viewerSessionScopeTracker: ViewerSessionScopeTracker = application.koin.get()
     val explorePresenter: ExplorePresenter by lazy { application.koin.get() }
     val favoritesPresenter: FavoritesPresenter by lazy { application.koin.get() }
@@ -128,6 +134,7 @@ private fun createRootModule(
     persistenceConfiguration: KwaborPersistenceConfiguration?,
 ): Module = module {
     single<DispatcherProvider> { DefaultDispatcherProvider() }
+    registerObservedAppSession(persistenceConfiguration)
     single { ViewerSessionScopeTracker() }
     includes(
         coreDataModule(
@@ -154,6 +161,21 @@ private fun createRootModule(
     }
     if (authSessionManager != null && persistenceConfiguration != null) {
         includes(interactionDataModule, interactionPresentationModule)
+    }
+}
+
+private fun Module.registerObservedAppSession(persistenceConfiguration: KwaborPersistenceConfiguration?) {
+    single<ObservedAppSessionStore> {
+        persistenceConfiguration?.observedAppSessionStore ?: InMemoryObservedAppSessionStore()
+    }
+    single<ObservedAppSessionTimeSource> {
+        persistenceConfiguration?.observedAppSessionTimeSource ?: UnavailableObservedAppSessionTimeSource
+    }
+    single {
+        ConsentedAppSessionTracker(
+            timeSource = get<ObservedAppSessionTimeSource>(),
+            store = get<ObservedAppSessionStore>(),
+        )
     }
 }
 

@@ -57,8 +57,14 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         val applicationState = application as KwaborApplication
         applicationState.observability.retryPendingMaintenance()
+        applicationState.observability.updateForegroundState(isForeground = true)
         notifyAuthenticationForeground(authViewModel?.let { it::onForeground })
         notifyInteractionForeground(applicationState.compositionRoot?.interactionCoordinator?.let { it::onForeground })
+    }
+
+    override fun onStop() {
+        (application as KwaborApplication).observability.updateForegroundState(isForeground = false)
+        super.onStop()
     }
 
     private fun configuredAppOrNull(): ConfiguredApp? {
