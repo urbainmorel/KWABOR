@@ -69,6 +69,14 @@ class AndroidClosedBetaReleaseWorkflowTest(unittest.TestCase):
             "qualified_ci_run_id",
             "artifact-digest",
             "artifact-url",
+            "GEL-G6-ANDROID-AAB.json",
+            "GEL-G6-ANDROID-PLAY-INTERNAL.json",
+            "tools/closed-beta-gel.py write",
+            "tools/closed-beta-gel.py verify",
+            "sourceArtifactSha256",
+            "CI-RUN-PROVENANCE.json",
+            "validated-ci-provenance.json",
+            "gateDecision=not-closed-by-receipt",
             "/actions/workflows/ci.yml/runs",
             '.event == "push"',
             '.head_branch == "main"',
@@ -76,6 +84,45 @@ class AndroidClosedBetaReleaseWorkflowTest(unittest.TestCase):
         for token in required_tokens:
             with self.subTest(token=token):
                 self.assertIn(token, self.workflow)
+
+    def test_gel_receipts_follow_real_build_and_play_operations(self) -> None:
+        signature_index = self.workflow.index(
+            "Replace debug signature with protected upload signature"
+        )
+        build_receipt_index = self.workflow.index(
+            "Write and verify sanitized Android AAB GEL receipt"
+        )
+        play_upload_index = self.workflow.index(
+            "Publish to closed Google Play Internal track"
+        )
+        play_receipt_index = self.workflow.index(
+            "Write and verify sanitized Play Internal GEL receipt"
+        )
+        self.assertLess(signature_index, build_receipt_index)
+        self.assertLess(play_upload_index, play_receipt_index)
+        self.assertGreaterEqual(self.workflow.count("retention-days: 90"), 2)
+        self.assertIn("artifact_digest: ${{ steps.upload.outputs.artifact-digest }}", self.workflow)
+        self.assertIn("publicationOutcome=upload-action-succeeded", self.workflow)
+        self.assertIn("--ci-provenance CI-RUN-PROVENANCE.json", self.workflow)
+        self.assertIn("--output \"$ci_provenance\"", self.workflow)
+
+    def test_publish_reuses_the_exact_build_attempt_provenance(self) -> None:
+        self.assertIn(
+            "build_run_attempt: ${{ steps.release_metadata.outputs.build_run_attempt }}",
+            self.workflow,
+        )
+        self.assertIn(
+            "BUILD_RUN_ATTEMPT: ${{ needs.build.outputs.build_run_attempt }}",
+            self.workflow,
+        )
+        self.assertIn(
+            '--arg workflow_run_attempt "$BUILD_RUN_ATTEMPT"',
+            self.workflow,
+        )
+        self.assertIn(
+            '--run-attempt "$BUILD_RUN_ATTEMPT"',
+            self.workflow,
+        )
 
     def test_every_external_action_is_pinned_to_a_commit(self) -> None:
         uses = re.findall(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)", self.workflow)

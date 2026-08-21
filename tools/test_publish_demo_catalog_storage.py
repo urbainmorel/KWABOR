@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import io
 import json
 import os
 import sys
@@ -39,6 +40,9 @@ class FakeStorageClient:
         self.download_metadata_failure_for: str | None = None
         self.upload_uncertain_for: str | None = None
         self.upload_uncertain_commits = False
+        self.upload_acknowledgement_body: bytes | None = None
+        self.remove_uncertain = False
+        self.remove_uncertain_commits: set[str] = set()
 
     def get_bucket(self, bucket: str) -> dict[str, object] | None:
         self.calls.append(("get_bucket", bucket))
@@ -65,6 +69,15 @@ class FakeStorageClient:
                 self.existing.add(path)
             raise storage.StorageRequestUncertain("simulated lost POST response")
         self.existing.add(path)
+        if self.upload_acknowledgement_body is not None:
+            storage._validate_upload_acknowledgement(
+                storage.StorageResponse(
+                    self.upload_acknowledgement_body,
+                    storage.Message(),
+                ),
+                bucket,
+                path,
+            )
 
     def download_public(self, bucket: str, path: str) -> object:
         self.calls.append(("download", path))
@@ -86,6 +99,9 @@ class FakeStorageClient:
 
     def remove_exact(self, bucket: str, paths: list[str]) -> tuple[str, ...]:
         self.calls.append(("remove", tuple(paths)))
+        if self.remove_uncertain:
+            self.existing.difference_update(self.remove_uncertain_commits)
+            raise storage.StorageRequestUncertain("simulated uncertain DELETE response")
         self.existing.difference_update(paths)
         return tuple(paths)
 
@@ -100,9 +116,11 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         publication_index = workflow.index(
             "python3 tools/publish-demo-catalog-storage.py publish"
         )
+        gel_index = workflow.index("Write and verify sanitized Storage GEL receipt")
 
         self.assertLess(local_gate_index, credential_guard_index)
         self.assertLess(credential_guard_index, publication_index)
+        self.assertLess(publication_index, gel_index)
         self.assertIn("environment: staging", workflow)
         self.assertIn('github.repository }}" != "urbainmorel/KWABOR"', workflow)
         self.assertIn("KWABOR_STAGING_PROJECT_REF_SHA256", workflow)
@@ -110,6 +128,23 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         self.assertIn(".deployment_branch_policy.protected_branches == true", workflow)
         self.assertIn(".deployment_branch_policy.custom_branch_policies == false", workflow)
         self.assertIn(".prevent_self_review == true", workflow)
+        self.assertIn("validated_ci_run_id:", workflow)
+        self.assertIn("validate-github-run", workflow)
+        self.assertIn("validated-ci-provenance.json", workflow)
+        self.assertIn("--ci-provenance CI-RUN-PROVENANCE.json", workflow)
+        self.assertIn("--workflow-path .github/workflows/ci.yml", workflow)
+        self.assertIn("--allowed-event push", workflow)
+        self.assertIn("group: closed-beta-demo-staging-operations", workflow)
+        self.assertIn("--result-json", workflow)
+        self.assertIn("--allow-absent-for-storage-rollback", workflow)
+        self.assertIn('tools/closed-beta-gel.py "${write_args[@]}"', workflow)
+        self.assertRegex(workflow, r"(?m)^\s+write\s*$")
+        self.assertIn("tools/closed-beta-gel.py verify", workflow)
+        self.assertIn(
+            "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            workflow,
+        )
+        self.assertIn("retention-days: 90", workflow)
 
     def test_storage_pgtap_plan_matches_all_top_level_assertions(self) -> None:
         sql = SQL_GUARDRAIL_PATH.read_text(encoding="utf-8")
@@ -263,6 +298,36 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
                 storage._publish(client, contract)
             self.assertFalse(any(call[0] == "upload" for call in client.calls))
 
+    def test_uncertain_bucket_creation_is_reconciled_before_publication(self) -> None:
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            (),
+        )
+        exact_bucket = {
+            "id": storage.EXPECTED_BUCKET,
+            "name": storage.EXPECTED_BUCKET,
+            "public": True,
+            "file_size_limit": storage.EXPECTED_FILE_SIZE_LIMIT,
+            "allowed_mime_types": [storage.EXPECTED_CONTENT_TYPE],
+        }
+        client = FakeStorageClient()
+        with (
+            patch.object(
+                client,
+                "get_bucket",
+                side_effect=(None, exact_bucket, exact_bucket),
+            ),
+            patch.object(
+                client,
+                "create_bucket",
+                side_effect=storage.StorageRequestUncertain("simulated HTTP 503"),
+            ),
+        ):
+            result = storage._publish(client, contract)
+
+        self.assertEqual(result["counts"]["createdObjects"], 0)
+
     def test_publish_verifies_each_object_immediately_after_upload(self) -> None:
         with tempfile.TemporaryDirectory() as temp_directory:
             payload = b"verified"
@@ -282,11 +347,14 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             client = FakeStorageClient()
             client.payloads = {media.path: payload}
 
-            storage._publish(client, contract)
+            result = storage._publish(client, contract)
             actions = [call[0] for call in client.calls]
             self.assertLess(actions.index("upload"), actions.index("download"))
+            self.assertEqual(result["operation"], "publish")
+            self.assertEqual(result["counts"]["createdObjects"], 1)
+            self.assertEqual(result["counts"]["verifiedObjects"], 1)
 
-    def test_publish_compensates_exact_created_paths_after_verification_failure(self) -> None:
+    def test_publish_preserves_unverified_path_after_success_acknowledgement_conflict(self) -> None:
         with tempfile.TemporaryDirectory() as temp_directory:
             payload = b"verified"
             local_path = Path(temp_directory) / "asset.jpg"
@@ -308,6 +376,59 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
 
             with self.assertRaisesRegex(storage.PublicationError, "Downloaded size mismatch"):
                 storage._publish(client, contract)
+            self.assertIn(media.path, client.existing)
+            self.assertFalse(any(call[0] == "remove" for call in client.calls))
+
+    def test_unreadable_2xx_upload_acknowledgement_preserves_conflicting_object(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            expected_payload = b"expected"
+            remote_payload = b"conflict"
+            local_path = Path(temp_directory) / "asset.jpg"
+            local_path.write_bytes(expected_payload)
+            media = storage.MediaObject(
+                "v1/example/asset.jpg",
+                hashlib.sha256(expected_payload).hexdigest(),
+                len(expected_payload),
+                local_path,
+            )
+            contract = storage.CatalogContract(
+                storage.EXPECTED_BUCKET,
+                storage.EXPECTED_CACHE_CONTROL,
+                (media,),
+            )
+            client = FakeStorageClient()
+            client.payloads = {media.path: remote_payload}
+            client.upload_acknowledgement_body = b"{"
+
+            with self.assertRaisesRegex(storage.PublicationError, "SHA-256 mismatch"):
+                storage._publish(client, contract)
+
+            self.assertIn(media.path, client.existing)
+            self.assertFalse(any(call[0] == "remove" for call in client.calls))
+
+    def test_unreadable_2xx_upload_acknowledgement_reconciles_exact_object(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            payload = b"committed-with-unreadable-acknowledgement"
+            local_path = Path(temp_directory) / "asset.jpg"
+            local_path.write_bytes(payload)
+            media = storage.MediaObject(
+                "v1/example/asset.jpg",
+                hashlib.sha256(payload).hexdigest(),
+                len(payload),
+                local_path,
+            )
+            contract = storage.CatalogContract(
+                storage.EXPECTED_BUCKET,
+                storage.EXPECTED_CACHE_CONTROL,
+                (media,),
+            )
+            client = FakeStorageClient()
+            client.payloads = {media.path: payload}
+            client.upload_acknowledgement_body = b"{"
+
+            with self.assertRaisesRegex(storage.PublicationError, "classified the exact object"):
+                storage._publish(client, contract)
+
             self.assertNotIn(media.path, client.existing)
             self.assertIn(("remove", (media.path,)), client.calls)
 
@@ -332,7 +453,7 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             client.upload_uncertain_for = media.path
             client.upload_uncertain_commits = True
 
-            with self.assertRaisesRegex(storage.PublicationError, "response was lost"):
+            with self.assertRaisesRegex(storage.PublicationError, "classified the exact object"):
                 storage._publish(client, contract)
 
             actions = [call[0] for call in client.calls]
@@ -376,7 +497,7 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             }
             client.upload_uncertain_for = media_two.path
 
-            with self.assertRaisesRegex(storage.PublicationError, "response was lost"):
+            with self.assertRaisesRegex(storage.PublicationError, "proved the object absent"):
                 storage._publish(client, contract)
 
             self.assertEqual(client.existing, set())
@@ -411,7 +532,35 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             self.assertIn(media.path, client.existing)
             self.assertFalse(any(call[0] == "remove" for call in client.calls))
 
-    def test_verified_payload_with_wrong_cache_metadata_is_rolled_back(self) -> None:
+    def test_uncertain_upload_never_deletes_matching_bytes_with_conflicting_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            payload = b"expected-bytes"
+            local_path = Path(temp_directory) / "asset.jpg"
+            local_path.write_bytes(payload)
+            media = storage.MediaObject(
+                "v1/example/asset.jpg",
+                hashlib.sha256(payload).hexdigest(),
+                len(payload),
+                local_path,
+            )
+            contract = storage.CatalogContract(
+                storage.EXPECTED_BUCKET,
+                storage.EXPECTED_CACHE_CONTROL,
+                (media,),
+            )
+            client = FakeStorageClient()
+            client.payloads = {media.path: payload}
+            client.upload_uncertain_for = media.path
+            client.upload_uncertain_commits = True
+            client.download_metadata_failure_for = media.path
+
+            with self.assertRaisesRegex(storage.PublicationError, "Cache-Control mismatch"):
+                storage._publish(client, contract)
+
+            self.assertIn(media.path, client.existing)
+            self.assertFalse(any(call[0] == "remove" for call in client.calls))
+
+    def test_successful_upload_with_conflicting_metadata_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_directory:
             payload = b"right-bytes-wrong-metadata"
             local_path = Path(temp_directory) / "asset.jpg"
@@ -434,17 +583,20 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             with self.assertRaisesRegex(storage.PublicationError, "Cache-Control mismatch"):
                 storage._publish(client, contract)
 
-            self.assertNotIn(media.path, client.existing)
-            self.assertIn(("remove", (media.path,)), client.calls)
+            self.assertIn(media.path, client.existing)
+            self.assertFalse(any(call[0] == "remove" for call in client.calls))
 
     def test_compensating_rollback_uses_reverse_creation_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp_directory:
             payload_one = b"first"
             payload_two = b"second"
+            payload_three = b"third"
             first_path = Path(temp_directory) / "first.jpg"
             second_path = Path(temp_directory) / "second.jpg"
+            third_path = Path(temp_directory) / "third.jpg"
             first_path.write_bytes(payload_one)
             second_path.write_bytes(payload_two)
+            third_path.write_bytes(payload_three)
             media_one = storage.MediaObject(
                 "v1/example/first.jpg",
                 hashlib.sha256(payload_one).hexdigest(),
@@ -457,17 +609,24 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
                 len(payload_two),
                 second_path,
             )
+            media_three = storage.MediaObject(
+                "v1/example/third.jpg",
+                hashlib.sha256(payload_three).hexdigest(),
+                len(payload_three),
+                third_path,
+            )
             contract = storage.CatalogContract(
                 storage.EXPECTED_BUCKET,
                 storage.EXPECTED_CACHE_CONTROL,
-                (media_one, media_two),
+                (media_one, media_two, media_three),
             )
             client = FakeStorageClient()
             client.payloads = {
                 media_one.path: payload_one,
                 media_two.path: payload_two,
+                media_three.path: payload_three,
             }
-            client.download_metadata_failure_for = media_two.path
+            client.download_metadata_failure_for = media_three.path
 
             with self.assertRaisesRegex(storage.PublicationError, "Cache-Control mismatch"):
                 storage._publish(client, contract)
@@ -476,6 +635,7 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
                 ("remove", (media_two.path, media_one.path)),
                 client.calls,
             )
+            self.assertIn(media_three.path, client.existing)
 
     def test_rollback_requires_confirmation_and_deletes_exact_paths_only(self) -> None:
         payload = b"x"
@@ -496,10 +656,12 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         with self.assertRaisesRegex(storage.PublicationError, "confirmation"):
             storage._rollback(client, contract, None)
 
-        storage._rollback(client, contract, "DELETE-EXACT-DEMO-MANIFEST")
+        result = storage._rollback(client, contract, "DELETE-EXACT-DEMO-MANIFEST")
         self.assertEqual(client.existing, {"v1/unrelated.jpg"})
         remove_calls = [call for call in client.calls if call[0] == "remove"]
         self.assertEqual(remove_calls, [("remove", (media.path,))])
+        self.assertEqual(result["counts"]["deletedObjects"], 1)
+        self.assertEqual(result["counts"]["alreadyAbsentObjects"], 0)
 
     def test_explicit_rollback_refuses_unverified_bytes_before_any_delete(self) -> None:
         payload = b"wrong"
@@ -563,16 +725,234 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         paths = [f"v1/example/{index:04d}.jpg" for index in range(1_001)]
         client = FakeStorageClient(existing=set(paths))
         client.payloads = {path: b"x" for path in paths}
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            tuple(
+                storage.MediaObject(
+                    path,
+                    hashlib.sha256(b"x").hexdigest(),
+                    1,
+                    Path("unused"),
+                )
+                for path in paths
+            ),
+        )
 
         deleted = storage._delete_exact_batches(
             client,
-            storage.EXPECTED_BUCKET,
+            contract,
             paths,
         )
 
         self.assertEqual(set(deleted), set(paths))
         remove_calls = [call[1] for call in client.calls if call[0] == "remove"]
         self.assertEqual([len(call) for call in remove_calls], [1_000, 1])
+
+    def test_uncertain_delete_all_absent_is_reconciled_as_committed(self) -> None:
+        payload = b"expected"
+        media = storage.MediaObject(
+            "v1/example/asset.jpg",
+            hashlib.sha256(payload).hexdigest(),
+            len(payload),
+            Path("unused"),
+        )
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            (media,),
+        )
+        client = FakeStorageClient(existing={media.path})
+        client.payloads = {media.path: payload}
+        client.remove_uncertain = True
+        client.remove_uncertain_commits = {media.path}
+
+        deleted = storage._delete_exact_batches(client, contract, [media.path])
+
+        self.assertEqual(deleted, (media.path,))
+        self.assertNotIn(media.path, client.existing)
+        self.assertEqual(
+            [call for call in client.calls if call[0] == "remove"],
+            [("remove", (media.path,))],
+        )
+
+    def test_uncertain_delete_conflict_fails_without_retry_or_foreign_delete(self) -> None:
+        expected_payload = b"expected"
+        remote_payload = b"foreign"
+        media = storage.MediaObject(
+            "v1/example/asset.jpg",
+            hashlib.sha256(expected_payload).hexdigest(),
+            len(expected_payload),
+            Path("unused"),
+        )
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            (media,),
+        )
+        client = FakeStorageClient(existing={media.path})
+        client.payloads = {media.path: remote_payload}
+        client.remove_uncertain = True
+
+        with self.assertRaisesRegex(storage.PublicationError, "conflicting exact path"):
+            storage._delete_exact_batches(client, contract, [media.path])
+
+        self.assertIn(media.path, client.existing)
+        self.assertIn(("exists", media.path), client.calls)
+        self.assertIn(("download", media.path), client.calls)
+        self.assertEqual(
+            [call for call in client.calls if call[0] == "remove"],
+            [("remove", (media.path,))],
+        )
+
+    def test_uncertain_delete_exact_object_remaining_fails_without_retry(self) -> None:
+        payload = b"expected"
+        media = storage.MediaObject(
+            "v1/example/asset.jpg",
+            hashlib.sha256(payload).hexdigest(),
+            len(payload),
+            Path("unused"),
+        )
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            (media,),
+        )
+        client = FakeStorageClient(existing={media.path})
+        client.payloads = {media.path: payload}
+        client.remove_uncertain = True
+
+        with self.assertRaisesRegex(storage.PublicationError, "still present"):
+            storage._delete_exact_batches(client, contract, [media.path])
+
+        self.assertEqual(
+            [call for call in client.calls if call[0] == "remove"],
+            [("remove", (media.path,))],
+        )
+        self.assertIn(("exists", media.path), client.calls)
+        self.assertIn(("download", media.path), client.calls)
+
+    def test_contradictory_delete_response_is_reconciled_but_never_accepted(self) -> None:
+        payload = b"expected"
+        media = storage.MediaObject(
+            "v1/example/asset.jpg",
+            hashlib.sha256(payload).hexdigest(),
+            len(payload),
+            Path("unused"),
+        )
+        contract = storage.CatalogContract(
+            storage.EXPECTED_BUCKET,
+            storage.EXPECTED_CACHE_CONTROL,
+            (media,),
+        )
+        client = FakeStorageClient(existing={media.path})
+        client.payloads = {media.path: payload}
+        with patch.object(
+            client,
+            "remove_exact",
+            side_effect=storage.StorageMutationConflict("contradictory response"),
+        ) as remove:
+            with self.assertRaisesRegex(storage.PublicationError, "contradicted"):
+                storage._delete_exact_batches(client, contract, [media.path])
+
+        remove.assert_called_once_with(storage.EXPECTED_BUCKET, [media.path])
+        self.assertIn(media.path, client.existing)
+        self.assertIn(("exists", media.path), client.calls)
+        self.assertIn(("download", media.path), client.calls)
+
+    def test_mutating_http_5xx_is_classified_as_post_commit_uncertain(self) -> None:
+        client = storage.StorageClient(
+            "https://abcdefghijklmnopqrst.supabase.co",
+            "test-key",
+            1.0,
+        )
+        error = storage.urllib.error.HTTPError(
+            "https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/path",
+            503,
+            "Service Unavailable",
+            {},
+            io.BytesIO(b"temporary failure"),
+        )
+        try:
+            with patch.object(storage.urllib.request, "urlopen", side_effect=error):
+                with self.assertRaisesRegex(storage.StorageRequestUncertain, "HTTP 503"):
+                    client._request("POST", "object/path", b"payload")
+        finally:
+            error.close()
+
+    def test_unreadable_mutation_response_is_classified_as_uncertain(self) -> None:
+        client = storage.StorageClient(
+            "https://abcdefghijklmnopqrst.supabase.co",
+            "test-key",
+            1.0,
+        )
+        response = storage.StorageResponse(b"{", storage.Message())
+        with patch.object(client, "_request", return_value=response):
+            with self.assertRaisesRegex(storage.StorageRequestUncertain, "invalid JSON"):
+                client._request_json(
+                    "DELETE",
+                    f"object/{storage.EXPECTED_BUCKET}",
+                    {"prefixes": ["v1/example/asset.jpg"]},
+                )
+
+    def test_upload_rejects_unreadable_or_unbound_2xx_acknowledgement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            payload = b"payload"
+            local_path = Path(temp_directory) / "asset.jpg"
+            local_path.write_bytes(payload)
+            media = storage.MediaObject(
+                "v1/example/asset.jpg",
+                hashlib.sha256(payload).hexdigest(),
+                len(payload),
+                local_path,
+            )
+            client = storage.StorageClient(
+                "https://abcdefghijklmnopqrst.supabase.co",
+                "test-key",
+                1.0,
+            )
+            for body in (b"{", b"{}", b'{"Key":"kwabor-catalog-demo/v1/other.jpg"}'):
+                with self.subTest(body=body):
+                    response = storage.StorageResponse(body, storage.Message())
+                    with patch.object(client, "_request", return_value=response):
+                        with self.assertRaises(storage.StorageRequestUncertain):
+                            client.upload(
+                                storage.EXPECTED_BUCKET,
+                                media,
+                                storage.EXPECTED_CACHE_CONTROL,
+                            )
+
+    def test_upload_accepts_2xx_acknowledgement_bound_to_exact_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            payload = b"payload"
+            local_path = Path(temp_directory) / "asset.jpg"
+            local_path.write_bytes(payload)
+            media = storage.MediaObject(
+                "v1/example/asset.jpg",
+                hashlib.sha256(payload).hexdigest(),
+                len(payload),
+                local_path,
+            )
+            client = storage.StorageClient(
+                "https://abcdefghijklmnopqrst.supabase.co",
+                "test-key",
+                1.0,
+            )
+            acknowledgement = json.dumps(
+                {
+                    "Id": "00000000-0000-0000-0000-000000000000",
+                    "Key": f"{storage.EXPECTED_BUCKET}/{media.path}",
+                }
+            ).encode("utf-8")
+            response = storage.StorageResponse(acknowledgement, storage.Message())
+            with patch.object(client, "_request", return_value=response) as request:
+                client.upload(
+                    storage.EXPECTED_BUCKET,
+                    media,
+                    storage.EXPECTED_CACHE_CONTROL,
+                )
+
+            request.assert_called_once()
 
     def test_storage_delete_rejects_incomplete_response_metadata(self) -> None:
         client = storage.StorageClient(
@@ -586,7 +966,7 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
             return_value=[{"name": "v1/example/other.jpg"}],
         ):
             with self.assertRaisesRegex(
-                storage.PublicationError,
+                storage.StorageMutationConflict,
                 "does not match",
             ):
                 client.remove_exact(

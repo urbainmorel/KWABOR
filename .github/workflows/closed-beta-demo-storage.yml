@@ -7,6 +7,10 @@ on:
         description: Exact 40-character commit SHA to publish or verify
         required: true
         type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run ID for expected_sha
+        required: true
+        type: string
       operation:
         description: Immutable publication, verification, or exact-manifest rollback
         required: true
@@ -25,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: closed-beta-demo-storage-staging
+  group: closed-beta-demo-staging-operations
   cancel-in-progress: false
 
 jobs:
@@ -105,9 +109,38 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile \
+            tools/closed-beta-gel.py \
             tools/publish-demo-catalog-storage.py \
+            tools/test_closed_beta_gel.py \
             tools/test_publish_demo_catalog_storage.py
-          python3 -m unittest tools.test_publish_demo_catalog_storage
+          python3 -m unittest \
+            tools.test_closed_beta_gel \
+            tools.test_publish_demo_catalog_storage
+
+      - name: Verify successful push main CI provenance
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "validated_ci_run_id must be a positive workflow run ID." >&2
+            exit 1
+          fi
+          ci_document="$RUNNER_TEMP/validated-ci-run.json"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" > "$ci_document"
+          python3 -B tools/closed-beta-gel.py validate-github-run \
+            --document "$ci_document" \
+            --run-id "$VALIDATED_CI_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ci.yml \
+            --allowed-event push \
+            --output "$RUNNER_TEMP/validated-ci-provenance.json"
 
       - name: Guard staging authority and credentials
         shell: bash
@@ -151,13 +184,17 @@ jobs:
         if: inputs.operation == 'publish'
         env:
           KWABOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.KWABOR_SUPABASE_SERVICE_ROLE_KEY }}
-        run: python3 tools/publish-demo-catalog-storage.py publish
+        run: >-
+          python3 tools/publish-demo-catalog-storage.py publish
+          --result-json "$RUNNER_TEMP/storage-operation-result.json"
 
       - name: Verify all public objects against the manifest
         if: inputs.operation == 'verify'
         env:
           KWABOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.KWABOR_SUPABASE_SERVICE_ROLE_KEY }}
-        run: python3 tools/publish-demo-catalog-storage.py verify
+        run: >-
+          python3 tools/publish-demo-catalog-storage.py verify
+          --result-json "$RUNNER_TEMP/storage-operation-result.json"
 
       - name: Require explicit rollback confirmation
         if: inputs.operation == 'rollback' && inputs.rollback_confirmation != 'DELETE-EXACT-DEMO-MANIFEST'
@@ -178,6 +215,68 @@ jobs:
             exit 1
           fi
           python3 -B tools/run-demo-catalog-database.py rollback \
-            --confirm-rollback HIDE-EXACT-DEMO-CATALOG
+            --confirm-rollback HIDE-EXACT-DEMO-CATALOG \
+            --allow-absent-for-storage-rollback \
+            --result-json "$RUNNER_TEMP/database-operation-result.json"
           python3 -B tools/publish-demo-catalog-storage.py rollback \
-            --confirm-rollback DELETE-EXACT-DEMO-MANIFEST
+            --confirm-rollback DELETE-EXACT-DEMO-MANIFEST \
+            --result-json "$RUNNER_TEMP/storage-operation-result.json"
+
+      - name: Write and verify sanitized Storage GEL receipt
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          set -euo pipefail
+          receipt_directory="$RUNNER_TEMP/kwabor-demo-storage-gel"
+          receipt_name="GEL-G5-DEMO-STORAGE-$OPERATION.json"
+          mkdir -p "$receipt_directory"
+          cp demo/catalog/v1/manifest.json "$receipt_directory/manifest.json"
+          cp "$RUNNER_TEMP/validated-ci-provenance.json" \
+            "$receipt_directory/CI-RUN-PROVENANCE.json"
+          cp "$RUNNER_TEMP/storage-operation-result.json" \
+            "$receipt_directory/STORAGE-OPERATION-RESULT.json"
+          write_args=(
+            write
+            --directory "$receipt_directory"
+            --workflow .github/workflows/closed-beta-demo-storage.yml
+            --operation "$OPERATION"
+            --expected-sha "$EXPECTED_SHA"
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID"
+            --repository "$GITHUB_REPOSITORY"
+            --actor "$GITHUB_ACTOR"
+            --run-id "$GITHUB_RUN_ID"
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --ci-provenance CI-RUN-PROVENANCE.json
+            --result STORAGE-OPERATION-RESULT.json
+            --artifact manifest=manifest.json
+            --digest "stagingProjectRefSha256=$KWABOR_STAGING_PROJECT_REF_SHA256"
+            --output "$receipt_directory/$receipt_name"
+          )
+          if [[ "$OPERATION" == "rollback" ]]; then
+            cp "$RUNNER_TEMP/database-operation-result.json" \
+              "$receipt_directory/DATABASE-OPERATION-RESULT.json"
+            write_args+=(--related-result DATABASE-OPERATION-RESULT.json)
+          fi
+          python3 -B tools/closed-beta-gel.py "${write_args[@]}"
+          python3 -B tools/closed-beta-gel.py verify \
+            --directory "$receipt_directory" \
+            --evidence "$receipt_directory/$receipt_name" \
+            --workflow .github/workflows/closed-beta-demo-storage.yml \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+          echo "KWABOR_STORAGE_GEL_DIRECTORY=$receipt_directory" >> "$GITHUB_ENV"
+
+      - name: Upload sanitized Storage GEL receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-gel-demo-storage-${{ inputs.operation }}-${{ inputs.expected_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.KWABOR_STORAGE_GEL_DIRECTORY }}
+          if-no-files-found: error
+          retention-days: 90

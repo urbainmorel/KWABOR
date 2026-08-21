@@ -135,6 +135,7 @@ jobs:
           python3 -B -m py_compile \
             tools/build-demo-catalog-contact-sheets.py \
             tools/build-demo-catalog-manifest.py \
+            tools/closed-beta-gel.py \
             tools/compile-demo-catalog-seed.py \
             tools/ios-closed-beta-release.py \
             tools/prepare_android_release_bundle.py \
@@ -144,6 +145,7 @@ jobs:
           python3 -B -m unittest \
             tools.test_compile_demo_catalog_seed \
             tools.test_android_release_workflow \
+            tools.test_closed_beta_gel \
             tools.test_ios_closed_beta_release \
             tools.test_prepare_android_release_bundle \
             tools.test_publish_demo_catalog_storage \
