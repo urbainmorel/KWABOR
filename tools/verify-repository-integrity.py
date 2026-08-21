@@ -31,10 +31,10 @@ IOS_ROOM_DATABASE_BUILDER_SHA256 = (
     "35789b52b5299ec72e55ffff16cb72fde0efe8d8b95fee992af2399ffa5ddf2c"
 )
 IOS_PRIVACY_CRITICAL_SOURCE_SHA256 = {
-    IOS_OBSERVABILITY_SOURCE_PATH: "123738c638e69c098955f4683e0e2448b7f4014cfe041f7f42aed930a80cd638",
+    IOS_OBSERVABILITY_SOURCE_PATH: "f78b0766e829740bc2f2747d1d258bd7c2cb543a65828df3f611397e2bd911bf",
     IOS_ONBOARDING_COORDINATOR_PATH: "27e757f9eea369a31e008a9f68e21cba81cae9dce1e5d8f296cb98a37fdca2a4",
     IOS_CONTENT_VIEW_PATH: "cb3c3e485da56b18d9a8c9e4931dbb57d20345bfa72a1da4bfa94d0593bb3409",
-    IOS_APP_SOURCE_PATH: "6df9293f95e30a9df9d4707addc64e13f151f546e2141000f8f5412f923c7293",
+    IOS_APP_SOURCE_PATH: "2abd7e78bef1d29f6d3bef2fc16c9ab0df8233f53048e33f29b4c946e7d3ac82",
 }
 ANDROID_MANIFEST_PATH = "androidApp/src/main/AndroidManifest.xml"
 ANDROID_ROOM_DATABASE_BUILDER_PATH = (
@@ -94,18 +94,62 @@ ANDROID_REMOTE_CONFIGURATION_COORDINATOR_PATH = (
     "AndroidRemoteConfigurationCoordinator.kt"
 )
 ANDROID_MAIN_ACTIVITY_PATH = "androidApp/src/main/kotlin/com/kwabor/android/MainActivity.kt"
+ANDROID_APPLICATION_PATH = "androidApp/src/main/kotlin/com/kwabor/android/KwaborApplication.kt"
+OBSERVABILITY_MODELS_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/domain/observability/ObservabilityModels.kt"
+)
+OBSERVED_APP_SESSION_TRACKER_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/domain/observability/"
+    "ConsentedAppSessionTracker.kt"
+)
+OBSERVED_APP_SESSION_CODEC_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/data/observability/"
+    "ObservedAppSessionCheckpointCodec.kt"
+)
+IN_MEMORY_OBSERVED_APP_SESSION_STORE_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/data/observability/"
+    "InMemoryObservedAppSessionStore.kt"
+)
+ANDROID_OBSERVED_APP_SESSION_STORE_PATH = (
+    "shared/src/androidMain/kotlin/com/kwabor/shared/data/observability/"
+    "AndroidObservedAppSessionStore.kt"
+)
+ANDROID_OBSERVED_APP_SESSION_TIME_SOURCE_PATH = (
+    "shared/src/androidMain/kotlin/com/kwabor/shared/data/observability/"
+    "AndroidObservedAppSessionTimeSource.kt"
+)
+IOS_OBSERVED_APP_SESSION_STORE_PATH = (
+    "shared/src/iosMain/kotlin/com/kwabor/shared/data/observability/"
+    "IosObservedAppSessionStore.kt"
+)
+IOS_OBSERVED_APP_SESSION_TIME_SOURCE_PATH = (
+    "shared/src/iosMain/kotlin/com/kwabor/shared/data/observability/"
+    "IosObservedAppSessionTimeSource.kt"
+)
+KWABOR_PERSISTENCE_CONFIGURATION_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/app/KwaborPersistenceConfiguration.kt"
+)
+KWABOR_COMPOSITION_ROOT_PATH = (
+    "shared/src/commonMain/kotlin/com/kwabor/shared/app/KwaborCompositionRoot.kt"
+)
+ANDROID_KWABOR_COMPOSITION_ROOT_PATH = (
+    "shared/src/androidMain/kotlin/com/kwabor/shared/app/AndroidKwaborCompositionRoot.kt"
+)
+IOS_KWABOR_COMPOSITION_ROOT_PATH = (
+    "shared/src/iosMain/kotlin/com/kwabor/shared/app/IosKwaborCompositionRoot.kt"
+)
 ANDROID_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     ANDROID_OBSERVABILITY_BACKEND_PATH: (
-        "1d0d12c32f2b2958bb5298e44fc750f50d9aff46da97ed5db8c509d709f26310"
+        "1a44b0f51926c00ee0f485037f1d36094f417776e4b0a7531bcd455a14ab39f4"
     ),
     ANDROID_OBSERVABILITY_CONTROLLER_PATH: (
-        "eb5e5e2eca1e7f5bbffa506433e60049df8bfd9d3f5e2f552c055aba917d7b05"
+        "23d1ff2ebd2b2c1aa275f96d003ddbd57ae2bc80c44bc371be39083bef01dc40"
     ),
     ANDROID_OBSERVABILITY_STORE_PATH: (
         "0dcab8d12c6226cf3de3ca6dde07482933dd14c233a0b654e0721dc8577879b6"
     ),
     ANDROID_OBSERVABILITY_RUNTIME_PATH: (
-        "8f3932c7181b9aabd09b23509343fc3badd6f23a8ca819ddb2d8a672cbb21e40"
+        "f087a98446e1ace12d99eb3a7b5b3ae20996f37f500691b0c39266ac5c01c351"
     ),
     ANDROID_OBSERVABILITY_MAINTENANCE_PATH: (
         "a5299db4add460fade4d9360e1564b73e963c0ad8be3f8d11b4157ceec342160"
@@ -114,7 +158,66 @@ ANDROID_PRIVACY_CRITICAL_SOURCE_SHA256 = {
         "cfb64b908f049cef32529b242180d13aaa9c535d09db788f7b71349b5ce8a0cf"
     ),
     ANDROID_MAIN_ACTIVITY_PATH: (
-        "9b836a991c4dd7ae1ca98a60b8b7be35e2ad495ae291b54a2f6cf3cc3516223b"
+        "bbada14bd81a18a36eb55078d5eb8bc5e42169c27d6f03d6d7d8dce0aeed992f"
+    ),
+}
+OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256 = {
+    OBSERVABILITY_MODELS_PATH: (
+        "068c04b3226c374eff3ca21f0ec2a2dab03b942d7c72c5a46abbd80396c2148e"
+    ),
+    OBSERVED_APP_SESSION_TRACKER_PATH: (
+        "1e92465f313cf08608498dbb99c71cd42c0fb3874653a2dd45d160e62cf45c30"
+    ),
+    OBSERVED_APP_SESSION_CODEC_PATH: (
+        "01b3f3dcd6a979310ea512bd2b582695aec305e4768abea9ad0e09bdf970066a"
+    ),
+    IN_MEMORY_OBSERVED_APP_SESSION_STORE_PATH: (
+        "e0f0f7fd797a3a823a5bb2381e76ec71463eec021cec9bde831abec3d5579cfd"
+    ),
+    ANDROID_OBSERVED_APP_SESSION_STORE_PATH: (
+        "ff0b7943de38651474f5eede207773c2fb5d26f736784cc7cb7e3b7abe8a93bf"
+    ),
+    ANDROID_OBSERVED_APP_SESSION_TIME_SOURCE_PATH: (
+        "dcab5c4e37a81a1ca28cac76d2ea6c7d7880cc88f32f514a34e5455ef20bc7a0"
+    ),
+    IOS_OBSERVED_APP_SESSION_STORE_PATH: (
+        "9175f8c51921925bafbe9f4af02882b96f966a516aa089c9af17e70f3b66ee85"
+    ),
+    IOS_OBSERVED_APP_SESSION_TIME_SOURCE_PATH: (
+        "e9842719f8f3bd53f7f146dced90a1e04f112f2bd25912cbf4ee02f70216e1e5"
+    ),
+    KWABOR_PERSISTENCE_CONFIGURATION_PATH: (
+        "4a7e5206411a7a359570788457fe93d5491f5b7401f8fb75cac8a0042d7e1816"
+    ),
+    KWABOR_COMPOSITION_ROOT_PATH: (
+        "ba21b8abcc2f02da2d6fc27d629cca1db81c799376c308dfb665bae25fef2fa8"
+    ),
+    ANDROID_KWABOR_COMPOSITION_ROOT_PATH: (
+        "03a3c2002f8fd8418254454128233341180c07d1b1759ca6c72dc5bb3874fc4a"
+    ),
+    IOS_KWABOR_COMPOSITION_ROOT_PATH: (
+        "4f50eba9f903b7392ceac49e3335487d2e655195349ea134110b20eecfbbea3e"
+    ),
+    ANDROID_APPLICATION_PATH: (
+        "e0efda41a11523487623bb53d62ff02182263c6155dff18c699f635681cc5fa9"
+    ),
+    ANDROID_MAIN_ACTIVITY_PATH: (
+        "bbada14bd81a18a36eb55078d5eb8bc5e42169c27d6f03d6d7d8dce0aeed992f"
+    ),
+    ANDROID_OBSERVABILITY_CONTROLLER_PATH: (
+        "23d1ff2ebd2b2c1aa275f96d003ddbd57ae2bc80c44bc371be39083bef01dc40"
+    ),
+    ANDROID_OBSERVABILITY_RUNTIME_PATH: (
+        "f087a98446e1ace12d99eb3a7b5b3ae20996f37f500691b0c39266ac5c01c351"
+    ),
+    ANDROID_OBSERVABILITY_BACKEND_PATH: (
+        "1a44b0f51926c00ee0f485037f1d36094f417776e4b0a7531bcd455a14ab39f4"
+    ),
+    IOS_APP_SOURCE_PATH: (
+        "2abd7e78bef1d29f6d3bef2fc16c9ab0df8233f53048e33f29b4c946e7d3ac82"
+    ),
+    IOS_OBSERVABILITY_SOURCE_PATH: (
+        "f78b0766e829740bc2f2747d1d258bd7c2cb543a65828df3f611397e2bd911bf"
     ),
 }
 ANDROID_FIREBASE_CONFIGURATION_SHA256 = {
@@ -326,6 +429,24 @@ def audited_source_sha256(source: str) -> str:
 
     normalized_source = source.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     return hashlib.sha256(normalized_source.encode("utf-8")).hexdigest()
+
+
+def validate_observed_app_session_source_contract(
+    source_files: dict[str, str],
+) -> None:
+    """Lock every app-owned session source that can affect the beta denominator."""
+
+    expected_paths = set(OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256)
+    require(
+        set(source_files) == expected_paths,
+        "Observed app session critical-source inventory changed outside its audited snapshot",
+    )
+    for source_path, expected_sha256 in OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256.items():
+        require(
+            audited_source_sha256(source_files[source_path]) == expected_sha256,
+            f"{source_path} changed outside its audited observed-session snapshot; "
+            "perform a new privacy and continuity review before updating the expected SHA-256",
+        )
 
 
 def strip_kotlin_java_comments(source: str) -> str:
@@ -983,13 +1104,16 @@ def validate_android_firebase_privacy_contract(
         f"{ANDROID_OBSERVABILITY_BACKEND_PATH} must keep automatic Crashlytics disabled",
     )
     required_backend_tokens = {
-        "internal fun createAndroidObservabilityController(context: Context)",
+        "internal fun createAndroidObservabilityController(",
+        "sessionTracker: ConsentedAppSessionTracker?",
         "private class FirebaseAndroidObservabilityBackend(",
         "FirebaseApp.initializeApp(context)",
         "initializedAnalytics.setAnalyticsCollectionEnabled(false)",
         "initializedPerformance.isPerformanceCollectionEnabled = false",
         "FirebaseInstallations.getInstance(app)",
         "fun deleteInstallation(onResult: (Boolean) -> Unit)",
+        "fun trackObservedSession(session: ObservedAppSession)",
+        "analytics?.logEvent(session.eventName, null)",
     }
     missing_backend_tokens = sorted(
         token for token in required_backend_tokens if token not in active_backend_source
@@ -1008,6 +1132,8 @@ def validate_android_firebase_privacy_contract(
         "pendingConsentMutation = mutation",
         "pendingConsentMutation = PendingConsentMutation.Revoke",
         "runtimeSuspendedAfterPersistenceFailure",
+        "fun updateForegroundState(isForeground: Boolean)",
+        "runtime.revokeObservedSession()",
     }
     active_controller_source = strip_swift_comments_and_string_literals(
         decode_java_unicode_escapes(controller_source)
@@ -1058,6 +1184,8 @@ def validate_android_firebase_privacy_contract(
         "installationDeletion.resume(installationDeletionRequestId)",
         "diagnosticsReports.resumePurge(stored.diagnosticsReportPurgeRequestId)",
         "diagnosticsReports.resumeRestoredSend()",
+        "sessionTracker?.onForeground()?.let(backend::trackObservedSession)",
+        "allowed = updatedConsent.allowsObservedSessionMeasurement",
         "desiredConsent.diagnosticsAllowed && stored.diagnosticsReportPurgeRequestId == null",
     }
     active_runtime_source = strip_swift_comments_and_string_literals(
@@ -1118,8 +1246,11 @@ def validate_android_firebase_privacy_contract(
     )
     require(
         "override fun onStart()" in active_main_activity_source
-        and "observability.retryPendingMaintenance()" in active_main_activity_source,
-        f"{ANDROID_MAIN_ACTIVITY_PATH} must retry durable Firebase maintenance on foreground",
+        and "observability.retryPendingMaintenance()" in active_main_activity_source
+        and "observability.updateForegroundState(isForeground = true)" in active_main_activity_source
+        and "override fun onStop()" in active_main_activity_source
+        and "observability.updateForegroundState(isForeground = false)" in active_main_activity_source,
+        f"{ANDROID_MAIN_ACTIVITY_PATH} must retry maintenance and forward observed-session lifecycle",
     )
 
     audited_sources = {
@@ -1590,6 +1721,15 @@ def verify_local_storage_privacy_contract() -> None:
     validate_ios_room_storage_contract(read_text(IOS_ROOM_DATABASE_BUILDER_PATH))
 
 
+def verify_observed_app_session_source_contract() -> None:
+    validate_observed_app_session_source_contract(
+        {
+            source_path: read_text(source_path)
+            for source_path in OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256
+        }
+    )
+
+
 def verify_ios_observability_privacy_contract() -> None:
     info_plist_path = REPOSITORY_ROOT / IOS_INFO_PLIST_PATH
     try:
@@ -1757,6 +1897,11 @@ def validate_ios_observability_privacy_contract(
         "markCrashlyticsDisableScheduled",
         "resetConsentForFreshInstallation",
         "phase: .sanitized",
+        "private let sessionTracker: ConsentedAppSessionTracker?",
+        "func applicationEnteredForeground()",
+        "let allowed = isConfigured && effectiveAnalyticsAllowed && effectiveDiagnosticsAllowed",
+        "allowsObservedSessionMeasurement",
+        "revokeObservedSession()",
     }
     missing_observability_tokens = sorted(
         token for token in required_observability_tokens if token not in observability_source
@@ -2420,6 +2565,7 @@ def validate_ios_observability_privacy_contract(
         re.search(
             r"private\s+var\s+maintenanceAllowsCollection\s*:\s*Bool\s*\{\s*"
             r"authenticatedSessionBound\s*&&\s*!\s*runtimeCollectionSuspended\s*&&\s*"
+            r"pendingConsentMutation\s*==\s*nil\s*&&\s*"
             r"overrideSanitizationState\.allowsCollection\s*&&\s*"
             r"installationDeletionState\s*==\s*\.notRequired\s*\}",
             active_observability_source,
@@ -2485,8 +2631,10 @@ def validate_ios_observability_privacy_contract(
         f"{IOS_ONBOARDING_COORDINATOR_PATH} must not bind Firebase before fresh-install cleanup",
     )
     require(
-        "coordinator.applicationBecameActive()" in active_app_source,
-        f"{IOS_APP_SOURCE_PATH} must retry durable Firebase maintenance on foreground",
+        "coordinator.applicationBecameActive()" in active_app_source
+        and "observability.applicationEnteredForeground()" in active_app_source
+        and "observability.applicationEnteredBackground()" in active_app_source,
+        f"{IOS_APP_SOURCE_PATH} must retry maintenance and forward observed-session lifecycle",
     )
     application_became_active_start = active_coordinator_source.find("func applicationBecameActive()")
     complete_intro_start = active_coordinator_source.find("func completeIntro")
@@ -2536,6 +2684,7 @@ def main() -> int:
         verify_configuration_templates()
         verify_gradle_wrapper()
         verify_git_hygiene()
+        verify_observed_app_session_source_contract()
         verify_android_firebase_privacy_contract()
         verify_local_storage_privacy_contract()
         verify_ios_privacy_manifest()
@@ -2547,7 +2696,7 @@ def main() -> int:
     print(
         "OK repository integrity: configuration templates complete, "
         "sensitive artifacts untracked, Gradle 9.4.1 wrapper checksummed, "
-        "Android/iOS audited Firebase privacy sources, local backup policy, "
+        "Android/iOS audited Firebase privacy sources, observed-session sources, local backup policy, "
         "and iOS host manifest locked"
     )
     return 0

@@ -8,6 +8,7 @@ import com.kwabor.shared.domain.observability.PerformanceTraceName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AndroidObservabilityControllerTest {
@@ -99,6 +100,89 @@ class AndroidObservabilityControllerTest {
         assertEquals(listOf(PerformanceTraceName.ExploreInitialLoad), backend.traces)
         assertTrue(backend.remoteConfigurationFetched)
         assertEquals(1, backend.remoteUpdateStartCount)
+    }
+
+    @Test
+    fun pendingForegroundEmitsOneSessionOnlyAfterBothRequiredConsentsAreEffective() {
+        val backend = TestObservabilityBackend()
+        val clock = MutableObservabilityClock()
+        val sessionStore = TestObservedAppSessionStore()
+        val controller = AndroidObservabilityController(
+            backend = backend,
+            consentStore = TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ObservabilityConsent(analyticsAllowed = true),
+            ),
+            sessionTracker = testObservedAppSessionTracker(clock, sessionStore),
+        )
+        controller.start()
+        controller.updateForegroundState(isForeground = true)
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+
+        assertEquals(emptyList(), backend.observedSessions)
+
+        assertTrue(controller.updateConsent(TEST_USER_ID, ALL_OBSERVABILITY_GRANTED))
+        controller.updateForegroundState(isForeground = true)
+
+        assertEquals(1, backend.observedSessions.size)
+    }
+
+    @Test
+    fun failedSessionClearKeepsRevocationOffUntilRetryAndExplicitRegrant() {
+        val backend = TestObservabilityBackend()
+        val clock = MutableObservabilityClock()
+        val sessionStore = TestObservedAppSessionStore(clearsSucceed = false)
+        val controller = AndroidObservabilityController(
+            backend = backend,
+            consentStore = TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ALL_OBSERVABILITY_GRANTED,
+            ),
+            sessionTracker = testObservedAppSessionTracker(clock, sessionStore),
+        )
+        controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+        controller.updateForegroundState(isForeground = true)
+        controller.updateForegroundState(isForeground = false)
+
+        assertFalse(controller.revokeAllConsent())
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+
+        sessionStore.clearsSucceed = true
+        assertTrue(controller.retryPendingMaintenance())
+        controller.updateForegroundState(isForeground = true)
+
+        assertEquals(1, backend.observedSessions.size)
+        assertEquals(2, sessionStore.clearCount)
+        assertEquals(ObservabilityConsent(), backend.appliedConsent)
+        assertTrue(controller.updateConsent(TEST_USER_ID, ALL_OBSERVABILITY_GRANTED))
+        assertEquals(2, backend.observedSessions.size)
+    }
+
+    @Test
+    fun changingAuthenticatedAccountClearsSessionCheckpointAndStopsMeasurement() {
+        val backend = TestObservabilityBackend()
+        val clock = MutableObservabilityClock()
+        val sessionStore = TestObservedAppSessionStore()
+        val controller = AndroidObservabilityController(
+            backend = backend,
+            consentStore = TestConsentStore(
+                ownerUserId = TEST_USER_ID,
+                consent = ALL_OBSERVABILITY_GRANTED,
+            ),
+            sessionTracker = testObservedAppSessionTracker(clock, sessionStore),
+        )
+        controller.start()
+        controller.bindToAuthenticatedUser(TEST_USER_ID)
+        controller.updateForegroundState(isForeground = true)
+        controller.updateForegroundState(isForeground = false)
+
+        controller.bindToAuthenticatedUser(TEST_OTHER_USER_ID)
+        controller.updateForegroundState(isForeground = true)
+
+        assertEquals(1, backend.observedSessions.size)
+        assertEquals(1, sessionStore.clearCount)
+        assertNull(sessionStore.checkpoint)
     }
 
     @Test

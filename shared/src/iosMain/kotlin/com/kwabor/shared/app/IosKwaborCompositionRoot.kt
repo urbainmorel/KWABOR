@@ -3,7 +3,10 @@ package com.kwabor.shared.app
 import com.kwabor.shared.bridge.KwaborSharedBridge
 import com.kwabor.shared.data.auth.createIosSecureAuthSessionManager
 import com.kwabor.shared.data.local.createIosKwaborDatabaseBuilder
+import com.kwabor.shared.data.observability.createIosObservedAppSessionStore
+import com.kwabor.shared.data.observability.createIosObservedAppSessionTimeSource
 import com.kwabor.shared.data.preferences.createIosAppPreferencesStorage
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 
@@ -21,11 +24,16 @@ class IosKwaborCompositionRoot(
             KwaborPersistenceConfiguration(
                 databaseBuilderFactory = ::createIosKwaborDatabaseBuilder,
                 preferencesStorageFactory = ::createIosAppPreferencesStorage,
+                observedAppSessionStore = createIosObservedAppSessionStore(),
+                observedAppSessionTimeSource = createIosObservedAppSessionTimeSource(),
             )
         },
     )
     private val dispatcherProvider = sharedRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
     private val viewerSessionScopeTracker = sharedRoot?.viewerSessionScopeTracker ?: ViewerSessionScopeTracker()
+
+    val consentedAppSessionTracker: ConsentedAppSessionTracker?
+        get() = sharedRoot?.consentedAppSessionTracker
 
     val bridge = KwaborSharedBridge(
         hasCatalogConfiguration = sharedRoot != null,

@@ -19,6 +19,7 @@ enum ObservabilityConsentCategory {
 final class FirebaseObservability {
     private let options: FirebaseOptions?
     private let consentStore: FirebaseConsentStore
+    private let sessionTracker: ConsentedAppSessionTracker?
     private var remoteConfig: RemoteConfig?
     private var remoteConfigUpdateRegistration: ConfigUpdateListenerRegistration?
     private var remoteConfigurationGeneration = 0
@@ -31,17 +32,23 @@ final class FirebaseObservability {
     private var installationDeletionInFlight = false
     private var authenticatedSessionBound = false
     private var runtimeCollectionSuspended = true
+    private var pendingConsentMutation: PendingObservabilityConsentMutation?
 
     private(set) var consent: ObservabilityConsent
     private(set) var isConfigured = false
 
-    init(bundle: Bundle = .main, legacyUserDefaults: UserDefaults = .standard) {
+    init(
+        sessionTracker: ConsentedAppSessionTracker? = nil,
+        bundle: Bundle = .main,
+        legacyUserDefaults: UserDefaults = .standard
+    ) {
         let consentStore = FirebaseConsentStore(
             service: (bundle.bundleIdentifier ?? fallbackConsentService) + consentServiceSuffix,
             legacyUserDefaults: legacyUserDefaults,
             processToken: firebaseObservabilityProcessToken
         )
         self.consentStore = consentStore
+        self.sessionTracker = sessionTracker
         diagnosticsReportPurgeState = consentStore.diagnosticsReportPurgeState
         overrideSanitizationState = consentStore.overrideSanitizationState
         installationDeletionState = consentStore.installationDeletionState
@@ -60,8 +67,14 @@ final class FirebaseObservability {
 
     @discardableResult
     func bindToAuthenticatedUser(_ userId: String?) -> Bool {
+        let requestedUserId = normalizedUserId(userId)
+        if case let .update(_, ownerUserId)? = pendingConsentMutation,
+           ownerUserId != requestedUserId {
+            pendingConsentMutation = .revoke
+        }
         suspendEffectiveConsent(configureForMaintenance: false)
         authenticatedSessionBound = false
+        guard pendingConsentMutation == nil else { return false }
         refreshPersistedMaintenanceState()
         guard overrideSanitizationState != .failure,
               diagnosticsReportPurgeState != .failure,
@@ -69,12 +82,13 @@ final class FirebaseObservability {
             return false
         }
         guard consentStore.reconcileInstallationDeletionIntent() else { return false }
-        guard let userId = normalizedUserId(userId) else {
+        guard let userId = requestedUserId else {
             resumePendingFirebaseInstallationDeletion()
             return true
         }
         switch consentStore.read() {
         case .missing:
+            guard revokeObservedSession() else { return false }
             replaceEffectiveConsent(
                 disabledObservabilityConsent(),
                 purgeDisabledData: true,
@@ -85,6 +99,7 @@ final class FirebaseObservability {
         case .failure:
             return false
         case .corrupted:
+            guard revokeObservedSession() else { return false }
             guard prepareUnknownFirebaseStateForRevocation() else { return false }
             replaceEffectiveConsent(
                 disabledObservabilityConsent(),
@@ -95,6 +110,7 @@ final class FirebaseObservability {
             return true
         case let .stored(storedConsent):
             guard storedConsent.ownerFingerprint == ownerFingerprint(userId) else {
+                guard revokeObservedSession() else { return false }
                 guard prepareStoredFirebaseStateForRevocation(storedConsent) else { return false }
                 guard requestFirebaseInstallationDeletion(.revokeConsent) else { return false }
                 replaceEffectiveConsent(
@@ -121,6 +137,24 @@ final class FirebaseObservability {
 
     @discardableResult
     func updateConsent(_ updatedConsent: ObservabilityConsent, ownerUserId: String) -> Bool {
+        guard let ownerUserId = normalizedUserId(ownerUserId) else {
+            suspendEffectiveConsent(configureForMaintenance: false)
+            return false
+        }
+        if case .revoke? = pendingConsentMutation {
+            suspendEffectiveConsent(configureForMaintenance: false)
+            return false
+        }
+        let mutation = PendingObservabilityConsentMutation.update(
+            updatedConsent,
+            ownerUserId: ownerUserId
+        )
+        pendingConsentMutation = mutation
+        return attemptConsentUpdate(mutation)
+    }
+
+    private func attemptConsentUpdate(_ mutation: PendingObservabilityConsentMutation) -> Bool {
+        guard case let .update(updatedConsent, ownerUserId) = mutation else { return false }
         let diagnosticsReportAction: DiagnosticsReportAction
         switch (consent.diagnosticsAllowed, updatedConsent.diagnosticsAllowed) {
         case (false, true):
@@ -135,13 +169,14 @@ final class FirebaseObservability {
         let allCollectionRevoked = consent.allowsAnyCollection &&
             !updatedConsent.allowsAnyCollection
         suspendEffectiveConsent(configureForMaintenance: false)
+        if !updatedConsent.allowsObservedSessionMeasurement,
+           !revokeObservedSession() {
+            return false
+        }
         refreshPersistedMaintenanceState()
         guard overrideSanitizationState != .failure,
               diagnosticsReportPurgeState != .failure,
               installationDeletionState != .failure else {
-            return false
-        }
-        guard let ownerUserId = normalizedUserId(ownerUserId) else {
             return false
         }
         let requiresDiagnosticsReportPurge = diagnosticsReportAction.requiresDurablePurge ||
@@ -166,6 +201,7 @@ final class FirebaseObservability {
             return false
         }
         authenticatedSessionBound = true
+        pendingConsentMutation = nil
 
         if persistConsentBeforePurge,
            requiresDiagnosticsReportPurge,
@@ -190,7 +226,13 @@ final class FirebaseObservability {
 
     @discardableResult
     func revokeAllConsent() -> Bool {
+        pendingConsentMutation = .revoke
+        return attemptConsentRevocation()
+    }
+
+    private func attemptConsentRevocation() -> Bool {
         suspendEffectiveConsent(configureForMaintenance: false)
+        guard revokeObservedSession() else { return false }
         authenticatedSessionBound = false
         refreshPersistedMaintenanceState()
         guard overrideSanitizationState != .failure,
@@ -200,6 +242,7 @@ final class FirebaseObservability {
         }
         let intentReconciled = requestFirebaseInstallationDeletion(.revokeConsent)
         guard intentReconciled || installationDeletionState.isPending else { return false }
+        pendingConsentMutation = nil
         guard requestDiagnosticsReportPurge() else {
             replaceEffectiveConsent(
                 disabledObservabilityConsent(),
@@ -225,6 +268,7 @@ final class FirebaseObservability {
             return false
         }
         suspendEffectiveConsent(configureForMaintenance: false)
+        guard revokeObservedSession() else { return false }
         authenticatedSessionBound = false
         guard consentStore.resetForFreshInstallation() else { return false }
         refreshPersistedMaintenanceState()
@@ -237,6 +281,10 @@ final class FirebaseObservability {
     }
 
     func retryPendingMaintenance() {
+        if pendingConsentMutation != nil {
+            _ = attemptPendingConsentMutation()
+            return
+        }
         let desiredConsent = consent
         suspendEffectiveConsent(configureForMaintenance: false)
         refreshPersistedMaintenanceState()
@@ -253,6 +301,25 @@ final class FirebaseObservability {
         resumePendingFirebaseInstallationDeletion()
     }
 
+    private func attemptPendingConsentMutation() -> Bool {
+        guard let pendingConsentMutation else { return true }
+        switch pendingConsentMutation {
+        case .update:
+            return attemptConsentUpdate(pendingConsentMutation)
+        case .revoke:
+            return attemptConsentRevocation()
+        }
+    }
+
+    func applicationEnteredForeground() {
+        guard let session = sessionTracker?.onForeground() else { return }
+        trackObservedSession(session)
+    }
+
+    func applicationEnteredBackground() {
+        sessionTracker?.onBackground()
+    }
+
     private func suspendEffectiveConsent(configureForMaintenance: Bool = true) {
         guard configureForMaintenance else {
             runtimeCollectionSuspended = true
@@ -263,6 +330,7 @@ final class FirebaseObservability {
             )
             remoteConfigurationGeneration += 1
             stopRemoteConfigurationUpdates()
+            updateObservedSessionEligibility()
             return
         }
         replaceEffectiveConsent(
@@ -306,6 +374,7 @@ final class FirebaseObservability {
             startRemoteConfigurationSession()
         }
         resumePendingDiagnosticsReportPurge()
+        updateObservedSessionEligibility()
     }
 
     private func configureIfNeeded(for consent: ObservabilityConsent) {
@@ -354,6 +423,21 @@ final class FirebaseObservability {
             parameters["post_type"] = postType.wireName
         }
         Analytics.logEvent(event.name.wireName, parameters: parameters)
+    }
+
+    private func trackObservedSession(_ session: ObservedAppSession) {
+        guard isConfigured, effectiveAnalyticsAllowed, effectiveDiagnosticsAllowed else { return }
+        Analytics.logEvent(session.eventName, parameters: nil)
+    }
+
+    private func updateObservedSessionEligibility() {
+        let allowed = isConfigured && effectiveAnalyticsAllowed && effectiveDiagnosticsAllowed
+        guard let session = sessionTracker?.updateMeasurementEligibility(allowed: allowed) else { return }
+        trackObservedSession(session)
+    }
+
+    private func revokeObservedSession() -> Bool {
+        sessionTracker?.revoke() ?? true
     }
 
     func recordDiagnostic(_ code: DiagnosticCode) {
@@ -508,6 +592,7 @@ final class FirebaseObservability {
     private var maintenanceAllowsCollection: Bool {
         authenticatedSessionBound &&
             !runtimeCollectionSuspended &&
+            pendingConsentMutation == nil &&
             overrideSanitizationState.allowsCollection &&
             installationDeletionState == .notRequired
     }
@@ -1311,6 +1396,11 @@ private enum FirebaseInstallationDeletionIntent {
     case preserveConsent
     case replaceConsent(ObservabilityConsent, ownerUserId: String)
     case revokeConsent
+}
+
+private enum PendingObservabilityConsentMutation {
+    case update(ObservabilityConsent, ownerUserId: String)
+    case revoke
 }
 
 private enum FirebaseInstallationDeletionConsentMutation: String, Codable {

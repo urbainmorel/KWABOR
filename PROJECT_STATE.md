@@ -507,7 +507,10 @@ Supabase et les workflows de distribution sont fusionnés et qualifiés ; il res
 Environments GitHub et les comptes fournisseurs, publier puis vérifier Storage et le catalogue sur
 le vrai staging, produire les builds signés internes et exécuter le pilote. La checklist opérateur
 non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
-secret ne doit être publié dans GitHub Issues.
+secret ne doit être publié dans GitHub Issues. Le dénominateur crash-free est désormais instrumenté
+par un tracker partagé sans PII, éligible seulement avec Analytics et Diagnostics consentis et borné
+par 30 minutes d'arrière-plan observé ; sa preuve Firebase réelle reste incluse dans le preflight
+staging/appareils d'OBS-001B.
 
 ## Blocages / limites
 

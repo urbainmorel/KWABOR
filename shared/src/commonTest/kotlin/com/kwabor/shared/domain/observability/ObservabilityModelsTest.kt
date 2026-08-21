@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ObservabilityModelsTest {
     @Test
@@ -57,6 +58,18 @@ class ObservabilityModelsTest {
         assertFalse(consent.analyticsAllowed)
         assertFalse(consent.diagnosticsAllowed)
         assertFalse(consent.remoteConfigurationAllowed)
+    }
+
+    @Test
+    fun observedSessionMeasurement_requiresAnalyticsAndDiagnosticsTogether() {
+        assertFalse(ObservabilityConsent(analyticsAllowed = true).allowsObservedSessionMeasurement)
+        assertFalse(ObservabilityConsent(diagnosticsAllowed = true).allowsObservedSessionMeasurement)
+        assertTrue(
+            ObservabilityConsent(
+                analyticsAllowed = true,
+                diagnosticsAllowed = true,
+            ).allowsObservedSessionMeasurement,
+        )
     }
 }
 

@@ -1,8 +1,10 @@
 package com.kwabor.android.observability
 
 import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.ObservedAppSession
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class AndroidObservabilityController internal constructor(
     backend: AndroidObservabilityBackend,
     private val consentStore: ObservabilityConsentStore,
+    sessionTracker: ConsentedAppSessionTracker? = null,
 ) {
     private val stateLock = AndroidObservabilityStateLock()
     private val mutableConsent = MutableStateFlow(ObservabilityConsent())
@@ -23,6 +26,7 @@ class AndroidObservabilityController internal constructor(
     private val runtime = AndroidObservabilityRuntime(
         backend = backend,
         consentStore = consentStore,
+        sessionTracker = sessionTracker,
         stateLock = stateLock,
         onPrivacyOperationFailed = { failed ->
             mutablePrivacyOperationFailed.value =
@@ -89,6 +93,10 @@ class AndroidObservabilityController internal constructor(
         !mutablePrivacyOperationFailed.value
     }
 
+    fun updateForegroundState(isForeground: Boolean) = stateLock.hold {
+        runtime.updateForegroundState(isForeground)
+    }
+
     fun track(event: AnalyticsEvent) = stateLock.hold {
         runtime.track(event)
     }
@@ -116,7 +124,8 @@ class AndroidObservabilityController internal constructor(
         }
 
         val storedOwner = consentStore.read().persistedOwnerUserId
-        if (storedOwner != null && storedOwner != userId && !consentStore.revoke()) {
+        val ownerChanged = storedOwner != null && storedOwner != userId
+        if (!runtime.prepareForOwnerChange(storedOwner, userId)) {
             boundUserId = null
             mutableConsent.value = ObservabilityConsent()
             runtimeSuspendedAfterPersistenceFailure = true
@@ -124,7 +133,7 @@ class AndroidObservabilityController internal constructor(
             reconcileRuntime()
             return false
         }
-        if (storedOwner != null && storedOwner != userId) {
+        if (ownerChanged) {
             runtimeSuspendedAfterPersistenceFailure = false
         }
 
@@ -144,22 +153,30 @@ class AndroidObservabilityController internal constructor(
         pendingConsentMutation = mutation
         requestedUserId = mutation.ownerUserId
         runtime.suspendCollection()
-        if (boundUserId != mutation.ownerUserId && !bindRequestedUser()) return false
-        if (boundUserId != mutation.ownerUserId) return false
-
-        if (!consentStore.write(mutation.ownerUserId, mutation.consent)) {
+        if (!mutation.consent.allowsObservedSessionMeasurement && !runtime.revokeObservedSession()) {
             mutableConsent.value = ObservabilityConsent()
             runtimeSuspendedAfterPersistenceFailure = true
             mutablePrivacyOperationFailed.value = true
             reconcileRuntime()
             return false
         }
-        pendingConsentMutation = null
-        runtimeSuspendedAfterPersistenceFailure = false
-        mutableConsent.value = mutation.consent
-        mutablePrivacyOperationFailed.value = false
-        reconcileRuntime()
-        return true
+        if (boundUserId != mutation.ownerUserId && !bindRequestedUser()) return false
+        if (boundUserId != mutation.ownerUserId) return false
+
+        return if (!consentStore.write(mutation.ownerUserId, mutation.consent)) {
+            mutableConsent.value = ObservabilityConsent()
+            runtimeSuspendedAfterPersistenceFailure = true
+            mutablePrivacyOperationFailed.value = true
+            reconcileRuntime()
+            false
+        } else {
+            pendingConsentMutation = null
+            runtimeSuspendedAfterPersistenceFailure = false
+            mutableConsent.value = mutation.consent
+            mutablePrivacyOperationFailed.value = false
+            reconcileRuntime()
+            true
+        }
     }
 
     private fun attemptConsentRevocation(clearRequestedUser: Boolean): Boolean {
@@ -167,6 +184,13 @@ class AndroidObservabilityController internal constructor(
         if (clearRequestedUser) requestedUserId = null
         boundUserId = null
         runtime.suspendCollection()
+        if (!runtime.revokeObservedSession()) {
+            runtimeSuspendedAfterPersistenceFailure = true
+            mutableConsent.value = ObservabilityConsent()
+            mutablePrivacyOperationFailed.value = true
+            reconcileRuntime()
+            return false
+        }
         val persisted = consentStore.revoke()
         runtimeSuspendedAfterPersistenceFailure = !persisted
         mutableConsent.value = ObservabilityConsent()
@@ -222,6 +246,8 @@ internal interface AndroidCollectionBackend {
     fun resetAnalyticsData()
 
     fun track(event: AnalyticsEvent)
+
+    fun trackObservedSession(session: ObservedAppSession)
 
     fun recordDiagnostic(code: DiagnosticCode)
 

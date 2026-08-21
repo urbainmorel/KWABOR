@@ -33,6 +33,13 @@ def load_verifier() -> ModuleType:
 VERIFIER = load_verifier()
 
 
+def read_observed_app_session_sources() -> dict[str, str]:
+    return {
+        source_path: (REPOSITORY_ROOT / source_path).read_text(encoding="utf-8")
+        for source_path in VERIFIER.OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256
+    }
+
+
 class IosPrivacyManifestValidationTest(unittest.TestCase):
     def setUp(self) -> None:
         manifest_path = REPOSITORY_ROOT / VERIFIER.IOS_PRIVACY_MANIFEST_PATH
@@ -476,15 +483,17 @@ class IosObservabilityPrivacyValidationTest(unittest.TestCase):
         with self.assertRaises(VERIFIER.RepositoryIntegrityError):
             self.validate(observability_source=changed)
 
-    def test_authenticated_runtime_gate_is_required(self) -> None:
-        changed = self.observability_source.replace(
+    def test_authenticated_runtime_and_pending_mutation_gates_are_required(self) -> None:
+        guarded_expressions = (
             "authenticatedSessionBound &&\n"
             "            !runtimeCollectionSuspended &&\n",
-            "",
-            1,
+            "            pendingConsentMutation == nil &&\n",
         )
-        with self.assertRaises(VERIFIER.RepositoryIntegrityError):
-            self.validate(observability_source=changed)
+        for guarded_expression in guarded_expressions:
+            with self.subTest(guarded_expression=guarded_expression.strip()):
+                changed = self.observability_source.replace(guarded_expression, "", 1)
+                with self.assertRaises(VERIFIER.RepositoryIntegrityError):
+                    self.validate(observability_source=changed)
 
     def test_effective_analytics_getter_cannot_return_true(self) -> None:
         changed = self.replace_after(
@@ -1221,6 +1230,28 @@ class AndroidFirebasePrivacyValidationTest(unittest.TestCase):
 
     def test_current_android_contract_is_accepted(self) -> None:
         self.validate()
+        observed_session_sources = read_observed_app_session_sources()
+        VERIFIER.validate_observed_app_session_source_contract(observed_session_sources)
+        self.assertEqual(
+            set(observed_session_sources),
+            set(VERIFIER.OBSERVED_APP_SESSION_CRITICAL_SOURCE_SHA256),
+        )
+        missing_source = dict(observed_session_sources)
+        missing_source.pop(VERIFIER.OBSERVED_APP_SESSION_TRACKER_PATH)
+        with self.assertRaisesRegex(
+            VERIFIER.RepositoryIntegrityError,
+            "critical-source inventory changed",
+        ):
+            VERIFIER.validate_observed_app_session_source_contract(missing_source)
+        for source_path in sorted(observed_session_sources):
+            with self.subTest(observed_session_source_drift=source_path):
+                changed_sources = dict(observed_session_sources)
+                changed_sources[source_path] += "\n"
+                with self.assertRaisesRegex(
+                    VERIFIER.RepositoryIntegrityError,
+                    "changed outside its audited observed-session snapshot",
+                ):
+                    VERIFIER.validate_observed_app_session_source_contract(changed_sources)
 
     def test_firebase_init_provider_removal_is_required(self) -> None:
         changed = self.manifest_source.replace(
@@ -1526,7 +1557,7 @@ class AndroidFirebasePrivacyValidationTest(unittest.TestCase):
         self.assertNotEqual(changed, self.main_activity_source)
         with self.assertRaisesRegex(
             VERIFIER.RepositoryIntegrityError,
-            "must retry durable Firebase maintenance on foreground",
+            "must retry maintenance and forward observed-session lifecycle",
         ):
             self.validate(main_activity_source=changed)
 

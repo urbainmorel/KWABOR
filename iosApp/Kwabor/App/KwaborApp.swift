@@ -7,6 +7,7 @@ import SwiftUI
 struct KwaborApp: App {
     @Environment(\.scenePhase) private var scenePhase
     private let compositionRoot: IosKwaborCompositionRoot
+    private let observability: FirebaseObservability
     @StateObject private var coordinator: OnboardingCoordinator
     @StateObject private var exploreStore: ExploreStore
     @StateObject private var favoritesStore: FavoritesStore
@@ -21,13 +22,16 @@ struct KwaborApp: App {
         _ = Task.detached(priority: .utility) {
             await legacyRemoteIntroCleaner.cleanIfNeeded()
         }
-        let observability = FirebaseObservability()
         let compositionRoot = IosKwaborCompositionRoot(
             environmentName: KwaborConfiguration.value("KWABOR_ENVIRONMENT"),
             supabaseUrl: KwaborConfiguration.value("KWABOR_SUPABASE_URL"),
             supabasePublishableKey: KwaborConfiguration.value("KWABOR_SUPABASE_PUBLISHABLE_KEY")
         )
+        let observability = FirebaseObservability(
+            sessionTracker: compositionRoot.consentedAppSessionTracker
+        )
         self.compositionRoot = compositionRoot
+        self.observability = observability
         let exploreStore = ExploreStore(
             controller: compositionRoot.exploreController,
             onProtectedActionReplayed: observability.track
@@ -110,7 +114,11 @@ struct KwaborApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         coordinator.applicationBecameActive()
+                        observability.applicationEnteredForeground()
                         compositionRoot.applicationBecameActive()
+                    }
+                    if phase == .background {
+                        observability.applicationEnteredBackground()
                     }
                 }
         }

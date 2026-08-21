@@ -352,6 +352,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   staging sans écriture client, un upload immuable et les tests prouvant exactement 60 fiches.
 - [x] BETA-NAV-001 — Restreindre Android/iOS à l'allowlist `Explorer · Compte`, retirer les
   placeholders et traiter les deep links des racines différées sans écran mort.
+- [x] BETA-OBS-001 — Instrumenter le dénominateur crash-free par session applicative sans PII,
+  uniquement avec Analytics et Diagnostics consentis, avec seuil d'inactivité de 30 minutes,
+  révocation durable et parité de cycle de vie Android/iOS.
 - [ ] BETA-STAGING-001 — Charger le corpus en staging, prouver rollback, offline, performances,
   accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
   dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61).

@@ -1,8 +1,16 @@
 package com.kwabor.android.observability
 
+import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.ObservedAppSession
+import com.kwabor.shared.domain.observability.ObservedAppSessionCheckpointRead
+import com.kwabor.shared.domain.observability.ObservedAppSessionStore
+import com.kwabor.shared.domain.observability.ObservedAppSessionTimeMark
+import com.kwabor.shared.domain.observability.ObservedAppSessionTimeRead
+import com.kwabor.shared.domain.observability.ObservedAppSessionTimeSource
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
 internal class TestConsentStore(
@@ -137,6 +145,7 @@ internal class TestObservabilityBackend(
         private set
     val appliedConsents = mutableListOf<ObservabilityConsent>()
     val events = mutableListOf<AnalyticsEvent>()
+    val observedSessions = mutableListOf<ObservedAppSession>()
     val diagnostics = mutableListOf<DiagnosticCode>()
     val traces = mutableListOf<PerformanceTraceName>()
     var remoteConfigurationFetched = false
@@ -199,6 +208,10 @@ internal class TestObservabilityBackend(
         events += event
     }
 
+    override fun trackObservedSession(session: ObservedAppSession) {
+        observedSessions += session
+    }
+
     override fun recordDiagnostic(code: DiagnosticCode) {
         diagnostics += code
     }
@@ -245,6 +258,56 @@ internal class TestObservabilityBackend(
     }
 }
 
+internal class MutableObservabilityClock(
+    var nowEpochMilliseconds: Long = 0L,
+) : ClockProvider, ObservedAppSessionTimeSource {
+    override fun nowEpochMilliseconds(): Long = nowEpochMilliseconds
+
+    override fun read(): ObservedAppSessionTimeRead = ObservedAppSessionTimeRead.Available(
+        ObservedAppSessionTimeMark(
+            wallEpochMilliseconds = nowEpochMilliseconds,
+            monotonicMilliseconds = nowEpochMilliseconds,
+            bootIdentifier = TEST_BOOT_IDENTIFIER,
+            bootAnchorEpochMilliseconds = 0L,
+        ),
+    )
+}
+
+internal class TestObservedAppSessionStore(
+    initialCheckpoint: ObservedAppSessionCheckpointRead? = null,
+    var clearsSucceed: Boolean = true,
+) : ObservedAppSessionStore {
+    var checkpoint = initialCheckpoint
+        private set
+    var clearCount = 0
+        private set
+
+    override fun read(): ObservedAppSessionCheckpointRead = checkpoint ?: ObservedAppSessionCheckpointRead.Missing
+
+    override fun writeForeground(): Boolean {
+        checkpoint = ObservedAppSessionCheckpointRead.Foreground
+        return true
+    }
+
+    override fun writeBackgroundedAt(timeMark: ObservedAppSessionTimeMark): Boolean {
+        checkpoint = ObservedAppSessionCheckpointRead.BackgroundedAt(timeMark)
+        return true
+    }
+
+    override fun clear(): Boolean {
+        clearCount += 1
+        if (!clearsSucceed) return false
+        checkpoint = null
+        return true
+    }
+}
+
+internal fun testObservedAppSessionTracker(
+    clock: MutableObservabilityClock,
+    store: TestObservedAppSessionStore,
+): ConsentedAppSessionTracker = ConsentedAppSessionTracker(timeSource = clock, store = store)
+
+private const val TEST_BOOT_IDENTIFIER = 1L
 internal const val TEST_USER_ID = "user-one"
 internal const val TEST_OTHER_USER_ID = "user-two"
 internal const val OLD_DIAGNOSTICS_REQUEST_ID = "diagnostics-old"

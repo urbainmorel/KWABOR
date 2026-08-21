@@ -29,9 +29,13 @@ class KwaborApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        observability = createAndroidObservabilityController(applicationContext)
+        val configuredRoot = compositionRoot
+        observability = createAndroidObservabilityController(
+            context = applicationContext,
+            sessionTracker = configuredRoot?.consentedAppSessionTracker,
+        )
         observability.start()
-        val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
+        val dispatcherProvider = configuredRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
         accountDeletionWorkerScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io)
         firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)
         legacyCleanupScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io).also { scope ->

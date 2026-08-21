@@ -111,6 +111,31 @@ un marqueur FID sans appeler l'API : il s'exécute seulement avant toute configu
 refuse de courir si une suppression est déjà en vol. Aucune permission ou collecte de remplacement
 n'est déclenchée par l'inscription avant l'accueil.
 
+## Sessions observées de bêta fermée
+
+Le dénominateur crash-free utilise un tracker possédé par l'application, distinct du catalogue fermé
+d'événements produit. Il émet uniquement `observed_session_started`, sans paramètre, identifiant de
+session, compte ou autre donnée personnelle. L'émission exige simultanément les consentements
+Analytics et Diagnostics effectivement actifs ; une suspension de maintenance ferme la porte sans
+créer d'événement.
+
+Le premier foreground éligible ouvre une session observée. Un foreground suivant n'en ouvre une
+nouvelle qu'après un background enregistré depuis au moins 30 minutes : 29 min 59 s reprend la même
+session et 30 min 00 s en crée une. Le checkpoint local non-PII contient seulement l'état
+`foreground`, ou les temps wall et monotone avec l'identité/ancre de boot du dernier passage en
+arrière-plan. À boot certain, le monotone est autoritaire, y compris après un saut d'horloge wall ;
+un reboot, une régression monotone ou une ancre inter-processus incertaine reprend la session sans en
+émettre une nouvelle. Une relance après un processus arrêté en foreground ne prétend donc jamais
+avoir observé une inactivité qui n'a pas été enregistrée.
+
+Le retrait de l'un des deux consentements, la révocation globale et un changement de compte effacent
+ce checkpoint avant toute reprise. Android le conserve dans un fichier `SharedPreferences` privé et
+synchrone, couvert par l'exclusion globale de sauvegarde ; iOS dans un fichier Application Support
+borné et remplacé atomiquement, sans identifiant. Une écriture ou suppression non acquittée échoue
+fermée. Le reset de première installation et chaque révocation effacent aussi le fichier et son
+temporaire. La source wall/monotone, le stockage et les signaux de cycle de vie sont injectés dans le
+tracker partagé ; les adaptateurs Firebase natifs ne font que relayer l'événement déjà admis.
+
 ## Contrat Analytics
 
 `ObservabilityModels.kt` porte la liste fermée des événements du PRD §11 et leurs dimensions communes. `ville` et `entite_id` reçoivent uniquement des identifiants opaques composés de lettres ASCII, chiffres, tiret ou underscore. Le contrat rejette les espaces, `@`, URL et texte libre.

@@ -7,7 +7,10 @@ data class ObservabilityConsent(
     val analyticsAllowed: Boolean = false,
     val diagnosticsAllowed: Boolean = false,
     val remoteConfigurationAllowed: Boolean = false,
-)
+) {
+    val allowsObservedSessionMeasurement: Boolean
+        get() = analyticsAllowed && diagnosticsAllowed
+}
 
 enum class DiagnosticCode(val wireName: String) {
     RemoteConfigurationFetchFailed(wireName = "remote_config_fetch_failed"),

@@ -14,15 +14,20 @@ import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.ObservedAppSession
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
-internal fun createAndroidObservabilityController(context: Context): AndroidObservabilityController =
-    AndroidObservabilityController(
-        backend = FirebaseAndroidObservabilityBackend(context.applicationContext),
-        consentStore = SharedPreferencesObservabilityConsentStore(context.applicationContext),
-    )
+internal fun createAndroidObservabilityController(
+    context: Context,
+    sessionTracker: ConsentedAppSessionTracker?,
+): AndroidObservabilityController = AndroidObservabilityController(
+    backend = FirebaseAndroidObservabilityBackend(context.applicationContext),
+    consentStore = SharedPreferencesObservabilityConsentStore(context.applicationContext),
+    sessionTracker = sessionTracker,
+)
 
 private class FirebaseAndroidObservabilityBackend(
     private val context: Context,
@@ -109,6 +114,10 @@ private class FirebaseAndroidObservabilityBackend(
 
     override fun track(event: AnalyticsEvent) {
         analytics?.logEvent(event.name.wireName, event.toBundle())
+    }
+
+    override fun trackObservedSession(session: ObservedAppSession) {
+        analytics?.logEvent(session.eventName, null)
     }
 
     override fun recordDiagnostic(code: DiagnosticCode) {

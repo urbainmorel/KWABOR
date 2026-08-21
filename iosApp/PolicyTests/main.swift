@@ -1636,6 +1636,9 @@ private let iosAuthSource = repositorySource(
     "shared/src/iosMain/kotlin/com/kwabor/shared/app/IosAccountDeletionCoordinator.kt"
 )
 private let kwaborAppSource = repositorySource("iosApp/Kwabor/App/KwaborApp.swift")
+private let firebaseObservabilitySource = repositorySource(
+    "iosApp/Kwabor/Observability/FirebaseObservability.swift"
+)
 private let accountDeletionSource = repositorySource(
     "iosApp/Kwabor/Onboarding/AccountDeletionView.swift"
 )
@@ -1749,8 +1752,83 @@ private let activeSceneSection = sourceSection(
 )
 expect(
     activeSceneSection.contains("coordinator.applicationBecameActive()") &&
+        activeSceneSection.contains("observability.applicationEnteredForeground()") &&
         activeSceneSection.contains("compositionRoot.applicationBecameActive()"),
-    "An active iOS scene must wake both onboarding maintenance and the durable interaction root."
+    "An active iOS scene must wake maintenance, observed sessions, and durable interactions."
+)
+private let backgroundSceneSection = sourceSection(
+    kwaborAppSource,
+    from: "if phase == .background",
+    until: "                }\n        }"
+)
+expect(
+    backgroundSceneSection.contains("observability.applicationEnteredBackground()"),
+    "A background iOS scene must checkpoint the app-owned observed session."
+)
+expect(
+    firebaseObservabilitySource.contains(
+        "guard isConfigured, effectiveAnalyticsAllowed, effectiveDiagnosticsAllowed else { return }"
+    ) && firebaseObservabilitySource.contains(
+        "let allowed = isConfigured && effectiveAnalyticsAllowed && effectiveDiagnosticsAllowed"
+    ) && firebaseObservabilitySource.contains(
+        "sessionTracker?.updateMeasurementEligibility(allowed: allowed)"
+    ) && firebaseObservabilitySource.contains("guard revokeObservedSession() else { return false }"),
+    "Observed sessions must require both effective consents and clear their checkpoint on revocation."
+)
+private let consentUpdateSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func updateConsent(_ updatedConsent: ObservabilityConsent, ownerUserId: String) -> Bool",
+    until: "func revokeAllConsent() -> Bool"
+)
+private let consentRevocationSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private func attemptConsentRevocation() -> Bool",
+    until: "func resetConsentForFreshInstallation() -> Bool"
+)
+private let consentRevocationRequestSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func revokeAllConsent() -> Bool",
+    until: "private func attemptConsentRevocation() -> Bool"
+)
+private let consentRetrySection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func retryPendingMaintenance()",
+    until: "func applicationEnteredForeground()"
+)
+private let effectiveCollectionSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private var maintenanceAllowsCollection: Bool",
+    until: "private var diagnosticsMaintenanceAllowsCollection: Bool"
+)
+expect(
+    sourceContains(
+        "pendingConsentMutation = mutation",
+        before: "return attemptConsentUpdate(mutation)",
+        in: consentUpdateSection
+    ) && sourceContains(
+        "pendingConsentMutation = .revoke",
+        before: "return attemptConsentRevocation()",
+        in: consentRevocationRequestSection
+    ) && sourceContains(
+        "!revokeObservedSession()",
+        before: "pendingConsentMutation = nil",
+        in: consentUpdateSection
+    ) && sourceContains(
+        "guard revokeObservedSession() else { return false }",
+        before: "pendingConsentMutation = nil",
+        in: consentRevocationSection
+    ) && sourceContains(
+        "requestFirebaseInstallationDeletion(.revokeConsent)",
+        before: "pendingConsentMutation = nil",
+        in: consentRevocationSection
+    ) && sourceContains(
+        "_ = attemptPendingConsentMutation()",
+        before: "let desiredConsent = consent",
+        in: consentRetrySection
+    ) && effectiveCollectionSection.contains("pendingConsentMutation == nil") &&
+        consentUpdateSection.contains("if case .revoke? = pendingConsentMutation"),
+    "A failed observed-session clear must retain the requested revocation, retry it before old consent, " +
+        "remain fail-closed on foreground, and require a later explicit regrant."
 )
 expect(
     iosAuthSource.contains("IosAccountDeletionPurgeAttempt(accountId, interactionLifecycle, host)") &&

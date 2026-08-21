@@ -1,6 +1,7 @@
 package com.kwabor.android.observability
 
 import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
 import com.kwabor.shared.domain.observability.PerformanceTraceName
@@ -8,6 +9,7 @@ import com.kwabor.shared.domain.observability.PerformanceTraceName
 internal class AndroidObservabilityRuntime(
     private val backend: AndroidObservabilityBackend,
     private val consentStore: ObservabilityConsentStore,
+    private val sessionTracker: ConsentedAppSessionTracker?,
     stateLock: AndroidObservabilityStateLock,
     private val onPrivacyOperationFailed: (Boolean) -> Unit,
 ) {
@@ -50,6 +52,21 @@ internal class AndroidObservabilityRuntime(
 
     fun setRestoredDiagnosticsSendPending(pending: Boolean) {
         diagnosticsReports.setRestoredSendPending(pending)
+    }
+
+    fun updateForegroundState(isForeground: Boolean) {
+        if (isForeground) {
+            sessionTracker?.onForeground()?.let(backend::trackObservedSession)
+        } else {
+            sessionTracker?.onBackground()
+        }
+    }
+
+    fun revokeObservedSession(): Boolean = sessionTracker?.revoke() ?: true
+
+    fun prepareForOwnerChange(storedOwner: String?, requestedOwner: String): Boolean {
+        if (storedOwner == null || storedOwner == requestedOwner) return true
+        return revokeObservedSession() && consentStore.revoke()
     }
 
     fun reconcile(updatedDesiredConsent: ObservabilityConsent) {
@@ -125,6 +142,11 @@ internal class AndroidObservabilityRuntime(
         effectiveConsent = updatedConsent
         if (backend.isConfigured) backend.applyConsent(updatedConsent)
         remoteConfiguration.transition(previousConsent, updatedConsent)
+        sessionTracker
+            ?.updateMeasurementEligibility(
+                allowed = updatedConsent.allowsObservedSessionMeasurement,
+            )
+            ?.let(backend::trackObservedSession)
     }
 }
 

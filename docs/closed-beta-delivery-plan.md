@@ -369,10 +369,14 @@ consentie capable d'établir le dénominateur crash-free.
 | B9.10 | Clore après sept jours J1–J7 complets | même RC sur 15 testeurs, ≥200 sessions consenties observées, rapport technique + produit | B9.02–B9.09 |
 
 Une « session observée » commence au premier passage de l'application au premier plan après opt-in
-et se termine après 30 minutes d'inactivité ou à la fin du processus ; elle ne compte qu'une fois
-dans le dénominateur, même avec plusieurs événements de crash. Les sessions sans consentement ne
-sont ni instrumentées ni extrapolées : leur nombre de testeurs est publié séparément afin que la
-couverture et le biais de mesure restent visibles.
+et une nouvelle session ne commence qu'après au moins 30 minutes d'arrière-plan enregistré. Une fin
+de processus seule ne crée pas de nouvelle session : sans preuve d'arrière-plan, la relance reprend
+la session précédente. Le seuil utilise le temps monotone à boot certain ; reboot, saut wall sans
+continuité prouvée ou checkpoint incertain échouent fermés. Chaque session ne compte qu'une fois dans
+le dénominateur, même avec plusieurs événements de crash. Les sessions sans les consentements
+Analytics et Diagnostics ne sont ni
+instrumentées ni extrapolées : leur nombre de testeurs est publié séparément afin que la couverture
+et le biais de mesure restent visibles.
 
 ## Phase 10 — Décision et passage suivant
 
