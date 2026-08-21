@@ -147,7 +147,8 @@ suppression définitive ne fait partie de cette préflight.
    remédiation approuvée.
 3. Vérifier que la requête de dérive taxonomique retourne zéro ligne.
 4. Appliquer `20260730140300_listing_taxonomy_guardrails.sql`.
-5. Exécuter `supabase db lint` et `supabase test db` contre l’état migré.
+5. Exécuter dans GitHub Actions le job `supabase_database` (`supabase db lint` et
+   `supabase test db`) contre l’état migré.
 6. Vérifier les ACL `anon`/`authenticated`, un onboarding Google ou Apple, une
    modération Social admin et une suspension de membre sur staging.
 7. Lever le gel uniquement après approbation du relecteur et archivage des

@@ -4,6 +4,10 @@
 
 Une tâche à la fois. Aucun agent ne démarre une deuxième tâche tant que son livrable n'est pas vérifié.
 
+Toute validation Supabase nécessitant Docker est exécutée par le job GitHub Actions
+`supabase_database` de `.github/workflows/ci.yml`. Les commandes Supabase de validation mentionnées
+dans les plans décrivent le contenu de cette gate CI et ne doivent pas être lancées dans Docker local.
+
 ## Périmètre cible ferme
 
 Kwabor est une application Android/iOS uniquement.
@@ -65,8 +69,7 @@ Ces zones demandent un plan dédié avant implémentation.
 
 **Validation**
 
-- `supabase db reset` si l'environnement Docker local le permet.
-- `supabase test db` pour les tests pgTAP.
+- `supabase db reset` et `supabase test db` via le job CI GitHub `supabase_database`.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -168,8 +171,8 @@ Ces zones demandent un plan dédié avant implémentation.
 
 **Validation**
 
-- `supabase db reset`.
-- `supabase test db`.
+- `supabase db reset` via le job CI GitHub `supabase_database`.
+- `supabase test db` via le job CI GitHub `supabase_database`.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -235,7 +238,7 @@ Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `Organizati
 
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
-- `supabase test db`.
+- `supabase test db` via le job CI GitHub `supabase_database`.
 - `git diff --check`.
 
 **Suite logique**
@@ -266,8 +269,8 @@ Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supab
 
 **Validation**
 
-- `supabase db reset`.
-- `supabase test db`.
+- `supabase db reset` via le job CI GitHub `supabase_database`.
+- `supabase test db` via le job CI GitHub `supabase_database`.
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
 - `git diff --check`.
@@ -305,7 +308,7 @@ Après merge, lancer DATA-CATALOG-001 : implémenter les repositories data Supab
 
 - Vérifier le changelog Supabase pour changement Data API/PostgREST pertinent.
 - `./gradlew.bat :shared:check`.
-- `supabase test db`.
+- `supabase test db` via le job CI GitHub `supabase_database`.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -379,8 +382,8 @@ Après merge, lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase
 **Validation**
 
 - Vérifier le changelog Supabase avant implémentation.
-- `supabase db reset`.
-- `supabase test db`.
+- `supabase db reset` via le job CI GitHub `supabase_database`.
+- `supabase test db` via le job CI GitHub `supabase_database`.
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
 - `git diff --check`.

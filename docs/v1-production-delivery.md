@@ -59,7 +59,10 @@ Chaque ticket suit le même cycle :
 6. pousser une PR, attendre `quality` et `iOS simulator build`, puis merger ;
 7. vérifier l'état réel de la PR et de `main` avant le ticket suivant.
 
-Une migration Supabase ajoute en plus `supabase db reset`, `supabase test db`, les tests RLS négatifs concernés et une vérification des grants Data API. Une tranche release ajoute les builds signés et les smoke tests correspondants.
+Une migration Supabase ajoute en plus la gate GitHub Actions `supabase_database` — qui prépare une
+base éphémère avec `supabase db start`, exécute `supabase test db`, les tests RLS négatifs concernés
+et une vérification des grants Data API — ainsi qu'une preuve de staging lorsque le lot l'exige. Une
+tranche release ajoute les builds signés et les smoke tests correspondants.
 
 ## Traçabilité PRD vers backlog
 

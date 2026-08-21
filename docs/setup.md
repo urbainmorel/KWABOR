@@ -13,11 +13,12 @@
 | macOS + Xcode | iOS 17 minimum ; CI sur macOS 15 | SwiftUI, simulateur et archives iOS |
 | Python 3 | Version courante supportée | Vérificateurs du dépôt et tests concurrents |
 | FFmpeg/ffprobe | `ffprobe` accessible dans le PATH | Qualification de la vidéo embarquée |
-| Docker + Supabase CLI | CLI 2.84.2 en CI, PostgreSQL local 17 | Migrations et pgTAP |
+| Supabase CLI | CLI 2.111.0 dans GitHub Actions ; installation locale optionnelle pour les commandes sans Docker | Migrations et pgTAP via CI |
 | Deno | 2.9.4 en CI | Edge Function `account-delete` |
 
 Les versions CI sont la référence reproductible. Aucun gestionnaire de paquets JavaScript n'est
-requis pour construire les applications mobiles.
+requis pour construire les applications mobiles. Docker n'est pas requis localement : les contrôles
+Supabase qui démarrent une stack de conteneurs sont exécutés par GitHub Actions.
 
 ## 1. Vérifier le checkout
 
@@ -100,21 +101,21 @@ xcodebuild \
 Les configurations `Staging` et `Release` utilisent le XCFramework release. Voir
 [iosApp/README.md](../iosApp/README.md) et [ios-release.md](ios-release.md).
 
-## 5. Démarrer Supabase localement
+## 5. Valider Supabase via GitHub Actions
 
-Docker doit être disponible. Depuis la racine :
+Les validations Supabase démarrent une stack Docker et doivent donc être exécutées dans GitHub
+Actions, jamais sur le poste local. Le workflow `.github/workflows/ci.yml` se lance
+automatiquement sur une pull request et peut aussi être lancé manuellement :
 
-```powershell
-supabase start
-supabase test db
-supabase status
-```
+1. Ouvrir l'onglet **Actions** du dépôt GitHub.
+2. Sélectionner **CI**, puis **Run workflow**.
+3. Choisir la branche de travail et lancer le workflow.
+4. Vérifier le job **Supabase database**.
 
-`supabase start` lance la pile locale nécessaire à l'application, notamment Auth, PostgREST et la
-base. La CI utilise `supabase db start` lorsqu'elle n'a besoin que de PostgreSQL pour les tests. La
-configuration locale utilise PostgreSQL 17, applique les migrations ordonnées de
-`supabase/migrations/` et charge `supabase/seed.sql`. Les tests pgTAP sont dans `supabase/tests/`.
-Ne jamais exécuter de reset destructif contre staging ou production.
+Ce job démarre PostgreSQL 17 avec `supabase db start`, applique les migrations et le seed, puis
+exécute pgTAP, le lint, les advisors de sécurité/performance et les harnais de concurrence. Les
+tests sont dans `supabase/tests/` et `supabase/local-tests/`. Ne jamais exécuter de reset destructif
+contre staging ou production.
 
 ## 6. Vérifier l'Edge Function locale
 
@@ -147,7 +148,7 @@ sélectionnée.
 
 ### Les tests Supabase ne démarrent pas
 
-Vérifier Docker et `supabase status`. Ne pas réutiliser ni arrêter un moteur Docker appartenant à un
-autre projet sans confirmer son identité.
+Ouvrir les logs du job **Supabase database** dans GitHub Actions et relancer le workflow sur la
+branche concernée si nécessaire. Ne pas installer Docker localement pour contourner un échec CI.
 
 Étape suivante : [comprendre l'architecture](architecture.md).

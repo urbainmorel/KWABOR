@@ -7,8 +7,18 @@ termine SYNC-001 : outbox Room v4 Like/Favori, drain partagé Android/iOS, RPC a
 suppression de compte coordonnée. La PR `#59` est validée exact-head et attend sa revue/fusion. Le
 drawer de filtres avancés reste séparé et soumis à arbitrage Produit.
 
-## Snapshot courant — 10 août 2026
+## Snapshot courant — 20 août 2026
 
+- Politique outillage ajoutée le 12 août 2026 : toute validation Supabase nécessitant Docker est
+  exécutée par le job GitHub Actions `supabase_database`. Le workflow `CI` dispose désormais d'un
+  déclenchement manuel ; Docker local n'est pas requis ni utilisé pour Kwabor.
+- Un projet Supabase hébergé est relié comme environnement `development` et initialisé avec les
+  21 migrations versionnées ainsi que le seed de démonstration. Android et iOS reçoivent uniquement
+  l'URL et la publishable key via des fichiers locaux ignorés. Le lint SQL distant est vert et les
+  rôles Data API ne peuvent plus exécuter le helper d'event trigger `rls_auto_enable`; les 12 RPC
+  `SECURITY DEFINER` restant exposées à `authenticated` ont été revues comme intentionnelles et
+  protégées par leurs gardes serveur. Ce projet ne remplace ni staging ni production ; les
+  fournisseurs Auth et l'Edge Function `account-delete` ne sont pas encore déployés/configurés.
 - La base de ce lot est le commit de fusion `8b698ea4d5b95879b5c0381d9ab0d068d5192c87` de la PR `#58`.
   Elle inclut le serveur et le raccord mobile EXPLORE-002B2, FAVORITES-001A de bout en bout,
   l'autorité HISTORY-001A, ADR-0031 proposé, la fondation domaine de `#51`, l'optimisation CI de
@@ -559,7 +569,9 @@ les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de b
   des filtres Explore/Search avant EXPLORE-002B2B2 ; aucun filtrage client de substitution n'est
   autorisé entre-temps.
 - La fiche SwiftUI compile sur simulateur dans les trois configurations, mais sa preuve VoiceOver sur appareil physique reste obligatoire. Le thème sombre complet appartient à SETTINGS-001 ; la fiche conserve temporairement la palette claire cohérente pour éviter des contrastes partiels.
-- Aucun secret Supabase n'est commité ; sans configuration locale, Explore reste sur l'état vide initial.
+- Aucun secret privilégié Supabase n'est commité. La configuration locale `development` contient
+  seulement l'URL et la publishable key dans des fichiers ignorés ; un checkout non configuré garde
+  le fallback vide prévu.
 - L'AVD API 30 local prouve l'installation, la résolution et les intents ACTIONS-001C1 à froid/chaud,
   mais pas l'affichage connecté de la fiche : l'APK n'a pas de configuration Supabase et les ANR
   observés concernent les processus système de l'AVD, pas KWABOR.
@@ -585,7 +597,10 @@ les cinq racines V1. FAVORITES-001A réutilise désormais l'outbox validée de b
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - La vidéo d'intro ne dépend plus d'ENV-001B/OBS-001B, d'un CDN ou de Firebase. Chaque nouvelle révision exige toutefois provenance, droits de diffusion, approbation éditoriale, preuves Android/iOS, builds signés et publication Store.
-- ENV-001B dépend du propriétaire : le compte Supabase CLI visible ne contient aucune organisation Kwabor et la création de deux projets engage le choix de l'organisation/du plan ; l'authentification Firebase CLI existante est expirée et exige `firebase login --reauth` avant création des deux projets.
+- ENV-001B reste incomplet : le projet Supabase fourni est affecté uniquement au développement.
+  Deux projets Supabase persistants distincts restent à créer pour staging et production dans les
+  organisations/plans validés par le propriétaire ; l'authentification Firebase CLI existante est
+  expirée et exige `firebase login --reauth` avant création des deux projets Firebase.
 - OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils d'Analytics, Crashlytics, Performance et Remote Config générique ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
 - La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
 - Les projets Supabase/Firebase staging et production, le compte FedaPay, les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention du propriétaire pendant les tranches concernées.

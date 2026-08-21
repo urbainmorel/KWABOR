@@ -118,24 +118,14 @@ exige le job `macos-15`, Xcode, les tests Swift et, avant release, un parcours s
 
 ## Supabase et PostgreSQL
 
-Avec Docker et Supabase CLI disponibles :
+Ces validations démarrent une stack Supabase qui repose sur Docker. Elles doivent être exécutées par
+le job GitHub Actions `supabase_database` du workflow `.github/workflows/ci.yml`, jamais sur le poste
+local. Pour une branche de travail, ouvrir une pull request ou lancer **Actions → CI → Run workflow**
+sur la branche concernée.
 
-```powershell
-supabase db start
-supabase test db
-python -B tools/test-event-details-concurrency.py
-python -B tools/test-search-history-concurrency.py
-python -B tools/test-favorites-concurrency.py
-```
-
-Une modification de migration/RLS doit aussi passer un reset isolé et le lint Supabase adaptés au
-lot. Ne jamais utiliser un reset destructif sur staging ou production. Les harnais de concurrence
-événement, historique et favoris sont séparés de la suite pgTAP standard et exigent la stack locale
-attendue.
-
-Sur ce poste Windows, les tâches qui nécessitent Docker sont déléguées à GitHub Actions. La preuve
-EXPLORE-002B2A exige un démarrage propre depuis toutes les migrations, la suite pgTAP, le lint, les
-advisors et les autres gates protégées sur le SHA exact de la PR.
+Le job exécute `supabase db start`, la suite pgTAP, le lint, les advisors et les harnais de
+concurrence événement/historique/favoris. Une modification de migration/RLS doit être validée par ce
+job sur le SHA exact de la branche. Ne jamais utiliser un reset destructif sur staging ou production.
 
 ### Classement catalogue EXPLORE-002B2A
 
@@ -222,18 +212,8 @@ et deux UI natives. Les validations doivent couvrir ces quatre frontières ; un 
 
 ### Contrat serveur
 
-Sur une stack Supabase locale jetable, reconstruire la base depuis toutes les migrations puis lancer
-la suite pgTAP complète :
-
-```powershell
-supabase db start
-supabase db reset --local --yes
-supabase test db
-supabase db lint --local --level warning
-```
-
-Le reset est destructif pour la base locale ciblée : vérifier le projet et les ports avant de
-l’exécuter, et ne jamais appliquer ce protocole à staging ou production. Le fichier
+Le job CI `supabase_database` reconstruit la base éphémère du runner à partir des migrations puis
+lance la suite pgTAP et le lint. Le fichier
 `supabase/tests/search_catalog_summaries_v1_test.sql` doit notamment prouver :
 
 - la signature stable, `security invoker`, le `search_path` fixé, les grants `anon`/`authenticated`
@@ -308,9 +288,10 @@ SEC-001F utilise la porte ciblée suivante depuis la racine du dépôt avant tou
 ```powershell
 .\gradlew.bat :shared:testAndroidHostTest --tests "*AccountDeletion*" --console=plain
 .\gradlew.bat :shared:compileTestKotlinIosX64 --console=plain
-supabase db reset --local --yes
-supabase test db
 ```
+
+Les deux validations Supabase supprimées de cette commande locale sont exécutées par le job CI
+`supabase_database` ; Docker ne doit pas être démarré sur le poste de développement.
 
 Depuis `supabase/functions/account-delete`, utiliser la même version Deno que la CI :
 

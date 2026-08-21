@@ -16,6 +16,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [x] IOS-001 — Créer l'hôte iOS SwiftUI et l'intégration du framework `shared`.
 - [x] CI-001 — Ajouter un job GitHub Actions macOS qui compile iOS en simulateur sans signature.
 - [x] CI-002 — Vérifier la CI macOS après push et corriger le build Xcode si nécessaire.
+- [x] CI-004 — Déléguer les validations Supabase nécessitant Docker à GitHub Actions et activer leur déclenchement manuel.
 - [x] DATA-TEAM-001 — Créer les migrations Supabase équipes, membres, invitations, budgets et tests RLS.
 - [x] DOMAIN-TEAM-001 — Ajouter les modèles domaine et contrats repository des organisations vérifiées.
 - [x] DATA-TEAM-002 — Implémenter les DTO et repository data des organisations vérifiées.
@@ -75,6 +76,11 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
 - [ ] ENV-001 — Créer et relier Supabase/Firebase staging et production, GitHub Environments et contrats de secrets sans valeur sensible.
   - [x] ENV-001A — Livrer les contrats/injections sans secret et protéger les GitHub Environments staging/production.
   - [ ] ENV-001B — Créer les projets Supabase/Firebase dans les organisations choisies par le propriétaire et renseigner leurs variables/configurations ; aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
+    - [x] ENV-001B-DEV — Relier le projet Supabase fourni comme `development`, appliquer migrations
+      et seed, configurer localement Android/iOS avec la paire publique, puis vérifier lint, ACL et
+      accès Data API sans stocker de credential privilégié.
+    - [ ] Créer et qualifier deux projets Supabase distincts pour staging et production ; configurer
+      Auth, OAuth, SMTP, fonctions et variables GitHub seulement après rotation des credentials.
 - [x] ANDROID-REL-001 — Ajouter variantes debug/staging/release, versionnement, minification, icônes, splash et signature injectée.
 - [x] PR-ANDROID-REL-001 — PR `#26` mergée après `quality`, pgTAP et `iOS simulator build` verts.
 - [x] IOS-REL-001 — Ajouter configurations Xcode, entitlements, Privacy Manifest, assets et signature injectée.

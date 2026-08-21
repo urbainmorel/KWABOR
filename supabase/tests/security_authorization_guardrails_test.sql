@@ -109,7 +109,7 @@ exception
 end;
 $$;
 
-select plan(74);
+select plan(79);
 
 insert into auth.users (
   id,
@@ -657,6 +657,90 @@ select ok(
     'execute'
   ),
   'anonymous sessions cannot execute the privileged listing helper'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.accept_organization_invite(text)',
+    'execute'
+  ),
+  'anonymous sessions cannot execute the organization invitation acceptance RPC'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.accept_organization_invite(text)',
+    'execute'
+  ),
+  'signed-in users can execute the organization invitation acceptance RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'service_role',
+    'public.accept_organization_invite(text)',
+    'execute'
+  ),
+  'the elevated backend role cannot execute the end-user invitation RPC'
+);
+
+select ok(
+  not exists (
+    select 1
+    from pg_catalog.pg_proc function_record
+    join pg_catalog.pg_namespace function_namespace
+      on function_namespace.oid = function_record.pronamespace
+    where function_namespace.nspname = 'public'
+      and function_record.proname = 'rls_auto_enable'
+      and function_record.pronargs = 0
+      and (
+        has_function_privilege('anon', function_record.oid, 'execute')
+        or has_function_privilege(
+          'authenticated',
+          function_record.oid,
+          'execute'
+        )
+        or has_function_privilege(
+          'service_role',
+          function_record.oid,
+          'execute'
+        )
+      )
+  ),
+  'Data API roles cannot execute the hosted RLS event-trigger helper'
+);
+
+select is(
+  (
+    select array_agg(function_record.proname::text order by function_record.proname)
+    from pg_catalog.pg_proc function_record
+    join pg_catalog.pg_namespace function_namespace
+      on function_namespace.oid = function_record.pronamespace
+    where function_namespace.nspname = 'public'
+      and function_record.prosecdef
+      and has_function_privilege(
+        'authenticated',
+        function_record.oid,
+        'execute'
+      )
+  ),
+  array[
+    'accept_organization_invite',
+    'activate_promoter_invite',
+    'clear_search_history_v1',
+    'complete_user_onboarding',
+    'create_promoter_invite',
+    'current_user_can_manage_listing',
+    'delete_search_history_entry_v1',
+    'list_search_history_v1',
+    'moderate_social_post',
+    'preview_promoter_invite',
+    'record_search_history_v1',
+    'suspend_organization_member'
+  ]::text[],
+  'the reviewed authenticated SECURITY DEFINER RPC allowlist is exact'
 );
 
 select ok(

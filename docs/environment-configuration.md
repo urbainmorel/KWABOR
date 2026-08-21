@@ -100,7 +100,8 @@ Pour chaque projet :
 
 1. relever le project ref, l'URL et la clé publishable ;
 2. lier explicitement le checkout avec `supabase link --project-ref <ref>` sans versionner le mot de passe de base ;
-3. appliquer les migrations sur staging et exécuter `supabase test db` ;
+3. appliquer les migrations sur staging et valider l'état migré via le job GitHub Actions
+   `supabase_database` (qui exécute `supabase test db`) ;
 4. vérifier les grants/RLS négatifs avant de reproduire la migration en production ;
 5. configurer Auth avec un mot de passe minimal de 8 caractères, un OTP email de 6 chiffres et un délai minimal de 30 secondes entre deux envois ;
 6. publier les templates OTP français d'inscription et de récupération avec la variable Supabase `{{ .Token }}`, puis brancher un SMTP de production vérifié ;

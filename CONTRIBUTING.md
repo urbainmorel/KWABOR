@@ -24,6 +24,7 @@ options et obtenir la validation nécessaire.
 - Appliquer les droits côté Supabase/RLS/RPC, jamais uniquement côté UI.
 - Conserver XOF comme devise d'autorité et les secrets hors du dépôt.
 - Ne pas présenter un stub, TODO ou CTA inactif comme une fonctionnalité livrée.
+- Déléguer à GitHub Actions toute validation Supabase qui nécessite Docker ; ne pas démarrer de stack Docker locale pour Kwabor.
 
 ## Workflow local
 
@@ -47,7 +48,7 @@ Ajouter selon le lot :
 
 - APK Android et compilation Kotlin iOS pour une verticale mobile ;
 - tests Swift/Xcode sous macOS pour toute modification iOS ;
-- reset isolé, pgTAP, lint et grants/RLS pour Supabase ;
+- reset isolé, pgTAP, lint et grants/RLS pour Supabase via le job CI GitHub `supabase_database` ;
 - vérificateurs marque/média lorsque ces assets changent ;
 - tests sur appareils, accessibilité et performance avant release.
 

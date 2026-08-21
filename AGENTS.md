@@ -49,6 +49,14 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Aucun secret, token, endpoint sensible ou clé API en dur.
 - Aucun message technique brut ne doit fuiter vers l'utilisateur final.
 
+## Exécution Docker et Supabase local
+
+- Le projet utilise Docker indirectement via la stack locale Supabase pour PostgreSQL, Auth, PostgREST et les tests pgTAP.
+- Docker Desktop ou un moteur de conteneurs local n'est pas une dépendance d'exécution autorisée pour le workflow Kwabor.
+- Toute tâche qui nécessite Docker — notamment `supabase start`, `supabase db start`, `supabase db reset`, `supabase test db`, le lint/advisor local ou les harnais de concurrence — doit être exécutée par le workflow GitHub Actions `CI` dans `.github/workflows/ci.yml`.
+- Pour une branche de travail, utiliser une pull request ou le déclenchement manuel `workflow_dispatch` du workflow `CI`. Les contrôles locaux doivent rester limités aux validations qui ne nécessitent pas Docker.
+- Ne jamais appliquer de reset destructif à staging ou production.
+
 ## Architecture obligatoire
 
 - Découpage strict : `presentation` -> `domain` -> `data`.
