@@ -240,7 +240,7 @@ struct ContentView: View {
     private func reconcileCatalogDetailPresentation(_ isPresented: Bool) {
         if isPresented {
             guard catalogDetailSheetPresentation == nil else { return }
-            let token = exploreStore.surfacePresentationStarted(.catalogDetail)
+            let token = exploreStore.surfacePresentationStarted(.catalogdetail)
             catalogDetailSheetPresentation = ExploreSheetPresentation(token: token)
         } else {
             dismissCatalogDetailSheetPresentation()

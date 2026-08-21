@@ -122,7 +122,7 @@ struct ExploreView: View {
     private func reconcileCitySelectorPresentation(_ isPresented: Bool) {
         if isPresented {
             guard citySelectorSheetPresentation == nil else { return }
-            let token = store.surfacePresentationStarted(.citySelector)
+            let token = store.surfacePresentationStarted(.cityselector)
             citySelectorSheetPresentation = ExploreSheetPresentation(token: token)
         } else {
             dismissCitySelectorSheetPresentation()

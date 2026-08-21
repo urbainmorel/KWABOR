@@ -2106,6 +2106,10 @@ expect(
         exploreViewSource.components(separatedBy: ".sheet(").count - 1 == 1 &&
         contentViewSource.contains("onAttached: exploreStore.surfacePresentationAttached") &&
         exploreViewSource.contains("onAttached: store.surfacePresentationAttached") &&
+        contentViewSource.contains("surfacePresentationStarted(.catalogdetail)") &&
+        exploreViewSource.contains("surfacePresentationStarted(.cityselector)") &&
+        !contentViewSource.contains("surfacePresentationStarted(.catalogDetail)") &&
+        !exploreViewSource.contains("surfacePresentationStarted(.citySelector)") &&
         catalogDetailDidRemoveSection.contains("surfacePresentationRemoved(token)") &&
         citySelectorDidRemoveSection.contains("surfacePresentationRemoved(token)"),
     "Each Explore sheet instance must complete with its own immutable presentation token."

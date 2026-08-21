@@ -33,7 +33,7 @@ IOS_ROOM_DATABASE_BUILDER_SHA256 = (
 IOS_PRIVACY_CRITICAL_SOURCE_SHA256 = {
     IOS_OBSERVABILITY_SOURCE_PATH: "7977fb9b131410e11762186bc8e11d128be7e739641027fb0eca2109c52a5604",
     IOS_ONBOARDING_COORDINATOR_PATH: "d91de720a63b85d86bb749fc0a3a440a27bae614c56bfd3fb75caf714661ee3f",
-    IOS_CONTENT_VIEW_PATH: "09b92f7b948d2e45673fbaa08071bc7fc84fff28fab3c277eba591459e6da419",
+    IOS_CONTENT_VIEW_PATH: "6d83d6cb63309a6ab8c4880a1bda9162671dc6512c1d763b784dc718fef6a177",
     IOS_APP_SOURCE_PATH: "74003c71fedfbb385476f3210e9fc2b3f6d1b65f2438b79f2b66a3acf362827b",
 }
 ANDROID_MANIFEST_PATH = "androidApp/src/main/AndroidManifest.xml"
@@ -229,8 +229,8 @@ FUV_CRITICAL_SOURCE_SHA256 = {
     "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/explore/ExploreViewportPerformanceBinding.kt": "26c6e205392d13d6dbb2be7acabbb41e643bc80a88a31d948086a3aaa37a5b6c",
     "androidApp/src/main/kotlin/com/kwabor/android/app/ExploreAppRoute.kt": "4739b0e372bc06bf0d5a58ba32cb041ca02cb4e74bca43848632e9505c36058b",
     "iosApp/Kwabor/Explore/ExploreStore.swift": "97681a9aa1bb9c491d0239beb5dffc7a55e15ca67891ac002692279016ae0b62",
-    "iosApp/Kwabor/Explore/ExploreView.swift": "2ae80e474d7f8afe1f2c7c333c8111212cfcae048c1417f629e5fa51ae14e185",
-    IOS_CONTENT_VIEW_PATH: "09b92f7b948d2e45673fbaa08071bc7fc84fff28fab3c277eba591459e6da419",
+    "iosApp/Kwabor/Explore/ExploreView.swift": "1405c938a836ac383bfb752cfac76fda567729508ea5dd32764f8cdec37b371a",
+    IOS_CONTENT_VIEW_PATH: "6d83d6cb63309a6ab8c4880a1bda9162671dc6512c1d763b784dc718fef6a177",
 }
 ANDROID_FIREBASE_CONFIGURATION_SHA256 = {
     ANDROID_BUILD_GRADLE_PATH: "614e5d7648d00fc0ee1ffcb8f901363e9112ce228105c6282847d557635c23d3",
