@@ -14,26 +14,33 @@ import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import com.kwabor.shared.domain.observability.AnalyticsEvent
+import com.kwabor.shared.domain.observability.ConsentedAppSessionTracker
 import com.kwabor.shared.domain.observability.DiagnosticCode
 import com.kwabor.shared.domain.observability.ObservabilityConsent
+import com.kwabor.shared.domain.observability.ObservedAppSession
+import com.kwabor.shared.domain.observability.PerformanceMeasurement
 import com.kwabor.shared.domain.observability.PerformanceTraceName
 
-internal fun createAndroidObservabilityController(context: Context): AndroidObservabilityController =
-    AndroidObservabilityController(
-        backend = FirebaseAndroidObservabilityBackend(context.applicationContext),
-        consentStore = SharedPreferencesObservabilityConsentStore(context.applicationContext),
-    )
+internal fun createAndroidObservabilityController(
+    context: Context,
+    sessionTracker: ConsentedAppSessionTracker?,
+): AndroidObservabilityController = AndroidObservabilityController(
+    backend = FirebaseAndroidObservabilityBackend(context.applicationContext),
+    consentStore = SharedPreferencesObservabilityConsentStore(context.applicationContext),
+    sessionTracker = sessionTracker,
+)
 
 private class FirebaseAndroidObservabilityBackend(
     private val context: Context,
-) : AndroidObservabilityBackend {
+    private val remoteConfigurationBackend: FirebaseRemoteConfigurationBackend =
+        FirebaseRemoteConfigurationBackend(),
+) : AndroidObservabilityBackend,
+    AndroidRemoteConfigurationBackend by remoteConfigurationBackend {
     private var firebaseApp: FirebaseApp? = null
     private var analytics: FirebaseAnalytics? = null
     private var crashlytics: FirebaseCrashlytics? = null
     private var performance: FirebasePerformance? = null
-    private var remoteConfig: FirebaseRemoteConfig? = null
     private var installations: FirebaseInstallations? = null
-    private var configUpdateRegistration: ConfigUpdateListenerRegistration? = null
 
     override val isConfigured: Boolean
         get() = firebaseApp != null
@@ -58,7 +65,7 @@ private class FirebaseAndroidObservabilityBackend(
         analytics = initializedAnalytics
         crashlytics = initializedCrashlytics
         performance = initializedPerformance
-        remoteConfig = initializedRemoteConfig
+        remoteConfigurationBackend.attach(initializedRemoteConfig)
         installations = FirebaseInstallations.getInstance(app)
         return true
     }
@@ -111,6 +118,10 @@ private class FirebaseAndroidObservabilityBackend(
         analytics?.logEvent(event.name.wireName, event.toBundle())
     }
 
+    override fun trackObservedSession(session: ObservedAppSession) {
+        analytics?.logEvent(session.eventName, null)
+    }
+
     override fun recordDiagnostic(code: DiagnosticCode) {
         crashlytics?.recordException(KwaborDiagnosticException(code))
     }
@@ -119,6 +130,27 @@ private class FirebaseAndroidObservabilityBackend(
         val trace = performance?.newTrace(name.wireName) ?: return PerformanceTrace.None
         trace.start()
         return PerformanceTrace(trace::stop)
+    }
+
+    override fun recordPerformanceMeasurement(measurement: PerformanceMeasurement) {
+        val trace = performance?.newTrace(measurement.traceName.wireName) ?: return
+        trace.start()
+        trace.putMetric(measurement.metricName.wireName, measurement.metricValue)
+        trace.putAttribute(
+            PERFORMANCE_PROCESS_EXPLORE_KIND_ATTRIBUTE,
+            measurement.processExploreKind.wireName,
+        )
+        trace.putAttribute(PERFORMANCE_VIEWPORT_STATE_ATTRIBUTE, measurement.viewportState.wireName)
+        trace.stop()
+    }
+}
+
+private class FirebaseRemoteConfigurationBackend : AndroidRemoteConfigurationBackend {
+    private var remoteConfig: FirebaseRemoteConfig? = null
+    private var configUpdateRegistration: ConfigUpdateListenerRegistration? = null
+
+    fun attach(config: FirebaseRemoteConfig) {
+        remoteConfig = config
     }
 
     override fun fetchAndActivateRemoteConfiguration(onResult: (Boolean) -> Unit) {
@@ -171,3 +203,5 @@ private fun AnalyticsEvent.toBundle(): Bundle = Bundle().apply {
 
 private const val REMOTE_CONFIG_FETCH_INTERVAL_SECONDS = 43_200L
 private const val NOT_APPLICABLE = "not_applicable"
+private const val PERFORMANCE_PROCESS_EXPLORE_KIND_ATTRIBUTE = "process_explore_kind"
+private const val PERFORMANCE_VIEWPORT_STATE_ATTRIBUTE = "viewport_state"

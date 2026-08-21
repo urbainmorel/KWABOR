@@ -2,13 +2,27 @@
 
 > Produire des changements Android/iOS maintenables, prouvés et alignés avec le PRD/DESIGN.
 
+## Dépôt GitHub d'autorité
+
+Le seul dépôt GitHub officiel et d'autorité de KWABOR est
+[`urbainmorel/KWABOR`](https://github.com/urbainmorel/KWABOR). Le remote local `origin` doit utiliser
+exactement `https://github.com/urbainmorel/KWABOR.git` pour le fetch et le push.
+
+Un fork, miroir, archive, clone ou autre remote reste une copie de travail non autoritative. Il ne
+peut servir de source d'état, de CI, de release, de GitHub Environment, d'issue ou de pull request
+officielle. Aucun secret fournisseur ni droit de déploiement ne doit lui être confié. Avant toute
+contribution ou opération GitHub, exécuter le
+[contrôle du checkout canonique](docs/setup.md#1-vérifier-le-checkout).
+
 ## Avant de modifier le dépôt
 
 1. Lire [AGENTS.md](AGENTS.md), [PRD.md](PRD.md), [DESIGN.md](DESIGN.md) et les ADR du périmètre.
 2. Vérifier [PROJECT_STATE.md](PROJECT_STATE.md), [BACKLOG.md](BACKLOG.md) et
    [docs/V1-PROGRESS.md](docs/V1-PROGRESS.md).
 3. Confirmer les dépendances du ticket dans [le plan V1](docs/v1-production-delivery.md).
-4. Repartir d'une base connue et créer une branche `codex/<ticket>`.
+4. Vérifier le dépôt d'autorité et la synchronisation avec `origin` selon
+   [le guide de setup](docs/setup.md#1-vérifier-le-checkout).
+5. Repartir d'une base connue et créer une branche `codex/<ticket>`.
 
 Ne pas commencer une décision structurante ambiguë par du code : réaliser l'audit, documenter les
 options et obtenir la validation nécessaire.
@@ -34,6 +48,10 @@ options et obtenir la validation nécessaire.
 5. Mettre à jour documentation, `PROJECT_STATE.md` et `BACKLOG.md`.
 6. Auto-relire le diff avant commit.
 
+Les validations Supabase dépendant de Docker ne sont jamais exécutées sur un poste local. Pousser la
+branche ou déclencher manuellement le workflow `CI`, puis inspecter le job `Supabase database
+(ephemeral CI)` sur le SHA exact.
+
 ## Gates de qualité
 
 Gate de base Windows :
@@ -47,7 +65,8 @@ Ajouter selon le lot :
 
 - APK Android et compilation Kotlin iOS pour une verticale mobile ;
 - tests Swift/Xcode sous macOS pour toute modification iOS ;
-- reset isolé, pgTAP, lint et grants/RLS pour Supabase ;
+- job CI éphémère `supabase_database` pour migrations, pgTAP, lint, advisors et grants/RLS ;
+- preuve distante protégée et non destructive séparée lorsqu'un projet Supabase hébergé est concerné ;
 - vérificateurs marque/média lorsque ces assets changent ;
 - tests sur appareils, accessibilité et performance avant release.
 

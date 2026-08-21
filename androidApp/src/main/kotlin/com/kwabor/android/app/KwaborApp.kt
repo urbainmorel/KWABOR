@@ -28,6 +28,7 @@ import com.kwabor.android.auth.LegalDocumentLauncher
 import com.kwabor.android.design.KwaborTheme
 import com.kwabor.android.detail.DetailExternalActionLauncher
 import com.kwabor.android.media.ListingMediaUrlPolicy
+import com.kwabor.android.observability.AndroidExploreFirstUsableViewportReporter
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.presentation.auth.AuthAccessUiState
 import com.kwabor.android.presentation.auth.AuthEffect
@@ -168,6 +169,7 @@ internal data class KwaborAppDependencies(
     val onboardingViewModel: OnboardingViewModel,
     val legalDocumentLauncher: LegalDocumentLauncher,
     val observabilityController: AndroidObservabilityController,
+    val exploreFirstUsableViewportReporter: AndroidExploreFirstUsableViewportReporter,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
     val detailExternalActionLauncher: DetailExternalActionLauncher,
     val rootNavigationProfile: RootNavigationProfile,
@@ -238,6 +240,7 @@ internal data class HomeShellDependencies(
     val authViewModel: AuthViewModel,
     val onboardingViewModel: OnboardingViewModel,
     val observabilityController: AndroidObservabilityController,
+    val exploreFirstUsableViewportReporter: AndroidExploreFirstUsableViewportReporter,
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
     val detailExternalActionLauncher: DetailExternalActionLauncher,
     val rootNavigationProfile: RootNavigationProfile,
@@ -252,6 +255,7 @@ internal data class HomeShellDependencies(
         authViewModel = dependencies.authViewModel,
         onboardingViewModel = dependencies.onboardingViewModel,
         observabilityController = dependencies.observabilityController,
+        exploreFirstUsableViewportReporter = dependencies.exploreFirstUsableViewportReporter,
         listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
         detailExternalActionLauncher = dependencies.detailExternalActionLauncher,
         rootNavigationProfile = dependencies.rootNavigationProfile,

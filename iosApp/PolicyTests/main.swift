@@ -1636,6 +1636,38 @@ private let iosAuthSource = repositorySource(
     "shared/src/iosMain/kotlin/com/kwabor/shared/app/IosAccountDeletionCoordinator.kt"
 )
 private let kwaborAppSource = repositorySource("iosApp/Kwabor/App/KwaborApp.swift")
+private let exploreStoreSource = repositorySource("iosApp/Kwabor/Explore/ExploreStore.swift")
+private let exploreViewSource = repositorySource("iosApp/Kwabor/Explore/ExploreView.swift")
+private let explorePresentationGateSource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationGate.kt"
+)
+private let explorePresentationGateTestSource = repositorySource(
+    "shared/src/commonTest/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationGateTest.kt"
+)
+private let explorePresentationRegistrySource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationRegistry.kt"
+)
+private let explorePresentationRegistryTestSource = repositorySource(
+    "shared/src/commonTest/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationRegistryTest.kt"
+)
+private let firebaseObservabilitySource = repositorySource(
+    "iosApp/Kwabor/Observability/FirebaseObservability.swift"
+)
+private let observabilityModelsSource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/domain/observability/ObservabilityModels.kt"
+)
+private let observedSessionTrackerTestSource = repositorySource(
+    "shared/src/commonTest/kotlin/com/kwabor/shared/domain/observability/ConsentedAppSessionTrackerTest.kt"
+)
+private let exploreFirstUsableViewportProbeSource = repositorySource(
+    "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreFirstUsableViewportProbe.kt"
+)
+private let iosObservedSessionStoreSource = repositorySource(
+    "shared/src/iosMain/kotlin/com/kwabor/shared/data/observability/IosObservedAppSessionStore.kt"
+)
+private let iosObservedSessionStoreTestSource = repositorySource(
+    "shared/src/iosTest/kotlin/com/kwabor/shared/data/observability/IosObservedAppSessionStoreTest.kt"
+)
 private let accountDeletionSource = repositorySource(
     "iosApp/Kwabor/Onboarding/AccountDeletionView.swift"
 )
@@ -1742,15 +1774,500 @@ expect(
         iosRootSource.contains("sharedRoot?.interactionCoordinator?.onForeground()"),
     "The iOS root foreground hook must wake the durable interaction coordinator."
 )
-private let activeSceneSection = sourceSection(
+private let sceneSynchronizationSection = sourceSection(
     kwaborAppSource,
-    from: "if phase == .active",
-    until: "                }\n        }"
+    from: "private func synchronizeScenePhase(_ phase: ScenePhase)",
+    until: "\n}\n\nprivate enum KwaborConfiguration"
 )
 expect(
-    activeSceneSection.contains("coordinator.applicationBecameActive()") &&
-        activeSceneSection.contains("compositionRoot.applicationBecameActive()"),
-    "An active iOS scene must wake both onboarding maintenance and the durable interaction root."
+    kwaborAppSource.contains(".onAppear {") &&
+        kwaborAppSource.contains("synchronizeScenePhase(scenePhase)") &&
+        kwaborAppSource.contains(".onChange(of: scenePhase)") &&
+        kwaborAppSource.contains("synchronizeScenePhase(phase)") &&
+        kwaborAppSource.components(separatedBy: "synchronizeScenePhase(").count - 1 == 3 &&
+        sceneSynchronizationSection.contains("if phase == .active") &&
+        sceneSynchronizationSection.contains("coordinator.applicationBecameActive()") &&
+        sceneSynchronizationSection.contains("observability.applicationEnteredForeground()") &&
+        sceneSynchronizationSection.contains("compositionRoot.applicationBecameActive()") &&
+        sceneSynchronizationSection.contains("observability.applicationEnteredBackground()") &&
+        kwaborAppSource.components(
+            separatedBy: "observability.applicationEnteredForeground()"
+        ).count - 1 == 1 &&
+        observedSessionTrackerTestSource.contains(
+            "fun restoredConsentAtInitialForegroundEmitsExactlyOnceWithoutLifecycleDuplicate()"
+        ) &&
+        observedSessionTrackerTestSource.contains(
+            "fun newOptInAfterInitialForegroundEmitsExactlyOnceWithoutLifecycleDuplicate()"
+        ),
+    "Initial and changed iOS scene phases must share one idempotent lifecycle path, with exactly-once " +
+        "observed-session coverage for restored consent and a new foreground opt-in."
+)
+expect(
+    firebaseObservabilitySource.contains(
+        "guard isConfigured, effectiveAnalyticsAllowed, effectiveDiagnosticsAllowed else { return }"
+    ) && firebaseObservabilitySource.contains(
+        "let allowed = isConfigured && effectiveAnalyticsAllowed && effectiveDiagnosticsAllowed"
+    ) && firebaseObservabilitySource.contains(
+        "sessionTracker?.updateMeasurementEligibility(allowed: allowed)"
+    ) && firebaseObservabilitySource.contains("revokeObservedSession()"),
+    "Observed sessions must require both effective consents and clear their checkpoint on revocation."
+)
+private let consentUpdateSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func updateConsent(_ updatedConsent: ObservabilityConsent, ownerUserId: String) -> Bool",
+    until: "func revokeAllConsent() -> Bool"
+)
+private let consentRevocationSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private func attemptConsentRevocation() -> Bool",
+    until: "func resetConsentForFreshInstallation() -> Bool"
+)
+private let consentRevocationRequestSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func revokeAllConsent() -> Bool",
+    until: "private func attemptConsentRevocation() -> Bool"
+)
+private let consentRetrySection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func retryPendingMaintenance()",
+    until: "func applicationEnteredForeground()"
+)
+private let effectiveCollectionSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private var maintenanceAllowsCollection: Bool",
+    until: "private var diagnosticsMaintenanceAllowsCollection: Bool"
+)
+private let durablePrivacyResumeSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private func resumeDurablePrivacyTransaction() -> Bool",
+    until: "private func attemptPendingConsentMutation() -> Bool"
+)
+private let installationIntentReconciliationSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func reconcileInstallationDeletionIntent() -> Bool",
+    until: "func completeInstallationDeletion("
+)
+private let consentBindSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func bindToAuthenticatedUser(_ userId: String?) -> Bool",
+    until: "func updateConsent(_ updatedConsent: ObservabilityConsent, ownerUserId: String) -> Bool"
+)
+private let pendingUpdateSupersessionSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "private func durablySupersedePendingUpdateIfNeeded(requestedUserId: String?) -> Bool",
+    until: "func updateConsent(_ updatedConsent: ObservabilityConsent, ownerUserId: String) -> Bool"
+)
+private let disabledSessionCleanupSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func stageDisabledSessionCleanupPreservingConsent() -> FirebaseDisabledSessionCleanupStagingResult",
+    until: "func stagePrivacyTransaction("
+)
+private let privacyTransactionStagingSection = sourceSection(
+    firebaseObservabilitySource,
+    from: "func stagePrivacyTransaction(",
+    until: "func refreshPrivacyTransactionState()"
+)
+private let anonymousConsentBindSection = sourceSection(
+    consentBindSection,
+    from: "guard let userId = requestedUserId else {",
+    until: "switch consentStore.read()"
+)
+expect(
+    sourceContains(
+        "pendingConsentMutation = mutation",
+        before: "return attemptConsentUpdate(mutation)",
+        in: consentUpdateSection
+    ) && sourceContains(
+        "pendingConsentMutation = .revoke",
+        before: "return attemptConsentRevocation()",
+        in: consentRevocationRequestSection
+    ) && sourceContains(
+        "consentStore.stagePrivacyTransaction(",
+        before: "resumeDurablePrivacyTransaction()",
+        in: consentUpdateSection
+    ) && sourceContains(
+        "consentStore.stagePrivacyTransaction(",
+        before: "resumeDurablePrivacyTransaction()",
+        in: consentRevocationSection
+    ) && sourceContains(
+        "revokeObservedSession()",
+        before: "consentStore.completePrivacySessionCheckpointPurge()",
+        in: durablePrivacyResumeSection
+    ) && durablePrivacyResumeSection.contains("activatePrivacyTransactionIfReady()") &&
+        sourceContains(
+            "privacyTransactionState.isPending",
+            before: "replaceEffectiveConsent(",
+            in: consentRetrySection
+        ) && effectiveCollectionSection.contains("pendingConsentMutation == nil") &&
+        effectiveCollectionSection.contains("privacyTransactionState == .notRequired") &&
+        consentUpdateSection.contains("if case .revoke? = pendingConsentMutation") &&
+        consentUpdateSection.contains("guard privacyTransactionState == .notRequired") &&
+        consentUpdateSection.contains("privacyTransactionState != .failure") &&
+        consentRevocationSection.contains("privacyTransactionState != .failure") &&
+        privacyTransactionStagingSection.contains("case .failure:") &&
+        sourceContains(
+            "case .failure:",
+            before: "return false",
+            in: privacyTransactionStagingSection
+        ),
+    "Privacy mutations must stage a durable OFF transaction before checkpoint cleanup and activate " +
+        "requested consent only after every durable maintenance step."
+)
+expect(
+    durablePrivacyResumeSection.contains("!transaction.matches(pendingConsentMutation)") &&
+        sourceContains(
+            "stagePendingConsentMutation(pendingConsentMutation)",
+            before: "activatePrivacyTransactionIfReady()",
+            in: durablePrivacyResumeSection
+        ) && durablePrivacyResumeSection.contains(
+            "activatedTransaction.matches(pendingConsentMutation)"
+        ) && sourceContains(
+            "storedConsent.matches(updatedConsent, ownerUserId: ownerUserId)",
+            before: "self.pendingConsentMutation = nil",
+            in: durablePrivacyResumeSection
+        ),
+    "A newer in-memory mutation must durably supersede an older transaction, and only an exact " +
+        "owner plus consent match may consume or publish that mutation."
+)
+expect(
+    firebaseObservabilitySource.contains("analyticsOverrideSanitizationPending") &&
+        firebaseObservabilitySource.contains("diagnosticsOverrideSanitizationPending") &&
+        sourceContains(
+            "resumePendingOverrideSanitization(transaction: &transaction)",
+            before: "requestDiagnosticsReportPurge()",
+            in: durablePrivacyResumeSection
+        ) && durablePrivacyResumeSection.contains("case .requiresSafeConfiguration, .awaitingRestart, .failure:") &&
+        durablePrivacyResumeSection.contains("completePrivacyOverrideSanitization()") &&
+        privacyTransactionStagingSection.contains(
+            "existingTransaction?.analyticsOverrideSanitizationPending"
+        ) && privacyTransactionStagingSection.contains(
+            "existingTransaction?.diagnosticsOverrideSanitizationPending"
+        ),
+    "Override sanitation requirements must survive process death inside the durable OFF transaction " +
+        "and block Firebase maintenance until the existing two-process gate is safe."
+)
+expect(
+    consentBindSection.contains("if case let .pending(transaction) = privacyTransactionState") &&
+        sourceContains(
+            "resumeDurablePrivacyTransaction()",
+            before: "switch consentStore.read()",
+            in: consentBindSection
+        ) && firebaseObservabilitySource.contains(
+            "case .pending:\n            return .missing"
+        ) && installationIntentReconciliationSection.contains(
+            "reconcileReplacementDeletionRecord(record, with: transaction)"
+        ) && installationIntentReconciliationSection.contains(
+            "persistPrivacyTransactionRecord(migratedTransaction)"
+        ) && !installationIntentReconciliationSection.contains(
+            "writeData(data, account: consentKeychainAccount)"
+        ),
+    "Process recreation must restore the durable privacy transaction as OFF and must never publish " +
+    "replacement consent from the FID intent before cleanup completes."
+)
+expect(
+    consentBindSection.contains(
+        "durablySupersedePendingUpdateIfNeeded(requestedUserId: requestedUserId)"
+    ) &&
+        pendingUpdateSupersessionSection.contains("let requestedUserId") &&
+        sourceContains(
+            "pendingConsentMutation = .revoke",
+            before: "consentStore.stagePrivacyTransaction(",
+            in: pendingUpdateSupersessionSection
+        ) &&
+        pendingUpdateSupersessionSection.contains("replacementConsent: nil") &&
+        pendingUpdateSupersessionSection.contains("diagnosticsPurgePending: true") &&
+        pendingUpdateSupersessionSection.contains("installationDeletionPending: true") &&
+        durablePrivacyResumeSection.contains(
+            "activatedTransaction.matches(pendingConsentMutation)"
+        ),
+    "A known account switch must durably supersede an in-memory update before resuming cleanup, " +
+        "while a nil bootstrap preserves the replacement and cannot reactivate it in the runtime."
+)
+expect(
+    disabledSessionCleanupSection.contains("let requiresUnknownStateCleanup: Bool") &&
+        disabledSessionCleanupSection.contains("requiresUnknownStateCleanup = true") &&
+        disabledSessionCleanupSection.contains(
+            "diagnosticsPurgePending: requiresUnknownStateCleanup"
+        ) &&
+        disabledSessionCleanupSection.contains(
+            "installationDeletionPending: requiresUnknownStateCleanup"
+        ) && anonymousConsentBindSection.contains("case .unknownState:") &&
+        sourceContains(
+            "prepareUnknownFirebaseStateForRevocation()",
+            before: "resumeDurablePrivacyTransaction()",
+            in: anonymousConsentBindSection
+        ),
+    "An undecodable consent record must remain fail-closed and stage conservative diagnostics/FID " +
+        "cleanup plus two-process SDK override sanitization before Firebase maintenance configuration."
+)
+expect(
+    installationIntentReconciliationSection.contains("case .notRequired:") &&
+        installationIntentReconciliationSection.contains("let migratedTransaction") &&
+        installationIntentReconciliationSection.contains("sessionCheckpointPurgePending: true") &&
+        installationIntentReconciliationSection.contains("diagnosticsPurgePending: true") &&
+        installationIntentReconciliationSection.contains("installationDeletionPending: true") &&
+        installationIntentReconciliationSection.contains(
+            "analyticsOverrideSanitizationPending: true"
+        ) && installationIntentReconciliationSection.contains(
+            "diagnosticsOverrideSanitizationPending: true"
+        ) &&
+        sourceContains(
+            "persistPrivacyTransactionRecord(migratedTransaction)",
+            before: "return revoke()",
+            in: installationIntentReconciliationSection
+        ) &&
+        installationIntentReconciliationSection.contains("reconcileReplacementDeletionRecord") &&
+        installationIntentReconciliationSection.contains("requestID: deletionRecord.requestID"),
+    "A legacy v2 replacement intent must migrate into the durable OFF transaction, and a newer " +
+        "transaction must supersede its replacement without losing the FID request."
+)
+
+private let retrySessionRestoreSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "func retrySessionRestore()",
+    until: "private func invalidatePromoterActivationCallbacksForAccountDeletion()"
+)
+private let restoreSessionAfterBootstrapSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "private func restoreSessionAfterBootstrap()",
+    until: "func retrySessionRestore()"
+)
+private let standardAuthStateSection = sourceSection(
+    onboardingCoordinatorSource,
+    from: "private func applyStandardAuthState(_ state: AuthUiState)",
+    until: "private func resumeIncompleteRegistration(_ session: AuthSession)"
+)
+expect(
+    sourceContains(
+        "observability.retryPendingMaintenance()",
+        before: "sessionRestoreFailed = false",
+        in: retrySessionRestoreSection
+    ) && sourceContains(
+        "observability.retryPendingMaintenance()",
+        before: "restoreSessionAfterBootstrap()",
+        in: retrySessionRestoreSection
+    ) && retrySessionRestoreSection.contains("quarantineObservability()") &&
+        restoreSessionAfterBootstrapSection.contains("quarantineObservability()") &&
+        !restoreSessionAfterBootstrapSection.contains(
+            "guard observabilityConsentErrorMessage == nil"
+        ) && sourceContains(
+            "quarantineObservability()",
+            before: "completedRegistrationSession = session",
+            in: standardAuthStateSection
+        ),
+    "Privacy maintenance must run before a session retry, while failure quarantines observability OFF " +
+        "without blocking authenticated session and catalog restoration."
+)
+expect(
+    kwaborAppSource.contains("exploreStore.applicationBecameActive()") &&
+        kwaborAppSource.contains("exploreStore.applicationBecameInactive()") &&
+        exploreViewSource.contains("store.screenDisappeared()") &&
+        exploreViewSource.contains("!searchStore.state.isActive") &&
+        exploreViewSource.contains("!store.state.isCitySelectorOpen") &&
+        exploreViewSource.contains("!store.surfacePresentationObscured") &&
+        exploreViewSource.contains("store.performanceCollectionEligibilityChanged()") &&
+        contentViewSource.contains("catalogDetailStore.isPresented") &&
+        exploreStoreSource.contains("firstUsableViewportProbe.onHidden()"),
+    "Explore performance samples must be cancelled on background or screen dismissal."
+)
+private let catalogDetailDismissRequestSection = sourceSection(
+    contentViewSource,
+    from: "private func dismissCatalogDetailSheetPresentation()",
+    until: "private func catalogDetailPresentationDidRemove"
+)
+private let catalogDetailDidRemoveSection = sourceSection(
+    contentViewSource,
+    from: "private func catalogDetailPresentationDidRemove(_ token:",
+    until: "private var destinationBinding"
+)
+private let citySelectorDismissRequestSection = sourceSection(
+    exploreViewSource,
+    from: "private func dismissCitySelectorSheetPresentation()",
+    until: "private func citySelectorPresentationDidRemove"
+)
+private let citySelectorDidRemoveSection = sourceSection(
+    exploreViewSource,
+    from: "private func citySelectorPresentationDidRemove(_ token:",
+    until: "private func gridColumns"
+)
+private let sheetDismissalObserverSection = sourceSection(
+    exploreViewSource,
+    from: "struct ExploreSheetDismissalObserver: UIViewRepresentable",
+    until: "private struct ExploreFirstUsableViewportCommitReader"
+)
+expect(
+    contentViewSource.contains(".sheet(item: catalogDetailPresentationBinding) { presentation in") &&
+        contentViewSource.contains("token: presentation.token") &&
+        contentViewSource.contains(".id(presentation.id)") &&
+        contentViewSource.components(separatedBy: ".sheet(").count - 1 == 1 &&
+        exploreViewSource.contains(".sheet(item: citySelectorBinding) { presentation in") &&
+        exploreViewSource.contains("token: presentation.token") &&
+        exploreViewSource.contains(".id(presentation.id)") &&
+        exploreViewSource.components(separatedBy: ".sheet(").count - 1 == 1 &&
+        contentViewSource.contains("onAttached: exploreStore.surfacePresentationAttached") &&
+        exploreViewSource.contains("onAttached: store.surfacePresentationAttached") &&
+        contentViewSource.contains("surfacePresentationStarted(.catalogdetail)") &&
+        exploreViewSource.contains("surfacePresentationStarted(.cityselector)") &&
+        !contentViewSource.contains("surfacePresentationStarted(.catalogDetail)") &&
+        !exploreViewSource.contains("surfacePresentationStarted(.citySelector)") &&
+        catalogDetailDidRemoveSection.contains("surfacePresentationRemoved(token)") &&
+        citySelectorDidRemoveSection.contains("surfacePresentationRemoved(token)"),
+    "Each Explore sheet instance must complete with its own immutable presentation token."
+)
+expect(
+    exploreStoreSource.contains("!surfacePresentationGate.isObscured") &&
+        exploreStoreSource.contains("@Published private(set) var surfacePresentationObscured") &&
+        exploreStoreSource.contains("private let surfacePresentationRegistry") &&
+        exploreStoreSource.contains("surfacePresentationRegistry.begin(token: token)") &&
+        exploreStoreSource.contains("surfacePresentationRegistry.attached(token: token)") &&
+        exploreStoreSource.contains("surfacePresentationRegistry.dismissRequested(token: token)") &&
+        exploreStoreSource.contains("surfacePresentationRegistry.removed(token: token)") &&
+        explorePresentationRegistrySource.contains("PresentationPhase.Queued") &&
+        explorePresentationRegistrySource.contains("PresentationPhase.Attached") &&
+        explorePresentationRegistrySource.contains("PresentationPhase.DismissRequested") &&
+        explorePresentationRegistrySource.contains("PresentationPhase.Completed") &&
+        catalogDetailDismissRequestSection.contains(
+            "surfacePresentationDismissRequested(presentation.token)"
+        ) &&
+        sourceContains(
+            "surfacePresentationDismissRequested(presentation.token)",
+            before: "catalogDetailSheetPresentation = nil",
+            in: catalogDetailDismissRequestSection
+        ) &&
+        citySelectorDismissRequestSection.contains(
+            "surfacePresentationDismissRequested(presentation.token)"
+        ) &&
+        sourceContains(
+            "surfacePresentationDismissRequested(presentation.token)",
+            before: "citySelectorSheetPresentation = nil",
+            in: citySelectorDismissRequestSection
+        ) &&
+        contentViewSource.components(
+            separatedBy: "catalogDetailSheetPresentation = nil"
+        ).count - 1 == 1 &&
+        exploreViewSource.components(
+            separatedBy: "citySelectorSheetPresentation = nil"
+        ).count - 1 == 1 &&
+        contentViewSource.components(
+            separatedBy: "dismissCatalogDetailSheetPresentation()"
+        ).count - 1 == 4 &&
+        exploreViewSource.components(
+            separatedBy: "dismissCitySelectorSheetPresentation()"
+        ).count - 1 == 4 &&
+        sheetDismissalObserverSection.contains("private let token: ExploreSurfacePresentationToken") &&
+        sheetDismissalObserverSection.contains("private var didDeliverAttachment = false") &&
+        sheetDismissalObserverSection.contains("private var didDeliverRemoval = false") &&
+        sheetDismissalObserverSection.contains("if window != nil") &&
+        sheetDismissalObserverSection.contains("deliverAttachment()") &&
+        sheetDismissalObserverSection.contains("attachment?(token)") &&
+        sourceContains(
+            "if window != nil",
+            before: "deliverAttachment()",
+            in: sheetDismissalObserverSection
+        ) &&
+        !sourceSection(
+            sheetDismissalObserverSection,
+            from: "func makeUIView",
+            until: "func updateUIView"
+        ).contains("onAttached(token)") &&
+        !sheetDismissalObserverSection.contains("static func dismantleUIView") &&
+        !sheetDismissalObserverSection.contains("completeIfNeverAttached") &&
+        sheetDismissalObserverSection.contains("guard didDeliverAttachment else") &&
+        sheetDismissalObserverSection.contains("guard !didDeliverRemoval else") &&
+        sheetDismissalObserverSection.contains("let removedToken = token") &&
+        sheetDismissalObserverSection.contains("completion?(removedToken)") &&
+        explorePresentationRegistryTestSource.contains(
+            "fun constructedButNeverAttachedPresentationCompletesImmediatelyWhenDismissed()"
+        ),
+    "Each Explore sheet owner must complete queued cancellation or await real attached removal."
+)
+expect(
+    explorePresentationGateSource.contains(
+        "private val activeTokens = mutableSetOf<ExploreSurfacePresentationToken>()"
+    ) &&
+        explorePresentationGateSource.contains("get() = activeTokens.isNotEmpty()") &&
+        explorePresentationGateSource.contains("activeTokens += token") &&
+        explorePresentationGateSource.contains("activeTokens.remove(token)") &&
+        !explorePresentationGateSource.contains("citySelectorToken") &&
+        !explorePresentationGateSource.contains("catalogDetailToken") &&
+        explorePresentationGateTestSource.contains(
+            "fun delayedAndDuplicateCallbackFromPresentationACannotFinishReopenedPresentationB()"
+        ) &&
+        explorePresentationGateTestSource.components(
+            separatedBy: "gate.onPresentationDismissed(presentationA)"
+        ).count - 1 == 2 &&
+        explorePresentationGateTestSource.contains("gate.onPresentationDismissed(presentationB)") &&
+        explorePresentationGateTestSource.contains(
+            "fun interleavedGenerationsAndKindsRemainObscuredUntilEveryTokenCompletes()"
+        ) &&
+        explorePresentationRegistryTestSource.contains(
+            "fun cancelledQueuedBAndDelayedCallbackAAllowFuturePresentationC()"
+        ) &&
+        explorePresentationRegistryTestSource.contains("registry.begin(presentationB)") &&
+        !explorePresentationRegistryTestSource.contains("registry.attached(presentationB)") &&
+        explorePresentationRegistryTestSource.contains("registry.removed(presentationA)") &&
+        explorePresentationRegistryTestSource.contains("registry.begin(presentationC)"),
+    "Explore must remain obstructed until every exact sheet token has completed."
+)
+expect(
+    exploreStoreSource.contains("DispatchTime.now().uptimeNanoseconds") &&
+        exploreStoreSource.contains("firstUsableViewportSample?.generation == token.generation") &&
+        exploreViewSource.contains("override func draw(_ rect: CGRect)") &&
+        exploreViewSource.contains("committedSignature != signature") &&
+        exploreViewSource.contains("self.tokenSignature == signature"),
+    "The iOS probe must use a monotonic clock and one stale-safe post-draw visibility commit."
+)
+expect(
+    firebaseObservabilitySource.contains("guard isPerformanceCollectionAllowed") &&
+        kwaborAppSource.contains("onPerformanceCollectionEligibilityChanged") &&
+        firebaseObservabilitySource.contains(
+            "trace.setValue(measurement.metricValue, forMetric: measurement.metricName.wireName)"
+        ) &&
+        firebaseObservabilitySource.contains("performanceProcessExploreKindAttribute") &&
+        firebaseObservabilitySource.contains("process_explore_kind") &&
+        firebaseObservabilitySource.contains("performanceViewportStateAttribute") &&
+        observabilityModelsSource.contains("enum class PerformanceExploreAppearanceKind") &&
+        observabilityModelsSource.contains("FirstProcessExplore(wireName = \"first_process_explore\")") &&
+        observabilityModelsSource.contains("SubsequentExplore(wireName = \"subsequent_explore\")") &&
+        exploreFirstUsableViewportProbeSource.contains(
+            "PerformanceExploreAppearanceKind.FirstProcessExplore"
+        ) &&
+        exploreFirstUsableViewportProbeSource.contains(
+            "PerformanceExploreAppearanceKind.SubsequentExplore"
+        ) &&
+        !exploreFirstUsableViewportProbeSource.contains("PerformanceSampleKind.Cold") &&
+        !exploreFirstUsableViewportProbeSource.contains("PerformanceSampleKind.Warm"),
+    "The iOS first-viewport metric must remain diagnostics-gated, bounded, and describe process " +
+        "appearance order without claiming operator-only cold or warm modes."
+)
+private let observedSessionPreparationSection = sourceSection(
+    iosObservedSessionStoreSource,
+    from: "private fun prepareObservedAppSessionFile(",
+    until: "private const val OBSERVED_APP_SESSION_DIRECTORY"
+)
+expect(
+    iosObservedSessionStoreSource.contains("NSURLIsExcludedFromBackupKey") &&
+        iosObservedSessionStoreSource.contains("NSNumber(bool = true)") &&
+        observedSessionPreparationSection.contains("backupExclusionApplicator.exclude") &&
+        sourceContains(
+            "backupExclusionApplicator.exclude",
+            before: "FoundationIosObservedAppSessionFile(",
+            in: observedSessionPreparationSection
+        ) &&
+        iosObservedSessionStoreTestSource.contains(
+            "fun checkpointDirectoryIsExcludedFromBackupBeforePersistence()"
+        ) &&
+        iosObservedSessionStoreTestSource.contains(
+            "fun backupExclusionFailureDisablesPersistenceBeforeCheckpointCreation()"
+        ) && iosObservedSessionStoreSource.contains(
+            "private class RetryingIosObservedAppSessionFile("
+        ) && iosObservedSessionStoreSource.contains(
+            "return fileFactory()?.also { preparedFile = it }"
+        ) && iosObservedSessionStoreTestSource.contains(
+            "fun backupExclusionPreparationIsRetriedAfterATransientFailureInTheSameProcess()"
+        ),
+    "The iOS observed-session checkpoint must fail closed when backup exclusion fails and retry " +
+        "that preparation after a transient failure in the same process."
 )
 expect(
     iosAuthSource.contains("IosAccountDeletionPurgeAttempt(accountId, interactionLifecycle, host)") &&

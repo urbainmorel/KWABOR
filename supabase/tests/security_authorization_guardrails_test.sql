@@ -109,7 +109,100 @@ exception
 end;
 $$;
 
-select plan(74);
+select plan(89);
+
+-- The canonical local stack does not currently define this hosted-only helper.
+-- When it is absent, these conditional assertions prove only that migrations
+-- and tests remain reset-safe; they do not prove that the hosted revoke branch
+-- ran. The same assertions must therefore be collected from staging where the
+-- function exists.
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_proc procedure
+    cross join lateral aclexplode(
+      coalesce(
+        procedure.proacl,
+        acldefault('f', procedure.proowner)
+      )
+    ) privilege
+    left join pg_catalog.pg_roles grantee
+      on grantee.oid = privilege.grantee
+    where procedure.oid = to_regprocedure('public.rls_auto_enable()')
+      and privilege.privilege_type = 'EXECUTE'
+      and (
+        privilege.grantee = 0
+        or grantee.rolname in ('anon', 'authenticated', 'service_role')
+      )
+  ),
+  0::bigint,
+  'hosted rls_auto_enable has no direct API-role EXECUTE grants when present'
+);
+
+select ok(
+  to_regprocedure('public.rls_auto_enable()') is null
+  or (
+    not has_function_privilege(
+      'anon',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+    and not has_function_privilege(
+      'service_role',
+      to_regprocedure('public.rls_auto_enable()'),
+      'execute'
+    )
+  ),
+  'hosted rls_auto_enable is not callable by API roles when present'
+);
+
+select is(
+  (
+    select string_agg(
+      coalesce(grantee.rolname, 'PUBLIC'),
+      ',' order by coalesce(grantee.rolname, 'PUBLIC')
+    )
+    from pg_catalog.pg_proc procedure
+    cross join lateral aclexplode(
+      coalesce(
+        procedure.proacl,
+        acldefault('f', procedure.proowner)
+      )
+    ) privilege
+    left join pg_catalog.pg_roles grantee
+      on grantee.oid = privilege.grantee
+    where procedure.oid =
+      'public.accept_organization_invite(text)'::regprocedure
+      and privilege.privilege_type = 'EXECUTE'
+      and privilege.grantee <> procedure.proowner
+  ),
+  'authenticated',
+  'only authenticated has a direct non-owner invite-acceptance EXECUTE grant'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.accept_organization_invite(text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.accept_organization_invite(text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'public.accept_organization_invite(text)',
+    'execute'
+  ),
+  'only authenticated API callers can execute invite acceptance'
+);
 
 insert into auth.users (
   id,
@@ -1781,6 +1874,170 @@ select is(
   ),
   0::bigint,
   'all persisted listings remain consistent with category taxonomy'
+);
+
+select is(
+  (
+    select count(*)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name in (
+        'organizations',
+        'organization_members',
+        'organization_invites',
+        'member_ad_budgets'
+      )
+      and privilege.grantee in ('PUBLIC', 'anon')
+  ),
+  0::bigint,
+  'public and anonymous clients have no privilege on team tables'
+);
+
+select is(
+  (
+    select string_agg(privilege.privilege_type, ',' order by privilege.privilege_type)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name = 'organizations'
+      and privilege.grantee = 'authenticated'
+  ),
+  'INSERT,SELECT,UPDATE',
+  'organization table privileges are limited to authenticated read and authoring'
+);
+
+select is(
+  (
+    select string_agg(privilege.privilege_type, ',' order by privilege.privilege_type)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name = 'organization_members'
+      and privilege.grantee = 'authenticated'
+  ),
+  'SELECT',
+  'organization membership has no table-wide mutation privilege'
+);
+
+select is(
+  (
+    select string_agg(privilege.column_name, ',' order by privilege.column_name)
+    from information_schema.column_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name = 'organization_members'
+      and privilege.grantee = 'authenticated'
+      and privilege.privilege_type = 'UPDATE'
+  ),
+  'role',
+  'organization membership exposes only the role column for direct updates'
+);
+
+select is(
+  (
+    select string_agg(privilege.privilege_type, ',' order by privilege.privilege_type)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name = 'organization_invites'
+      and privilege.grantee = 'authenticated'
+  ),
+  'INSERT,SELECT,UPDATE',
+  'organization invite privileges are limited to authenticated read and authoring'
+);
+
+select is(
+  (
+    select string_agg(privilege.privilege_type, ',' order by privilege.privilege_type)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name = 'member_ad_budgets'
+      and privilege.grantee = 'authenticated'
+  ),
+  'INSERT,SELECT',
+  'member budget privileges exclude client updates and deletion'
+);
+
+select is(
+  (
+    select count(*)
+    from information_schema.table_privileges privilege
+    where privilege.table_schema = 'public'
+      and privilege.table_name in (
+        'organizations',
+        'organization_members',
+        'organization_invites',
+        'member_ad_budgets'
+      )
+      and privilege.grantee = 'authenticated'
+      and privilege.privilege_type in ('DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
+  ),
+  0::bigint,
+  'authenticated clients have no destructive or structural team-table privilege'
+);
+
+select is(
+  (
+    select count(*)
+    from pg_catalog.pg_default_acl default_acl
+    left join pg_catalog.pg_namespace namespace
+      on namespace.oid = default_acl.defaclnamespace
+    cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) privilege
+    where default_acl.defaclrole = 'postgres'::regrole
+      and (
+        default_acl.defaclnamespace = 0
+        or namespace.nspname = 'public'
+      )
+      and default_acl.defaclobjtype = 'r'
+      and privilege.grantee in (0, 'anon'::regrole, 'authenticated'::regrole)
+  ),
+  0::bigint,
+  'future postgres-owned public tables are private by default'
+);
+
+select is(
+  (
+    select count(*)
+    from pg_catalog.pg_default_acl default_acl
+    left join pg_catalog.pg_namespace namespace
+      on namespace.oid = default_acl.defaclnamespace
+    cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) privilege
+    where default_acl.defaclrole = 'postgres'::regrole
+      and (
+        default_acl.defaclnamespace = 0
+        or namespace.nspname = 'public'
+      )
+      and default_acl.defaclobjtype = 'S'
+      and privilege.grantee in (0, 'anon'::regrole, 'authenticated'::regrole)
+  ),
+  0::bigint,
+  'future postgres-owned public sequences are private by default'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_default_acl default_acl
+    where default_acl.defaclrole = 'postgres'::regrole
+      and default_acl.defaclnamespace = 0
+      and default_acl.defaclobjtype = 'f'
+  ),
+  'postgres has an explicit global function ACL overriding PUBLIC execute'
+);
+
+select is(
+  (
+    select count(*)
+    from pg_catalog.pg_default_acl default_acl
+    left join pg_catalog.pg_namespace namespace
+      on namespace.oid = default_acl.defaclnamespace
+    cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) privilege
+    where default_acl.defaclrole = 'postgres'::regrole
+      and (
+        default_acl.defaclnamespace = 0
+        or namespace.nspname = 'public'
+      )
+      and default_acl.defaclobjtype = 'f'
+      and privilege.grantee in (0, 'anon'::regrole, 'authenticated'::regrole)
+  ),
+  0::bigint,
+  'future postgres-owned public functions are private by default'
 );
 
 select * from finish();

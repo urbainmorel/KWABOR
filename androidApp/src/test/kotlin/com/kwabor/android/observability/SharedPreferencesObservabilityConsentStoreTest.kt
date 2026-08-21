@@ -307,6 +307,51 @@ class SharedPreferencesObservabilityConsentStoreTest {
         assertEquals(USER_ID, restartedState.persistedOwnerUserId)
         assertEquals(ALL_GRANTED, restartedState.persistedConsent)
     }
+
+    @Test
+    fun stagedReductionStaysOffAcrossRestartUntilSessionAndMaintenanceComplete() {
+        val preferences = FakeObservabilityPreferences()
+        preferences.seedConsent(USER_ID, ALL_GRANTED, forceDisabled = false)
+        val store = SharedPreferencesObservabilityConsentStore(preferences)
+        val reducedConsent = ObservabilityConsent(
+            diagnosticsAllowed = true,
+            remoteConfigurationAllowed = true,
+        )
+
+        assertTrue(store.stageWrite(USER_ID, reducedConsent))
+
+        val restartedStore = SharedPreferencesObservabilityConsentStore(preferences.restart())
+        val staged = restartedStore.read()
+        assertNull(staged.ownerUserId)
+        assertEquals(ObservabilityConsent(), staged.consent)
+        assertTrue(staged.sessionCheckpointPurgePending)
+        assertTrue(staged.hasStagedConsentActivation)
+        assertEquals(USER_ID, staged.stagedOwnerUserId)
+        assertEquals(reducedConsent, staged.stagedConsent)
+        assertFalse(restartedStore.activateStagedConsent())
+
+        assertTrue(restartedStore.completeSessionCheckpointPurge())
+        assertFalse(restartedStore.activateStagedConsent())
+        assertTrue(restartedStore.clearAnalyticsPurgePending())
+        assertTrue(restartedStore.activateStagedConsent())
+        assertEquals(reducedConsent, restartedStore.read().consent)
+    }
+
+    @Test
+    fun stagedRegrantCannotPersistOnBeforeCheckpointCleanup() {
+        val preferences = FakeObservabilityPreferences()
+        val store = SharedPreferencesObservabilityConsentStore(preferences)
+        val analyticsConsent = ObservabilityConsent(analyticsAllowed = true)
+
+        assertTrue(store.stageWrite(USER_ID, analyticsConsent))
+        assertFalse(store.activateStagedConsent())
+
+        val restartedStore = SharedPreferencesObservabilityConsentStore(preferences.restart())
+        assertEquals(ObservabilityConsent(), restartedStore.read().consent)
+        assertTrue(restartedStore.completeSessionCheckpointPurge())
+        assertTrue(restartedStore.activateStagedConsent())
+        assertEquals(analyticsConsent, restartedStore.read().consent)
+    }
 }
 
 private class FakeObservabilityPreferences private constructor(

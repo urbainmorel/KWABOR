@@ -29,22 +29,27 @@ Dans ce plan, « mise en production de la bêta » signifie : builds signés dis
 interne Google Play et TestFlight à une liste fermée, connectés au staging protégé. Cela ne signifie
 ni publication publique, ni chargement automatique du corpus fictif dans Supabase Production.
 
-## État d'exécution au 12 août 2026
+## État d'exécution au 20 août 2026
 
 | Gate | État | Preuve acquise | Prochaine condition de sortie |
 | --- | --- | --- | --- |
 | G0 — scope | **vert** | ADR accepté, profil catalogue fermé, branche/worktree dédiés | maintenir le périmètre sans réintroduire de surface différée |
-| G1 — catalogue | **prêt pour CI** | 60 fiches, 180 JPEG inspectés, droits démo approuvés, dimensions/hashes/manifeste et quatre planches-contact conformes | archiver les quatre planches-contact depuis la CI exact-head |
-| G2 — données | **prêt pour CI** | seed idempotent, collisions fail-closed, rollback logique, Storage immuable et tests statiques verts | exécuter pgTAP/import double/rollback dans CI puis publier sur le vrai staging protégé |
-| G3 — mobile | **prêt pour CI** | profil staging `Explorer · Compte`, deep links bornés, disclosure, zéro CTA externe démo et 50 tests KMP/Android ciblés verts | prouver les PolicyTests et builds Staging iOS en CI |
-| G4 — exact-head | **en attente** | politique de tests proportionnés définie | geler les writers puis exécuter une seule gate globale sur le même SHA |
-| G5 — staging | **en attente externe** | workflows Storage/import/rollback fail-closed et tests statiques verts | provisionner l'Environment et les secrets, puis exécuter upload 180/180, import/réimport/rollback réels |
-| G6 — distribution | **en attente externe** | workflows AAB staging/Play Internal et archive IPA/TestFlight interne construits et testés statiquement | provisionner les Environments/credentials, puis signer, téléverser et qualifier sur appareils réels |
-| G7 — cohorte | **en attente** | protocole de cohorte et go/no-go défini | preflight signé, canary puis 15 testeurs sur le même RC |
+| G1 — catalogue | **versionné, CI main verte** | PR `#60`, exactement 60 fiches et 180 JPEG, manifestes et planches-contact conformes | préserver ces invariants sur le futur exact-head intégré |
+| G2 — données | **prêt localement** | seed/rollback, Storage et catalogue fail-closed, plus workflow DB fresh-empty v2 sous verrou staging commun | publier le delta, obtenir la CI exact-head puis exécuter sur le vrai staging protégé |
+| G3 — mobile | **fonctionnel local, P2 iOS ouverte** | profil `Explorer · Compte`, sessions consenties et sonde FUV fusionnés ; un cleanup Firebase froid impossible place seulement l'observabilité en quarantaine OFF et laisse auth/catalogue utilisables | qualifier sur macOS la transaction privacy et décider la P2 de reprise Firebase avant la CI exact-head |
+| G4 — exact-head | **en attente CI distante** | validations locales proportionnées possibles, mais aucun commit/PR/run ne porte encore le delta intégré | geler les writers, publier après autorisation puis exécuter une gate protégée sur le même SHA |
+| G5 — staging | **en attente externe** | workflows locaux préparés ; aucun projet staging hébergé qualifié ni preuve 60/180 distante | protéger l'Environment, provisionner variables/secrets et exécuter migration, upload, import, rollback et vérification réels |
+| G6 — distribution | **en attente externe** | workflows de build/upload préparés sans artefact Store réel | provisionner comptes/credentials, signer, téléverser puis qualifier sur appareils physiques |
+| G7 — cohorte | **en attente appareils/cohorte** | protocole et validateur go/no-go locaux ; aucune cohorte réelle exécutée | preflight signé, canary puis 10 Android et 5 iPhone sur le même RC pendant J1–J7 |
 
-Le chemin critique immédiat est `G2 → G3 → G4`. Les travaux Storage, mobile et correction SQL
-avancent en parallèle, mais aucune gate aval n'est déclarée verte sur une preuve statique ou un
-artefact provenant d'un autre SHA.
+Le chemin critique immédiat est la qualification macOS de la transaction privacy iOS, puis
+l'intégration publiée et la CI exact-head G4, le vrai staging G5, la distribution G6 et la cohorte G7.
+Storage et SQL sont prêts localement. Le parcours mobile reste utilisable lorsque l'observabilité iOS
+est mise en quarantaine, mais la reprise froide Firebase et le regrant restent refusés et retryables
+tant que le cleanup sûr n'a pas abouti. Les retries actuels ne franchissent pas
+`requiresSafeConfiguration` dans ce cas froid ; cette P2 ne ferme ni G3 ni les gates aval.
+Aucun échantillon P75 physique (10 cold + 20 warm par plateforme), aucune série réelle de
+200 sessions consenties et aucun jour J1–J7 ne sont encore archivés.
 
 ## Contraintes de pilotage
 
@@ -325,6 +330,11 @@ tactiles et scrollables, avec image finale ou placeholder déterministe visible,
 bloquant. Chaque plateforme fournit exactement 30 valeurs brutes — 10 cold puis 20 warm — sous le
 même profil 1,6 Mbps descendant, 750 kbps montant et 150 ms RTT.
 
+La trace applicative ne déduit jamais le mode `cold`/`warm` : elle expose seulement
+`first_process_explore` ou `subsequent_explore`, qui décrivent l'ordre d'apparition d'Explore dans le
+processus. Seul le harnais opérateur attribue le mode B7.10 à partir du force-stop/lancement direct ou
+du retour contrôlé ; aucune dimension interne ne ferme cette preuve appareil.
+
 **Gate G6 — candidat distribuable** : builds signés, parcours critique et appareils cibles verts ;
 zéro P0/P1 ouvert. Android et iOS sont issus de `expected_sha`, réellement téléversés et traités dans
 Play Internal/TestFlight. Le rapport P75 nomme les appareils physiques et leur source : Android
@@ -369,10 +379,14 @@ consentie capable d'établir le dénominateur crash-free.
 | B9.10 | Clore après sept jours J1–J7 complets | même RC sur 15 testeurs, ≥200 sessions consenties observées, rapport technique + produit | B9.02–B9.09 |
 
 Une « session observée » commence au premier passage de l'application au premier plan après opt-in
-et se termine après 30 minutes d'inactivité ou à la fin du processus ; elle ne compte qu'une fois
-dans le dénominateur, même avec plusieurs événements de crash. Les sessions sans consentement ne
-sont ni instrumentées ni extrapolées : leur nombre de testeurs est publié séparément afin que la
-couverture et le biais de mesure restent visibles.
+et une nouvelle session ne commence qu'après au moins 30 minutes d'arrière-plan enregistré. Une fin
+de processus seule ne crée pas de nouvelle session : sans preuve d'arrière-plan, la relance reprend
+la session précédente. Le seuil utilise le temps monotone à boot certain ; reboot, saut wall sans
+continuité prouvée ou checkpoint incertain échouent fermés. Chaque session ne compte qu'une fois dans
+le dénominateur, même avec plusieurs événements de crash. Les sessions sans les consentements
+Analytics et Diagnostics ne sont ni
+instrumentées ni extrapolées : leur nombre de testeurs est publié séparément afin que la couverture
+et le biais de mesure restent visibles.
 
 ## Phase 10 — Décision et passage suivant
 

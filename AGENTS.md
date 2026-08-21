@@ -48,6 +48,10 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Toute décision structurante doit être documentée par ADR.
 - Aucun secret, token, endpoint sensible ou clé API en dur.
 - Aucun message technique brut ne doit fuiter vers l'utilisateur final.
+- Avant toute opération GitHub, appliquer la politique du
+  [dépôt GitHub d'autorité](CONTRIBUTING.md#dépôt-github-dautorité). Ne jamais créer, promouvoir ou
+  utiliser un fork, miroir ou autre dépôt comme autorité du projet sans décision explicite du
+  propriétaire documentée dans le dépôt canonique.
 
 ## Architecture obligatoire
 
@@ -95,6 +99,20 @@ La vitesse d'exécution ne justifie jamais un contournement de ces priorités.
 - Auth tokens en stockage sécurisé plateforme via `expect`/`actual`.
 - Logs sans PII ni données sensibles.
 - Entrées utilisateur, deep links et payloads validés.
+
+## Docker et preuves Supabase
+
+- Docker n'est jamais exécuté sur les postes de travail Kwabor. Toute commande Supabase qui dépend
+  de Docker — `supabase start`, `supabase db start`, `supabase db reset`, `supabase test db`, lint ou
+  advisors locaux et harnais de concurrence — passe exclusivement par le job GitHub Actions
+  `supabase_database`, via une pull request, un push autorisé ou le `workflow_dispatch` du workflow
+  `CI`.
+- Le job `supabase_database` crée une base jetable avec `supabase db start`, applique les migrations,
+  charge le seed, puis exécute lint, pgTAP, advisors et harnais. Il ne fait pas de `db reset`, ne se
+  lie à aucun projet hébergé et ne qualifie donc ni `development`, ni `staging`, ni `production`.
+- Une preuve distante exige un projet explicitement ciblé, un GitHub Environment protégé, une
+  sauvegarde vérifiée, une migration non destructive approuvée et des contrôles lecture/ACL/smoke
+  archivés. Aucun reset destructif n'est autorisé sur un projet Supabase persistant.
 
 ## Offline, performance et contexte local
 

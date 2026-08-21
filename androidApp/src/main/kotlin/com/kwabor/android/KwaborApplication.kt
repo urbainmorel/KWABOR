@@ -1,6 +1,7 @@
 package com.kwabor.android
 
 import android.app.Application
+import com.kwabor.android.observability.AndroidExploreFirstUsableViewportReporter
 import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.observability.createAndroidObservabilityController
 import com.kwabor.android.onboarding.FirstLaunchStore
@@ -20,6 +21,9 @@ class KwaborApplication : Application() {
 
     lateinit var observability: AndroidObservabilityController
         private set
+    internal val exploreFirstUsableViewportReporter by lazy(LazyThreadSafetyMode.NONE) {
+        AndroidExploreFirstUsableViewportReporter(observability)
+    }
     internal lateinit var firstLaunchStore: FirstLaunchStore
         private set
     private var legacyCleanupScope: CoroutineScope? = null
@@ -29,9 +33,13 @@ class KwaborApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        observability = createAndroidObservabilityController(applicationContext)
+        val configuredRoot = compositionRoot
+        observability = createAndroidObservabilityController(
+            context = applicationContext,
+            sessionTracker = configuredRoot?.consentedAppSessionTracker,
+        )
         observability.start()
-        val dispatcherProvider = compositionRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
+        val dispatcherProvider = configuredRoot?.dispatcherProvider ?: DefaultDispatcherProvider()
         accountDeletionWorkerScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io)
         firstLaunchStore = SharedPreferencesFirstLaunchStore(applicationContext)
         legacyCleanupScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io).also { scope ->

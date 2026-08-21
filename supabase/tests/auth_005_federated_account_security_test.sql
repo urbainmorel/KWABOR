@@ -64,6 +64,8 @@ end;
 $$;
 
 grant usage on schema tests to anon, authenticated;
+grant execute on function tests.set_auth_amr(text, bigint) to authenticated;
+grant execute on function tests.set_auth_amr_entries(jsonb) to authenticated;
 
 create or replace function tests.statement_succeeds_as(db_role text, uid uuid, sql text)
 returns boolean

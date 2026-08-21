@@ -1,6 +1,5 @@
 package com.kwabor.android.ui.screens.explore
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -83,12 +81,12 @@ fun ExploreScreen(
 ) {
     val state = model.state
     val searchState = model.searchState
-    val focusManager = LocalFocusManager.current
-    BackHandler(enabled = searchState.isActive) {
-        focusManager.clearFocus()
-        actions.onSearchClose()
-    }
-    Column(modifier = modifier.fillMaxSize()) {
+    ExploreSearchBackHandler(searchState = searchState, actions = actions)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .firstUsableViewportCommit(state = state, binding = model.viewportPerformance),
+    ) {
         if (model.showClosedBetaDemoDisclosure) {
             KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
         }
@@ -126,6 +124,7 @@ data class ExploreScreenUiModel(
     val isGuestSession: Boolean = true,
     val showClosedBetaDemoDisclosure: Boolean = false,
     val showGuideDiscoveryEntry: Boolean = true,
+    val viewportPerformance: ExploreViewportPerformanceBinding = ExploreViewportPerformanceBinding.Disabled,
 )
 
 @Composable

@@ -22,7 +22,7 @@ class AndroidObservabilityConsentRetryTest {
         assertTrue(controller.updateConsent(TEST_USER_ID, ALL_OBSERVABILITY_GRANTED))
         controller.track(AnalyticsEvent(AnalyticsEventName.ViewCard))
         controller.recordDiagnostic(DiagnosticCode.UnexpectedApplicationState)
-        controller.startTrace(PerformanceTraceName.ExploreInitialLoad).stop()
+        controller.performance.startTrace(PerformanceTraceName.ExploreInitialLoad).stop()
 
         assertEquals(TEST_USER_ID, store.read().ownerUserId)
         assertEquals(ALL_OBSERVABILITY_GRANTED, store.read().consent)

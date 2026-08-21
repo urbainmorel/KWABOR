@@ -1,0 +1,225 @@
+name: Closed-beta staging database backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Validate readiness or capture and restore-qualify the encrypted backup
+        required: true
+        type: choice
+        options:
+          - readiness
+          - backup
+      expected_sha:
+        description: Exact full lowercase SHA currently selected on main
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run ID for expected_sha
+        required: true
+        type: string
+      capture_confirmation:
+        description: For backup only, type CAPTURE-ENCRYPTED-STAGING-BACKUP
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  # Shared literally with every hosted staging database, Storage, and catalog mutation.
+  group: closed-beta-demo-staging-operations
+  cancel-in-progress: false
+
+jobs:
+  staging_database_backup:
+    name: ${{ inputs.operation }} encrypted staging database backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: staging
+    env:
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      CAPTURE_CONFIRMATION: ${{ inputs.capture_confirmation }}
+      KWABOR_ENVIRONMENT: ${{ vars.KWABOR_ENVIRONMENT }}
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+      KWABOR_STAGING_BACKUP_AGE_RECIPIENT: ${{ vars.KWABOR_STAGING_BACKUP_AGE_RECIPIENT }}
+      KWABOR_STAGING_BACKUP_ESCROW_MODE: ${{ vars.KWABOR_STAGING_BACKUP_ESCROW_MODE }}
+      KWABOR_STAGING_BACKUP_ESCROW_RECIPIENT_SHA256: ${{ vars.KWABOR_STAGING_BACKUP_ESCROW_RECIPIENT_SHA256 }}
+      KWABOR_STAGING_BACKUP_ESCROW_TESTED_AT: ${{ vars.KWABOR_STAGING_BACKUP_ESCROW_TESTED_AT }}
+      KWABOR_STAGING_BACKUP_ESCROW_VALID_UNTIL: ${{ vars.KWABOR_STAGING_BACKUP_ESCROW_VALID_UNTIL }}
+      KWABOR_STAGING_BACKUP_LIVE_ENABLED: ${{ vars.KWABOR_STAGING_BACKUP_LIVE_ENABLED }}
+      KWABOR_STAGING_BACKUP_MAX_RPO_SECONDS: ${{ vars.KWABOR_STAGING_BACKUP_MAX_RPO_SECONDS }}
+      KWABOR_STAGING_BACKUP_MAX_RTO_SECONDS: ${{ vars.KWABOR_STAGING_BACKUP_MAX_RTO_SECONDS }}
+      KWABOR_STAGING_BACKUP_RETENTION_DAYS: ${{ vars.KWABOR_STAGING_BACKUP_RETENTION_DAYS }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Initialize fail-closed evidence boundary
+        shell: bash
+        run: mkdir -p build/closed-beta-staging-database-backup-evidence
+
+      - name: Verify B6.02 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tools/closed-beta-staging-database-backup.py \
+            tools/test_closed_beta_staging_database_backup.py
+          python3 -B -m unittest tools.test_closed_beta_staging_database_backup
+          python3 -B tools/verify-repository-integrity.py
+
+      - name: Fetch immutable CI and Environment authority
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ci_run_json="$RUNNER_TEMP/kwabor-backup-ci-run.json"
+          environment_json="$RUNNER_TEMP/kwabor-backup-environment.json"
+
+          fetch_json() {
+            local endpoint="$1"
+            local destination="$2"
+            local temporary="${destination}.tmp"
+            if gh api --method GET \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "$endpoint" > "$temporary" 2>/dev/null; then
+              mv "$temporary" "$destination"
+            else
+              rm -f "$temporary"
+              printf '{"fetchStatus":"failed"}\n' > "$destination"
+            fi
+          }
+
+          if [[ "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            fetch_json "/repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" "$ci_run_json"
+          else
+            printf '{"fetchStatus":"invalid-identifier"}\n' > "$ci_run_json"
+          fi
+          fetch_json "/repos/$GITHUB_REPOSITORY/environments/staging" "$environment_json"
+          echo "KWABOR_BACKUP_CI_RUN_JSON=$ci_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_BACKUP_ENVIRONMENT_JSON=$environment_json" >> "$GITHUB_ENV"
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: 2.111.0
+          github-token: ${{ github.token }}
+
+      - name: Install age and PostgreSQL 17 client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends age ca-certificates curl postgresql-common
+          if ! pg_dump --version 2>/dev/null | grep -Eq ' 17([.]|$)'; then
+            sudo install -d -m 0755 /usr/share/postgresql-common/pgdg
+            curl --fail --silent --show-error --location \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+              | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+            . /etc/os-release
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends postgresql-client-17
+          fi
+          test -x /usr/lib/postgresql/17/bin/pg_dump
+          test -x /usr/lib/postgresql/17/bin/psql
+          /usr/lib/postgresql/17/bin/pg_dump --version | grep -Eq ' 17([.]|$)'
+          /usr/lib/postgresql/17/bin/psql --version | grep -Eq ' 17([.]|$)'
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          age --version
+
+      - name: Capture, encrypt, and restore-qualify staging
+        shell: bash
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+          KWABOR_STAGING_BACKUP_AGE_IDENTITY: ${{ secrets.KWABOR_STAGING_BACKUP_AGE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-database-backup.py \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --capture-confirmation "$CAPTURE_CONFIRMATION" \
+            --ci-run-json "$KWABOR_BACKUP_CI_RUN_JSON" \
+            --environment-json "$KWABOR_BACKUP_ENVIRONMENT_JSON" \
+            --workspace "$GITHUB_WORKSPACE" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence"
+
+      - name: Stop exact disposable restore stack
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          supabase stop \
+            --project-id "kwabor-b602-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --no-backup
+
+      - name: Emit receipt for an operational workflow failure
+        if: failure()
+        shell: bash
+        run: |
+          python3 -B tools/closed-beta-staging-database-backup.py \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --capture-confirmation "$CAPTURE_CONFIRMATION" \
+            --workspace "$GITHUB_WORKSPACE" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-database-backup-evidence" \
+            --failure-code B602_WORKFLOW_STEP_FAILED
+
+      - name: Upload encrypted B6.02 GEL evidence
+        if: always()
+        id: qualified_artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-gel-g5-staging-database-backup-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/closed-beta-staging-database-backup-evidence
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 90
+
+      - name: Verify artifact digest and authoritative expiry
+        if: always() && steps.qualified_artifact.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.qualified_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.qualified_artifact.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          raw_digest="${ARTIFACT_DIGEST#sha256:}"
+          [[ "$raw_digest" =~ ^[0-9a-f]{64}$ ]]
+          metadata="$RUNNER_TEMP/kwabor-backup-artifact.json"
+          gh api --method GET \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$metadata"
+          expected_name="kwabor-gel-g5-staging-database-backup-$GITHUB_SHA-$GITHUB_RUN_ATTEMPT"
+          jq --exit-status \
+            --arg digest "sha256:$raw_digest" \
+            --arg name "$expected_name" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            '.digest == $digest and .name == $name and .workflow_run.id == $run_id and
+             .expired == false and (.expires_at | fromdateiso8601) > now' \
+            "$metadata" >/dev/null
+          expires_at="$(jq --raw-output '.expires_at' "$metadata")"
+          {
+            echo '### B6.02 encrypted backup evidence'
+            echo "- Artifact ID: $ARTIFACT_ID"
+            echo "- Artifact SHA-256: $raw_digest"
+            echo "- Authoritative expiry: $expires_at"
+            echo '- Plaintext uploaded: no'
+          } >> "$GITHUB_STEP_SUMMARY"
