@@ -332,7 +332,7 @@ class SnapshotAndFingerprintTest(unittest.TestCase):
         cwd = Path(".")
         snapshot = "00000003-00000001-1"
         with mock.patch.object(
-            backup, "run_command", return_value=json.dumps(valid_snapshot_document())
+            backup, "run_command", return_value=json.dumps(valid_snapshot_document(), indent=2)
         ) as run:
             proof = backup.run_snapshot_query(DATABASE_URL, snapshot, cwd=cwd)
         run.assert_called_once()

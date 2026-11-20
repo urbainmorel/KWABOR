@@ -702,10 +702,8 @@ def managed_data_query() -> str:
 
 
 def parse_snapshot_proof(raw: str) -> dict[str, Any]:
-    json_lines = [line.strip() for line in raw.splitlines() if line.strip().startswith("{")]
-    require(len(json_lines) == 1, "SNAPSHOT_PROOF_OUTPUT_INVALID")
     try:
-        document = json.loads(json_lines[0])
+        document = json.loads(raw)
     except json.JSONDecodeError as error:
         raise BackupError("SNAPSHOT_PROOF_OUTPUT_INVALID") from error
     require(isinstance(document, dict), "SNAPSHOT_PROOF_OUTPUT_INVALID")
