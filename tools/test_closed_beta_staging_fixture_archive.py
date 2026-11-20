@@ -277,7 +277,7 @@ class SqlSafetyTest(unittest.TestCase):
 
 class ProcessBoundaryTest(unittest.TestCase):
     def test_database_url_is_environment_only_and_unrelated_secrets_are_removed(self) -> None:
-        database_url = "postgresql://postgres.project:secret@pooler.supabase.com:5432/postgres?sslmode=require"
+        database_url = "postgresql://postgres.project:secret%40value@pooler.supabase.com:5432/postgres?sslmode=require"
         with mock.patch.dict(
             os.environ,
             {
@@ -288,7 +288,12 @@ class ProcessBoundaryTest(unittest.TestCase):
             clear=False,
         ):
             environment = archive.sanitized_psql_environment(database_url)
-        self.assertEqual(environment["PGDATABASE"], database_url)
+        self.assertEqual(environment["PGDATABASE"], "postgres")
+        self.assertEqual(environment["PGHOST"], "pooler.supabase.com")
+        self.assertEqual(environment["PGPORT"], "5432")
+        self.assertEqual(environment["PGUSER"], "postgres.project")
+        self.assertEqual(environment["PGPASSWORD"], "secret@value")
+        self.assertEqual(environment["PGSSLMODE"], "require")
         self.assertNotIn("SUPABASE_ACCESS_TOKEN", environment)
         self.assertNotIn("KWABOR_SUPABASE_SERVICE_ROLE_KEY", environment)
 
@@ -297,7 +302,9 @@ class ProcessBoundaryTest(unittest.TestCase):
             archive.run_psql(database_url, "select 1")
         command = runner.call_args.args[0]
         self.assertNotIn(database_url, command)
-        self.assertEqual(runner.call_args.kwargs["env"]["PGDATABASE"], database_url)
+        self.assertNotIn("secret@value", command)
+        self.assertEqual(command[-2:], ["--file", "-"])
+        self.assertEqual(runner.call_args.kwargs["input"], "select 1")
 
     def test_apply_output_proves_published_to_archived_transition(self) -> None:
         payload = {
