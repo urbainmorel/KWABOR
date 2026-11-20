@@ -328,6 +328,27 @@ class SnapshotAndFingerprintTest(unittest.TestCase):
         self.assertIn('["--snapshot", snapshot_id]', source)
         self.assertIn('"applicationDumpAndManagedProofShareSnapshot": True', source)
 
+    def test_snapshot_proof_uses_separate_commands_in_one_read_only_session(self) -> None:
+        cwd = Path(".")
+        snapshot = "00000003-00000001-1"
+        with mock.patch.object(
+            backup, "run_command", return_value=json.dumps(valid_snapshot_document(), indent=2)
+        ) as run:
+            proof = backup.run_snapshot_query(DATABASE_URL, snapshot, cwd=cwd)
+        run.assert_called_once()
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command[command.index("--command"):],
+            [
+                "--command", "begin transaction isolation level repeatable read read only",
+                "--command", f"set transaction snapshot '{snapshot}'",
+                "--command", backup.managed_data_query(),
+                "--command", "commit",
+            ],
+        )
+        self.assertTrue(run.call_args.kwargs["read_only"])
+        self.assertGreater(proof["constraintCount"], 0)
+
     def test_restore_requires_a_nonempty_exact_constraint_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
