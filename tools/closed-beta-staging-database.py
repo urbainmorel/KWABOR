@@ -62,6 +62,8 @@ EXPECTED_MANAGED_SCHEMA_TABLES = (
     ("auth", "mfa_amr_claims"),
     ("auth", "mfa_challenges"),
     ("auth", "mfa_factors"),
+    ("auth", "mfa_recovery_code_sets"),
+    ("auth", "mfa_recovery_codes"),
     ("auth", "oauth_authorizations"),
     ("auth", "oauth_client_states"),
     ("auth", "oauth_clients"),
@@ -71,6 +73,8 @@ EXPECTED_MANAGED_SCHEMA_TABLES = (
     ("auth", "saml_providers"),
     ("auth", "saml_relay_states"),
     ("auth", "schema_migrations"),
+    ("auth", "scim_tokens"),
+    ("auth", "scim_users"),
     ("auth", "sessions"),
     ("auth", "sso_domains"),
     ("auth", "sso_providers"),
@@ -118,10 +122,12 @@ FRESH_EMPTY_QUERY = (
     "('auth','sessions','auth',false),('auth','refresh_tokens','auth',false),"
     "('auth','mfa_factors','auth',false),('auth','mfa_challenges','auth',false),"
     "('auth','mfa_amr_claims','auth',false),"
+    "('auth','mfa_recovery_code_sets','auth',false),('auth','mfa_recovery_codes','auth',false),"
     "('auth','one_time_tokens','auth',false),('auth','flow_state','auth',false),"
     "('auth','audit_log_entries','auth',false),"
     "('auth','saml_providers','auth',false),"
     "('auth','saml_relay_states','auth',false),('auth','sso_domains','auth',false),"
+    "('auth','scim_tokens','auth',false),('auth','scim_users','auth',false),"
     "('auth','sso_providers','auth',false),"
     "('auth','oauth_clients','auth',false),"
     "('auth','oauth_client_states','auth',false),"
