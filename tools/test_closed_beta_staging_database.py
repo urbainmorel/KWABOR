@@ -1927,7 +1927,6 @@ class WorkflowStaticPolicyTest(unittest.TestCase):
 
     def test_reconstructible_demo_proof_checks_empty_managed_data(self) -> None:
         for column in (
-            "managed_schema_table_drift_count",
             "auth_user_count",
             "auth_relevant_row_count",
             "storage_object_count",
@@ -1935,6 +1934,8 @@ class WorkflowStaticPolicyTest(unittest.TestCase):
             "storage_relevant_row_count",
         ):
             self.assertIn(f"counts.{column} = 0", database.DEMO_PROOF_QUERY)
+        self.assertIn("where n.nspname in ('auth','storage') and r.relkind in ('r','p')", database.DEMO_PROOF_QUERY)
+        self.assertIn("select exists(select 1 from %I.%I) as has_data", database.DEMO_PROOF_QUERY)
 
     @classmethod
     def setUpClass(cls) -> None:
