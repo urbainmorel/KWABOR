@@ -217,14 +217,24 @@ select fixture.digest from ({FRESH_EMPTY_QUERY.rstrip(';')}) counts
 cross join ({DEMO_DATA_QUERY}) fixture
 where counts.public_schema_count = 1
   and counts.required_system_table_count = 3
-  and counts.managed_schema_table_drift_count = 0
   and counts.auth_user_count = 0 and counts.auth_relevant_row_count = 0
   and counts.storage_object_count = 0 and counts.storage_bucket_count = 0
   and counts.storage_relevant_row_count = 0
   and not exists (
     select 1 from pg_catalog.pg_class r
     join pg_catalog.pg_namespace n on n.oid = r.relnamespace
-    where n.nspname in ('public','app_private') and r.relkind in ('m','f')
+    where n.nspname in ('public','app_private','auth','storage') and r.relkind in ('m','f')
+  )
+  and not exists (
+    select 1 from pg_catalog.pg_class r
+    join pg_catalog.pg_namespace n on n.oid = r.relnamespace
+    where n.nspname in ('auth','storage') and r.relkind in ('r','p')
+      and (n.nspname, r.relname) not in (
+        ('auth','instances'), ('auth','schema_migrations'), ('storage','migrations')
+      )
+      and coalesce((xpath('/table/row/has_data/text()', query_to_xml(format(
+        'select exists(select 1 from %I.%I) as has_data',
+        n.nspname, r.relname), true, false, '')))[1]::text::boolean, true)
   )
 """
 

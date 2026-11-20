@@ -138,8 +138,10 @@ le même digest sous `sha256:<digest>` ; le runner exige les deux représentatio
 
 Pour le jalon individuel [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md),
 ajouter `-f reconstructible_demo=true` à `plan` et `apply`, en laissant les entrées backup vides.
-Le plan publie `RECONSTRUCTIBLE-DEMO.json` après contrôle du jeu fictif exact et des tables
-Auth et Storage vides. L’apply lie cette preuve au plan validé, puis refait le contrôle avant
+Le plan publie `RECONSTRUCTIBLE-DEMO.json` après contrôle du jeu fictif exact et de la vacuité
+de toutes les tables de données Auth et Storage présentes, y compris les nouvelles tables gérées.
+Seules les trois tables de métadonnées de plateforme déjà recensées sont exclues du comptage.
+L’apply lie cette preuve au plan validé, puis refait le contrôle avant
 la migration ACL épinglée. Le gel des écritures externes s’applique jusqu’à la vérification.
 
 Pour le parcours par défaut, deux chemins exclusifs sont autorisés :
