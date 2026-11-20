@@ -920,6 +920,10 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
 
 
 class GitHubArtifactProofTest(unittest.TestCase):
+    def setUp(self) -> None:
+        fixture_clock = self.enterContext(mock.patch.object(database, "datetime", wraps=datetime))
+        fixture_clock.now.return_value = datetime(2026, 8, 21, tzinfo=timezone.utc)
+
     def test_supporting_run_rejects_repository_workflow_sha_event_and_status_drift(self) -> None:
         mutations = (
             {"repository": {"full_name": "fork/KWABOR", "id": 1234}},
@@ -971,7 +975,7 @@ class GitHubArtifactProofTest(unittest.TestCase):
             {"id": 302},
             {"name": "forged"},
             {"expired": True},
-            {"expires_at": "2000-08-19T12:00:00Z"},
+            {"expires_at": "2026-08-20T12:00:02Z"},
             {"digest": "sha256:" + "b" * 64},
             {"url": "https://api.github.com/repos/fork/KWABOR/actions/artifacts/301"},
             {"workflow_run": {**base["workflow_run"], "id": 999}},
