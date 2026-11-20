@@ -240,6 +240,15 @@ class SnapshotAndFingerprintTest(unittest.TestCase):
         with self.assertRaisesRegex(backup.BackupError, "MANAGED_AUTH_STORAGE_NOT_EMPTY"):
             backup.parse_snapshot_proof(json.dumps(nonempty))
 
+        for name in ("mfa_recovery_code_sets", "mfa_recovery_codes", "scim_tokens", "scim_users"):
+            with self.subTest(table=name):
+                snapshot = valid_snapshot_document()
+                table = next(row for row in snapshot["managedTables"]
+                             if (row["schema"], row["table"]) == ("auth", name))
+                table.update(exists=True, rowCount=1)
+                with self.assertRaisesRegex(backup.BackupError, "MANAGED_AUTH_STORAGE_NOT_EMPTY"):
+                    backup.parse_snapshot_proof(json.dumps(snapshot))
+
         missing_required = valid_snapshot_document()
         missing_required["managedTables"][0]["exists"] = False
         missing_required["managedTables"][0]["rowCount"] = None

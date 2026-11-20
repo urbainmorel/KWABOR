@@ -43,8 +43,9 @@ Le ciphertext contient :
 
 Le catalogue exact des tables hébergées Auth et Storage est verrouillé par le SHA du runner : une
 table inconnue, manquante ou renommée impose une nouvelle revue. Les données client de toutes les
-tables connues doivent être strictement vides dans le même snapshot, notamment MFA AMR, SAML,
-OAuth client state et buckets Analytics/Vector. `auth.users`, `storage.objects` et
+tables connues doivent être strictement vides dans le même snapshot, notamment MFA AMR, les
+tables de récupération MFA et SCIM, SAML, OAuth client state et buckets Analytics/Vector.
+`auth.users`, `storage.objects` et
 `storage.buckets` sont obligatoirement présents. Le producteur ferme l’exécution
 avec `MANAGED_AUTH_STORAGE_NOT_EMPTY` dès qu’une ligne client existe.
 
