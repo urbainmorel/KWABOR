@@ -83,10 +83,9 @@ def environment_evidence() -> dict[str, object]:
         "canAdminsBypass": False,
         "environmentId": 20,
         "name": "staging",
-        "preventSelfReview": True,
+        "governanceMode": "single-maintainer-demo",
         "protectedBranchesOnly": True,
-        "reviewerCount": 1,
-        "reviewerTypes": ["User"],
+        "reviewerCount": 0,
         "schemaVersion": 1,
         "updatedAt": "2026-08-21T10:00:00Z",
     }

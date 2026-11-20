@@ -375,13 +375,14 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). La réussite du job CI
   `supabase_database` sur une base éphémère ne clôt pas ce ticket.
   - [ ] BETA-STAGING-001A — Les Environments GitHub sont sans bypass administrateur et limités aux
-    branches protégées, et l'accès staging via pooler TLS est qualifié. Désigner encore un reviewer
-    indépendant légitime avant toute opération live exigeant une approbation.
+    branches protégées, et l'accès staging via pooler TLS est qualifié. Valider la politique du
+    mainteneur unique sur `main` pour le catalogue fictif. Auth et distribution gardent une revue
+    indépendante.
   - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
     sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
-  - [ ] BETA-STAGING-001C — La référence production est provisionnée. Désigner l'autorité de revue,
-    fusionner la PR exact-head, provisionner l'escrow age hors dépôt, puis exécuter dans l'ordre
-    B6.02, migration ACL, archivage, Auth et corpus.
+  - [ ] BETA-STAGING-001C — La référence production est provisionnée. Qualifier la copie de
+    récupération age hors ligne, puis exécuter B6.02, migration ACL, archivage et publication du
+    corpus de démonstration. La qualification Auth et l'ouverture de cohorte sont des étapes séparées.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

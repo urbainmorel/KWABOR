@@ -1,7 +1,7 @@
 # Runbook B6.02 — sauvegarde staging chiffrée et restaurée
 
 > Statut : implémentation prête, exécution live fermée tant que la paire age, sa preuve
-> d’escrow et le project ref Production distinct ne sont pas provisionnés dans
+> de récupération hors ligne et le project ref Production distinct ne sont pas provisionnés dans
 > l’Environment GitHub `staging`. Aucun Docker local et aucune mutation du projet hébergé ne
 > sont autorisés par ce runbook.
 
@@ -81,7 +81,7 @@ dispatch.
 | `KWABOR_PRODUCTION_SUPABASE_PROJECT_REF` | project ref Production distinct |
 | `KWABOR_STAGING_PROJECT_REF_SHA256` | SHA-256 du project ref staging |
 | `KWABOR_STAGING_BACKUP_AGE_RECIPIENT` | recipient public age X25519 |
-| `KWABOR_STAGING_BACKUP_ESCROW_MODE` | exactement `offline-two-person` |
+| `KWABOR_STAGING_BACKUP_ESCROW_MODE` | exactement `offline-single-maintainer` pour le staging de démonstration |
 | `KWABOR_STAGING_BACKUP_ESCROW_RECIPIENT_SHA256` | SHA-256 du recipient conservé hors dépôt |
 | `KWABOR_STAGING_BACKUP_ESCROW_TESTED_AT` | test réel de récupération UTC, moins de 90 jours |
 | `KWABOR_STAGING_BACKUP_ESCROW_VALID_UNTIL` | UTC, au moins 90 jours après capture |
@@ -95,11 +95,11 @@ dispatch.
 | Nom | Contrat |
 | --- | --- |
 | `KWABOR_STAGING_DATABASE_URL` | `postgresql://postgres.<ref>:<mot-de-passe-percent-encoded>@<session-pooler>:5432/postgres?sslmode=require` |
-| `KWABOR_STAGING_BACKUP_AGE_IDENTITY` | identité privée age correspondant au recipient ; copie de reprise hors dépôt sous contrôle de deux personnes |
+| `KWABOR_STAGING_BACKUP_AGE_IDENTITY` | identité privée age correspondant au recipient, avec copie de récupération hors ligne séparée de GitHub |
 
 L’identité privée ne doit pas être générée dans les logs Actions. La générer sur un poste de
-confiance, conserver une copie de reprise hors ligne sous contrôle de deux custodians, tester un
-cycle chiffrement/déchiffrement, puis renseigner les trois variables d’escrow avec les valeurs
+confiance, conserver une copie de reprise hors ligne dans un stockage chiffré sous le contrôle
+du mainteneur, tester un cycle chiffrement/déchiffrement avec cette copie, puis renseigner les trois variables d’escrow avec les valeurs
 réelles. L’identité GitHub et la copie d’escrow doivent dériver le même recipient.
 
 ## Séquence d’exécution

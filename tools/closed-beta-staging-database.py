@@ -1071,7 +1071,9 @@ def validate_backup_artifact_bundle(
         isinstance(environment, dict)
         and environment.get("name") == "staging"
         and environment.get("canAdminsBypass") is False
-        and environment.get("preventSelfReview") is True
+        and environment.get("governanceMode") == "single-maintainer-demo"
+        and type(environment.get("reviewerCount")) is int
+        and environment["reviewerCount"] == 0
         and environment.get("protectedBranchesOnly") is True,
         "BACKUP_RECEIPT_ENVIRONMENT_DRIFT",
     )
@@ -1190,7 +1192,7 @@ def validate_backup_artifact_bundle(
     require(
         isinstance(escrow, dict)
         and escrow.get("status") == "provisioned"
-        and escrow.get("custodyMode") == "offline-two-person"
+        and escrow.get("custodyMode") == "offline-single-maintainer"
         and escrow.get("recipientSha256") == encryption.get("recipientSha256")
         and escrow.get("maxRecoveryTestAgeDays") == 90,
         "BACKUP_RECEIPT_ESCROW_INVALID",
@@ -1269,34 +1271,13 @@ def validate_environment_protection(document: Mapping[str, Any]) -> dict[str, An
     require(document.get("name") == EXPECTED_ENVIRONMENT, "ENVIRONMENT_IDENTITY_DRIFT")
     require(document.get("can_admins_bypass") is False, "ENVIRONMENT_ADMIN_BYPASS_ENABLED")
     rules = document.get("protection_rules")
-    require(isinstance(rules, list), "ENVIRONMENT_RULES_MISSING")
-    reviewer_rules = [
-        rule
-        for rule in rules
-        if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
-    ]
-    branch_rules = [
-        rule for rule in rules if isinstance(rule, dict) and rule.get("type") == "branch_policy"
-    ]
-    require(len(reviewer_rules) == 1, "ENVIRONMENT_REVIEWER_RULE_INVALID")
-    require(len(branch_rules) == 1, "ENVIRONMENT_BRANCH_RULE_INVALID")
-    reviewer_rule = reviewer_rules[0]
-    require(reviewer_rule.get("prevent_self_review") is True, "ENVIRONMENT_SELF_REVIEW_ENABLED")
-    reviewers = reviewer_rule.get("reviewers")
-    require(isinstance(reviewers, list) and bool(reviewers), "ENVIRONMENT_REVIEWER_MISSING")
-    reviewer_types: set[str] = set()
-    for reviewer_link in reviewers:
-        require(isinstance(reviewer_link, dict), "ENVIRONMENT_REVIEWER_INVALID")
-        reviewer_type = reviewer_link.get("type")
-        reviewer = reviewer_link.get("reviewer")
-        require(reviewer_type in {"User", "Team"}, "ENVIRONMENT_REVIEWER_INVALID")
-        require(
-            isinstance(reviewer, dict)
-            and isinstance(reviewer.get("id"), int)
-            and reviewer["id"] > 0,
-            "ENVIRONMENT_REVIEWER_INVALID",
-        )
-        reviewer_types.add(str(reviewer_type))
+    require(
+        isinstance(rules, list)
+        and len(rules) == 1
+        and isinstance(rules[0], dict)
+        and rules[0].get("type") == "branch_policy",
+        "ENVIRONMENT_BRANCH_RULE_INVALID",
+    )
     branch_policy = document.get("deployment_branch_policy")
     require(isinstance(branch_policy, dict), "ENVIRONMENT_BRANCH_POLICY_MISSING")
     require(
@@ -1312,10 +1293,9 @@ def validate_environment_protection(document: Mapping[str, Any]) -> dict[str, An
         "canAdminsBypass": False,
         "environmentId": environment_id,
         "name": EXPECTED_ENVIRONMENT,
-        "preventSelfReview": True,
         "protectedBranchesOnly": True,
-        "reviewerCount": len(reviewers),
-        "reviewerTypes": sorted(reviewer_types),
+        "governanceMode": "single-maintainer-demo",
+        "reviewerCount": 0,
         "schemaVersion": 1,
         "updatedAt": updated_at,
     }

@@ -58,6 +58,12 @@ concurrency:
 
 jobs:
   fixture_archive:
+    if: >-
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     name: ${{ inputs.operation }} exact staging fixture archive
     runs-on: ubuntu-24.04
     timeout-minutes: 30

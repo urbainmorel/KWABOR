@@ -448,31 +448,13 @@ def validate_environment(document: Mapping[str, Any]) -> dict[str, Any]:
         "ENVIRONMENT_BRANCH_POLICY_INVALID",
     )
     rules = document.get("protection_rules")
-    require(isinstance(rules, list), "ENVIRONMENT_RULES_MISSING")
-    reviewer_rules = [
-        rule for rule in rules if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
-    ]
-    branch_rules = [
-        rule for rule in rules if isinstance(rule, dict) and rule.get("type") == "branch_policy"
-    ]
-    require(len(reviewer_rules) == 1 and len(branch_rules) == 1, "ENVIRONMENT_RULES_INVALID")
-    reviewer_rule = reviewer_rules[0]
-    reviewers = reviewer_rule.get("reviewers")
     require(
-        reviewer_rule.get("prevent_self_review") is True
-        and isinstance(reviewers, list)
-        and bool(reviewers),
-        "ENVIRONMENT_REVIEWER_INVALID",
+        isinstance(rules, list)
+        and len(rules) == 1
+        and isinstance(rules[0], dict)
+        and rules[0].get("type") == "branch_policy",
+        "ENVIRONMENT_RULES_INVALID",
     )
-    for reviewer_link in reviewers:
-        require(isinstance(reviewer_link, dict), "ENVIRONMENT_REVIEWER_INVALID")
-        reviewer = reviewer_link.get("reviewer")
-        require(
-            reviewer_link.get("type") in {"User", "Team"}
-            and isinstance(reviewer, dict)
-            and positive_integer(reviewer.get("id"), "ENVIRONMENT_REVIEWER_INVALID") > 0,
-            "ENVIRONMENT_REVIEWER_INVALID",
-        )
     environment_id = positive_integer(document.get("id"), "ENVIRONMENT_RESOURCE_INVALID")
     updated_at = document.get("updated_at")
     parse_timestamp(updated_at, "ENVIRONMENT_TIMESTAMP_INVALID")
@@ -480,9 +462,9 @@ def validate_environment(document: Mapping[str, Any]) -> dict[str, Any]:
         "canAdminsBypass": False,
         "environmentId": environment_id,
         "name": EXPECTED_ENVIRONMENT,
-        "preventSelfReview": True,
         "protectedBranchesOnly": True,
-        "reviewerCount": len(reviewers),
+        "governanceMode": "single-maintainer-demo",
+        "reviewerCount": 0,
         "schemaVersion": 1,
         "updatedAt": updated_at,
     }
@@ -563,7 +545,7 @@ def validate_age_and_escrow(now: datetime) -> dict[str, Any]:
     identity = os.environ.get("KWABOR_STAGING_BACKUP_AGE_IDENTITY", "").strip()
     require("AGE-SECRET-KEY-" in identity and len(identity) <= 8192, "AGE_IDENTITY_INVALID")
     require(
-        os.environ.get("KWABOR_STAGING_BACKUP_ESCROW_MODE", "") == "offline-two-person",
+        os.environ.get("KWABOR_STAGING_BACKUP_ESCROW_MODE", "") == "offline-single-maintainer",
         "AGE_ESCROW_MODE_INVALID",
     )
     tested_at = parse_timestamp(
@@ -586,7 +568,7 @@ def validate_age_and_escrow(now: datetime) -> dict[str, Any]:
     return {
         "identity": identity,
         "public": {
-            "custodyMode": "offline-two-person",
+            "custodyMode": "offline-single-maintainer",
             "maxRecoveryTestAgeDays": MAX_ESCROW_TEST_AGE_DAYS,
             "recipientSha256": recipient_sha256,
             "recoveryTestedAt": format_timestamp(tested_at),

@@ -63,14 +63,7 @@ def valid_environment_document() -> dict[str, object]:
             "protected_branches": True,
             "custom_branch_policies": False,
         },
-        "protection_rules": [
-            {
-                "type": "required_reviewers",
-                "prevent_self_review": True,
-                "reviewers": [{"type": "User", "reviewer": {"id": 42}}],
-            },
-            {"type": "branch_policy"},
-        ],
+        "protection_rules": [{"type": "branch_policy"}],
         "updated_at": "2026-08-20T12:00:00Z",
     }
 
@@ -169,14 +162,16 @@ class TargetAndAuthorityTest(unittest.TestCase):
                     database_url=database_url,
                 )
 
-    def test_ci_and_environment_require_exact_main_success_and_independent_review(self) -> None:
+    def test_ci_and_environment_require_exact_main_and_solo_policy(self) -> None:
         self.assertEqual(
             backup.validate_ci_run(valid_ci_document(), expected_run_id=100, expected_sha=SHA)[
                 "headSha"
             ],
             SHA,
         )
-        self.assertTrue(backup.validate_environment(valid_environment_document())["preventSelfReview"])
+        evidence = backup.validate_environment(valid_environment_document())
+        self.assertEqual(evidence["governanceMode"], "single-maintainer-demo")
+        self.assertEqual(evidence["reviewerCount"], 0)
         for mutation in (
             {"event": "workflow_dispatch"},
             {"conclusion": "failure"},
@@ -377,14 +372,17 @@ class EncryptionEscrowAndEvidenceTest(unittest.TestCase):
         environment = {
             "KWABOR_STAGING_BACKUP_AGE_RECIPIENT": RECIPIENT,
             "KWABOR_STAGING_BACKUP_AGE_IDENTITY": "AGE-SECRET-KEY-1" + "A" * 58,
-            "KWABOR_STAGING_BACKUP_ESCROW_MODE": "offline-two-person",
+            "KWABOR_STAGING_BACKUP_ESCROW_MODE": "offline-single-maintainer",
             "KWABOR_STAGING_BACKUP_ESCROW_RECIPIENT_SHA256": backup.sha256_text(RECIPIENT),
             "KWABOR_STAGING_BACKUP_ESCROW_TESTED_AT": "2026-08-20T12:00:00Z",
             "KWABOR_STAGING_BACKUP_ESCROW_VALID_UNTIL": "2027-08-21T12:00:00Z",
         }
         with patched_environment(environment):
             result = backup.validate_age_and_escrow(now)
-        self.assertEqual(result["public"]["custodyMode"], "offline-two-person")
+        self.assertEqual(result["public"]["custodyMode"], "offline-single-maintainer")
+        with patched_environment({**environment, "KWABOR_STAGING_BACKUP_ESCROW_MODE": "offline-two-person"}):
+            with self.assertRaisesRegex(backup.BackupError, "AGE_ESCROW_MODE_INVALID"):
+                backup.validate_age_and_escrow(now)
         environment["KWABOR_STAGING_BACKUP_ESCROW_RECIPIENT_SHA256"] = "0" * 64
         with patched_environment(environment), self.assertRaisesRegex(
             backup.BackupError, "AGE_ESCROW_RECIPIENT_DRIFT"
