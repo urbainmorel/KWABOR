@@ -834,14 +834,16 @@ class SnapshotLease(AbstractContextManager["SnapshotLease"]):
 
 def run_snapshot_query(database_url: str, snapshot_id: str, *, cwd: Path) -> dict[str, Any]:
     require(SNAPSHOT_PATTERN.fullmatch(snapshot_id) is not None, "SNAPSHOT_ID_INVALID")
-    sql = (
-        "begin transaction isolation level repeatable read read only;"
-        f"set transaction snapshot '{snapshot_id}';"
-        + managed_data_query()
-        + "commit;"
-    )
+    # Send the JSON query separately so psql retains its result before COMMIT.
     output = run_command(
-        ["psql", database_url, "--no-psqlrc", "--quiet", "--no-align", "--tuples-only", "--set", "ON_ERROR_STOP=1", "--command", sql],
+        [
+            "psql", database_url, "--no-psqlrc", "--quiet", "--no-align", "--tuples-only",
+            "--set", "ON_ERROR_STOP=1",
+            "--command", "begin transaction isolation level repeatable read read only",
+            "--command", f"set transaction snapshot '{snapshot_id}'",
+            "--command", managed_data_query(),
+            "--command", "commit",
+        ],
         cwd=cwd,
         code="SNAPSHOT_PROOF_QUERY_FAILED",
         read_only=True,
