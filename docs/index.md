@@ -30,7 +30,7 @@
 | [Architecture](architecture.md) | Développeur, reviewer | Couches, modules, flux et frontières de sécurité |
 | [Modèle de données](data-model.md) | Mobile, backend | Entités Supabase, stockage local et migrations |
 | [Tests et qualité](testing.md) | Contributeur | Commandes, niveaux de tests et gate avant PR |
-| [Contribution](../CONTRIBUTING.md) | Contributeur | Workflow Git, critères de changement et checklist |
+| [Contribution](../CONTRIBUTING.md) | Contributeur | Dépôt GitHub d'autorité, workflow Git, critères de changement et checklist |
 | [Chaîne qualité KMP](../TOOLING_SETUP_qualite_kmp.md) | Mainteneur | Configuration détaillée Spotless/Detekt/CI |
 
 ## Configuration et livraison

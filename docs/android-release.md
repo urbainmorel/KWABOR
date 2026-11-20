@@ -252,8 +252,10 @@ le dépôt canonique et la branche `main`.
 4. Vérifier les protections de l'Environment `staging` et les identités staging.
 5. Construire `:androidApp:bundleStaging` sans rejouer la gate globale déjà prouvée par la CI.
 6. Retirer la signature debug, signer avec la clé d'upload et vérifier le certificat attendu.
-7. Archiver pendant 30 jours l'AAB, `mapping.txt`, `KWABOR-SHA256SUMS.txt` et
-   `KWABOR-ANDROID-PROVENANCE.json`.
+7. Produire puis revérifier `GEL-G6-ANDROID-AAB.json` après signature, avec les digests de l'AAB,
+   du mapping, de la provenance, des identités staging et du certificat d'upload.
+8. Archiver pendant 90 jours l'AAB, `mapping.txt`, `KWABOR-SHA256SUMS.txt`,
+   `KWABOR-ANDROID-PROVENANCE.json` et le reçu GEL.
 
 Le nom de l'artefact contient version, code et `expected_sha`. La provenance relie le SHA source,
 le run CI qualifié, le run de build, les empreintes de staging, la signature et les hashes de
@@ -276,6 +278,10 @@ Avant tout upload, il retélécharge l'artefact du même run et revérifie :
 L'action Play est épinglée par SHA, utilise exclusivement `tracks: internal` avec
 `status: completed` et ne définit aucun `userFraction`. « Completed » rend la version disponible à
 tous les testeurs éligibles de la piste Internal ; ce n'est ni une promotion ni un rollout public.
+Après le retour réussi de cette action, le workflow produit et revérifie
+`GEL-G6-ANDROID-PLAY-INTERNAL.json`, lié au même AAB, au digest de l'artefact source, au certificat,
+à la piste `internal`, au run/attempt et au SHA exact. Un second artefact borné à 90 jours conserve
+le reçu avec la copie exacte du bundle et de ses fichiers de preuve.
 
 ## Preflight et preuves G6
 
@@ -296,9 +302,17 @@ Un succès d'upload ne ferme pas G6. Il faut encore prouver le traitement Play I
 l'installation sur les appareils cibles, les parcours critiques, l'accessibilité et les mesures P75
 définies dans le [plan de bêta fermée](closed-beta-delivery-plan.md).
 
-Le GEL enregistre le workflow/run, `expected_sha`, l'URL et le digest de l'artefact, les SHA-256,
-l'auteur/reviewer, l'horodatage et le résultat Play. Toute nouvelle RC exige un nouveau
-`versionCode`, un SHA exact requalifié et les gates affectées.
+Le GEL enregistre le workflow/run/attempt, `expected_sha`, le run CI qualifié, les SHA-256, l'acteur,
+l'horodatage, le résultat de l'action Play et les paramètres internes protégés. Son schéma refuse les
+champs ou valeurs ressemblant à un secret et `tools/closed-beta-gel.py verify` recalcule les fichiers
+référencés. Le reçu Play prouve que l'action d'upload a réussi ; il ne remplace pas la preuve séparée
+du traitement Play, de l'éligibilité du compte testeur et de l'installation réelle. Toute nouvelle
+RC exige un nouveau `versionCode`, un SHA exact requalifié et les gates affectées.
+
+Chaque reçu inclut et hashe `CI-RUN-PROVENANCE.json` : tentative exacte du run CI, acteur initial,
+acteur ayant déclenché la tentative quand disponible et classification `initial`/`rerun`. Le reçu
+Play porte en plus `gateDecision=not-closed-by-receipt` : même vérifiable, il ne ferme jamais G6 à lui
+seul.
 
 Documents liés : [ADR-0036](adr/0036-closed-beta-catalog-delivery-profile.md),
 [déploiement](deployment.md) et [configuration des environnements](environment-configuration.md).

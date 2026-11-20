@@ -7,7 +7,10 @@ data class ObservabilityConsent(
     val analyticsAllowed: Boolean = false,
     val diagnosticsAllowed: Boolean = false,
     val remoteConfigurationAllowed: Boolean = false,
-)
+) {
+    val allowsObservedSessionMeasurement: Boolean
+        get() = analyticsAllowed && diagnosticsAllowed
+}
 
 enum class DiagnosticCode(val wireName: String) {
     RemoteConfigurationFetchFailed(wireName = "remote_config_fetch_failed"),
@@ -18,6 +21,34 @@ enum class PerformanceTraceName(val wireName: String) {
     ExploreInitialLoad(wireName = "explore_initial_load"),
     AuthSessionRestore(wireName = "auth_session_restore"),
     IntroVideoReady(wireName = "intro_video_ready"),
+}
+
+enum class PerformanceMetricName(val wireName: String) {
+    FirstUsableViewportMicroseconds(wireName = "first_usable_viewport_us"),
+}
+
+enum class PerformanceExploreAppearanceKind(val wireName: String) {
+    FirstProcessExplore(wireName = "first_process_explore"),
+    SubsequentExplore(wireName = "subsequent_explore"),
+}
+
+enum class PerformanceViewportState(val wireName: String) {
+    Content(wireName = "content"),
+    Empty(wireName = "empty"),
+    Offline(wireName = "offline"),
+    Error(wireName = "error"),
+}
+
+data class PerformanceMeasurement(
+    val traceName: PerformanceTraceName,
+    val metricName: PerformanceMetricName,
+    val metricValue: Long,
+    val processExploreKind: PerformanceExploreAppearanceKind,
+    val viewportState: PerformanceViewportState,
+) {
+    init {
+        require(metricValue >= 0L) { "Performance metric values must be non-negative." }
+    }
 }
 
 enum class AnalyticsEventName(val wireName: String) {

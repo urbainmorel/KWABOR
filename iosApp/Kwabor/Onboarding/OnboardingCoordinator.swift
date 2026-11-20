@@ -224,8 +224,11 @@ final class OnboardingCoordinator: ObservableObject {
             completeAccountDeletionPrivacyCleanupIfNeeded(authState)
         }
         guard freshInstallSessionCleanupCompleted else { return }
-        observability.retryPendingMaintenance()
+        let maintenanceRecovered = observability.retryPendingMaintenance()
         observabilityConsent = observability.consent
+        if maintenanceRecovered {
+            observabilityConsentErrorMessage = nil
+        }
     }
 
     func completeIntro(skipped: Bool) {
@@ -421,10 +424,9 @@ final class OnboardingCoordinator: ObservableObject {
             failClosedObservabilitySession()
             return
         }
-        guard bindObservability(to: userId) else {
+        if !bindObservability(to: userId) {
             registrationCancellationErrorMessage = strings.settings.privacyPersistenceError
-            failClosedObservabilitySession()
-            return
+            quarantineObservability()
         }
         federatedIdentityHintStore.clearPendingHints()
         interruptedAuthJourneyStore.clearRegistration()
@@ -649,9 +651,9 @@ final class OnboardingCoordinator: ObservableObject {
             }
             temporaryPromoterActivationSessionCleanupRequired = false
         }
-        guard bindObservability(to: userId) else {
+        if !bindObservability(to: userId) {
             promoterActivationErrorMessage = strings.settings.privacyPersistenceError
-            return
+            quarantineObservability()
         }
         federatedIdentityHintStore.clearPendingHints()
         completedRegistrationSession = result.session
@@ -892,15 +894,22 @@ final class OnboardingCoordinator: ObservableObject {
               interruptedAuthJourneyStore.current != .registration,
               let session = accountSettingsSession,
               let userId = normalizedSessionUserId(session.userId) else {
-            bindObservability(to: nil)
+            if !bindObservability(to: nil) {
+                quarantineObservability()
+            }
             return true
         }
-        guard bindObservability(to: userId) else {
-            failClosedObservabilitySession()
-            return false
+        if !bindObservability(to: userId) {
+            quarantineObservability()
+            return true
         }
         observabilityConsentErrorMessage = nil
         return true
+    }
+
+    private func quarantineObservability() {
+        observabilityConsent = observability.consent
+        observabilityConsentErrorMessage = strings.settings.privacyPersistenceError
     }
 
     private func failClosedObservabilitySession() {
@@ -1065,9 +1074,8 @@ final class OnboardingCoordinator: ObservableObject {
                 return
             }
             observabilityConsentErrorMessage = nil
-            guard bindObservability(to: userId) else {
-                failClosedObservabilitySession()
-                return
+            if !bindObservability(to: userId) {
+                quarantineObservability()
             }
             federatedIdentityHintStore.clearPendingHints()
             interruptedAuthJourneyStore.clearRegistration()
@@ -1076,14 +1084,20 @@ final class OnboardingCoordinator: ObservableObject {
             isAuthenticationPresented = false
             isRegistrationPresented = false
         } else if state.hasSession, let session = state.currentSession {
-            observabilityConsentErrorMessage = nil
-            bindObservability(to: nil)
+            if bindObservability(to: nil) {
+                observabilityConsentErrorMessage = nil
+            } else {
+                quarantineObservability()
+            }
             completedRegistrationSession = nil
             guestAccessGranted = false
             resumeIncompleteRegistration(session)
         } else {
-            observabilityConsentErrorMessage = nil
-            bindObservability(to: nil)
+            if bindObservability(to: nil) {
+                observabilityConsentErrorMessage = nil
+            } else {
+                quarantineObservability()
+            }
             completedRegistrationSession = nil
         }
     }
@@ -1462,8 +1476,11 @@ final class OnboardingCoordinator: ObservableObject {
     }
 
     private func restoreSessionAfterBootstrap() {
-        bindObservability(to: nil)
-        observabilityConsentErrorMessage = nil
+        if bindObservability(to: nil) {
+            observabilityConsentErrorMessage = nil
+        } else {
+            quarantineObservability()
+        }
         sessionRestoreCompleted = false
         sessionRestoreFailed = false
         resolveRoute()
@@ -1475,12 +1492,6 @@ final class OnboardingCoordinator: ObservableObject {
                 guestAccessGranted = false
                 isAuthenticationPresented = false
                 isRegistrationPresented = false
-                sessionRestoreCompleted = false
-                sessionRestoreFailed = true
-                resolveRoute()
-                return
-            }
-            guard observabilityConsentErrorMessage == nil else {
                 sessionRestoreCompleted = false
                 sessionRestoreFailed = true
                 resolveRoute()
@@ -1499,6 +1510,12 @@ final class OnboardingCoordinator: ObservableObject {
 
     func retrySessionRestore() {
         guard sessionRestoreFailed, !isDeletingAccount else { return }
+        if observability.retryPendingMaintenance() {
+            observabilityConsent = observability.consent
+            observabilityConsentErrorMessage = nil
+        } else {
+            quarantineObservability()
+        }
         sessionRestoreFailed = false
         if temporaryPromoterActivationSessionCleanupRequired {
             clearTemporaryPromoterActivationSessionBeforeBootstrap()

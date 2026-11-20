@@ -1,0 +1,254 @@
+name: Closed-beta staging Auth
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan, apply, or independently verify the exact staging Auth contract
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - verify
+      expected_sha:
+        description: Exact full lowercase SHA currently selected on main
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run ID for expected_sha
+        required: true
+        type: string
+      apply_confirmation:
+        description: For apply only, type APPLY-EXACT-STAGING-AUTH
+        required: false
+        type: string
+      validated_plan_run_id:
+        description: For apply only, successful Auth plan workflow run ID for this exact authority
+        required: false
+        type: string
+      validated_plan_artifact_id:
+        description: For apply only, exact Auth plan GEL artifact ID
+        required: false
+        type: string
+      validated_plan_artifact_digest:
+        description: For apply only, exact lowercase SHA-256 returned by upload-artifact
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  # Shared with every other staging mutation so Auth cannot race a database or corpus operation.
+  group: closed-beta-demo-staging-operations
+  cancel-in-progress: false
+
+jobs:
+  staging_auth:
+    name: ${{ inputs.operation }} protected staging Auth
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: staging
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      OPERATION: ${{ inputs.operation }}
+      APPLY_CONFIRMATION_INPUT: ${{ inputs.apply_confirmation }}
+      VALIDATED_PLAN_RUN_ID: ${{ inputs.validated_plan_run_id }}
+      VALIDATED_PLAN_ARTIFACT_ID: ${{ inputs.validated_plan_artifact_id }}
+      VALIDATED_PLAN_ARTIFACT_DIGEST: ${{ inputs.validated_plan_artifact_digest }}
+      KWABOR_ENVIRONMENT: ${{ vars.KWABOR_ENVIRONMENT }}
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+      KWABOR_GOOGLE_WEB_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_WEB_CLIENT_ID }}
+      KWABOR_GOOGLE_SERVER_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_SERVER_CLIENT_ID }}
+      KWABOR_GOOGLE_IOS_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_IOS_CLIENT_ID }}
+      KWABOR_GOOGLE_REVERSED_CLIENT_ID: ${{ vars.KWABOR_GOOGLE_REVERSED_CLIENT_ID }}
+      KWABOR_AUTH_SMTP_ADMIN_EMAIL: ${{ vars.KWABOR_AUTH_SMTP_ADMIN_EMAIL }}
+      KWABOR_AUTH_SMTP_HOST: ${{ vars.KWABOR_AUTH_SMTP_HOST }}
+      KWABOR_AUTH_SMTP_PORT: ${{ vars.KWABOR_AUTH_SMTP_PORT }}
+
+    steps:
+      - name: Validate immutable manual request
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_sha must be a full lowercase commit SHA." >&2
+            exit 1
+          fi
+          if [[ ! "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "validated_ci_run_id must be a positive workflow run ID." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REPOSITORY" != "urbainmorel/KWABOR" ]]; then
+            echo "Staging Auth is restricted to the canonical Kwabor repository." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$GITHUB_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "Staging Auth may only target the selected main exact-head." >&2
+            exit 1
+          fi
+          if [[ "$OPERATION" == "apply" ]]; then
+            if [[ "$APPLY_CONFIRMATION_INPUT" != "APPLY-EXACT-STAGING-AUTH" ]]; then
+              echo "Apply requires the exact confirmation phrase." >&2
+              exit 1
+            fi
+            if [[ ! "$VALIDATED_PLAN_RUN_ID" =~ ^[1-9][0-9]*$ ]] ||
+              [[ ! "$VALIDATED_PLAN_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] ||
+              [[ ! "$VALIDATED_PLAN_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Apply requires an exact successful plan run, artifact, and SHA-256." >&2
+              exit 1
+            fi
+          elif [[ -n "$APPLY_CONFIRMATION_INPUT" ]]; then
+            echo "Apply confirmation is forbidden for plan and verify." >&2
+            exit 1
+          elif [[ -n "$VALIDATED_PLAN_RUN_ID" || -n "$VALIDATED_PLAN_ARTIFACT_ID" ||
+            -n "$VALIDATED_PLAN_ARTIFACT_DIGEST" ]]; then
+            echo "Plan authority inputs are forbidden for plan and verify." >&2
+            exit 1
+          fi
+
+      - name: Require protected staging Environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment_json="$(gh api "/repos/$GITHUB_REPOSITORY/environments/staging")"
+          if ! jq -e '
+            .name == "staging" and
+            .can_admins_bypass == false and
+            .deployment_branch_policy.protected_branches == true and
+            .deployment_branch_policy.custom_branch_policies == false and
+            any(
+              .protection_rules[];
+              .type == "required_reviewers" and
+              .prevent_self_review == true and
+              (.reviewers | length) > 0
+            )
+          ' <<<"$environment_json" >/dev/null; then
+            echo "The staging Environment is not protected for an Auth operation." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Verify guarded runner implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python3 -B -m py_compile \
+            tools/closed-beta-staging-auth.py \
+            tools/test_closed_beta_staging_auth.py
+          python3 -B -m unittest tools.test_closed_beta_staging_auth
+          python3 -B tools/verify-repository-integrity.py
+
+      - name: Freeze successful push main CI provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ci_run_json="$RUNNER_TEMP/kwabor-validated-ci-run.json"
+          ci_provenance="$RUNNER_TEMP/kwabor-validated-ci-provenance.json"
+          plan_run_json="$RUNNER_TEMP/kwabor-validated-auth-plan-run.json"
+          plan_artifact_json="$RUNNER_TEMP/kwabor-validated-auth-plan-artifact.json"
+          plan_artifact_zip="$RUNNER_TEMP/kwabor-validated-auth-plan-artifact.zip"
+          gh api \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" > "$ci_run_json"
+          python3 -B tools/closed-beta-gel.py validate-github-run \
+            --document "$ci_run_json" \
+            --run-id "$VALIDATED_CI_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ci.yml \
+            --allowed-event push \
+            --output "$ci_provenance"
+          if [[ "$OPERATION" == "apply" ]]; then
+            gh api \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_PLAN_RUN_ID" > "$plan_run_json"
+            gh api \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$VALIDATED_PLAN_ARTIFACT_ID" > "$plan_artifact_json"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); assert d.get("id") == int(sys.argv[2]) and 0 < d.get("size_in_bytes", 0) <= 16777216' \
+              "$plan_artifact_json" "$VALIDATED_PLAN_ARTIFACT_ID"
+            curl --fail --silent --show-error --location \
+              --connect-timeout 15 --max-time 180 \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$VALIDATED_PLAN_ARTIFACT_ID/zip" \
+              --output "$plan_artifact_zip"
+          else
+            printf '{"fetchStatus":"not-requested"}\n' > "$plan_run_json"
+            printf '{"fetchStatus":"not-requested"}\n' > "$plan_artifact_json"
+          fi
+          echo "KWABOR_VALIDATED_CI_PROVENANCE=$ci_provenance" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_AUTH_PLAN_RUN_JSON=$plan_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_AUTH_PLAN_ARTIFACT_JSON=$plan_artifact_json" >> "$GITHUB_ENV"
+          echo "KWABOR_VALIDATED_AUTH_PLAN_ARTIFACT_ZIP=$plan_artifact_zip" >> "$GITHUB_ENV"
+
+      - name: Execute fail-closed staging Auth operation
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          KWABOR_GOOGLE_WEB_CLIENT_SECRET: ${{ secrets.KWABOR_GOOGLE_WEB_CLIENT_SECRET }}
+          KWABOR_AUTH_SMTP_USER: ${{ secrets.KWABOR_AUTH_SMTP_USER }}
+          KWABOR_AUTH_SMTP_PASSWORD: ${{ secrets.KWABOR_AUTH_SMTP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in \
+            "$SUPABASE_ACCESS_TOKEN" \
+            "$KWABOR_GOOGLE_WEB_CLIENT_SECRET" \
+            "$KWABOR_AUTH_SMTP_USER" \
+            "$KWABOR_AUTH_SMTP_PASSWORD"; do
+            if [[ -n "$value" ]]; then
+              echo "::add-mask::$value"
+            fi
+          done
+          python3 -B tools/closed-beta-staging-auth.py execute \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --apply-confirmation "$APPLY_CONFIRMATION_INPUT" \
+            --validated-plan-run-id "$VALIDATED_PLAN_RUN_ID" \
+            --validated-plan-artifact-id "$VALIDATED_PLAN_ARTIFACT_ID" \
+            --validated-plan-artifact-digest "$VALIDATED_PLAN_ARTIFACT_DIGEST" \
+            --ci-provenance "$KWABOR_VALIDATED_CI_PROVENANCE" \
+            --plan-run-json "$KWABOR_VALIDATED_AUTH_PLAN_RUN_JSON" \
+            --plan-artifact-json "$KWABOR_VALIDATED_AUTH_PLAN_ARTIFACT_JSON" \
+            --plan-artifact-zip "$KWABOR_VALIDATED_AUTH_PLAN_ARTIFACT_ZIP" \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-auth-evidence"
+
+      - name: Verify successful staging Auth GEL receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-auth.py verify-receipt \
+            --receipt "$GITHUB_WORKSPACE/build/closed-beta-staging-auth-evidence/GEL-G5-STAGING-AUTH.json" \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID"
+
+      - name: Upload sanitized staging Auth GEL evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-gel-g5-staging-auth-${{ inputs.operation }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/closed-beta-staging-auth-evidence
+          if-no-files-found: error
+          retention-days: 90

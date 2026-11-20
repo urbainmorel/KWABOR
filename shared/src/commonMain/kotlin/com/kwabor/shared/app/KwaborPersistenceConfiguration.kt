@@ -15,6 +15,8 @@ import com.kwabor.shared.data.local.SearchCacheStore
 import com.kwabor.shared.data.local.buildKwaborDatabase
 import com.kwabor.shared.data.preferences.DataStoreAppPreferencesRepository
 import com.kwabor.shared.data.preferences.createAppPreferencesDataStore
+import com.kwabor.shared.domain.observability.ObservedAppSessionStore
+import com.kwabor.shared.domain.observability.ObservedAppSessionTimeSource
 import com.kwabor.shared.domain.preferences.AppPreferencesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +29,8 @@ import org.koin.dsl.onClose
 internal class KwaborPersistenceConfiguration(
     val databaseBuilderFactory: () -> KwaborDatabaseBuilderResult,
     val preferencesStorageFactory: () -> Storage<Preferences>,
+    val observedAppSessionStore: ObservedAppSessionStore? = null,
+    val observedAppSessionTimeSource: ObservedAppSessionTimeSource? = null,
 )
 
 private val appPreferencesDataStoreScopeQualifier = named("app-preferences-data-store-scope")

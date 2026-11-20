@@ -1,0 +1,469 @@
+{
+  "$defs": {
+    "accessibility": {
+      "additionalProperties": false,
+      "properties": {
+        "announcements": { "type": "boolean" },
+        "assistive_technology": { "enum": ["talkback", "voiceover"] },
+        "contrast_aa": { "type": "boolean" },
+        "device_id": { "$ref": "#/$defs/deviceId" },
+        "focus_order": { "type": "boolean" },
+        "labels": { "type": "boolean" },
+        "physical": { "type": "boolean" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "touch_targets": { "type": "boolean" }
+      },
+      "required": [
+        "announcements",
+        "assistive_technology",
+        "contrast_aa",
+        "device_id",
+        "focus_order",
+        "labels",
+        "physical",
+        "platform",
+        "proof",
+        "rc_id",
+        "touch_targets"
+      ],
+      "type": "object"
+    },
+    "accountDeletion": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": { "type": "boolean" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" }
+      },
+      "required": ["passed", "proof", "rc_id"],
+      "type": "object"
+    },
+    "canary": {
+      "additionalProperties": false,
+      "properties": {
+        "ended_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "participant_ids": {
+          "items": { "$ref": "#/$defs/participantId" },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "started_at_utc": { "$ref": "#/$defs/utcTimestamp" }
+      },
+      "required": ["ended_at_utc", "participant_ids", "proof", "rc_id", "started_at_utc"],
+      "type": "object"
+    },
+    "catalog": {
+      "additionalProperties": false,
+      "properties": {
+        "broken_media": { "minimum": 0, "type": "integer" },
+        "duplicate_listings": { "minimum": 0, "type": "integer" },
+        "fictitious_cta_violations": { "minimum": 0, "type": "integer" },
+        "listings": { "minimum": 0, "type": "integer" },
+        "media": { "minimum": 0, "type": "integer" },
+        "missing_listings": { "minimum": 0, "type": "integer" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" }
+      },
+      "required": [
+        "broken_media",
+        "duplicate_listings",
+        "fictitious_cta_violations",
+        "listings",
+        "media",
+        "missing_listings",
+        "proof",
+        "rc_id"
+      ],
+      "type": "object"
+    },
+    "cohortDay": {
+      "additionalProperties": false,
+      "properties": {
+        "day": { "maximum": 7, "minimum": 1, "type": "integer" },
+        "ended_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "participant_ids": {
+          "items": { "$ref": "#/$defs/participantId" },
+          "maxItems": 15,
+          "minItems": 15,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "run_id": { "$ref": "#/$defs/runId" },
+        "sessions_observed": { "minimum": 0, "type": "integer" },
+        "sessions_with_crash": { "minimum": 0, "type": "integer" },
+        "started_at_utc": { "$ref": "#/$defs/utcTimestamp" }
+      },
+      "required": [
+        "day",
+        "ended_at_utc",
+        "participant_ids",
+        "proof",
+        "rc_id",
+        "run_id",
+        "sessions_observed",
+        "sessions_with_crash",
+        "started_at_utc"
+      ],
+      "type": "object"
+    },
+    "consent": {
+      "additionalProperties": false,
+      "properties": {
+        "analytics": { "type": "boolean" },
+        "diagnostics": { "type": "boolean" }
+      },
+      "required": ["analytics", "diagnostics"],
+      "type": "object"
+    },
+    "consentRevocation": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": { "type": "boolean" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "zero_events_after_revocation": { "type": "boolean" }
+      },
+      "required": ["passed", "proof", "rc_id", "zero_events_after_revocation"],
+      "type": "object"
+    },
+    "criticalChecks": {
+      "additionalProperties": false,
+      "properties": {
+        "account_deletion": { "$ref": "#/$defs/accountDeletion" },
+        "consent_revocation": { "$ref": "#/$defs/consentRevocation" }
+      },
+      "required": ["account_deletion", "consent_revocation"],
+      "type": "object"
+    },
+    "decision": {
+      "additionalProperties": false,
+      "properties": {
+        "all_signed": { "type": "boolean" },
+        "declared": { "enum": ["go", "go-with-corrections", "no-go"] },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "review_roles": {
+          "items": { "enum": ["content", "product", "security-privacy", "technical"] },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "run_id": { "$ref": "#/$defs/runId" }
+      },
+      "required": ["all_signed", "declared", "proof", "rc_id", "review_roles", "run_id"],
+      "type": "object"
+    },
+    "device": {
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/deviceId" },
+        "model_code": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$", "type": "string" },
+        "os_version": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$", "type": "string" },
+        "participant_id": { "$ref": "#/$defs/participantId" },
+        "physical": { "type": "boolean" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" }
+      },
+      "required": [
+        "id",
+        "model_code",
+        "os_version",
+        "participant_id",
+        "physical",
+        "platform",
+        "proof",
+        "rc_id"
+      ],
+      "type": "object"
+    },
+    "deviceId": {
+      "enum": [
+        "D-A01", "D-A02", "D-A03", "D-A04", "D-A05",
+        "D-A06", "D-A07", "D-A08", "D-A09", "D-A10",
+        "D-I01", "D-I02", "D-I03", "D-I04", "D-I05"
+      ]
+    },
+    "incident": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "closed" } }, "required": ["status"] },
+          "then": { "required": ["resolved_at_utc"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "open" } }, "required": ["status"] },
+          "then": { "not": { "required": ["resolved_at_utc"] } }
+        }
+      ],
+      "properties": {
+        "detected_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "id": { "pattern": "^INC-[0-9]{3}$", "type": "string" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "resolved_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "run_id": { "$ref": "#/$defs/runId" },
+        "severity": { "enum": ["P0", "P1", "P2", "P3"] },
+        "status": { "enum": ["closed", "open"] }
+      },
+      "required": ["detected_at_utc", "id", "proof", "rc_id", "run_id", "severity", "status"],
+      "type": "object"
+    },
+    "network": {
+      "additionalProperties": false,
+      "properties": {
+        "down_kbps": { "minimum": 1, "type": "integer" },
+        "rtt_ms": { "minimum": 0, "type": "integer" },
+        "up_kbps": { "minimum": 1, "type": "integer" }
+      },
+      "required": ["down_kbps", "rtt_ms", "up_kbps"],
+      "type": "object"
+    },
+    "participant": {
+      "additionalProperties": false,
+      "properties": {
+        "consent": { "$ref": "#/$defs/consent" },
+        "device_id": { "$ref": "#/$defs/deviceId" },
+        "id": { "$ref": "#/$defs/participantId" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" }
+      },
+      "required": ["consent", "device_id", "id", "platform", "proof", "rc_id"],
+      "type": "object"
+    },
+    "participantId": {
+      "enum": [
+        "T-A01", "T-A02", "T-A03", "T-A04", "T-A05",
+        "T-A06", "T-A07", "T-A08", "T-A09", "T-A10",
+        "T-I01", "T-I02", "T-I03", "T-I04", "T-I05"
+      ]
+    },
+    "performance": {
+      "additionalProperties": false,
+      "properties": {
+        "clock": { "const": "monotonic" },
+        "device_id": { "$ref": "#/$defs/deviceId" },
+        "network": { "$ref": "#/$defs/network" },
+        "outliers_removed": { "type": "boolean" },
+        "p75_limit_ms": { "const": 1500 },
+        "p75_method": { "const": "nearest-rank" },
+        "physical": { "type": "boolean" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "samples": {
+          "items": { "$ref": "#/$defs/performanceSample" },
+          "maxItems": 30,
+          "minItems": 30,
+          "type": "array"
+        }
+      },
+      "required": [
+        "clock",
+        "device_id",
+        "network",
+        "outliers_removed",
+        "p75_limit_ms",
+        "p75_method",
+        "physical",
+        "platform",
+        "proof",
+        "rc_id",
+        "samples"
+      ],
+      "type": "object"
+    },
+    "performanceSample": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": { "maximum": 60000, "minimum": 1, "type": "integer" },
+        "index": { "maximum": 30, "minimum": 1, "type": "integer" },
+        "mode": { "enum": ["cold", "warm"] }
+      },
+      "required": ["duration_ms", "index", "mode"],
+      "type": "object"
+    },
+    "platform": {
+      "enum": ["android", "ios"]
+    },
+    "proof": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "uri": {
+          "description": "Unique opaque URN whose 32-hex suffix equals the first 32 characters of the declared SHA-256; enforced across the manifest by the validator.",
+          "maxLength": 55,
+          "minLength": 55,
+          "pattern": "^urn:kwabor:evidence:ev-[0-9a-f]{32}$",
+          "type": "string"
+        }
+      },
+      "required": ["sha256", "uri"],
+      "type": "object"
+    },
+    "rcId": {
+      "pattern": "^RC-[A-Z0-9][A-Z0-9._-]{0,31}$",
+      "type": "string"
+    },
+    "releaseCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$",
+          "type": "string"
+        },
+        "environment": { "const": "staging" },
+        "expected_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "proofs": {
+          "additionalProperties": false,
+          "properties": {
+            "android_distribution": { "$ref": "#/$defs/proof" },
+            "ci": { "$ref": "#/$defs/proof" },
+            "ios_distribution": { "$ref": "#/$defs/proof" }
+          },
+          "required": ["android_distribution", "ci", "ios_distribution"],
+          "type": "object"
+        },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "version_name": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9][A-Za-z0-9.-]{0,23})?$",
+          "type": "string"
+        }
+      },
+      "required": ["build_id", "environment", "expected_sha", "proofs", "rc_id", "version_name"],
+      "type": "object"
+    },
+    "runId": {
+      "pattern": "^RUN-[A-Z0-9][A-Z0-9._-]{0,31}$",
+      "type": "string"
+    },
+    "previousRun": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_sha": { "pattern": "^[0-9a-f]{40}$", "type": "string" },
+        "generation": { "maximum": 99, "minimum": 0, "type": "integer" },
+        "proof": { "$ref": "#/$defs/proof" },
+        "rc_id": { "$ref": "#/$defs/rcId" },
+        "reason": { "enum": ["P0", "P1"] },
+        "run_id": { "$ref": "#/$defs/runId" }
+      },
+      "required": ["expected_sha", "generation", "proof", "rc_id", "reason", "run_id"],
+      "type": "object"
+    },
+    "runReset": {
+      "additionalProperties": false,
+      "properties": {
+        "active_run_id": { "$ref": "#/$defs/runId" },
+        "carryover_sessions": { "minimum": 0, "type": "integer" },
+        "confirmed_no_carryover": { "type": "boolean" },
+        "generation": { "maximum": 100, "minimum": 0, "type": "integer" },
+        "j1_started_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+        "previous_runs": {
+          "items": { "$ref": "#/$defs/previousRun" },
+          "maxItems": 100,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "proof": { "$ref": "#/$defs/proof" }
+      },
+      "required": [
+        "active_run_id",
+        "carryover_sessions",
+        "confirmed_no_carryover",
+        "generation",
+        "j1_started_at_utc",
+        "previous_runs",
+        "proof"
+      ],
+      "type": "object"
+    },
+    "utcTimestamp": {
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "type": "string"
+    }
+  },
+  "$id": "https://kwabor.example/schemas/closed-beta-pilot-evidence-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Closed contract for pseudonymized Kwabor closed-beta pilot evidence. Cross-record and gate semantics are enforced by the repository validator.",
+  "properties": {
+    "accessibility": {
+      "items": { "$ref": "#/$defs/accessibility" },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "canary": { "$ref": "#/$defs/canary" },
+    "catalog": { "$ref": "#/$defs/catalog" },
+    "cohort_days": {
+      "items": { "$ref": "#/$defs/cohortDay" },
+      "maxItems": 7,
+      "minItems": 7,
+      "type": "array"
+    },
+    "critical_checks": { "$ref": "#/$defs/criticalChecks" },
+    "decision": { "$ref": "#/$defs/decision" },
+    "devices": {
+      "items": { "$ref": "#/$defs/device" },
+      "maxItems": 15,
+      "minItems": 15,
+      "type": "array"
+    },
+    "evaluated_at_utc": { "$ref": "#/$defs/utcTimestamp" },
+    "fictitious": { "type": "boolean" },
+    "incidents": {
+      "items": { "$ref": "#/$defs/incident" },
+      "type": "array"
+    },
+    "participants": {
+      "items": { "$ref": "#/$defs/participant" },
+      "maxItems": 15,
+      "minItems": 15,
+      "type": "array"
+    },
+    "performance": {
+      "items": { "$ref": "#/$defs/performance" },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "release_candidate": { "$ref": "#/$defs/releaseCandidate" },
+    "run_reset": { "$ref": "#/$defs/runReset" },
+    "schema_version": { "const": 1 }
+  },
+  "required": [
+    "accessibility",
+    "canary",
+    "catalog",
+    "cohort_days",
+    "critical_checks",
+    "decision",
+    "devices",
+    "evaluated_at_utc",
+    "fictitious",
+    "incidents",
+    "participants",
+    "performance",
+    "release_candidate",
+    "run_reset",
+    "schema_version"
+  ],
+  "title": "Kwabor closed-beta pilot evidence v1",
+  "type": "object"
+}

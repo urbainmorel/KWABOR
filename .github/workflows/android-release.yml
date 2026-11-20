@@ -42,6 +42,9 @@ jobs:
     outputs:
       aab_name: ${{ steps.release_metadata.outputs.aab_name }}
       artifact_name: ${{ steps.release_metadata.outputs.artifact_name }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+      build_run_attempt: ${{ steps.release_metadata.outputs.build_run_attempt }}
+      validated_ci_run_id: ${{ steps.ci_provenance.outputs.ci_run_id }}
     env:
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       VERSION_CODE: ${{ inputs.version_code }}
@@ -119,20 +122,24 @@ jobs:
               )] | sort_by(.run_number) | last | .id // empty' \
               <<<"$response"
           )"
-          ci_run_url="$(
-            jq -r --arg sha "$EXPECTED_SHA" \
-              '[.workflow_runs[] | select(
-                .head_sha == $sha and
-                .head_branch == "main" and
-                .event == "push" and
-                .conclusion == "success"
-              )] | sort_by(.run_number) | last | .html_url // empty' \
-              <<<"$response"
-          )"
-          if [[ ! "$ci_run_id" =~ ^[1-9][0-9]*$ || "$ci_run_url" != https://github.com/* ]]; then
+          if [[ ! "$ci_run_id" =~ ^[1-9][0-9]*$ ]]; then
             echo "No successful CI run proves this exact-head." >&2
             exit 1
           fi
+          ci_document="$RUNNER_TEMP/validated-ci-run.json"
+          ci_provenance="$RUNNER_TEMP/validated-ci-provenance.json"
+          gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$ci_run_id" > "$ci_document"
+          python3 -B tools/closed-beta-gel.py validate-github-run \
+            --document "$ci_document" \
+            --run-id "$ci_run_id" \
+            --expected-sha "$EXPECTED_SHA" \
+            --workflow-path .github/workflows/ci.yml \
+            --allowed-event push \
+            --output "$ci_provenance"
+          ci_run_url="$(jq -r '.runUrl' "$ci_provenance")"
           echo "ci_run_id=$ci_run_id" >>"$GITHUB_OUTPUT"
           echo "ci_run_url=$ci_run_url" >>"$GITHUB_OUTPUT"
 
@@ -355,9 +362,11 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="release/android"
+          mkdir -p "$release_dir"
+          cp "$RUNNER_TEMP/validated-ci-provenance.json" \
+            "$release_dir/CI-RUN-PROVENANCE.json"
           aab_name="kwabor-staging-${VERSION_NAME}-${VERSION_CODE}.aab"
           artifact_name="kwabor-android-staging-${VERSION_NAME}-${VERSION_CODE}-${EXPECTED_SHA}"
-          mkdir -p "$release_dir"
           cp "androidApp/build/outputs/bundle/staging/androidApp-staging.aab" "$release_dir/$aab_name"
           cp "androidApp/build/outputs/mapping/staging/mapping.txt" "$release_dir/mapping.txt"
           test -s "$release_dir/$aab_name"
@@ -414,6 +423,55 @@ jobs:
             }' >"$release_dir/KWABOR-ANDROID-PROVENANCE.json"
           echo "aab_name=$aab_name" >>"$GITHUB_OUTPUT"
           echo "artifact_name=$artifact_name" >>"$GITHUB_OUTPUT"
+          echo "build_run_attempt=$GITHUB_RUN_ATTEMPT" >>"$GITHUB_OUTPUT"
+
+      - name: Write and verify sanitized Android AAB GEL receipt
+        shell: bash
+        env:
+          AAB_NAME: ${{ steps.release_metadata.outputs.aab_name }}
+          VALIDATED_CI_RUN_ID: ${{ steps.ci_provenance.outputs.ci_run_id }}
+        run: |
+          set -euo pipefail
+          release_dir="release/android"
+          upload_certificate_sha256="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          receipt="$release_dir/GEL-G6-ANDROID-AAB.json"
+          python3 -B tools/closed-beta-gel.py write \
+            --directory "$release_dir" \
+            --workflow .github/workflows/android-release.yml \
+            --operation build-aab \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --repository "$GITHUB_REPOSITORY" \
+            --actor "$GITHUB_ACTOR" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --ci-provenance CI-RUN-PROVENANCE.json \
+            --artifact "aab=$AAB_NAME" \
+            --artifact checksums=KWABOR-SHA256SUMS.txt \
+            --artifact mapping=mapping.txt \
+            --artifact provenance=KWABOR-ANDROID-PROVENANCE.json \
+            --digest "firebaseProjectIdSha256=$KWABOR_STAGING_FIREBASE_PROJECT_ID_SHA256" \
+            --digest "stagingProjectRefSha256=$KWABOR_STAGING_PROJECT_REF_SHA256" \
+            --digest "uploadCertificateSha256=$upload_certificate_sha256" \
+            --counter "versionCode=$VERSION_CODE" \
+            --detail applicationId=com.kwabor.android \
+            --detail variant=staging \
+            --detail "versionName=$VERSION_NAME" \
+            --output "$receipt"
+          python3 -B tools/closed-beta-gel.py verify \
+            --directory "$release_dir" \
+            --evidence "$receipt" \
+            --workflow .github/workflows/android-release.yml \
+            --operation build-aab \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
 
       - name: Upload signed closed-beta artifact
         id: upload
@@ -422,7 +480,7 @@ jobs:
           name: ${{ steps.release_metadata.outputs.artifact_name }}
           path: release/android
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
 
       - name: Record build evidence
         shell: bash
@@ -456,7 +514,9 @@ jobs:
     timeout-minutes: 20
     environment: play-internal
     env:
+      BUILD_RUN_ATTEMPT: ${{ needs.build.outputs.build_run_attempt }}
       EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ needs.build.outputs.validated_ci_run_id }}
       VERSION_CODE: ${{ inputs.version_code }}
       VERSION_NAME: ${{ inputs.version_name }}
       KWABOR_ANDROID_UPLOAD_CERT_SHA256: ${{ vars.KWABOR_ANDROID_UPLOAD_CERT_SHA256 }}
@@ -563,7 +623,7 @@ jobs:
             --arg aab_name "$AAB_NAME" \
             --arg upload_cert "$expected_upload_cert" \
             --arg workflow_run_id "$GITHUB_RUN_ID" \
-            --arg workflow_run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg workflow_run_attempt "$BUILD_RUN_ATTEMPT" \
             '.schema_version == 1 and
              .repository == $repository and
              .source_commit == $sha and
@@ -603,6 +663,15 @@ jobs:
             echo "The AAB signer is not the protected Google Play upload certificate." >&2
             exit 1
           fi
+          python3 -B tools/closed-beta-gel.py verify \
+            --directory "$release_dir" \
+            --evidence "$release_dir/GEL-G6-ANDROID-AAB.json" \
+            --workflow .github/workflows/android-release.yml \
+            --operation build-aab \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$BUILD_RUN_ATTEMPT"
           echo "aab=$aab" >>"$GITHUB_OUTPUT"
           echo "release_name=Kwabor beta $VERSION_NAME ($VERSION_CODE) ${EXPECTED_SHA:0:12}" >>"$GITHUB_OUTPUT"
 
@@ -639,6 +708,69 @@ jobs:
           status: completed
           releaseName: ${{ steps.verify_artifact.outputs.release_name }}
 
+      - name: Write and verify sanitized Play Internal GEL receipt
+        shell: bash
+        env:
+          AAB_NAME: ${{ needs.build.outputs.aab_name }}
+          SOURCE_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
+          SOURCE_ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          release_dir="release/android"
+          source_artifact_sha256="${SOURCE_ARTIFACT_DIGEST#sha256:}"
+          upload_certificate_sha256="$(
+            printf '%s' "$KWABOR_ANDROID_UPLOAD_CERT_SHA256" |
+              tr -d ':[:space:]' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          receipt="$release_dir/GEL-G6-ANDROID-PLAY-INTERNAL.json"
+          python3 -B tools/closed-beta-gel.py write \
+            --directory "$release_dir" \
+            --workflow .github/workflows/android-release.yml \
+            --operation publish-play-internal \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --repository "$GITHUB_REPOSITORY" \
+            --actor "$GITHUB_ACTOR" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --ci-provenance CI-RUN-PROVENANCE.json \
+            --artifact "aab=$AAB_NAME" \
+            --artifact buildEvidence=GEL-G6-ANDROID-AAB.json \
+            --artifact checksums=KWABOR-SHA256SUMS.txt \
+            --artifact mapping=mapping.txt \
+            --artifact provenance=KWABOR-ANDROID-PROVENANCE.json \
+            --digest "sourceArtifactSha256=$source_artifact_sha256" \
+            --digest "uploadCertificateSha256=$upload_certificate_sha256" \
+            --counter "versionCode=$VERSION_CODE" \
+            --detail gateDecision=not-closed-by-receipt \
+            --detail packageName=com.kwabor.android \
+            --detail publicationOutcome=upload-action-succeeded \
+            --detail requestedStatus=completed \
+            --detail "sourceArtifactName=$SOURCE_ARTIFACT_NAME" \
+            --detail track=internal \
+            --detail "versionName=$VERSION_NAME" \
+            --output "$receipt"
+          python3 -B tools/closed-beta-gel.py verify \
+            --directory "$release_dir" \
+            --evidence "$receipt" \
+            --workflow .github/workflows/android-release.yml \
+            --operation publish-play-internal \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+      - name: Upload Play Internal GEL receipt and exact source bundle
+        id: play_gel_upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-play-internal-gel-${{ inputs.version_name }}-${{ inputs.version_code }}-${{ inputs.expected_sha }}
+          path: release/android
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Record publication evidence
         shell: bash
         run: |
@@ -648,6 +780,8 @@ jobs:
             echo "- Version: \`$VERSION_NAME ($VERSION_CODE)\`"
             echo "- Track: \`internal\`"
             echo "- Build artifact: \`${{ needs.build.outputs.artifact_name }}\`"
+            echo "- GEL artifact: [Play Internal receipt](${{ steps.play_gel_upload.outputs.artifact-url }})"
+            echo "- GEL artifact digest: \`${{ steps.play_gel_upload.outputs.artifact-digest }}\`"
             echo "- Workflow run: \`$GITHUB_RUN_ID\` attempt \`$GITHUB_RUN_ATTEMPT\`"
           } >>"$GITHUB_STEP_SUMMARY"
 

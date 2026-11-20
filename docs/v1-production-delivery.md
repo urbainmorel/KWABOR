@@ -55,7 +55,8 @@ Les éléments suivants ne sont pas encore des capacités V1 complètes :
 - l'état applicatif Compose n'est pas encore porté par des ViewModels UDF par feature ;
 - le cache/offline n'est pas persistant ;
 - les intégrations Firebase, FedaPay, IA, médias et release ne sont pas présentes ;
-- les comptes et secrets staging/production ne sont pas encore configurés.
+- les projets Supabase/Firebase et les secrets `staging`/`production` ne sont pas encore disponibles ;
+  les conteneurs GitHub Environments ne constituent pas à eux seuls ces environnements distants.
 
 ## Règles d'exécution par ticket
 
@@ -69,7 +70,13 @@ Chaque ticket suit le même cycle :
 6. pousser une PR, attendre `quality` et `iOS simulator build`, puis merger ;
 7. vérifier l'état réel de la PR et de `main` avant le ticket suivant.
 
-Une migration Supabase ajoute en plus `supabase db reset`, `supabase test db`, les tests RLS négatifs concernés et une vérification des grants Data API. Une tranche release ajoute les builds signés et les smoke tests correspondants.
+Une migration Supabase ajoute le job CI `supabase_database` sur le SHA exact : le runner Docker
+jetable exécute `supabase db start`, les migrations, le lint, pgTAP, les advisors et les harnais
+versionnés sans lier de projet hébergé. Cette preuve qualifie le dépôt, pas un tier distant. La
+livraison vers `development`, `staging` ou `production` exige en plus une preuve protégée et non
+destructive sur le project ref exact : sauvegarde, historique de migrations, lint/advisors liés,
+refus ACL/RLS et smoke tests lecture/admin archivés. Une tranche release ajoute les builds signés et
+les smoke tests correspondants. Aucune base persistante n'est remise à zéro.
 
 ## Traçabilité PRD vers backlog
 
@@ -129,6 +136,8 @@ La release candidate n'entre en bêta qu'après les tests E2E critiques, la séc
 Une release candidate V1 est admissible seulement si :
 
 - `quality`, pgTAP et `iOS simulator build` sont verts sur le commit candidat ;
+- `staging` possède sa preuve distante protégée et non destructive ; le succès de
+  `supabase_database` sur sa base éphémère ne remplace pas cette gate ;
 - aucun écran visible n'est un placeholder et tous les états prévus sont traités ;
 - les tests RLS/IDOR, suppression de compte, replay webhook, rate limiting et uploads malveillants passent ;
 - P75 Explore est inférieur à 1,5 s sur le profil réseau dégradé retenu ;

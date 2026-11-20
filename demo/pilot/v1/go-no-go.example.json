@@ -1,0 +1,181 @@
+{
+  "declared_decision": null,
+  "eligible_for_go": false,
+  "evaluated_at_utc": "2026-01-01T00:00:00Z",
+  "failures": [
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.accessibility"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.canary"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.catalog"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.cohort_days"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.critical_checks"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.decision"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.devices"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.incidents"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.participants"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.performance"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.release_candidate"
+    },
+    {
+      "code": "REQUIRED_FIELD_MISSING",
+      "message": "Required field is missing.",
+      "path": "$.run_reset"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.accessibility"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.cohort_days"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.devices"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.incidents"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.participants"
+    },
+    {
+      "code": "TYPE_ARRAY_REQUIRED",
+      "message": "Expected an array.",
+      "path": "$.performance"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.canary"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.catalog"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.critical_checks"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.decision"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.release_candidate"
+    },
+    {
+      "code": "TYPE_OBJECT_REQUIRED",
+      "message": "Expected an object.",
+      "path": "$.run_reset"
+    }
+  ],
+  "fictitious": true,
+  "release_fingerprint": {
+    "build_id": null,
+    "expected_sha": null,
+    "rc_id": null,
+    "version_name": null
+  },
+  "schema_version": 1,
+  "source_bytes_sha256": "74262d9750bae1b356f6cb90c9de47ec075c0c4d45a71d5bf59ae88f8d3f8d87",
+  "source_sha256": "8191fd81ae196ba1c853cd1c7f7f9223aa6669a71ce36c113aec1d45b7b00996",
+  "status": "no-go",
+  "summary": {
+    "accessibility_passed": {
+      "android": false,
+      "ios": false
+    },
+    "canary": {
+      "duration_minutes": 0,
+      "participants": 0
+    },
+    "catalog": {
+      "listings": 0,
+      "media": 0
+    },
+    "cohort": {
+      "days": 0,
+      "reset_generation": 0
+    },
+    "consent_coverage": {
+      "analytics_and_diagnostics": 0,
+      "without_full_consent": 0
+    },
+    "critical_checks": {
+      "account_deletion": false,
+      "consent_revocation": false
+    },
+    "incidents": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 0,
+      "P3": 0
+    },
+    "participants": {
+      "android": 0,
+      "ios": 0,
+      "total": 0
+    },
+    "performance": {},
+    "sessions": {
+      "crash_free_percent": "0.0000",
+      "observed": 0,
+      "with_crash": 0
+    }
+  }
+}

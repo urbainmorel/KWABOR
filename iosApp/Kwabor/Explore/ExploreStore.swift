@@ -14,11 +14,18 @@ struct ExploreAuthenticationRequest: Identifiable {
     let suggestedCityID: String?
 }
 
+struct ExploreFirstUsableViewportDrawToken {
+    let generation: Int64
+    let viewportState: PerformanceViewportState
+}
+
 @MainActor
 final class ExploreStore: ObservableObject {
     @Published private(set) var state: ExploreUiState
     @Published private(set) var authenticationRequest: ExploreAuthenticationRequest?
     @Published private(set) var announcementRevision = 0
+    @Published private(set) var firstUsableViewportSample: ExploreFirstUsableViewportSample?
+    @Published private(set) var surfacePresentationObscured = false
 
     let strings: KwaborStrings
     let isConfigured: Bool
@@ -26,6 +33,12 @@ final class ExploreStore: ObservableObject {
     private let controller: IosExploreController
     private let locationProvider: ApproximateLocationProviding
     private let onProtectedActionReplayed: (AnalyticsEvent) -> Void
+    private let isPerformanceCollectionAllowed: () -> Bool
+    private let recordPerformanceMeasurement: (PerformanceMeasurement) -> Void
+    private let monotonicNowNanoseconds: () -> Int64
+    private let firstUsableViewportProbe = ExploreFirstUsableViewportProbe()
+    private let surfacePresentationGate = ExploreSurfacePresentationGate()
+    private let surfacePresentationRegistry = ExploreSurfacePresentationRegistry()
     private var onFavoriteChanged: (String, Bool, Int64, ViewerSessionScope) -> Void
     private var paginationGuard = ExplorePaginationGuard()
     private var locationTask: Task<Void, Never>?
@@ -34,6 +47,9 @@ final class ExploreStore: ObservableObject {
     private var currentViewerScope: ViewerSessionScope?
     private var hasAppliedViewerContext = false
     private var authenticationRequestRevision = 0
+    private var screenVisible = false
+    private var surfaceUnobscured = false
+    private var applicationActive = false
 
     private(set) var latestAnnouncement: String?
 
@@ -41,11 +57,17 @@ final class ExploreStore: ObservableObject {
         controller: IosExploreController,
         locationProvider: ApproximateLocationProviding? = nil,
         onProtectedActionReplayed: @escaping (AnalyticsEvent) -> Void = { _ in },
+        isPerformanceCollectionAllowed: @escaping () -> Bool = { false },
+        recordPerformanceMeasurement: @escaping (PerformanceMeasurement) -> Void = { _ in },
+        monotonicNowNanoseconds: @escaping () -> Int64 = monotonicUptimeNanoseconds,
         onFavoriteChanged: @escaping (String, Bool, Int64, ViewerSessionScope) -> Void = { _, _, _, _ in }
     ) {
         self.controller = controller
         self.locationProvider = locationProvider ?? CoreLocationApproximateLocationProvider()
         self.onProtectedActionReplayed = onProtectedActionReplayed
+        self.isPerformanceCollectionAllowed = isPerformanceCollectionAllowed
+        self.recordPerformanceMeasurement = recordPerformanceMeasurement
+        self.monotonicNowNanoseconds = monotonicNowNanoseconds
         self.onFavoriteChanged = onFavoriteChanged
         state = controller.currentState
         strings = controller.strings
@@ -55,7 +77,94 @@ final class ExploreStore: ObservableObject {
 
     deinit {
         locationTask?.cancel()
+        firstUsableViewportProbe.onHidden()
         controller.unobserve()
+    }
+
+    var firstUsableViewportDrawToken: ExploreFirstUsableViewportDrawToken? {
+        guard let sample = firstUsableViewportSample,
+              let viewportState = state.firstUsableViewportState else {
+            return nil
+        }
+        return ExploreFirstUsableViewportDrawToken(
+            generation: sample.generation,
+            viewportState: viewportState
+        )
+    }
+
+    func screenAppeared(applicationActive: Bool, surfaceUnobscured: Bool) {
+        screenVisible = true
+        self.applicationActive = applicationActive
+        self.surfaceUnobscured = surfaceUnobscured
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func screenDisappeared() {
+        screenVisible = false
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func applicationBecameActive() {
+        applicationActive = true
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func applicationBecameInactive() {
+        applicationActive = false
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func surfaceVisibilityChanged(_ unobscured: Bool) {
+        surfaceUnobscured = unobscured
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func surfacePresentationStarted(
+        _ kind: ExploreSurfacePresentationKind
+    ) -> ExploreSurfacePresentationToken {
+        let token = surfacePresentationGate.onPresentationStarted(kind: kind)
+        surfacePresentationRegistry.begin(token: token)
+        surfacePresentationObscured = surfacePresentationGate.isObscured
+        reconcileFirstUsableViewportProbe()
+        return token
+    }
+
+    func surfacePresentationAttached(_ token: ExploreSurfacePresentationToken) {
+        surfacePresentationRegistry.attached(token: token)
+    }
+
+    func surfacePresentationDismissRequested(_ token: ExploreSurfacePresentationToken) {
+        completeSurfacePresentation(
+            surfacePresentationRegistry.dismissRequested(token: token)
+        )
+    }
+
+    func surfacePresentationRemoved(_ token: ExploreSurfacePresentationToken) {
+        completeSurfacePresentation(surfacePresentationRegistry.removed(token: token))
+    }
+
+    private func completeSurfacePresentation(_ token: ExploreSurfacePresentationToken?) {
+        guard let token else { return }
+        _ = surfacePresentationGate.onPresentationDismissed(token: token)
+        surfacePresentationObscured = surfacePresentationGate.isObscured
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func performanceCollectionEligibilityChanged() {
+        reconcileFirstUsableViewportProbe()
+    }
+
+    func firstUsableViewportWasCommitted(_ token: ExploreFirstUsableViewportDrawToken) {
+        guard firstUsableViewportSample?.generation == token.generation else { return }
+        let measurement = firstUsableViewportProbe.onViewportCommitted(
+            generation: token.generation,
+            viewportState: token.viewportState,
+            committedAtNanoseconds: monotonicNowNanoseconds()
+        )
+        firstUsableViewportSample = nil
+        if let measurement {
+            recordPerformanceMeasurement(measurement.performanceMeasurement)
+        }
     }
 
     func prepareViewerContext(_ rawViewerID: String?) {
@@ -207,6 +316,26 @@ final class ExploreStore: ObservableObject {
         )
     }
 
+    private func reconcileFirstUsableViewportProbe() {
+        guard screenVisible,
+              surfaceUnobscured,
+              applicationActive,
+              !surfacePresentationGate.isObscured else {
+            firstUsableViewportProbe.onHidden()
+            firstUsableViewportSample = nil
+            return
+        }
+        guard isPerformanceCollectionAllowed() else {
+            firstUsableViewportProbe.onHidden()
+            firstUsableViewportSample = nil
+            return
+        }
+        firstUsableViewportSample = firstUsableViewportProbe.onVisible(
+            diagnosticsAllowed: true,
+            startedAtNanoseconds: monotonicNowNanoseconds()
+        )
+    }
+
     private func accept(_ updatedState: ExploreUiState) {
         let previousState = state
         if didSelectedTabChange(previousState, updatedState) ||
@@ -349,3 +478,7 @@ private func didSelectedTabChange(
 }
 
 private let paginationThresholdItemCount = 4
+
+private func monotonicUptimeNanoseconds() -> Int64 {
+    Int64(clamping: DispatchTime.now().uptimeNanoseconds)
+}

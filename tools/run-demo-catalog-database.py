@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 import re
@@ -30,6 +31,29 @@ class DatabaseOperationError(RuntimeError):
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise DatabaseOperationError(message)
+
+
+@dataclass(frozen=True)
+class CatalogState:
+    target_listings: int
+    tagged_listings: int
+    published_listings: int
+    archived_listings: int
+    media: int
+
+    def counts(self, prefix: str) -> dict[str, int]:
+        return {
+            f"{prefix}ArchivedListings": self.archived_listings,
+            f"{prefix}Media": self.media,
+            f"{prefix}PublishedListings": self.published_listings,
+            f"{prefix}TaggedListings": self.tagged_listings,
+            f"{prefix}TargetListings": self.target_listings,
+        }
+
+
+ABSENT_STATE = CatalogState(0, 0, 0, 0, 0)
+PUBLISHED_STATE = CatalogState(60, 60, 60, 0, 180)
+ARCHIVED_STATE = CatalogState(60, 60, 0, 60, 180)
 
 
 def _project_ref_from_database_url(database_url: str) -> str:
@@ -134,22 +158,50 @@ def _execute(database_url: str, source_path: Path) -> None:
         raise DatabaseOperationError(f"Demo catalog SQL failed: {safe_error[-2000:]}")
 
 
-def _verify(database_url: str, expected_published: int) -> None:
+def _catalog_state(database_url: str) -> CatalogState:
     ids = _manifest_ids()
     values = ",".join("'" + listing_id + "'::uuid" for listing_id in ids)
     query = f"""
       select
         count(*)::text || '|' ||
-        count(*) filter (where listing.status = 'publie')::text || '|' ||
+        count(*) filter (where 'demo-kwabor' = any(listing.tags))::text || '|' ||
+        count(*) filter (
+          where 'demo-kwabor' = any(listing.tags)
+            and listing.status = 'publie'
+        )::text || '|' ||
+        count(*) filter (
+          where 'demo-kwabor' = any(listing.tags)
+            and listing.status = 'archive'
+        )::text || '|' ||
         (select count(*) from public.listing_media media where media.listing_id = any(array[{values}]::uuid[]))::text
       from public.listings listing
       where listing.id = any(array[{values}]::uuid[])
-        and 'demo-kwabor' = any(listing.tags)
     """
     result = _run_psql(database_url, "--tuples-only", "--no-align", "--command", query)
     require(result.returncode == 0, "Unable to verify demo catalog state")
-    actual = result.stdout.strip()
-    require(actual == f"60|{expected_published}|180", f"Unexpected demo catalog state: {actual}")
+    raw_state = result.stdout.strip()
+    parts = raw_state.split("|")
+    require(
+        len(parts) == 5 and all(re.fullmatch(r"0|[1-9][0-9]*", part) for part in parts),
+        f"Invalid demo catalog state: {raw_state}",
+    )
+    return CatalogState(*(int(part) for part in parts))
+
+
+def _verify(
+    database_url: str,
+    expected_published: int,
+    state: CatalogState | None = None,
+) -> CatalogState:
+    state = state or _catalog_state(database_url)
+    expected = CatalogState(
+        60,
+        60,
+        expected_published,
+        60 if expected_published == 0 else 0,
+        180,
+    )
+    require(state == expected, f"Unexpected demo catalog state: {state}")
     if expected_published == 60:
         global_result = _run_psql(
             database_url,
@@ -163,28 +215,87 @@ def _verify(database_url: str, expected_published: int) -> None:
             global_result.stdout.strip() == "60",
             f"Staging contains non-demo published listings: {global_result.stdout.strip()} total",
         )
+    return state
+
+
+def _operation_result(
+    operation: str,
+    mode: str,
+    before: CatalogState,
+    after: CatalogState,
+) -> dict[str, object]:
+    return {
+        "counts": {**before.counts("before"), **after.counts("after")},
+        "kind": "demo-catalog-database-operation",
+        "mode": mode,
+        "operation": operation,
+        "outcome": "succeeded",
+        "schemaVersion": 1,
+    }
+
+
+def _write_result(path: Path, result: dict[str, object]) -> None:
+    require(not path.is_symlink(), "Database result output must not be a symbolic link")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("publish", "verify", "rollback"))
     parser.add_argument("--confirm-rollback")
+    parser.add_argument("--allow-absent-for-storage-rollback", action="store_true")
+    parser.add_argument("--result-json", type=Path)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    require(
+        not args.allow_absent_for_storage_rollback or args.command == "rollback",
+        "Absent-state allowance is valid only for rollback",
+    )
+    if args.command == "rollback":
+        require(args.confirm_rollback == ROLLBACK_CONFIRMATION, "Rollback confirmation is missing")
     database_url, project_ref = _validated_environment()
     _manifest_ids()
+    before = _catalog_state(database_url)
     if args.command == "publish":
+        require(
+            before in {ABSENT_STATE, ARCHIVED_STATE, PUBLISHED_STATE},
+            f"Refusing publish from drifted demo catalog state: {before}",
+        )
         _execute(database_url, SEED_PATH)
-        _verify(database_url, expected_published=60)
+        after = _verify(database_url, expected_published=60)
+        mode = "published-and-verified"
     elif args.command == "rollback":
-        require(args.confirm_rollback == ROLLBACK_CONFIRMATION, "Rollback confirmation is missing")
-        _execute(database_url, ROLLBACK_PATH)
-        _verify(database_url, expected_published=0)
+        if before == ABSENT_STATE:
+            require(
+                args.allow_absent_for_storage_rollback,
+                "Standalone database rollback refuses an absent catalog state",
+            )
+            after = _catalog_state(database_url)
+            require(after == ABSENT_STATE, "Absent rollback state changed unexpectedly")
+            mode = "already-absent"
+        elif before == ARCHIVED_STATE:
+            _execute(database_url, ROLLBACK_PATH)
+            after = _verify(database_url, expected_published=0)
+            mode = "already-archived"
+        else:
+            require(before == PUBLISHED_STATE, f"Refusing rollback from drifted demo catalog state: {before}")
+            _execute(database_url, ROLLBACK_PATH)
+            after = _verify(database_url, expected_published=0)
+            mode = "archived-exact-catalog"
     else:
-        _verify(database_url, expected_published=60)
+        after = _verify(database_url, expected_published=60, state=before)
+        before = after
+        mode = "verified"
+    result = _operation_result(args.command, mode, before, after)
+    if args.result_json is not None:
+        _write_result(args.result_json, result)
     print(f"OK {args.command} demo catalog on protected staging project {project_ref}")
 
 

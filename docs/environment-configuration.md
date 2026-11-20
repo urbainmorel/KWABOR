@@ -6,11 +6,22 @@ Ce document est le contrat de configuration mobile et le runbook de provisionnem
 
 | Nom | Usage | Distribution | Données distantes |
 |---|---|---|---|
-| `development` | Développement local | APK/Xcode local non distribués | Supabase local ou projet de développement explicitement choisi |
+| `development` | Développement de l'application | APK/Xcode locaux non distribués | Projet Supabase development explicitement choisi |
 | `staging` | QA, tests internes, bêta | Builds internes/TestFlight | Projets Supabase et Firebase Kwabor staging |
 | `production` | Stores | AAB/App Store signés | Projets Supabase et Firebase Kwabor production |
 
 Toute autre valeur est rejetée par le build Android et par la composition root partagée. Les clients Android et iOS conservent les identifiants `com.kwabor.android` et `com.kwabor.ios` dans les deux projets Firebase ; la séparation est portée par les projets fournisseurs et les configurations injectées.
+
+## État de preuve au 20 août 2026
+
+- `development` possède une configuration client publique et la Data API a répondu
+  `206 Partial Content` à une lecture anonyme de quatre fixtures. Cette observation prouve seulement
+  la joignabilité et ce chemin de lecture.
+- L'historique des migrations, le lint et les advisors liés, les refus ACL/RLS négatifs et les
+  parcours admin de `development` ne sont pas prouvés : les opérations CLI liées observées répondent
+  `403`. `ENV-001B-DEV` reste donc ouvert.
+- Aucun projet Supabase `staging` ou `production` Kwabor qualifiable n'est disponible. Ces deux tiers
+  restent absents et ne peuvent pas être remplacés par la base éphémère de la CI.
 
 ## Contrat de configuration client
 
@@ -88,27 +99,43 @@ Dans un fichier `.xcconfig`, `//` ouvre un commentaire. Une URL HTTPS doit donc 
 
 ## GitHub Environments
 
-Les environnements `staging` et `production` existent dans `urbainmorel/KWABOR` et n'acceptent que les branches protégées. `production` interdit le contournement administrateur et exige une approbation de `urbainmorel`. Seule la variable non sensible `KWABOR_ENVIRONMENT` est déjà renseignée.
+Les conteneurs GitHub Environments `staging` et `production` existent dans `urbainmorel/KWABOR` et
+n'acceptent que les branches protégées. `production` interdit le contournement administrateur et
+exige une approbation de `urbainmorel`. Seule la variable non sensible `KWABOR_ENVIRONMENT` est déjà
+renseignée : cela ne signifie pas que les projets Supabase ou Firebase correspondants existent.
 
 Les variables Supabase, OAuth Google et les deux configurations Firebase doivent être ajoutées seulement après création et vérification des projets correspondants. Aucun workflow ne doit utiliser une valeur de `staging` pour un artefact production.
 
 ## Provisionnement Supabase propriétaire
 
-Le compte CLI actuellement disponible ne contient aucune organisation Kwabor. Le propriétaire doit d'abord choisir l'organisation et le plan facturé, puis créer deux projets distincts, par exemple `kwabor-staging` et `kwabor-production`.
+Le projet `development` n'est que partiellement observable avec les identifiants publics disponibles.
+Les accès nécessaires à sa qualification répondent actuellement `403`. Le propriétaire doit rétablir
+un accès audité à cette cible et créer deux projets distincts `staging` et `production` avant de
+fermer `ENV-001B-DEV` puis `ENV-001B`.
 
-Pour chaque projet :
+Pour chaque projet hébergé, la preuve distante suit une procédure protégée et non destructive :
 
-1. relever le project ref, l'URL et la clé publishable ;
-2. lier explicitement le checkout avec `supabase link --project-ref <ref>` sans versionner le mot de passe de base ;
-3. appliquer les migrations sur staging et exécuter `supabase test db` ;
-4. vérifier les grants/RLS négatifs avant de reproduire la migration en production ;
-5. configurer Auth avec un mot de passe minimal de 8 caractères, un OTP email de 6 chiffres et un délai minimal de 30 secondes entre deux envois ;
-6. publier les templates OTP français d'inscription et de récupération avec la variable Supabase `{{ .Token }}`, puis brancher un SMTP de production vérifié ;
-7. provisionner les trois révisions juridiques actives décrites ci-dessous ;
-8. renseigner les variables GitHub de l'environnement correspondant ;
-9. délier ou relier explicitement avant toute commande distante suivante afin d'éviter une erreur de cible.
+1. faire approuver le tier, le project ref exact et le SHA à qualifier ;
+2. exécuter depuis le GitHub Environment protégé correspondant ou avec un opérateur audité, sans
+   exposer le mot de passe de base ;
+3. créer et vérifier une sauvegarde restaurable ou le mécanisme PITR applicable ;
+4. relever l'historique des migrations, faire relire le plan et appliquer uniquement des migrations
+   additives ou explicitement approuvées ;
+5. archiver les résultats liés du lint, des advisors, des grants et des refus ACL/RLS négatifs ;
+6. exécuter avec des comptes synthétiques les smoke tests de lecture anonyme/authentifiée et les
+   parcours admin attendus ;
+7. configurer Auth avec un mot de passe minimal de 8 caractères, un OTP email de 6 chiffres et un
+   délai minimal de 30 secondes entre deux envois ;
+8. publier les templates OTP français d'inscription et de récupération avec la variable Supabase
+   `{{ .Token }}`, puis brancher un SMTP vérifié ;
+9. provisionner les trois révisions juridiques actives décrites ci-dessous et renseigner les
+   variables GitHub du tier.
 
-La production ne doit jamais être utilisée comme environnement de test ou comme source de seed de développement.
+Le job CI `supabase_database` est une preuve différente : il utilise Docker sur un runner jetable,
+exécute `supabase db start` sans lier de projet hébergé et qualifie seulement l'état du dépôt. Il peut
+être lancé par PR, push autorisé ou `workflow_dispatch`, mais ne ferme aucune gate distante. Ne jamais
+remettre à zéro une base persistante `development`, `staging` ou `production`. La production ne doit
+jamais servir d'environnement de test ou de source de seed de développement.
 
 Les nouveaux projets Supabase gratuits ne doivent pas être supposés capables d'utiliser les
 templates d'authentification Kwabor avec le SMTP par défaut. Le propriétaire doit confirmer un
@@ -273,7 +300,9 @@ L'intégration `OBS-001A` est prête côté code et workflows. Les releases exig
 
 ## Gate avant release
 
-- Les deux projets Supabase sont distincts, migrés et testés.
+- Les projets Supabase `staging` et `production` sont distincts et chacun possède une preuve distante
+  protégée et non destructive : sauvegarde, historique de migrations, lint/advisors, ACL/RLS
+  négatives et smoke tests lecture/admin archivés.
 - Google est configuré dans chaque projet Supabase avec clients Android/iOS/Web du même tier,
   vérification de nonce active et secret Web exclusivement serveur.
 - Sign in with Apple est activé sur l'App ID, présent dans les profils signés et configuré dans

@@ -20,6 +20,7 @@ internal class SharedPreferencesObservabilityConsentStore(
         val ownerUserId = preferences.getString(OWNER_USER_ID_KEY, null)?.normalizedOrNull()
         val installationDeletionRequestId =
             preferences.getString(INSTALLATION_DELETION_REQUEST_ID_KEY, null)?.normalizedOrNull()
+        val staged = preferences.readStagedConsent()
         val persistedConsent = if (ownerUserId == null) {
             ObservabilityConsent()
         } else {
@@ -38,16 +39,26 @@ internal class SharedPreferencesObservabilityConsentStore(
             installationDeletionRequestId = installationDeletionRequestId,
             persistedOwnerUserId = ownerUserId,
             persistedConsent = persistedConsent,
+            sessionCheckpointPurgePending = preferences.getBoolean(SESSION_CHECKPOINT_PURGE_PENDING_KEY, false),
+            hasStagedConsentActivation = staged.isPending,
+            stagedOwnerUserId = staged.ownerUserId,
+            stagedConsent = staged.consent,
         )
     }
 
-    override fun write(ownerUserId: String, consent: ObservabilityConsent): Boolean {
+    fun write(ownerUserId: String, consent: ObservabilityConsent): Boolean {
         val normalizedOwnerUserId = ownerUserId.normalizedOrNull() ?: return false
         val plan = createWritePlan(normalizedOwnerUserId, consent) ?: return false
         return persistWritePlan(plan)
     }
 
-    override fun revoke(): Boolean {
+    override fun stageWrite(ownerUserId: String, consent: ObservabilityConsent): Boolean {
+        val normalizedOwnerUserId = ownerUserId.normalizedOrNull() ?: return false
+        val plan = createWritePlan(normalizedOwnerUserId, consent) ?: return false
+        return preferences.commitDurably(stagedConsentMutation(plan))
+    }
+
+    fun revoke(): Boolean {
         val current = read()
         val hadAccountState = current.persistedOwnerUserId != null || current.persistedConsent.allowsAnyCollection
         val installationDeletionRequestId = if (hadAccountState) {
@@ -64,8 +75,67 @@ internal class SharedPreferencesObservabilityConsentStore(
             },
             installationDeletionRequestId = installationDeletionRequestId,
         )
-        if (!persistForceDisabled(maintenance)) return false
-        return persistRevokedConsent(maintenance)
+        if (!preferences.commitDurably(forceDisabledMutation(maintenance))) return false
+        return preferences.commitDurably(
+            revokedConsentMutation(maintenance).withoutStagedActivation(),
+        )
+    }
+
+    override fun stageRevocation(): Boolean {
+        val current = read()
+        val hadAccountState =
+            current.persistedOwnerUserId != null ||
+                current.persistedConsent.allowsAnyCollection ||
+                current.hasStagedConsentActivation
+        val diagnosticsRequestId = if (hadAccountState) {
+            requestIdProvider().normalizedOrNull() ?: return false
+        } else {
+            current.diagnosticsReportPurgeRequestId
+        }
+        val installationRequestId = if (hadAccountState) {
+            requestIdProvider().normalizedOrNull() ?: return false
+        } else {
+            current.installationDeletionRequestId
+        }
+        val maintenance = ObservabilityMaintenanceState(
+            analyticsPurgePending = current.analyticsPurgePending || hadAccountState,
+            diagnosticsReportPurgeRequestId = diagnosticsRequestId,
+            installationDeletionRequestId = installationRequestId,
+        )
+        return preferences.commitDurably(
+            revokedConsentMutation(maintenance)
+                .withSessionCheckpointPurgePending()
+                .withoutStagedActivation(),
+        )
+    }
+
+    override fun ensureSessionCheckpointPurgePending(): Boolean {
+        if (read().sessionCheckpointPurgePending) return true
+        return preferences.commitDurably(
+            ObservabilityPreferencesMutation(
+                booleans = mapOf(SESSION_CHECKPOINT_PURGE_PENDING_KEY to true),
+            ),
+        )
+    }
+
+    override fun completeSessionCheckpointPurge(): Boolean = removeDurably(
+        key = SESSION_CHECKPOINT_PURGE_PENDING_KEY,
+        restoreMutation = ObservabilityPreferencesMutation(
+            booleans = mapOf(SESSION_CHECKPOINT_PURGE_PENDING_KEY to true),
+        ),
+    )
+
+    override fun activateStagedConsent(): Boolean {
+        val current = read()
+        val ownerUserId = current.stagedOwnerUserId
+        val consent = current.stagedConsent
+        return when {
+            !current.hasStagedConsentActivation -> true
+            current.hasPendingMaintenance || ownerUserId == null || consent == null -> false
+            else -> preferences.commitDurably(
+                activatedConsentMutation(ownerUserId, consent).withoutStagedActivation(),
+            )
+        }
     }
 
     override fun clearAnalyticsPurgePending(): Boolean = removeDurably(
@@ -120,20 +190,51 @@ internal class SharedPreferencesObservabilityConsentStore(
         )
     }
 
-    private fun persistWritePlan(plan: ObservabilityConsentWritePlan): Boolean {
+    private val persistWritePlan: (ObservabilityConsentWritePlan) -> Boolean = persist@{ plan ->
         val failClosedMutation = forceDisabledMutation(plan.maintenance)
-        if (!preferences.commitDurably(failClosedMutation)) return false
-        val finalMutation = plan.finalMutation()
-        if (preferences.commitDurably(finalMutation)) return true
+        if (!preferences.commitDurably(failClosedMutation)) return@persist false
+        val finalMutation = plan.finalMutation().withoutStagedActivation()
+        if (preferences.commitDurably(finalMutation)) return@persist true
         preferences.commitDurably(plan.rollbackMutation)
-        return false
+        false
     }
+}
 
-    private fun persistForceDisabled(maintenance: ObservabilityMaintenanceState): Boolean =
-        preferences.commitDurably(forceDisabledMutation(maintenance))
+private data class StagedConsentRead(
+    val isPending: Boolean,
+    val ownerUserId: String?,
+    val consent: ObservabilityConsent?,
+)
 
-    private fun persistRevokedConsent(maintenance: ObservabilityMaintenanceState): Boolean =
-        preferences.commitDurably(revokedConsentMutation(maintenance))
+private fun ObservabilityPreferences.readStagedConsent(): StagedConsentRead {
+    val isPending = getBoolean(STAGED_ACTIVATION_PENDING_KEY, false)
+    val ownerUserId = getString(STAGED_OWNER_USER_ID_KEY, null)?.normalizedOrNull()
+    val consent = if (isPending && ownerUserId != null) {
+        ObservabilityConsent(
+            analyticsAllowed = getBoolean(STAGED_ANALYTICS_ALLOWED_KEY, false),
+            diagnosticsAllowed = getBoolean(STAGED_DIAGNOSTICS_ALLOWED_KEY, false),
+            remoteConfigurationAllowed = getBoolean(STAGED_REMOTE_CONFIGURATION_ALLOWED_KEY, false),
+        )
+    } else {
+        null
+    }
+    return StagedConsentRead(isPending, ownerUserId, consent)
+}
+
+private fun activatedConsentMutation(
+    ownerUserId: String,
+    consent: ObservabilityConsent,
+): ObservabilityPreferencesMutation {
+    val maintenance = ObservabilityMaintenanceState(
+        analyticsPurgePending = false,
+        diagnosticsReportPurgeRequestId = null,
+        installationDeletionRequestId = null,
+    )
+    return if (consent.allowsAnyCollection) {
+        activeConsentMutation(ownerUserId, consent, maintenance)
+    } else {
+        revokedConsentMutation(maintenance)
+    }
 }
 
 private data class ObservabilityConsentWritePlan(
@@ -148,6 +249,22 @@ private data class ObservabilityConsentWritePlan(
         revokedConsentMutation(maintenance)
     }
 }
+
+private fun stagedConsentMutation(plan: ObservabilityConsentWritePlan): ObservabilityPreferencesMutation =
+    forceDisabledMutation(plan.maintenance)
+        .withSessionCheckpointPurgePending()
+        .copy(
+            strings = forceDisabledMutation(plan.maintenance).strings +
+                (STAGED_OWNER_USER_ID_KEY to plan.ownerUserId),
+            booleans = forceDisabledMutation(plan.maintenance).booleans + mapOf(
+                STAGED_ACTIVATION_PENDING_KEY to true,
+                STAGED_ANALYTICS_ALLOWED_KEY to plan.consent.analyticsAllowed,
+                STAGED_DIAGNOSTICS_ALLOWED_KEY to plan.consent.diagnosticsAllowed,
+                STAGED_REMOTE_CONFIGURATION_ALLOWED_KEY to plan.consent.remoteConfigurationAllowed,
+                SESSION_CHECKPOINT_PURGE_PENDING_KEY to true,
+            ),
+            removals = forceDisabledMutation(plan.maintenance).removals - STAGED_OWNER_USER_ID_KEY,
+        )
 
 private data class ObservabilityConsentTransition(
     private val current: StoredObservabilityConsent,
@@ -338,6 +455,16 @@ private fun ObservabilityPreferences.commitDurably(mutation: ObservabilityPrefer
     return false
 }
 
+private fun ObservabilityPreferencesMutation.withSessionCheckpointPurgePending(): ObservabilityPreferencesMutation =
+    copy(
+        booleans = booleans + (SESSION_CHECKPOINT_PURGE_PENDING_KEY to true),
+        removals = removals - SESSION_CHECKPOINT_PURGE_PENDING_KEY,
+    )
+
+private fun ObservabilityPreferencesMutation.withoutStagedActivation(): ObservabilityPreferencesMutation = copy(
+    removals = removals + STAGED_ACTIVATION_KEYS,
+)
+
 private fun requestIdMutation(key: String, requestId: String): ObservabilityPreferencesMutation =
     ObservabilityPreferencesMutation(strings = mapOf(key to requestId))
 
@@ -351,9 +478,22 @@ private const val REMOTE_CONFIGURATION_ALLOWED_KEY = "remote_configuration_allow
 private const val ANALYTICS_PURGE_PENDING_KEY = "analytics_purge_pending"
 private const val DIAGNOSTICS_PURGE_REQUEST_ID_KEY = "diagnostics_report_purge_request_id"
 private const val INSTALLATION_DELETION_REQUEST_ID_KEY = "installation_deletion_request_id"
+private const val SESSION_CHECKPOINT_PURGE_PENDING_KEY = "session_checkpoint_purge_pending"
+private const val STAGED_ACTIVATION_PENDING_KEY = "staged_activation_pending"
+private const val STAGED_OWNER_USER_ID_KEY = "staged_owner_user_id"
+private const val STAGED_ANALYTICS_ALLOWED_KEY = "staged_analytics_allowed"
+private const val STAGED_DIAGNOSTICS_ALLOWED_KEY = "staged_diagnostics_allowed"
+private const val STAGED_REMOTE_CONFIGURATION_ALLOWED_KEY = "staged_remote_configuration_allowed"
 private val CONSENT_HISTORY_KEYS = setOf(
     OWNER_USER_ID_KEY,
     ANALYTICS_ALLOWED_KEY,
     DIAGNOSTICS_ALLOWED_KEY,
     REMOTE_CONFIGURATION_ALLOWED_KEY,
+)
+private val STAGED_ACTIVATION_KEYS = setOf(
+    STAGED_ACTIVATION_PENDING_KEY,
+    STAGED_OWNER_USER_ID_KEY,
+    STAGED_ANALYTICS_ALLOWED_KEY,
+    STAGED_DIAGNOSTICS_ALLOWED_KEY,
+    STAGED_REMOTE_CONFIGURATION_ALLOWED_KEY,
 )

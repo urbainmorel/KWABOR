@@ -10,9 +10,16 @@ précèdent ensuite `20260730140300`. Le hotfix ferme les écritures non autoris
 futures, mais ne peut pas distinguer automatiquement une ancienne décision
 opérateur légitime d’une valeur forgée par un client avant le correctif.
 
-Les environnements distants Kwabor ne sont pas encore provisionnés. Cette
-préflight n’a donc été exécutée que sur la base locale de test, dont les fixtures
-sont recréées et couvertes par pgTAP.
+Au 20 août 2026, `development` n'a qu'une preuve publique limitée : configuration
+client présente, réponse Data API `206 Partial Content` et quatre fixtures lues.
+Les migrations liées, le lint/advisors, les ACL négatives et les parcours admin ne
+sont pas prouvés, car les opérations CLI liées répondent `403`. `staging` et
+`production` sont absents. Cette préflight n'a donc été exécutée sur aucun projet
+hébergé.
+
+Le job CI `supabase_database` couvre séparément le SQL versionné sur une base
+éphémère démarrée avec `supabase db start`. Il ne lie aucun projet distant et ne
+qualifie ni `development`, ni `staging`, ni `production`.
 
 ## Responsables et preuves
 
@@ -27,14 +34,18 @@ sont recréées et couvertes par pgTAP.
 ## 1. Préconditions
 
 1. Geler temporairement les opérations d’administration concernées.
-2. Créer et vérifier une sauvegarde restaurable.
-3. Confirmer le SHA déployé et l’ordre des deux migrations indépendantes.
-4. Exécuter et exporter les requêtes suivantes avec une connexion serveur en transaction
+2. Faire approuver le tier et le project ref exacts, puis exécuter depuis le GitHub
+   Environment protégé correspondant ou avec un opérateur audité.
+3. Créer et vérifier une sauvegarde restaurable ou le mécanisme PITR applicable.
+4. Confirmer le SHA déployé et l’ordre des deux migrations indépendantes.
+5. Exécuter et exporter les requêtes suivantes avec une connexion serveur en transaction
    `READ ONLY`.
-5. Appliquer immédiatement
+6. Appliquer immédiatement
    `20260730140225_security_authorization_guardrails.sql` après la sauvegarde et
    l’export. Une ligne à examiner ou une dérive taxonomique ne bloque pas ce
    hotfix.
+
+Ne jamais remettre à zéro une base persistante pour réaliser cette préflight.
 
 ## 2. Audit en lecture seule
 
@@ -147,10 +158,14 @@ suppression définitive ne fait partie de cette préflight.
    remédiation approuvée.
 3. Vérifier que la requête de dérive taxonomique retourne zéro ligne.
 4. Appliquer `20260730140300_listing_taxonomy_guardrails.sql`.
-5. Exécuter `supabase db lint` et `supabase test db` contre l’état migré.
-6. Vérifier les ACL `anon`/`authenticated`, un onboarding Google ou Apple, une
-   modération Social admin et une suspension de membre sur staging.
-7. Lever le gel uniquement après approbation du relecteur et archivage des
+5. Vérifier que `supabase_database` est vert sur le SHA exact. Cette preuve CI
+   éphémère est nécessaire, mais ne remplace pas les contrôles distants suivants.
+6. Sur `staging`, après migration non destructive, archiver les sorties liées du
+   lint, des advisors et de l'historique des migrations.
+7. Avec des comptes synthétiques, vérifier les refus ACL/RLS
+   `anon`/`authenticated`, un onboarding Google ou Apple, une modération Social
+   admin et une suspension de membre sur `staging`.
+8. Lever le gel uniquement après approbation du relecteur et archivage des
    preuves.
 
 La gate du hotfix est rouge uniquement si la sauvegarde/export échoue, si

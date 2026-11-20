@@ -4,6 +4,10 @@
 
 Une tâche à la fois. Aucun agent ne démarre une deuxième tâche tant que son livrable n'est pas vérifié.
 
+Toute validation Supabase qui nécessite Docker s'exécute exclusivement dans le job GitHub Actions
+`supabase_database`. Ce job démarre une base éphémère avec `supabase db start` ; il ne fait pas de
+`db reset`, ne cible aucun projet hébergé et ne remplace jamais une qualification distante protégée.
+
 ## Périmètre cible ferme
 
 Kwabor est une application Android/iOS uniquement.
@@ -45,7 +49,7 @@ Ces zones demandent un plan dédié avant implémentation.
 
 **Livrables**
 
-- Initialisation locale Supabase sans secret commité.
+- Configuration Supabase versionnée sans secret commité, exécutée sur une base CI éphémère.
 - Migration SQL initiale créée via `supabase migration new`.
 - RLS activée sur toutes les tables `public`.
 - Grants explicites `anon` / `authenticated` cohérents avec la Data API.
@@ -65,8 +69,7 @@ Ces zones demandent un plan dédié avant implémentation.
 
 **Validation**
 
-- `supabase db reset` si l'environnement Docker local le permet.
-- `supabase test db` pour les tests pgTAP.
+- Job CI `supabase_database` : migrations depuis zéro via `supabase db start`, lint, pgTAP et advisors.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -168,8 +171,7 @@ Ces zones demandent un plan dédié avant implémentation.
 
 **Validation**
 
-- `supabase db reset`.
-- `supabase test db`.
+- Job CI `supabase_database` : migrations, pgTAP, lint et advisors sur base éphémère.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -235,7 +237,7 @@ Après merge, lancer DATA-TEAM-002 : DTO Supabase et implémentation `Organizati
 
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
-- `supabase test db`.
+- Job CI `supabase_database` si le contrat SQL/RLS est modifié.
 - `git diff --check`.
 
 **Suite logique**
@@ -266,8 +268,7 @@ Après merge, lancer DATA-TEAM-003 : brancher `OrganizationDataSource` sur Supab
 
 **Validation**
 
-- `supabase db reset`.
-- `supabase test db`.
+- Job CI `supabase_database` : migrations, pgTAP, lint et advisors sur base éphémère.
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
 - `git diff --check`.
@@ -305,7 +306,7 @@ Après merge, lancer DATA-CATALOG-001 : implémenter les repositories data Supab
 
 - Vérifier le changelog Supabase pour changement Data API/PostgREST pertinent.
 - `./gradlew.bat :shared:check`.
-- `supabase test db`.
+- Job CI `supabase_database` si le contrat SQL/RLS est modifié.
 - `./gradlew.bat check`.
 - `git diff --check`.
 
@@ -379,8 +380,7 @@ Après merge, lancer DATA-CATALOG-002 : ajouter les contrats et la data Supabase
 **Validation**
 
 - Vérifier le changelog Supabase avant implémentation.
-- `supabase db reset`.
-- `supabase test db`.
+- Job CI `supabase_database` : migrations, pgTAP, lint et advisors sur base éphémère.
 - `./gradlew.bat :shared:check`.
 - `./gradlew.bat check`.
 - `git diff --check`.

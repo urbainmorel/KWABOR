@@ -4,6 +4,7 @@
 
 | Élément | État actuel |
 | --- | --- |
+| Dépôt GitHub officiel | [`urbainmorel/KWABOR`](https://github.com/urbainmorel/KWABOR) — voir la [politique d'autorité](CONTRIBUTING.md#dépôt-github-dautorité) |
 | Livraison | V1 en construction — **non déployable en production à ce jour** |
 | Android | Compose Multiplatform, API 26 minimum, API 36 cible |
 | iOS | SwiftUI natif, iOS 17 minimum |

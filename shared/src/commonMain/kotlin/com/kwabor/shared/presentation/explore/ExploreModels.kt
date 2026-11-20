@@ -5,6 +5,7 @@ import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.explore.ExploreFeedSnapshot
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.money.MoneyXof
+import com.kwabor.shared.domain.observability.PerformanceViewportState
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.session.ViewerSessionScope
 
@@ -132,6 +133,16 @@ data class ExploreUiState(
 
     val canLoadMore: Boolean
         get() = nextCursor != null && !isLoading && !isRefreshing && !isAppending && !isOffline
+
+    val firstUsableViewportState: PerformanceViewportState?
+        get() = when {
+            isLoading -> null
+            hasError -> PerformanceViewportState.Error
+            isOffline && (listings.isNotEmpty() || isEmpty) -> PerformanceViewportState.Offline
+            listings.isNotEmpty() -> PerformanceViewportState.Content
+            isEmpty -> PerformanceViewportState.Empty
+            else -> null
+        }
 }
 
 fun ExploreTab.label(strings: KwaborStrings): String = when (this) {

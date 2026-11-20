@@ -1,0 +1,236 @@
+name: Closed-beta staging fixture archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan, apply, or verify the exact four-fixture archive
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - verify
+      expected_sha:
+        description: Exact full lowercase SHA selected on main
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run ID for expected_sha
+        required: true
+        type: string
+      apply_confirmation:
+        description: For apply only, type ARCHIVE-EXACT-FOUR-STAGING-FIXTURES
+        required: false
+        type: string
+      backup_run_id:
+        description: Qualified, restorable and unexpired B6.02 run ID
+        required: true
+        type: string
+      backup_artifact_id:
+        description: Exact qualified B6.02 artifact ID
+        required: true
+        type: string
+      backup_artifact_digest:
+        description: Exact lowercase SHA-256 emitted by the B6.02 upload
+        required: true
+        type: string
+      plan_run_id:
+        description: For apply only, successful plan workflow run ID
+        required: false
+        type: string
+      plan_artifact_id:
+        description: For apply only, exact plan GEL artifact ID
+        required: false
+        type: string
+      plan_artifact_digest:
+        description: For apply only, exact lowercase SHA-256 emitted by the plan upload
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: closed-beta-demo-staging-operations
+  cancel-in-progress: false
+
+jobs:
+  fixture_archive:
+    name: ${{ inputs.operation }} exact staging fixture archive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    env:
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      APPLY_CONFIRMATION: ${{ inputs.apply_confirmation }}
+      BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+      BACKUP_ARTIFACT_ID: ${{ inputs.backup_artifact_id }}
+      BACKUP_ARTIFACT_DIGEST: ${{ inputs.backup_artifact_digest }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+      PLAN_ARTIFACT_ID: ${{ inputs.plan_artifact_id }}
+      PLAN_ARTIFACT_DIGEST: ${{ inputs.plan_artifact_digest }}
+      KWABOR_ENVIRONMENT: ${{ vars.KWABOR_ENVIRONMENT }}
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify guarded implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tools/closed-beta-staging-fixture-archive.py \
+            tools/test_closed_beta_staging_fixture_archive.py
+          python3 -B -m unittest tools.test_closed_beta_staging_fixture_archive
+
+      - name: Fetch immutable authority and evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ci_run_json="$RUNNER_TEMP/fixture-archive-ci-run.json"
+          environment_json="$RUNNER_TEMP/fixture-archive-environment.json"
+          backup_run_json="$RUNNER_TEMP/fixture-archive-backup-run.json"
+          backup_artifact_json="$RUNNER_TEMP/fixture-archive-backup-artifact.json"
+          backup_artifact_zip="$RUNNER_TEMP/fixture-archive-backup-artifact.zip"
+          plan_run_json="$RUNNER_TEMP/fixture-archive-plan-run.json"
+          plan_artifact_json="$RUNNER_TEMP/fixture-archive-plan-artifact.json"
+          plan_artifact_zip="$RUNNER_TEMP/fixture-archive-plan-artifact.zip"
+
+          fetch_json() {
+            local endpoint="$1"
+            local destination="$2"
+            local temporary="${destination}.tmp"
+            if gh api --method GET \
+              --header 'Accept: application/vnd.github+json' \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              "$endpoint" > "$temporary" 2>/dev/null; then
+              mv "$temporary" "$destination"
+            else
+              rm -f "$temporary"
+              printf '{"fetchStatus":"failed"}\n' > "$destination"
+            fi
+          }
+
+          fetch_id_json() {
+            local resource="$1"
+            local identifier="$2"
+            local destination="$3"
+            if [[ "$identifier" =~ ^[1-9][0-9]*$ ]]; then
+              fetch_json "/repos/$GITHUB_REPOSITORY/actions/$resource/$identifier" "$destination"
+            else
+              printf '{"fetchStatus":"invalid-identifier"}\n' > "$destination"
+            fi
+          }
+
+          download_artifact() {
+            local identifier="$1"
+            local destination="$2"
+            if [[ "$identifier" =~ ^[1-9][0-9]*$ ]]; then
+              curl --fail --silent --show-error --location \
+                --connect-timeout 15 --max-time 600 \
+                --header 'Accept: application/vnd.github+json' \
+                --header "Authorization: Bearer $GH_TOKEN" \
+                --header 'X-GitHub-Api-Version: 2022-11-28' \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$identifier/zip" \
+                --output "$destination" 2>/dev/null || rm -f "$destination"
+            fi
+          }
+
+          fetch_id_json runs "$VALIDATED_CI_RUN_ID" "$ci_run_json"
+          fetch_json "/repos/$GITHUB_REPOSITORY/environments/staging" "$environment_json"
+          fetch_id_json runs "$BACKUP_RUN_ID" "$backup_run_json"
+          fetch_id_json artifacts "$BACKUP_ARTIFACT_ID" "$backup_artifact_json"
+          download_artifact "$BACKUP_ARTIFACT_ID" "$backup_artifact_zip"
+
+          if [[ "$OPERATION" == 'apply' ]]; then
+            fetch_id_json runs "$PLAN_RUN_ID" "$plan_run_json"
+            fetch_id_json artifacts "$PLAN_ARTIFACT_ID" "$plan_artifact_json"
+            download_artifact "$PLAN_ARTIFACT_ID" "$plan_artifact_zip"
+          else
+            printf '{"fetchStatus":"not-requested"}\n' > "$plan_run_json"
+            printf '{"fetchStatus":"not-requested"}\n' > "$plan_artifact_json"
+          fi
+
+          echo "KWABOR_FIXTURE_CI_RUN_JSON=$ci_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_ENVIRONMENT_JSON=$environment_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_BACKUP_RUN_JSON=$backup_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_BACKUP_ARTIFACT_JSON=$backup_artifact_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_BACKUP_ARTIFACT_ZIP=$backup_artifact_zip" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_PLAN_RUN_JSON=$plan_run_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_PLAN_ARTIFACT_JSON=$plan_artifact_json" >> "$GITHUB_ENV"
+          echo "KWABOR_FIXTURE_PLAN_ARTIFACT_ZIP=$plan_artifact_zip" >> "$GITHUB_ENV"
+
+      - name: Execute controlled fixture operation
+        shell: bash
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          python3 -B tools/closed-beta-staging-fixture-archive.py \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
+            --apply-confirmation "$APPLY_CONFIRMATION" \
+            --backup-run-id "$BACKUP_RUN_ID" \
+            --backup-artifact-id "$BACKUP_ARTIFACT_ID" \
+            --backup-artifact-digest "$BACKUP_ARTIFACT_DIGEST" \
+            --plan-run-id "$PLAN_RUN_ID" \
+            --plan-artifact-id "$PLAN_ARTIFACT_ID" \
+            --plan-artifact-digest "$PLAN_ARTIFACT_DIGEST" \
+            --ci-run-json "$KWABOR_FIXTURE_CI_RUN_JSON" \
+            --environment-json "$KWABOR_FIXTURE_ENVIRONMENT_JSON" \
+            --backup-run-json "$KWABOR_FIXTURE_BACKUP_RUN_JSON" \
+            --backup-artifact-json "$KWABOR_FIXTURE_BACKUP_ARTIFACT_JSON" \
+            --backup-artifact-zip "$KWABOR_FIXTURE_BACKUP_ARTIFACT_ZIP" \
+            --plan-run-json "$KWABOR_FIXTURE_PLAN_RUN_JSON" \
+            --plan-artifact-json "$KWABOR_FIXTURE_PLAN_ARTIFACT_JSON" \
+            --plan-artifact-zip "$KWABOR_FIXTURE_PLAN_ARTIFACT_ZIP" \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-fixture-archive-evidence"
+
+      - name: Emit sanitized failure receipt
+        if: failure()
+        shell: bash
+        run: |
+          python3 -B tools/closed-beta-staging-fixture-archive.py emit-failure \
+            --operation "$OPERATION" \
+            --expected-sha "$EXPECTED_SHA" \
+            --failure-code FIXTURE_ARCHIVE_WORKFLOW_STEP_FAILED \
+            --evidence-directory "$GITHUB_WORKSPACE/build/closed-beta-staging-fixture-archive-evidence"
+
+      - name: Upload fixture archive GEL evidence
+        id: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-gel-g5-staging-fixture-archive-${{ inputs.operation }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/closed-beta-staging-fixture-archive-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish immutable artifact authority
+        if: always() && steps.upload-evidence.outcome == 'success'
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.upload-evidence.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload-evidence.outputs.artifact-digest }}
+        run: |
+          {
+            echo '### Fixture archive GEL artifact'
+            echo
+            echo "- artifact-id: \`$ARTIFACT_ID\`"
+            echo "- artifact-digest: \`$ARTIFACT_DIGEST\`"
+            echo "- retention-days: \`90\`"
+          } >> "$GITHUB_STEP_SUMMARY"
