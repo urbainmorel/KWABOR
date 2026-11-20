@@ -3,6 +3,11 @@ name: Closed-beta staging fixture archive
 on:
   workflow_dispatch:
     inputs:
+      reconstructible_demo:
+        description: Use the audited reconstructible demo staging dataset without B6.02
+        required: false
+        default: false
+        type: boolean
       operation:
         description: Plan, apply, or verify the exact four-fixture archive
         required: true
@@ -25,15 +30,15 @@ on:
         type: string
       backup_run_id:
         description: Qualified, restorable and unexpired B6.02 run ID
-        required: true
+        required: false
         type: string
       backup_artifact_id:
         description: Exact qualified B6.02 artifact ID
-        required: true
+        required: false
         type: string
       backup_artifact_digest:
         description: Exact lowercase SHA-256 emitted by the B6.02 upload
-        required: true
+        required: false
         type: string
       plan_run_id:
         description: For apply only, successful plan workflow run ID
@@ -69,6 +74,7 @@ jobs:
     timeout-minutes: 30
     environment: staging
     env:
+      RECONSTRUCTIBLE_DEMO: ${{ inputs.reconstructible_demo }}
       OPERATION: ${{ inputs.operation }}
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}

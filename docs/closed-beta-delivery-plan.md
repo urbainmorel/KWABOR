@@ -282,6 +282,26 @@ autorisé est classé infrastructure et traçable ; aucun rerun manuel ne rempla
 
 ## Phase 6 — Déploiement staging et smoke tests
 
+### Jalon individuel Android — staging de démonstration reconstructible
+
+Le propriétaire accepte la perte des données fictives du staging actuel. Ce jalon réutilise
+`KWABOR Staging` et suit [ADR-0038](adr/0038-single-maintainer-closed-beta-governance.md).
+Les conditions ci-dessous s'appliquent à ce test individuel. Le tableau qui suit reste celui
+de la qualification avant l'ouverture de la cohorte.
+
+1. Adapter les workflows de migration et d'archivage pour accepter, sur option explicite, une
+   preuve de staging reconstructible sans reçu B6.02. Vérifier le projet distinct de la
+   production, la CI réussie sur le SHA exact et l'autorité du mainteneur. Prouver l'absence de
+   données Auth et Storage, et que les seules données applicatives présentes correspondent
+   aux fixtures versionnées. Tester le refus d'une donnée ou d'une cible inattendue.
+2. Exécuter le plan en lecture seule, appliquer la migration attendue et archiver uniquement
+   les quatre fiches de test identifiées. Vérifier les deux résultats avant publication.
+3. Publier et revérifier les **180 photos**, puis publier et compter les **60 fiches**.
+   En cas d'échec, utiliser le rollback ciblé du manifeste et les sources versionnées pour
+   reconstruire le catalogue.
+4. Installer `Kwabor Staging` sur le Tecno. En invité, vérifier les photos sur les cartes
+   et les fiches, la recherche et la consultation d'une fiche après redémarrage hors ligne.
+
 | ID | Tâche | Livrable / preuve de sortie | Dépendance |
 | --- | --- | --- | --- |
 | B6.01 | Exécuter le preflight staging/Store | vrai projet staging, secrets non loggés, comptes/contrats/légal, credentials, apps et groupes Play/App Store vérifiés | G4 |

@@ -192,6 +192,52 @@ FRESH_EMPTY_CSV_COLUMNS = (
     "storage_bucket_count",
     "storage_relevant_row_count",
 )
+
+# Audited staging fixtures and reference data. Only the listing lifecycle may change.
+DEMO_DIGEST = "1602e68d81afb69d4a9c8bb8624d8f4570ae8ce1b849355fd7312894148048d1"
+DEMO_EVIDENCE_FILE = "RECONSTRUCTIBLE-DEMO.json"
+DEMO_DATA_QUERY = """
+with fingerprints as (
+    select n.nspname::text as schema_name, r.relname::text as table_name,
+        (xpath('/table/row/digest/text()', query_to_xml(format(
+            'select encode(sha256(convert_to(coalesce(string_agg(payload, chr(10) order by payload collate "C"), ''''), ''UTF8'')), ''hex'') as digest from (select (%s)::text as payload from %I.%I t) items',
+            case when n.nspname = 'public' and r.relname = 'listings' then
+                'to_jsonb(t) - array[''status'',''published_at'',''updated_at'']'
+                else 'to_jsonb(t)' end,
+            n.nspname, r.relname), true, false, '')))[1]::text as digest
+    from pg_catalog.pg_class r join pg_catalog.pg_namespace n on n.oid = r.relnamespace
+    where n.nspname in ('public','app_private') and r.relkind in ('r','p')
+)
+select encode(sha256(convert_to(jsonb_agg(jsonb_build_array(schema_name,table_name,digest)
+    order by schema_name collate "C", table_name collate "C")::text, 'UTF8')), 'hex') as digest
+from fingerprints
+""".strip()
+DEMO_PROOF_QUERY = f"""
+select fixture.digest from ({FRESH_EMPTY_QUERY.rstrip(';')}) counts
+cross join ({DEMO_DATA_QUERY}) fixture
+where counts.public_schema_count = 1
+  and counts.required_system_table_count = 3
+  and counts.managed_schema_table_drift_count = 0
+  and counts.auth_user_count = 0 and counts.auth_relevant_row_count = 0
+  and counts.storage_object_count = 0 and counts.storage_bucket_count = 0
+  and counts.storage_relevant_row_count = 0
+  and not exists (
+    select 1 from pg_catalog.pg_class r
+    join pg_catalog.pg_namespace n on n.oid = r.relnamespace
+    where n.nspname in ('public','app_private') and r.relkind in ('m','f')
+  )
+"""
+
+
+def demo_evidence(digest: str) -> dict[str, str]:
+    require(digest == DEMO_DIGEST, "RECONSTRUCTIBLE_DEMO_DATA_DRIFT")
+    return {"dataSha256": digest, "policy": "reconstructible-demo-v1"}
+
+
+def reconstructible_demo_requested() -> bool:
+    value = os.environ.get("RECONSTRUCTIBLE_DEMO", "false")
+    require(value in {"true", "false"}, "RECONSTRUCTIBLE_DEMO_INPUT_INVALID")
+    return value == "true"
 FRESH_EMPTY_COUNT_KEYS = {
     "public_schema_count": "publicSchemaCount",
     "managed_schema_table_drift_count": "managedSchemaTableDriftCount",
@@ -719,6 +765,7 @@ def validate_plan_artifact_bundle(
     validated_ci_run_id: int,
     target_evidence: Mapping[str, Any],
     migration_manifest: Mapping[str, Any],
+    reconstructible_demo: bool = False,
 ) -> dict[str, Any]:
     run_evidence = validate_supporting_workflow_run(
         run_document,
@@ -755,6 +802,7 @@ def validate_plan_artifact_bundle(
             fresh_query_name,
             manifest_name,
             dry_run_name,
+            *((DEMO_EVIDENCE_FILE,) if reconstructible_demo else ()),
         ),
     )
     require(
@@ -767,6 +815,11 @@ def validate_plan_artifact_bundle(
         sidecar_name=GEL_HASH_FILENAME,
     )
     receipt = _load_internal_json(entries, GEL_FILENAME)
+    if reconstructible_demo:
+        require(
+            _load_internal_json(entries, DEMO_EVIDENCE_FILE) == demo_evidence(DEMO_DIGEST),
+            "RECONSTRUCTIBLE_DEMO_PLAN_DRIFT",
+        )
     pending = _load_internal_json(entries, pending_name)
     fresh_empty = validate_fresh_empty_evidence(
         _load_internal_json(entries, fresh_check_name)
@@ -863,6 +916,7 @@ def validate_plan_artifact_bundle(
         fresh_query_name,
         manifest_name,
         dry_run_name,
+        *((DEMO_EVIDENCE_FILE,) if reconstructible_demo else ()),
     ):
         archived_digest = receipt_evidence.get(evidence_name)
         require(
@@ -1497,6 +1551,10 @@ def validate_command_policy(command: Sequence[str], *, database_url: str) -> Non
             "--db-url",
             "<DATABASE_URL>",
         ),
+        (
+            "supabase", "db", "query", DEMO_PROOF_QUERY,
+            "--output", "csv", "--agent=no", "--db-url", "<DATABASE_URL>",
+        ),
     }
     shape = tuple("<DATABASE_URL>" if token == database_url else token for token in command)
     require(shape in allowed_shapes, "COMMAND_SHAPE_FORBIDDEN")
@@ -1581,6 +1639,10 @@ def build_command(kind: str, authority: TargetAuthority) -> list[str]:
             "--agent=no",
             "--db-url",
             database_url,
+        ],
+        "reconstructible-demo": [
+            "supabase", "db", "query", DEMO_PROOF_QUERY,
+            "--output", "csv", "--agent=no", "--db-url", database_url,
         ],
     }
     require(kind in commands, "COMMAND_KIND_FORBIDDEN")
@@ -2100,6 +2162,30 @@ def inspect_fresh_empty_state(
         secret_values=authority.secret_values,
     )
     return evidence
+
+
+def inspect_reconstructible_demo(
+    *,
+    evidence_directory: Path,
+    authority: TargetAuthority,
+    repository_root: Path,
+) -> None:
+    result = run_cli(
+        kind="reconstructible-demo",
+        evidence_path=evidence_directory / "RECONSTRUCTIBLE-DEMO-QUERY.txt",
+        authority=authority,
+        repository_root=repository_root,
+    )
+    rows = list(csv.reader((result.stdout or "").strip().splitlines()))
+    require(
+        len(rows) == 2 and rows[0] == ["digest"] and len(rows[1]) == 1,
+        "RECONSTRUCTIBLE_DEMO_PROOF_INVALID",
+    )
+    write_json_exclusive(
+        evidence_directory / DEMO_EVIDENCE_FILE,
+        demo_evidence(rows[1][0]),
+        secret_values=authority.secret_values,
+    )
 
 
 def migration_state_evidence(
@@ -2775,6 +2861,12 @@ def execute(args: argparse.Namespace) -> None:
             validated_plan_artifact_id=args.validated_plan_artifact_id,
             validated_plan_artifact_digest=args.validated_plan_artifact_digest,
         )
+        reconstructible_demo = reconstructible_demo_requested()
+        if reconstructible_demo:
+            require(
+                apply_authority is None or apply_authority["backup"] is None,
+                "RECONSTRUCTIBLE_DEMO_BACKUP_CONFLICT",
+            )
         request_evidence = validate_request_identity(
             repository=os.environ.get("GITHUB_REPOSITORY", ""),
             event_name=os.environ.get("GITHUB_EVENT_NAME", ""),
@@ -2858,6 +2950,13 @@ def execute(args: argparse.Namespace) -> None:
                 migration_state,
                 code="PLAN_FRESH_HISTORY_DRIFT",
             )
+            if reconstructible_demo:
+                validate_pending_migration_scope(repository_root, migration_state["pendingVersions"])
+                inspect_reconstructible_demo(
+                    evidence_directory=evidence_directory,
+                    authority=authority,
+                    repository_root=repository_root,
+                )
         elif args.operation == "apply":
             require(apply_authority is not None, "APPLY_AUTHORITY_MISSING")
             require(
@@ -2876,6 +2975,7 @@ def execute(args: argparse.Namespace) -> None:
                     validated_ci_run_id=request_evidence["validatedCiRunId"],
                     target_evidence=target_evidence,
                     migration_manifest=migration_manifest,
+                    reconstructible_demo=reconstructible_demo,
                 )
             except StagingDatabaseError as error:
                 write_json_exclusive(
@@ -2905,8 +3005,8 @@ def execute(args: argparse.Namespace) -> None:
                 plan_evidence,
                 secret_values=authority.secret_values,
             )
-            uses_fresh_empty_exception = apply_authority["backup"] is None
-            if not uses_fresh_empty_exception:
+            uses_fresh_empty_exception = apply_authority["backup"] is None and not reconstructible_demo
+            if apply_authority["backup"] is not None:
                 backup_authority = apply_authority["backup"]
                 require(isinstance(backup_authority, dict), "BACKUP_AUTHORITY_MISSING")
                 require(
@@ -3096,6 +3196,13 @@ def execute(args: argparse.Namespace) -> None:
                     )
                     > datetime.now(timezone.utc),
                     "BACKUP_RECEIPT_RPO_INVALID",
+                )
+            if reconstructible_demo:
+                validate_pending_migration_scope(repository_root, pre_apply_state["pendingVersions"])
+                inspect_reconstructible_demo(
+                    evidence_directory=evidence_directory,
+                    authority=authority,
+                    repository_root=repository_root,
                 )
             attempt = run_apply_mutation(
                 evidence_path=evidence_directory / "APPLY-DB-PUSH.txt",

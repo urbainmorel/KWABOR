@@ -380,9 +380,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     indépendante.
   - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
     sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
-  - [ ] BETA-STAGING-001C — La référence production est provisionnée. Qualifier la copie de
-    récupération age hors ligne, puis exécuter B6.02, migration ACL, archivage et publication du
-    corpus de démonstration. La qualification Auth et l'ouverture de cohorte sont des étapes séparées.
+  - [ ] BETA-STAGING-001C — Implémenter la preuve de staging reconstructible prévue par ADR-0038.
+    Rejouer ensuite migration ACL, archivage et publication du corpus fictif, puis tester sur le
+    Tecno. La qualification Auth et l'ouverture de cohorte sont des étapes séparées.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

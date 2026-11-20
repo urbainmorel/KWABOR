@@ -485,7 +485,8 @@ def sql_literal(value: str) -> str:
 def apply_sql(
     plan_state: Mapping[str, Any],
     *,
-    apply_valid_until: datetime,
+    apply_valid_until: datetime | None,
+    reconstructible_guard: str = "",
 ) -> str:
     plan_mode = state_mode(plan_state)
     plan_child_digest = str(plan_state["childSetSha256"])
@@ -500,15 +501,19 @@ def apply_sql(
     locks = "\n".join(f"lock table {table} in share mode;" for table in CLOSURE_TABLES)
     non_event_ids = target_ids_sql(FIXTURE_IDS[:-1])
     state_sql = state_select_sql()
-    deadline_text = apply_valid_until.astimezone(timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
     require(
-        re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", deadline_text)
-        is not None,
-        "BACKUP_APPLY_WINDOW_INVALID",
+        (apply_valid_until is not None) != bool(reconstructible_guard),
+        "FIXTURE_ARCHIVE_AUTHORITY_INVALID",
     )
-    deadline_sql = f"'{deadline_text}'"
+    deadline_sql = "NULL"
+    if apply_valid_until is not None:
+        deadline_text = apply_valid_until.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        require(
+            re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", deadline_text)
+            is not None,
+            "BACKUP_APPLY_WINDOW_INVALID",
+        )
+        deadline_sql = f"'{deadline_text}'"
     return f"""
 begin isolation level serializable;
 set local timezone = 'UTC';
@@ -576,6 +581,7 @@ begin
   end if;
 end;
 $guard$;
+{reconstructible_guard}
 do $backup_window_final$
 begin
   if clock_timestamp() >= {deadline_sql}::timestamptz then
@@ -1122,21 +1128,31 @@ def execute(args: argparse.Namespace) -> None:
             project_ref_sha256=os.environ.get("KWABOR_STAGING_PROJECT_REF_SHA256", ""),
             database_url=os.environ.get("KWABOR_STAGING_DATABASE_URL", ""),
         )
-        backup_run_id = positive_integer(args.backup_run_id, "BACKUP_RUN_ID_INVALID")
-        backup_artifact_id = positive_integer(args.backup_artifact_id, "BACKUP_ARTIFACT_ID_INVALID")
-        require(SHA256_PATTERN.fullmatch(args.backup_artifact_digest or "") is not None, "BACKUP_DIGEST_INVALID")
-        backup_evidence = guard.validate_backup_artifact_bundle(
-            run_document=load_json(Path(args.backup_run_json), "BACKUP_RUN_EVIDENCE_INVALID"),
-            artifact_document=load_json(Path(args.backup_artifact_json), "BACKUP_ARTIFACT_EVIDENCE_INVALID"),
-            archive_path=Path(args.backup_artifact_zip),
-            backup_run_id=backup_run_id,
-            backup_artifact_id=backup_artifact_id,
-            backup_artifact_digest=args.backup_artifact_digest,
-            expected_sha=args.expected_sha,
-            validated_ci_run_id=int(args.validated_ci_run_id),
-            target_evidence=authority.public_evidence(),
-        )
-        backup = summarize_backup(backup_evidence)
+        reconstructible_demo = guard.reconstructible_demo_requested()
+        if reconstructible_demo:
+            require(
+                not any((args.backup_run_id, args.backup_artifact_id, args.backup_artifact_digest)),
+                "RECONSTRUCTIBLE_DEMO_BACKUP_CONFLICT",
+            )
+            proof = run_psql(authority.database_url, guard.DEMO_PROOF_QUERY)
+            require(proof.returncode == 0, "RECONSTRUCTIBLE_DEMO_QUERY_FAILED")
+            backup = guard.demo_evidence(proof.stdout.strip())
+        else:
+            backup_run_id = positive_integer(args.backup_run_id, "BACKUP_RUN_ID_INVALID")
+            backup_artifact_id = positive_integer(args.backup_artifact_id, "BACKUP_ARTIFACT_ID_INVALID")
+            require(SHA256_PATTERN.fullmatch(args.backup_artifact_digest or "") is not None, "BACKUP_DIGEST_INVALID")
+            backup_evidence = guard.validate_backup_artifact_bundle(
+                run_document=load_json(Path(args.backup_run_json), "BACKUP_RUN_EVIDENCE_INVALID"),
+                artifact_document=load_json(Path(args.backup_artifact_json), "BACKUP_ARTIFACT_EVIDENCE_INVALID"),
+                archive_path=Path(args.backup_artifact_zip),
+                backup_run_id=backup_run_id,
+                backup_artifact_id=backup_artifact_id,
+                backup_artifact_digest=args.backup_artifact_digest,
+                expected_sha=args.expected_sha,
+                validated_ci_run_id=int(args.validated_ci_run_id),
+                target_evidence=authority.public_evidence(),
+            )
+            backup = summarize_backup(backup_evidence)
         plan_evidence: dict[str, Any] | None = None
         plan_state: dict[str, Any] | None = None
         if args.operation == "apply":
@@ -1192,12 +1208,26 @@ def execute(args: argparse.Namespace) -> None:
                 )
             result: PsqlResult | None
             try:
-                apply_valid_until = require_backup_apply_window(guard, backup)
+                apply_valid_until = None
+                reconstructible_guard = ""
+                if reconstructible_demo:
+                    reconstructible_guard = f"""
+do $demo_proof$
+begin
+  if ({guard.DEMO_PROOF_QUERY}) is distinct from '{guard.DEMO_DIGEST}' then
+    raise exception 'RECONSTRUCTIBLE_DEMO_DATA_DRIFT' using errcode = 'P0001';
+  end if;
+end;
+$demo_proof$;
+"""
+                else:
+                    apply_valid_until = require_backup_apply_window(guard, backup)
                 result = run_psql(
                     authority.database_url,
                     apply_sql(
                         plan_state,
                         apply_valid_until=apply_valid_until,
+                        reconstructible_guard=reconstructible_guard,
                     ),
                     timeout=240,
                 )

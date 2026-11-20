@@ -1,6 +1,6 @@
 # Base Supabase staging — migration et qualification protégées
 
-Ce runbook couvre `plan`, `apply` avec exception staging vierge ou backup B6.02 qualifié, et `verify`
+Ce runbook couvre `plan`, `apply` et `verify`
 pour les migrations versionnées Kwabor. Il ne crée pas le projet Supabase, n’importe pas le catalogue
 de démonstration et ne ferme pas seul G5. Le reçu est une contribution
 `taskId=B6.01.database-migrations`, `contributesTo=G5`, avec `gateClosed=false`.
@@ -136,7 +136,13 @@ le même digest sous `sha256:<digest>` ; le runner exige les deux représentatio
 
 ## Opération `apply` — staging vierge ou backup B6.02 qualifié
 
-Deux chemins exclusifs sont autorisés :
+Pour le jalon individuel [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md),
+ajouter `-f reconstructible_demo=true` à `plan` et `apply`, en laissant les entrées backup vides.
+Le plan publie `RECONSTRUCTIBLE-DEMO.json` après contrôle du jeu fictif exact et des tables
+Auth et Storage vides. L’apply lie cette preuve au plan validé, puis refait le contrôle avant
+la migration ACL épinglée. Le gel des écritures externes s’applique jusqu’à la vérification.
+
+Pour le parcours par défaut, deux chemins exclusifs sont autorisés :
 
 1. `backup_*` tous vides et preuve `fresh empty` stricte ;
 2. `backup_*` tous renseignés depuis un run vert du workflow B6.02, conformément au
@@ -197,7 +203,7 @@ Après validation du plan et de la confirmation de l’opérateur, le runner :
 Toute non-vacuité sans backup, dérive ou absence de preuve read-only avant l’étape 8 produit un
 reçu rouge ou `status=prepared_not_executable`, `mutationState=not_started`. La base n’est pas
 mutée. Un backup expiré, une donnée Auth/Storage apparue ou un scope pending incompatible impose
-une nouvelle capture B6.02 ; aucune exception reconstructible n’existe.
+une nouvelle capture B6.02 pour le parcours par défaut.
 
 ## Réconciliation après erreur ou timeout
 
