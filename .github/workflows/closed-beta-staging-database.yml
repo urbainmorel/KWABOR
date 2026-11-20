@@ -3,6 +3,11 @@ name: Closed-beta staging database
 on:
   workflow_dispatch:
     inputs:
+      reconstructible_demo:
+        description: Use the audited reconstructible demo staging dataset without B6.02
+        required: false
+        default: false
+        type: boolean
       operation:
         description: Plan, apply, or independently verify the staging migrations
         required: true
@@ -70,6 +75,7 @@ jobs:
     timeout-minutes: 45
     environment: staging
     env:
+      RECONSTRUCTIBLE_DEMO: ${{ inputs.reconstructible_demo }}
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
       OPERATION: ${{ inputs.operation }}

@@ -30,7 +30,8 @@
   `KWABOR_DEMO_MEDIA_BASE_URL` ;
 - secrets `KWABOR_SUPABASE_SERVICE_ROLE_KEY` et `KWABOR_STAGING_DATABASE_URL`, présents uniquement
   dans ce GitHub Environment ;
-- sauvegarde/restauration staging qualifiées ;
+- sauvegarde/restauration staging qualifiées pour la cohorte, ou migrations et archivage vérifiés
+  en mode `reconstructible_demo=true` pour le test individuel ADR-0038 ;
 - opérateur autorisé à interrompre et restaurer le lot.
 - run `CI` réussi, déclenché par `push` sur `main`, pour le même `expected_sha` ; son identifiant
   positif est fourni comme `validated_ci_run_id` aux deux workflows.

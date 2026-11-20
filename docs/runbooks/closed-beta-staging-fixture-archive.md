@@ -83,7 +83,13 @@ sauvegarde complète. Ne jamais prolonger une date dans un reçu.
 
 ## Séquence plan → confirmation → apply → verify
 
-Les trois opérations réutilisent le même SHA, le même run CI et le même reçu B6.02.
+Pour le jalon individuel ADR-0038, ajouter `-f reconstructible_demo=true` aux trois opérations
+et laisser leurs entrées backup vides. Le reçu atteste alors la politique `reconstructible-demo-v1`.
+L’empreinte du catalogue fictif et la vacuité Auth/Storage sont revérifiées dans la transaction
+d’archivage. Exécuter `verify` avant la publication Storage.
+
+Les trois opérations réutilisent le même SHA et le même run CI. Le parcours par défaut
+réutilise aussi le même reçu B6.02.
 
 ### 1. Plan non mutatif
 

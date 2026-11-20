@@ -1917,6 +1917,25 @@ class WorkflowStaticPolicyTest(unittest.TestCase):
                 job = workflow.split("\njobs:\n", 1)[1].split("\n    environment: staging", 1)[0]
                 self.assertIn(owner_gate, job)
 
+    def test_reconstructible_demo_requires_exact_digest(self) -> None:
+        self.assertEqual(database.demo_evidence(database.DEMO_DIGEST)["policy"], "reconstructible-demo-v1")
+        for digest in ("", "a" * 64):
+            with self.subTest(digest=digest), self.assertRaisesRegex(
+                database.StagingDatabaseError, "RECONSTRUCTIBLE_DEMO_DATA_DRIFT"
+            ):
+                database.demo_evidence(digest)
+
+    def test_reconstructible_demo_proof_checks_empty_managed_data(self) -> None:
+        for column in (
+            "managed_schema_table_drift_count",
+            "auth_user_count",
+            "auth_relevant_row_count",
+            "storage_object_count",
+            "storage_bucket_count",
+            "storage_relevant_row_count",
+        ):
+            self.assertIn(f"counts.{column} = 0", database.DEMO_PROOF_QUERY)
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
