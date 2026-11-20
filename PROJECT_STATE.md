@@ -55,16 +55,14 @@ surface différée n'est déclarée terminée.
   par le propriétaire, en `eu-west-1`, saine et vide. Sa référence non secrète alimente les guards
   GitHub ; aucun schéma, donnée ou réglage Auth de production n'y a été déployé.
 - Les Environments GitHub `staging`, `production`, `play-internal` et `testflight-internal` existent,
-  interdisent le bypass administrateur et ciblent les branches protégées. Aucun reviewer indépendant
-  n'est actuellement configuré ; toute opération protégée qui exige une approbation reste donc
-  bloquée jusqu'à désignation d'une autorité légitime. Les identités Firebase/OAuth, les signatures
-  mobiles, l'escrow B6.02 et les autorités Store restent incomplets.
-- La PR ouverte `#63` porte le tracker de sessions consenties, la sonde monotone du first usable
-  viewport Android/iOS et les garde-fous staging. Sa tête fonctionnelle auditée
-  `ba1738459896cda8e17318edb7d1ed7c5e1d4cc7` est propre, exactement synchronisée avec sa branche
-  distante et qualifiée par le run CI `32446975862` entièrement vert. Elle est fusionnable mais
-  bloquée par la règle générique d'une approbation indépendante ; aucun reviewer n'est demandé ou
-  configuré. Tout delta documentaire ultérieur doit recevoir sa propre qualification exact-head.
+  interdisent le bypass administrateur et ciblent les branches protégées. La politique de
+  démonstration [ADR-0038](docs/adr/0038-single-maintainer-closed-beta-governance.md) réserve les
+  opérations catalogue au mainteneur canonique. Auth et distribution gardent leurs exigences
+  d'approbation. Les identités Firebase/OAuth, les signatures mobiles et les autorités Store
+  restent incomplets.
+- Les PR `#63` et `#64` sont fusionnées. Le run post-fusion `44724652825` est vert sur
+  `0e9486bae71b2101691700048ee0cd8be5f7390b`. Le corpus staging reste à charger après
+  qualification du mode de démonstration et de la récupération B6.02.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -74,7 +72,7 @@ surface différée n'est déclarée terminée.
   miroir Room/synchronisation/UI de l'historique de recherche, autocomplétion, drawer Explore et
   filtres avancés, multi-ville, compteur live, recherche filtrée, carte, avis, partage public,
   signalement, claim, IA, contribution, B2B, paiement et notifications.
-- La décision de release reste **no-go** : escrow de sauvegarde à deux personnes, exécution B6.02,
+- La décision de release reste **no-go** : preuve de récupération hors ligne, exécution B6.02,
   migration distante, Auth/SMTP/OAuth, corpus, juridique, builds signés,
   appareils physiques, accessibilité, performance et rollback ne sont pas encore qualifiés.
 - Le PRD et le DESIGN conservent leur cible complète à cinq racines. ADR-0036 accepte un profil de

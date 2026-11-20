@@ -31,7 +31,7 @@ class DemoCatalogDatabaseTest(unittest.TestCase):
         self.assertIn(".can_admins_bypass == false", workflow)
         self.assertIn(".deployment_branch_policy.protected_branches == true", workflow)
         self.assertIn(".deployment_branch_policy.custom_branch_policies == false", workflow)
-        self.assertIn(".prevent_self_review == true", workflow)
+        self.assertIn('.[0].type == "branch_policy"', workflow)
         self.assertIn("validated_ci_run_id:", workflow)
         self.assertIn("validate-github-run", workflow)
         self.assertIn("validated-ci-provenance.json", workflow)

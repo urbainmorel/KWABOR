@@ -250,7 +250,7 @@ def create_backup_archive(
     recipient_sha256 = "f" * 64
     receipt: dict[str, object] = {
         "ageEscrow": {
-            "custodyMode": "offline-two-person",
+            "custodyMode": "offline-single-maintainer",
             "maxRecoveryTestAgeDays": 90,
             "recipientSha256": recipient_sha256,
             "recoveryTestedAt": "2026-08-19T12:00:00Z",
@@ -298,9 +298,9 @@ def create_backup_archive(
             "canAdminsBypass": False,
             "environmentId": 10,
             "name": "staging",
-            "preventSelfReview": True,
+            "governanceMode": "single-maintainer-demo",
             "protectedBranchesOnly": True,
-            "reviewerCount": 1,
+            "reviewerCount": 0,
             "schemaVersion": 1,
             "updatedAt": "2026-08-20T11:00:00Z",
         },
@@ -387,16 +387,7 @@ def valid_environment() -> dict[str, object]:
         },
         "id": 10,
         "name": "staging",
-        "protection_rules": [
-            {
-                "prevent_self_review": True,
-                "reviewers": [
-                    {"reviewer": {"id": 42, "login": "reviewer"}, "type": "User"}
-                ],
-                "type": "required_reviewers",
-            },
-            {"type": "branch_policy"},
-        ],
+        "protection_rules": [{"type": "branch_policy"}],
         "updated_at": "2026-08-20T12:00:00Z",
     }
 
@@ -489,26 +480,27 @@ class RequestAndProviderGuardTest(unittest.TestCase):
                     document, expected_run_id="100", expected_sha=EXPECTED_SHA
                 )
 
-    def test_environment_requires_reviewer_self_review_block_and_protected_branches(self) -> None:
+    def test_environment_requires_protected_branches_and_no_admin_bypass(self) -> None:
         evidence = database.validate_environment_protection(valid_environment())
         self.assertFalse(evidence["canAdminsBypass"])
-        self.assertTrue(evidence["preventSelfReview"])
+        self.assertEqual(evidence["governanceMode"], "single-maintainer-demo")
+        self.assertEqual(evidence["reviewerCount"], 0)
         serialized = json.dumps(evidence)
         self.assertNotIn('"login"', serialized)
         self.assertNotIn('"reviewer":', serialized)
 
         bypass = valid_environment()
         bypass["can_admins_bypass"] = True
-        missing_reviewer = valid_environment()
-        missing_reviewer["protection_rules"] = [{"type": "branch_policy"}]
-        self_review = valid_environment()
-        self_review["protection_rules"][0]["prevent_self_review"] = False  # type: ignore[index]
+        missing_branch_rule = valid_environment()
+        missing_branch_rule["protection_rules"] = []
+        other_environment = valid_environment()
+        other_environment["name"] = "production"
         unprotected = valid_environment()
         unprotected["deployment_branch_policy"] = {
             "custom_branch_policies": True,
             "protected_branches": False,
         }
-        for document in (bypass, missing_reviewer, self_review, unprotected):
+        for document in (bypass, missing_branch_rule, other_environment, unprotected):
             with self.subTest(document=document), self.assertRaises(database.StagingDatabaseError):
                 database.validate_environment_protection(document)
 
@@ -1164,6 +1156,15 @@ class GitHubArtifactProofTest(unittest.TestCase):
             {"target": {"environment": "production"}},
             {"targetDigestSha256": "0" * 64},
             {"restorable": False},
+            {
+                "environmentEvidence": {
+                    "name": "staging",
+                    "canAdminsBypass": False,
+                    "protectedBranchesOnly": True,
+                    "preventSelfReview": True,
+                    "reviewerCount": 1,
+                }
+            },
             {"schemaVersion": 1},
             {"workflowPath": ".github/workflows/ci.yml"},
             {"databaseScope": {}},
@@ -1894,6 +1895,28 @@ def urllib_unquoted_password() -> str:
 
 
 class WorkflowStaticPolicyTest(unittest.TestCase):
+    def test_demo_workflows_gate_environment_access_on_canonical_maintainer(self) -> None:
+        workflows = (
+            "closed-beta-staging-database-backup",
+            "closed-beta-staging-database",
+            "closed-beta-staging-fixture-archive",
+            "closed-beta-demo-storage",
+            "closed-beta-demo-catalog",
+        )
+        owner_gate = (
+            "    if: >-\n"
+            "      github.repository == 'urbainmorel/KWABOR' &&\n"
+            "      github.ref == 'refs/heads/main' &&\n"
+            "      github.ref_protected &&\n"
+            "      github.actor_id == '146450999' &&\n"
+            "      github.triggering_actor == 'urbainmorel'\n"
+        )
+        for name in workflows:
+            with self.subTest(workflow=name):
+                workflow = (WORKFLOW_PATH.parent / f"{name}.yml").read_text(encoding="utf-8")
+                job = workflow.split("\njobs:\n", 1)[1].split("\n    environment: staging", 1)[0]
+                self.assertIn(owner_gate, job)
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.workflow = WORKFLOW_PATH.read_text(encoding="utf-8")

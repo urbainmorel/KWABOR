@@ -34,6 +34,12 @@ concurrency:
 
 jobs:
   catalog_database:
+    if: >-
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     name: ${{ inputs.operation }} demo catalog on staging
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -78,12 +84,7 @@ jobs:
             .can_admins_bypass == false and
             .deployment_branch_policy.protected_branches == true and
             .deployment_branch_policy.custom_branch_policies == false and
-            any(
-              .protection_rules[];
-              .type == "required_reviewers" and
-              .prevent_self_review == true and
-              (.reviewers | length) > 0
-            )
+            (.protection_rules | type == "array" and length == 1 and .[0].type == "branch_policy")
           ' <<<"$environment_json" >/dev/null; then
             echo "The staging Environment is not protected for a demo database operation." >&2
             exit 1

@@ -16,8 +16,8 @@ d’historique et cible production sont interdits.
 - `expected_sha` complet, minuscule, égal au SHA dispatché et au checkout ;
 - `validated_ci_run_id` obligatoire : run exact de `.github/workflows/ci.yml`, événement `push`,
   branche `main`, même SHA, état `completed`, conclusion `success` ;
-- Environment `staging` sans bypass administrateur, avec reviewer, `prevent_self_review=true` et
-  branches protégées uniquement ;
+- Environment `staging` sans bypass administrateur et branches protégées uniquement, avec
+  déclenchement et relance réservés au propriétaire canonique selon [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md) ;
 - cible liée par URL publique, project ref et SHA-256 du project ref ; staging et production sont
   valides et distincts ;
 - URI PostgreSQL issue uniquement du secret de l’Environment, avec parseur strict et environnement
@@ -32,8 +32,7 @@ d’historique et cible production sont interdits.
 | --- | --- |
 | Admin bypass | désactivé |
 | Deployment branches | protected branches uniquement |
-| Required reviewers | au moins un reviewer indépendant |
-| Prevent self-review | activé |
+| Déclenchement et relance | compte canonique `urbainmorel` |
 
 Variables existantes :
 
@@ -122,7 +121,7 @@ gh workflow run closed-beta-staging-database.yml \
   -f validated_ci_run_id=<successful-ci-run-id>
 ```
 
-Après approbation de l’Environment, `plan` :
+Après validation des protections de l’Environment, `plan` :
 
 1. archive l’historique distant et prouve qu’il est un préfixe local exact ;
 2. exécute `supabase db push --dry-run --db-url '<protected-staging-uri>'`, sans seed ;
@@ -147,7 +146,7 @@ Un triplet backup partiel est refusé. Le producteur doit être sur le même rep
 avoir restauré son ciphertext dans Supabase éphémère avec fingerprint identique et rester dans sa
 fenêtre RPO. L’artefact GitHub doit être non expiré et son escrow age couvrir son expiration réelle.
 
-Avant approbation, confirmer que ce projet neuf n’est routé vers aucun client, job, webhook ou
+Avant de lancer `apply`, confirmer que ce projet neuf n’est routé vers aucun client, job, webhook ou
 opérateur SQL. Le groupe GitHub sérialise les workflows Kwabor, mais ne peut pas bloquer une écriture
 directe externe entre le dernier snapshot et la commande CLI ; le gel opérationnel du projet est donc
 une précondition explicite de l’exception.
@@ -175,7 +174,7 @@ Pour un staging non vierge, ajouter obligatoirement :
   -f backup_artifact_digest=<qualified-b602-raw-sha256>
 ```
 
-Après approbation indépendante, le runner :
+Après validation du plan et de la confirmation de l’opérateur, le runner :
 
 1. relit par l’API GitHub le run de plan et sa métadonnée d’artefact ;
 2. vérifie dépôt, workflow, run, attempt, SHA, branche, statut, expiration, nom, taille et digest ;
@@ -206,8 +205,8 @@ Le runner ne réessaie jamais `db push`. Après un code non nul ou un timeout, i
 
 | Preuve read-only | Reçu | Action opérateur |
 | --- | --- | --- |
-| aucune migration appliquée **et** base toujours strictement vierge | `failed`, `not_committed` | nouveau plan et nouvelle approbation requis |
-| CLI absente ou impossible à lancer avant toute mutation, historique strictement identique au pré-apply | `failed`, `not_committed`, `EXECUTION_NOT_STARTED` | corriger le runner, puis nouveau plan et nouvelle approbation |
+| aucune migration appliquée **et** base toujours strictement vierge | `failed`, `not_committed` | nouveau plan et nouvelle confirmation requis |
+| CLI absente ou impossible à lancer avant toute mutation, historique strictement identique au pré-apply | `failed`, `not_committed`, `EXECUTION_NOT_STARTED` | corriger le runner, puis nouveau plan et nouvelle confirmation |
 | liste distante complète et exactement égale au manifeste local | qualification post-apply, puis `succeeded`, `committed`, `EXECUTED_RECOVERED` | conserver l'erreur récupérée dans le reçu |
 | code retour non nul/timeout, préfixe partiel, historique inconnu, objet sans historique ou réconciliation impossible | `indeterminate`, `mutationState=indeterminate`, `DO_NOT_RETRY` | geler les writers et investiguer humainement |
 
@@ -271,4 +270,4 @@ sha256sum --check GEL-G5-STAGING-DATABASE.json.sha256
 Les aides intégrées `supabase db push --help`, `supabase db query --help`,
 `supabase migration list --help`, `supabase db lint --help` et `supabase db advisors --help` ont été
 revérifiées. Toute montée de version exige les tests statiques, un nouveau `plan` et une nouvelle
-approbation avant `apply`.
+confirmation avant `apply`.

@@ -34,8 +34,8 @@ Avant toute mutation, l’outil exige simultanément :
 
 - dépôt `urbainmorel/KWABOR`, `refs/heads/main`, SHA complet dispatché = checkout = SHA GitHub ;
 - CI `push/main` verte pour ce SHA exact ;
-- Environment `staging` sans bypass admin, limité aux branches protégées, avec relecteur indépendant
-  et auto-approbation interdite ;
+- Environment `staging` sans bypass admin, limité aux branches protégées, avec exécution
+  réservée au propriétaire canonique selon [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md) ;
 - project ref staging lié à l’URL API, au digest protégé et au session pooler TLS port 5432 ; project
   ref Production valide et distinct ;
 - reçu B6.02 du même SHA/CI/cible, `restorable=true`, restauration réelle verte, fingerprint source =
@@ -105,9 +105,9 @@ le résumé du run le `plan_run_id`, le `plan_artifact_id` et le digest brut de 
 
 ### 2. Revue et confirmation
 
-Un relecteur indépendant vérifie le GEL du plan, les quatre identités, `otherPublishedListings=0`,
-les empreintes de contenu/enfants, la référence B6.02 et sa date limite. L’approbation de
-l’Environment est distincte de la phrase de confirmation.
+Le mainteneur vérifie le GEL du plan, les quatre identités, `otherPublishedListings=0`,
+les empreintes de contenu/enfants, la référence B6.02 et sa date limite, puis utilise la phrase
+de confirmation dans un déclenchement séparé.
 
 ### 3. Apply exact
 
@@ -152,7 +152,7 @@ gh workflow run closed-beta-staging-fixture-archive.yml \
 ```
 
 Le résultat attendu est `transition=verified-already-archived`, quatre lignes archivées, zéro fiche
-publiée et les mêmes empreintes contenu/enfants. Conserver l’approbation, le run URL et l’artefact.
+publiée et les mêmes empreintes contenu/enfants. Conserver l’URL du run et l’artefact.
 
 ## Reçu GEL et conservation
 

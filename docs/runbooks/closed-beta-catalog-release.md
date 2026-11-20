@@ -23,7 +23,8 @@
 
 - branche candidate propre et revue ;
 - manifeste, 180 JPEG et checksums versionnés ;
-- GitHub Environment `staging` avec reviewer obligatoire et sans bypass administrateur ;
+- GitHub Environment `staging` limité aux branches protégées, sans bypass administrateur. Le
+  propriétaire canonique déclenche les opérations depuis `main` selon [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md) ;
 - variables `KWABOR_SUPABASE_URL`, `KWABOR_SUPABASE_PROJECT_REF`,
   `KWABOR_PRODUCTION_SUPABASE_PROJECT_REF`, `KWABOR_STAGING_PROJECT_REF_SHA256` et
   `KWABOR_DEMO_MEDIA_BASE_URL` ;

@@ -34,6 +34,12 @@ concurrency:
 
 jobs:
   staging_database_backup:
+    if: >-
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     name: ${{ inputs.operation }} encrypted staging database backup
     runs-on: ubuntu-24.04
     timeout-minutes: 60
