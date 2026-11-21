@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -60,13 +60,15 @@ def _project_ref_from_database_url(database_url: str) -> str:
     parsed = urlparse(database_url)
     require(parsed.scheme in {"postgres", "postgresql"}, "Staging database URL must use PostgreSQL")
     require(parsed.hostname is not None, "Staging database URL is missing a hostname")
-    require(parsed.username is not None, "Staging database URL is missing a username")
+    require(bool(parsed.username) and bool(parsed.password), "Staging database URL is missing credentials")
     require(parsed.path == "/postgres", "Staging database URL must target the postgres database")
     require(not parsed.fragment, "Staging database URL must not contain a fragment")
     try:
+        port = parsed.port
         query_parameters = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True)
     except ValueError as error:
-        raise DatabaseOperationError("Staging database URL query is malformed") from error
+        raise DatabaseOperationError("Staging database URL is malformed") from error
+    require(port in {None, 5432}, "Staging database URL must use the PostgreSQL session port")
     require(
         query_parameters == {"sslmode": ["require"]},
         "Staging database URL must contain only sslmode=require",
@@ -110,12 +112,22 @@ def _manifest_ids() -> list[str]:
 
 
 def _run_psql(database_url: str, *arguments: str) -> subprocess.CompletedProcess[str]:
-    environment = os.environ.copy()
-    environment["PGDATABASE"] = database_url
-    environment["PGCONNECT_TIMEOUT"] = "10"
+    target = urlparse(database_url)
+    environment = {
+        key: value for key, value in os.environ.items() if not key.upper().startswith(("PG", "KWABOR_"))
+    }
+    environment.update(
+        PGDATABASE="postgres",
+        PGHOST=target.hostname,
+        PGPORT="5432",
+        PGUSER=unquote(target.username),
+        PGPASSWORD=unquote(target.password),
+        PGSSLMODE="require",
+        PGCONNECT_TIMEOUT="10",
+    )
     try:
         return subprocess.run(
-            ["psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1", *arguments],
+            ["psql", "--no-psqlrc", "--no-password", "--set", "ON_ERROR_STOP=1", *arguments],
             cwd=REPOSITORY_ROOT,
             check=False,
             capture_output=True,
