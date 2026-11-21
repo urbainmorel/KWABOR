@@ -109,6 +109,7 @@ jobs:
             tools.test_compile_demo_catalog_seed \
             tools.test_closed_beta_gel \
             tools.test_run_demo_catalog_database
+          python3 -m pip install --disable-pip-version-check --requirement tools/requirements-demo-media.txt
           python3 -B tools/verify-demo-catalog.py --require-media
           python3 -B tools/build-demo-catalog-manifest.py --check
           python3 -B tools/compile-demo-catalog-seed.py --check
