@@ -80,14 +80,15 @@ internal fun NavHostController.resetToHomeAfterAuthenticationEnd() {
         launchSingleTop = true
         restoreState = false
     }
-    clearBackStack(HomeRoute)
-    clearBackStack(GuideDiscoveryRoute)
-    clearBackStack(SocialRoute)
-    clearBackStack(AddRoute)
-    clearBackStack(NotificationsRoute)
-    clearBackStack(ProfileRoute)
-    clearBackStack(FavoritesRoute)
-    clearBackStack(SettingsRoute)
+    // Route types can clear saved state even when the current graph omits those destinations.
+    clearBackStack<HomeRoute>()
+    clearBackStack<GuideDiscoveryRoute>()
+    clearBackStack<SocialRoute>()
+    clearBackStack<AddRoute>()
+    clearBackStack<NotificationsRoute>()
+    clearBackStack<ProfileRoute>()
+    clearBackStack<FavoritesRoute>()
+    clearBackStack<SettingsRoute>()
 }
 
 internal fun NavHostController.purgePrivateProfileChildren() {
