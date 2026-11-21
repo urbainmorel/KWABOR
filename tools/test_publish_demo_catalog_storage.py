@@ -860,6 +860,28 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
         self.assertIn(("exists", media.path), client.calls)
         self.assertIn(("download", media.path), client.calls)
 
+    def test_bucket_lookup_recognizes_only_the_structured_missing_bucket_error(self) -> None:
+        client = storage.StorageClient("https://abcdefghijklmnopqrst.supabase.co", "test-key", 1.0)
+        for status, detail, missing in (
+            (404, b"", True),
+            (400, b'{"statusCode":"404","code":"NoSuchBucket"}', True),
+            (400, b'{"statusCode":"404","code":"NoSuchKey"}', False),
+            (400, b'{"statusCode":"403","code":"NoSuchBucket"}', False),
+            (403, b'{"statusCode":"404","code":"NoSuchBucket"}', False),
+            (400, b"malformed", False),
+        ):
+            with self.subTest(status=status, detail=detail):
+                error = storage.urllib.error.HTTPError(
+                    "https://abcdefghijklmnopqrst.supabase.co/storage/v1/bucket/demo",
+                    status, "Storage error", {}, io.BytesIO(detail),
+                )
+                with patch.object(storage.urllib.request, "urlopen", side_effect=error):
+                    if missing:
+                        self.assertIsNone(client.get_bucket("demo"))
+                    else:
+                        with self.assertRaises(storage.StorageHttpError):
+                            client.get_bucket("demo")
+
     def test_mutating_http_5xx_is_classified_as_post_commit_uncertain(self) -> None:
         client = storage.StorageClient(
             "https://abcdefghijklmnopqrst.supabase.co",
@@ -879,6 +901,23 @@ class PublishDemoCatalogStorageTest(unittest.TestCase):
                     client._request("POST", "object/path", b"payload")
         finally:
             error.close()
+
+    def test_object_lookup_confirms_opaque_head_400_on_exact_get(self) -> None:
+        client = storage.StorageClient("https://abcdefghijklmnopqrst.supabase.co", "test-key", 1.0)
+        initial = storage.StorageHttpError("HEAD", 400, "")
+        for code in ("NoSuchKey", "NoSuchBucket"):
+            detail = json.dumps({"statusCode": "404", "code": code})
+            lookup = storage.StorageHttpError("GET", 400, detail)
+            with self.subTest(code=code), patch.object(client, "_request", side_effect=[initial, lookup]) as request:
+                if code == "NoSuchKey":
+                    self.assertFalse(client.object_exists("demo", "v1/asset.jpg"))
+                else:
+                    with self.assertRaises(storage.StorageHttpError):
+                        client.object_exists("demo", "v1/asset.jpg")
+                self.assertEqual(
+                    [call.args for call in request.call_args_list],
+                    [("HEAD", "object/demo/v1/asset.jpg"), ("GET", "object/demo/v1/asset.jpg")],
+                )
 
     def test_unreadable_mutation_response_is_classified_as_uncertain(self) -> None:
         client = storage.StorageClient(
