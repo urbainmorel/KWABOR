@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 from typing import Any, Mapping, Sequence
+from urllib.parse import unquote, urlsplit
 import zipfile
 
 
@@ -741,6 +742,17 @@ class PsqlResult:
 
 
 def sanitized_psql_environment(database_url: str) -> dict[str, str]:
+    target = urlsplit(database_url)
+    require(
+        target.scheme == "postgresql"
+        and target.hostname is not None
+        and target.port == 5432
+        and target.username is not None
+        and target.password is not None
+        and target.path == "/postgres"
+        and target.query == "sslmode=require",
+        "PSQL_TARGET_INVALID",
+    )
     allowed = {
         "CI",
         "GITHUB_ACTIONS",
@@ -760,7 +772,12 @@ def sanitized_psql_environment(database_url: str) -> dict[str, str]:
     environment.update(
         {
             "PGCONNECT_TIMEOUT": "10",
-            "PGDATABASE": database_url,
+            "PGDATABASE": "postgres",
+            "PGHOST": target.hostname,
+            "PGPORT": "5432",
+            "PGUSER": unquote(target.username),
+            "PGPASSWORD": unquote(target.password),
+            "PGSSLMODE": "require",
             "PGTZ": "UTC",
         }
     )
@@ -776,8 +793,9 @@ def run_psql(database_url: str, sql: str, *, timeout: int = 180) -> PsqlResult:
         "--no-align",
         "--set",
         "ON_ERROR_STOP=1",
-        "--command",
-        sql,
+        "--no-password",
+        "--file",
+        "-",
     ]
     require(database_url not in command, "DATABASE_SECRET_IN_COMMAND")
     try:
@@ -786,6 +804,7 @@ def run_psql(database_url: str, sql: str, *, timeout: int = 180) -> PsqlResult:
             cwd=REPOSITORY_ROOT,
             check=False,
             capture_output=True,
+            input=sql,
             text=True,
             encoding="utf-8",
             errors="replace",
