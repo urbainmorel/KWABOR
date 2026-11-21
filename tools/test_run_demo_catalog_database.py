@@ -54,6 +54,14 @@ class DemoCatalogDatabaseTest(unittest.TestCase):
         )
         self.assertIn("retention-days: 90", workflow)
 
+    def test_workflow_installs_the_pinned_image_validator_before_use(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertLess(
+            workflow.index("pip install --disable-pip-version-check --requirement tools/requirements-demo-media.txt"),
+            workflow.index("tools/verify-demo-catalog.py --require-media"),
+        )
+
     def test_direct_and_pooler_urls_identify_exact_project(self) -> None:
         project_ref = "abcdefghijklmnopqrst"
         self.assertEqual(
@@ -79,6 +87,8 @@ class DemoCatalogDatabaseTest(unittest.TestCase):
             "postgresql://postgres:secret@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require&service=unsafe",
             "postgresql://postgres:secret@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require&sslmode=disable",
             "postgresql://postgres:secret@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require#override",
+            "postgresql://postgres@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require",
+            "postgresql://postgres.abcdefghijklmnopqrst:secret@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require",
         )
         for unsafe_url in unsafe_urls:
             with self.subTest(url=unsafe_url), self.assertRaises(database.DatabaseOperationError):
@@ -235,16 +245,29 @@ class DemoCatalogDatabaseTest(unittest.TestCase):
 
         execute.assert_called_once_with("safe", database.ROLLBACK_PATH)
 
-    def test_psql_keeps_database_secret_out_of_process_arguments(self) -> None:
-        database_url = "postgresql://postgres:secret@db.abcdefghijklmnopqrst.supabase.co/postgres"
+    def test_psql_uses_only_validated_libpq_connection_parameters(self) -> None:
+        database_url = (
+            "postgresql://postgres.abcdefghijklmnopqrst:secret%40encoded"
+            "@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+        )
         completed = type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-        with patch.object(database.subprocess, "run", return_value=completed) as run:
+        with (
+            patch.dict(os.environ, {"PGHOSTADDR": "127.0.0.1", "KWABOR_STAGING_DATABASE_URL": database_url}),
+            patch.object(database.subprocess, "run", return_value=completed) as run,
+        ):
             database._run_psql(database_url, "--command", "select 1")
 
         arguments = run.call_args.args[0]
         environment = run.call_args.kwargs["env"]
-        self.assertNotIn(database_url, arguments)
-        self.assertEqual(environment["PGDATABASE"], database_url)
+        self.assertNotIn("secret", " ".join(arguments))
+        self.assertNotIn("PGHOSTADDR", environment)
+        self.assertNotIn("KWABOR_STAGING_DATABASE_URL", environment)
+        self.assertEqual(environment["PGDATABASE"], "postgres")
+        self.assertEqual(environment["PGHOST"], "aws-0-eu-west-1.pooler.supabase.com")
+        self.assertEqual(environment["PGPORT"], "5432")
+        self.assertEqual(environment["PGUSER"], "postgres.abcdefghijklmnopqrst")
+        self.assertEqual(environment["PGPASSWORD"], "secret@encoded")
+        self.assertEqual(environment["PGSSLMODE"], "require")
 
     def test_execute_requires_the_exact_staging_storage_base_url(self) -> None:
         unsafe = {
