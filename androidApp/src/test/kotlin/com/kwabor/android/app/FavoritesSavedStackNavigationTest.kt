@@ -10,6 +10,7 @@ import androidx.navigation.createGraph
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import com.kwabor.shared.presentation.navigation.RootNavigationDestination
+import com.kwabor.shared.presentation.navigation.RootNavigationProfile
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -22,22 +23,24 @@ import kotlin.test.assertTrue
 class FavoritesSavedStackNavigationTest {
     @Test
     fun coldGuestRestore_resetsHomeAndClearsRestoredPrivateProfileStack() {
-        val navController = testNavController()
-        navController.navigateToRoot(RootNavigationDestination.Profile)
-        navController.navigate(FavoritesRoute)
-        navController.navigateToRoot(RootNavigationDestination.Home)
+        for (profile in RootNavigationProfile.entries) {
+            val navController = testNavController(profile)
+            navController.navigateToRoot(RootNavigationDestination.Profile, profile)
+            navController.navigate(FavoritesRoute)
+            navController.navigateToRoot(RootNavigationDestination.Home, profile)
 
-        navController.navigateToRoot(RootNavigationDestination.Profile)
-        assertCurrentRoute<FavoritesRoute>(navController)
+            navController.navigateToRoot(RootNavigationDestination.Profile, profile)
+            assertCurrentRoute<FavoritesRoute>(navController)
 
-        navController.applyFavoritesNavigationPrivacy(
-            FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge,
-        )
+            navController.applyFavoritesNavigationPrivacy(
+                FavoritesNavigationPrivacyDecision.ResetToHomeAndPurge,
+            )
 
-        assertCurrentRoute<HomeRoute>(navController)
-        navController.navigateToRoot(RootNavigationDestination.Profile)
+            assertCurrentRoute<HomeRoute>(navController)
+            navController.navigateToRoot(RootNavigationDestination.Profile, profile)
 
-        assertCurrentRoute<ProfileRoute>(navController)
+            assertCurrentRoute<ProfileRoute>(navController)
+        }
     }
 
     @Test
@@ -58,16 +61,18 @@ class FavoritesSavedStackNavigationTest {
         assertCurrentRoute<ProfileRoute>(navController)
     }
 
-    private fun testNavController(): TestNavHostController {
+    private fun testNavController(profile: RootNavigationProfile = RootNavigationProfile.Full): TestNavHostController {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return TestNavHostController(context).apply {
             navigatorProvider.addNavigator(ComposeNavigator())
             graph = createGraph(startDestination = HomeRoute) {
                 composable<HomeRoute> {}
-                composable<GuideDiscoveryRoute> {}
-                composable<SocialRoute> {}
-                composable<AddRoute> {}
-                composable<NotificationsRoute> {}
+                if (profile == RootNavigationProfile.Full) {
+                    composable<GuideDiscoveryRoute> {}
+                    composable<SocialRoute> {}
+                    composable<AddRoute> {}
+                    composable<NotificationsRoute> {}
+                }
                 composable<ProfileRoute> {}
                 composable<FavoritesRoute> {}
                 composable<SettingsRoute> {}
