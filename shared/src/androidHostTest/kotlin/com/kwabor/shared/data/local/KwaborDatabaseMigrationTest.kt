@@ -126,7 +126,8 @@ class KwaborDatabaseMigrationTest {
     fun autoMigrationFromFourToFivePreservesFeedCacheAndAddsEmptyDemoDetailCache() {
         context.deleteDatabase(MIGRATION_DATABASE_NAME)
         try {
-            migrationHelper.createDatabase(4).use(SQLiteConnection::seedExploreCache)
+            migrationHelper.createDatabase(DEMO_DETAIL_CACHE_PREVIOUS_DATABASE_VERSION)
+                .use(SQLiteConnection::seedExploreCache)
 
             migrationHelper.runMigrationsAndValidate(version = 5, migrations = emptyList()).use { database ->
                 database.assertExploreMigrationPreservedCache()
@@ -138,6 +139,8 @@ class KwaborDatabaseMigrationTest {
         }
     }
 }
+
+private const val DEMO_DETAIL_CACHE_PREVIOUS_DATABASE_VERSION = 4
 
 private fun SQLiteConnection.seedExploreCache() {
     execSQL(INSERT_EXPLORE_SNAPSHOT)
