@@ -38,6 +38,28 @@ class PublicationError(RuntimeError):
     """Raised when a publication invariant or Storage request fails."""
 
 
+class StorageHttpError(PublicationError):
+    def __init__(self, method: str, status: int, detail: str) -> None:
+        super().__init__(f"Storage {method} failed with HTTP {status}: {detail}")
+        self.status = status
+        self.detail = detail
+
+    def is_missing(self, code: str) -> bool:
+        if self.status == 404:
+            return True
+        if self.status != 400:
+            return False
+        try:
+            problem = json.loads(self.detail)
+        except json.JSONDecodeError:
+            return False
+        return (
+            isinstance(problem, dict)
+            and problem.get("statusCode") in (404, "404")
+            and problem.get("code") == code
+        )
+
+
 class StorageRequestUncertain(PublicationError):
     """Raised when a request cannot prove the remote state safely."""
 
@@ -108,8 +130,8 @@ class StorageClient:
     def get_bucket(self, bucket: str) -> dict[str, Any] | None:
         try:
             return self._request_json("GET", f"bucket/{_quote_segment(bucket)}")
-        except PublicationError as error:
-            if "HTTP 404" in str(error):
+        except StorageHttpError as error:
+            if error.is_missing("NoSuchBucket"):
                 return None
             raise
 
@@ -169,16 +191,22 @@ class StorageClient:
         )
 
     def object_exists(self, bucket: str, path: str) -> bool:
+        object_path = f"object/{_quote_segment(bucket)}/{_quote_path(path)}"
         try:
-            self._request(
-                "HEAD",
-                f"object/{_quote_segment(bucket)}/{_quote_path(path)}",
-            )
-            return True
-        except PublicationError as error:
-            if "HTTP 404" in str(error):
+            self._request("HEAD", object_path)
+        except StorageHttpError as error:
+            if error.status == 404:
                 return False
-            raise
+            if error.status != 400:
+                raise
+            # The hosted gateway omits the structured error body for HEAD.
+            try:
+                self._request("GET", object_path)
+            except StorageHttpError as lookup_error:
+                if lookup_error.is_missing("NoSuchKey"):
+                    return False
+                raise
+        return True
 
     def remove_exact(self, bucket: str, paths: list[str]) -> tuple[str, ...]:
         _require(paths, "Storage deletion requires at least one exact path")
@@ -277,9 +305,7 @@ class StorageClient:
                 ) from error
             detail = error.read(4096).decode("utf-8", errors="replace")
             error.close()
-            raise PublicationError(
-                f"Storage {method} failed with HTTP {error.code}: {detail}"
-            ) from error
+            raise StorageHttpError(method, error.code, detail) from error
         except (OSError, http.client.HTTPException) as error:
             raise StorageRequestUncertain(
                 f"Storage {method} response was not received; server outcome is uncertain"
