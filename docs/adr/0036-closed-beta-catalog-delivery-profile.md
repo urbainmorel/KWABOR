@@ -93,6 +93,14 @@ organisateur aux événements. Le seed utilise uniquement des identités réserv
 comme données de démonstration ; l'UI bêta supprime leurs CTA afin qu'aucune action morte ou adresse
 réelle ne soit exposée.
 
+### Fiches déjà consultées hors ligne
+
+Le client staging conserve dans Room les fiches de démonstration validées qu'il a déjà ouvertes.
+Le cache est isolé par projet, limité à 60 fiches et consultable pendant 24 heures. L'API reste
+prioritaire. Une panne réseau permet de relire la fiche locale et un retrait constaté par l'API
+l'efface. Le cache exclut les fiches dépourvues des deux marqueurs `demo-kwabor` et
+`contenu-fictif`. Le rendu des images dépend du cache d'images existant de l'appareil.
+
 ### Gates non différables
 
 - CI exacte : intégrité, Spotless, Detekt, tests, pgTAP, concurrence et builds simulateur Android/iOS ;

@@ -16,6 +16,7 @@ import com.kwabor.shared.domain.interaction.ListingLikeMutation
 
 class DataCatalogRepository internal constructor(
     private val dataSource: CatalogDataSource,
+    private val detailCache: DemoCatalogDetailCache? = null,
 ) : CatalogRepository, AccountScopedListingLikeRepository {
     override suspend fun listCities(): DomainResult<List<City>> = runDataCall {
         dataSource.listCities().map { item -> item.toDomain() }
@@ -44,7 +45,21 @@ class DataCatalogRepository internal constructor(
     }
 
     override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> = runDataCall {
-        dataSource.getListingDetail(listingId.toRequiredListingId()).toDomain()
+        val id = listingId.toRequiredCanonicalListingId()
+        val payload = try {
+            dataSource.getListingDetail(id)
+        } catch (exception: CatalogDataException.NetworkUnavailable) {
+            return@runDataCall detailCache?.read(id) ?: throw exception
+        } catch (exception: CatalogDataException.NotFound) {
+            detailCache?.forget(id)
+            throw exception
+        }
+        val detail = payload.toDomain()
+        if (detail.common.id != id) {
+            throw CatalogDataException.Unexpected(IllegalStateException("Catalog detail ID did not match the request."))
+        }
+        detailCache?.save(id, payload)
+        detail
     }
 
     override suspend fun getListingViewerInteraction(listingId: String): DomainResult<ListingViewerInteraction> =

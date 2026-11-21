@@ -141,7 +141,12 @@ private fun createRootModule(
             environment = environment,
             authSessionManager = authSessionManager,
         ),
-        catalogDataModule(hasAuthentication = authSessionManager != null),
+        catalogDataModule(
+            hasAuthentication = authSessionManager != null,
+            demoDetailCacheProjectUrl = environment.supabaseUrl.trimEnd('/').takeIf {
+                environment.tier == KwaborEnvironmentTier.Staging && persistenceConfiguration != null
+            },
+        ),
         exploreDataModule(hasPersistence = persistenceConfiguration != null),
         favoritesDataModule,
         searchDataModule(hasPersistence = persistenceConfiguration != null),

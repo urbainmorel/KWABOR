@@ -1,5 +1,6 @@
 package com.kwabor.shared.data.catalog
 
+import com.kwabor.shared.data.local.KwaborDatabase
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.interaction.AccountScopedListingLikeRepository
 import io.github.jan.supabase.SupabaseClient
@@ -8,7 +9,7 @@ import io.github.jan.supabase.postgrest.postgrest
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-internal fun catalogDataModule(hasAuthentication: Boolean): Module = module {
+internal fun catalogDataModule(hasAuthentication: Boolean, demoDetailCacheProjectUrl: String?): Module = module {
     single<CatalogSessionState> {
         if (hasAuthentication) {
             SupabaseCatalogSessionState(auth = get<SupabaseClient>().auth)
@@ -24,7 +25,18 @@ internal fun catalogDataModule(hasAuthentication: Boolean): Module = module {
             sessionState = get(),
         )
     }
-    single { DataCatalogRepository(dataSource = get()) }
+    single {
+        DataCatalogRepository(
+            dataSource = get(),
+            detailCache = demoDetailCacheProjectUrl?.let { projectUrl ->
+                DemoCatalogDetailCache(
+                    dao = get<KwaborDatabase>().demoCatalogDetailDao(),
+                    projectUrl = projectUrl,
+                    clock = get(),
+                )
+            },
+        )
+    }
     single<CatalogRepository> { get<DataCatalogRepository>() }
     single<AccountScopedListingLikeRepository> { get<DataCatalogRepository>() }
 }
