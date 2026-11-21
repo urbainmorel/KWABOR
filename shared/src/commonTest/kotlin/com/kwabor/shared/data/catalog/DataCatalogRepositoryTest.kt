@@ -10,6 +10,7 @@ import com.kwabor.shared.domain.catalog.ListingStatus
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
+import com.kwabor.shared.domain.core.ClockProvider
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.interaction.ListingLikeMutation
@@ -18,6 +19,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.hours
 
 class DataCatalogRepositoryTest {
     @Test
@@ -143,6 +146,50 @@ class DataCatalogRepositoryTest {
         assertEquals("restaurant-kwabor", detail.common.slug)
         assertEquals("https://cdn.kwabor.test/cover.jpg", detail.common.media.single().url)
         assertEquals(listOf("beninoise"), detail.cuisines)
+    }
+
+    @Test
+    fun getListingDetail_reopensPreviouslyViewedDemoAfterRepositoryRecreationAndNetworkLoss() = runTest {
+        val dao = TestDemoCatalogDetailDao()
+        val dataSource = FakeCatalogDataSource(detailTags = DEMO_DETAIL_TAGS)
+        val first = DataCatalogRepository(dataSource, demoDetailCache(dao))
+            .getListingDetail(CATALOG_LISTING_ID_ONE)
+        assertIs<DomainResult.Success<CatalogDetail>>(first)
+        dataSource.detailException = CatalogDataException.NetworkUnavailable()
+
+        val reopened = DataCatalogRepository(dataSource, demoDetailCache(dao))
+        assertEquals(first, reopened.getListingDetail(CATALOG_LISTING_ID_ONE.uppercase()))
+        assertIs<DomainError.NetworkUnavailable>(
+            assertIs<DomainResult.Failure>(reopened.getListingDetail(CATALOG_LISTING_ID_TWO)).error,
+        )
+    }
+
+    @Test
+    fun getListingDetail_cacheDoesNotReuseExpiredWithdrawnOrForeignDemo() = runTest {
+        val dao = TestDemoCatalogDetailDao()
+        val dataSource = FakeCatalogDataSource(detailTags = DEMO_DETAIL_TAGS)
+        var now = 100.hours.inWholeMilliseconds
+        val cache = demoDetailCache(dao, now = { now })
+        val repository = DataCatalogRepository(dataSource, cache)
+        assertIs<DomainResult.Success<CatalogDetail>>(repository.getListingDetail(CATALOG_LISTING_ID_ONE))
+        assertNull(demoDetailCache(dao, projectUrl = "https://other.kwabor.test").read(CATALOG_LISTING_ID_ONE))
+
+        now += 25.hours.inWholeMilliseconds
+        assertNull(cache.read(CATALOG_LISTING_ID_ONE))
+        assertIs<DomainResult.Success<CatalogDetail>>(repository.getListingDetail(CATALOG_LISTING_ID_ONE))
+        dataSource.detailException = CatalogDataException.NotFound()
+        assertIs<DomainError.NotFound>(
+            assertIs<DomainResult.Failure>(repository.getListingDetail(CATALOG_LISTING_ID_ONE)).error,
+        )
+        assertNull(cache.read(CATALOG_LISTING_ID_ONE))
+    }
+
+    @Test
+    fun getListingDetail_doesNotCacheNonDemoPayloads() = runTest {
+        val cache = demoDetailCache(TestDemoCatalogDetailDao())
+        val repository = DataCatalogRepository(FakeCatalogDataSource(), cache)
+        assertIs<DomainResult.Success<CatalogDetail>>(repository.getListingDetail(CATALOG_LISTING_ID_ONE))
+        assertNull(cache.read(CATALOG_LISTING_ID_ONE))
     }
 
     @Test
@@ -335,6 +382,39 @@ class DataCatalogRepositoryTest {
     }
 }
 
+private fun demoDetailCache(
+    dao: DemoCatalogDetailDao,
+    projectUrl: String = "https://staging.kwabor.test",
+    now: () -> Long = { 100.hours.inWholeMilliseconds },
+): DemoCatalogDetailCache = DemoCatalogDetailCache(
+    dao = dao,
+    projectUrl = projectUrl,
+    clock = object : ClockProvider {
+        override fun nowEpochMilliseconds(): Long = now()
+    },
+)
+
+private class TestDemoCatalogDetailDao : DemoCatalogDetailDao {
+    private val records = mutableMapOf<Pair<String, String>, DemoCatalogDetailRecord>()
+
+    override suspend fun find(projectUrl: String, listingId: String): DemoCatalogDetailRecord? =
+        records[projectUrl to listingId]
+
+    override suspend fun delete(projectUrl: String, listingId: String) {
+        records.remove(projectUrl to listingId)
+    }
+
+    override suspend fun upsert(record: DemoCatalogDetailRecord) {
+        records[record.projectUrl to record.listingId] = record
+    }
+
+    override suspend fun prune(oldest: Long) {
+        records.entries.removeAll { entry -> entry.value.cachedAt < oldest }
+    }
+}
+
+private val DEMO_DETAIL_TAGS = listOf("demo-kwabor", "contenu-fictif")
+
 private class FakeCatalogDataSource(
     private val listingsPage: ListingSummaryPageDto = ListingSummaryPageDto(
         items = listOf(listingSummaryDto()),
@@ -342,9 +422,11 @@ private class FakeCatalogDataSource(
     ),
     private val listingsException: CatalogDataException? = null,
     private val throwOnGetDetail: Boolean = false,
+    private val detailTags: List<String> = catalogDetailPayloadDto().tags,
     private val interaction: ListingViewerInteractionDto = listingViewerInteractionDto(),
     private val interactionException: CatalogDataException? = null,
 ) : CatalogDataSource {
+    var detailException: CatalogDataException? = null
     var lastListingFilters: ListingFilters? = null
         private set
     var lastSearchQuery: ListingSearchQuery? = null
@@ -400,11 +482,12 @@ private class FakeCatalogDataSource(
 
     override suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto {
         detailCallCount += 1
+        detailException?.let { exception -> throw exception }
         if (throwOnGetDetail) {
             throw CatalogDataException.NotFound()
         }
 
-        return catalogDetailPayloadDto().copy(id = listingId)
+        return catalogDetailPayloadDto().copy(id = listingId, tags = detailTags)
     }
 
     override suspend fun getListingViewerInteraction(listingId: String): ListingViewerInteractionDto =

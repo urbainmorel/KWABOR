@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import com.kwabor.shared.data.catalog.DemoCatalogDetailDao
+import com.kwabor.shared.data.catalog.DemoCatalogDetailRecord
 import kotlin.coroutines.CoroutineContext
 
 internal const val KWABOR_DATABASE_FILENAME = "kwabor.db"
@@ -35,13 +37,15 @@ internal data class KwaborDatabaseBuilderResult(
         ExploreReferenceCityEntity::class,
         ExploreReferenceCategoryEntity::class,
         InteractionOutboxEntity::class,
+        DemoCatalogDetailRecord::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
         AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
     ],
 )
 @ConstructedBy(KwaborDatabaseConstructor::class)
@@ -57,6 +61,7 @@ internal abstract class KwaborDatabase : RoomDatabase() {
     internal abstract fun searchCacheDao(): SearchCacheDao
 
     internal abstract fun interactionOutboxDao(): InteractionOutboxDao
+    internal abstract fun demoCatalogDetailDao(): DemoCatalogDetailDao
 }
 
 internal expect object KwaborDatabaseConstructor : RoomDatabaseConstructor<KwaborDatabase>

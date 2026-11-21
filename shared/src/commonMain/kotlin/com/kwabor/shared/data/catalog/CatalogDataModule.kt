@@ -1,5 +1,8 @@
 package com.kwabor.shared.data.catalog
 
+import com.kwabor.shared.data.config.KwaborEnvironment
+import com.kwabor.shared.data.config.KwaborEnvironmentTier
+import com.kwabor.shared.data.local.KwaborDatabase
 import com.kwabor.shared.domain.catalog.CatalogRepository
 import com.kwabor.shared.domain.interaction.AccountScopedListingLikeRepository
 import io.github.jan.supabase.SupabaseClient
@@ -24,7 +27,21 @@ internal fun catalogDataModule(hasAuthentication: Boolean): Module = module {
             sessionState = get(),
         )
     }
-    single { DataCatalogRepository(dataSource = get()) }
+    single {
+        val environment = get<KwaborEnvironment>()
+        val detailCache = if (environment.tier == KwaborEnvironmentTier.Staging) {
+            getOrNull<KwaborDatabase>()?.let { database ->
+                DemoCatalogDetailCache(
+                    dao = database.demoCatalogDetailDao(),
+                    projectUrl = environment.supabaseUrl.trimEnd('/'),
+                    clock = get(),
+                )
+            }
+        } else {
+            null
+        }
+        DataCatalogRepository(dataSource = get(), detailCache = detailCache)
+    }
     single<CatalogRepository> { get<DataCatalogRepository>() }
     single<AccountScopedListingLikeRepository> { get<DataCatalogRepository>() }
 }

@@ -121,7 +121,26 @@ class KwaborDatabaseMigrationTest {
             context.deleteDatabase(MIGRATION_DATABASE_NAME)
         }
     }
+
+    @Test
+    fun autoMigrationFromFourToFivePreservesFeedCacheAndAddsEmptyDemoDetailCache() {
+        context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        try {
+            migrationHelper.createDatabase(DEMO_DETAIL_CACHE_PREVIOUS_DATABASE_VERSION)
+                .use(SQLiteConnection::seedExploreCache)
+
+            migrationHelper.runMigrationsAndValidate(version = 5, migrations = emptyList()).use { database ->
+                database.assertExploreMigrationPreservedCache()
+                database.assertInteractionOutboxIsEmpty()
+                assertEquals(0L, database.singleLong("SELECT COUNT(*) FROM demo_catalog_detail_cache"))
+            }
+        } finally {
+            context.deleteDatabase(MIGRATION_DATABASE_NAME)
+        }
+    }
 }
+
+private const val DEMO_DETAIL_CACHE_PREVIOUS_DATABASE_VERSION = 4
 
 private fun SQLiteConnection.seedExploreCache() {
     execSQL(INSERT_EXPLORE_SNAPSHOT)
