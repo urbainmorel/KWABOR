@@ -565,7 +565,6 @@ private fun KwaborRootNavHost(
             viewModel = dependencies.favoritesViewModel,
             resources = FavoritesScreenResources(strings, dependencies.listingMediaUrlPolicy),
             paddingValues = paddingValues,
-            rootNavigationProfile = dependencies.rootNavigationProfile,
         )
         settingsRoute(navController, paddingValues, strings, dependencies, state)
     }

@@ -82,8 +82,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     Firebase staging/production dans les organisations choisies par le propriétaire, puis renseigner
     leurs variables/configurations ; aucun CDN ni IAM de publication n'est requis pour l'intro embarquée.
     - [ ] ENV-001B-STAGING — Le projet Supabase existant est désigné staging ; pooler TLS, 21 migrations,
-      catalogue Auth/Storage et contraintes sont qualifiés en lecture. Restent B6.02, migration ACL,
-      archivage des quatre fixtures, Auth/SMTP/OAuth et corpus avant clôture.
+      catalogue Auth/Storage et contraintes sont qualifiés en lecture. La migration ACL,
+      l'archivage des fixtures et le test individuel du corpus sont validés. La qualification
+      de cohorte reste ouverte, dont B6.02 et Auth/SMTP/OAuth.
     - [x] ENV-001B-PROD — Créer l'autorité Supabase `KWABOR Production` distincte dans l'organisation
       choisie par le propriétaire en `eu-west-1`, vérifier qu'elle est saine et vide, puis fournir
       uniquement sa référence non secrète aux guards staging ; configuration et déploiement restent
@@ -366,6 +367,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   staging sans écriture client, un upload immuable et les tests prouvant exactement 60 fiches.
 - [x] BETA-NAV-001 — Restreindre Android/iOS à l'allowlist `Explorer · Compte`, retirer les
   placeholders et traiter les deep links des racines différées sans écran mort.
+  - L'aperçu Android affiche les cinq icônes dans une capsule flottante sans bordure. Les destinations
+    différées sont désactivées. La recherche compacte et ses libellés contextuels sont validés
+    sur le Tecno. Le fond de l'icône active épouse l'arrondi de la barre aux extrémités.
 - [x] BETA-OBS-001 — Instrumenter localement le dénominateur crash-free par session applicative
   sans PII, uniquement avec Analytics et Diagnostics consentis, avec seuil d'inactivité de
   30 minutes, révocation durable et parité de cycle de vie Android/iOS. La preuve Firebase sur
@@ -374,15 +378,16 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   accessibilité et builds signés avant d'ouvrir la cohorte ; provisioning et preuves opérateur suivis
   dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). La réussite du job CI
   `supabase_database` sur une base éphémère ne clôt pas ce ticket.
-  - [ ] BETA-STAGING-001A — Les Environments GitHub sont sans bypass administrateur et limités aux
-    branches protégées, et l'accès staging via pooler TLS est qualifié. Valider la politique du
-    mainteneur unique sur `main` pour le catalogue fictif. Auth et distribution gardent une revue
-    indépendante.
+  - [x] BETA-STAGING-001A — Les Environments GitHub sont sans bypass administrateur et limités aux
+    branches protégées. L'accès staging via pooler TLS et la politique du mainteneur unique sur
+    `main` pour le catalogue fictif sont validés. Auth et distribution gardent une revue indépendante.
   - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
     sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
-  - [ ] BETA-STAGING-001C — Implémenter la preuve de staging reconstructible prévue par ADR-0038.
-    Rejouer ensuite migration ACL, archivage et publication du corpus fictif, puis tester sur le
-    Tecno. La qualification Auth et l'ouverture de cohorte sont des étapes séparées.
+  - [x] BETA-STAGING-001C — Terminer le jalon catalogue sur le Tecno. La preuve de staging
+    reconstructible prévue par ADR-0038, la migration ACL, l'archivage, les 180 médias et les
+    60 fiches sont vérifiés. Sur le Tecno, le parcours invité, les photos et la recherche sont
+    validés. Une fiche déjà consultée s'ouvre après un redémarrage hors ligne et la recherche
+    fonctionne à la reconnexion avec l'APK `0.1.0-staging` du commit `cb8e376`.
 
 - [ ] QUAL-001 — Ajouter tests Compose/Roborazzi, XCTest/XCUITest, contrats Edge Functions et E2E critiques.
 - [ ] SEC-001 — Vérifier RLS négative, IDOR, account delete, replay, rate limiting, secrets, médias et migrations.

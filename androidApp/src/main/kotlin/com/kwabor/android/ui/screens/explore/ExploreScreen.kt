@@ -1,5 +1,7 @@
 package com.kwabor.android.ui.screens.explore
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -20,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -28,6 +32,7 @@ import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -48,7 +54,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
@@ -87,21 +95,14 @@ fun ExploreScreen(
             .fillMaxSize()
             .firstUsableViewportCommit(state = state, binding = model.viewportPerformance),
     ) {
-        if (model.showClosedBetaDemoDisclosure) {
-            KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
-        }
         if (if (searchState.isActive) searchState.isOffline else state.isOffline) {
             OfflineBanner(strings = strings)
         }
-        state.interactionMessage?.let { message ->
-            KwaborInlineBanner(text = message)
-        }
+        state.interactionMessage?.let { KwaborInlineBanner(text = it) }
         (if (searchState.isActive) searchState.refreshMessage else state.refreshMessage)?.let { message ->
             KwaborInlineBanner(text = message)
         }
-        state.locationMessage
-            ?.takeUnless { state.isCitySelectorOpen }
-            ?.let { message -> KwaborInlineBanner(text = message) }
+        state.locationMessage?.takeUnless { state.isCitySelectorOpen }?.let { KwaborInlineBanner(text = it) }
         ExploreContent(
             model = model,
             strings = strings,
@@ -122,7 +123,6 @@ data class ExploreScreenUiModel(
     val state: ExploreUiState,
     val searchState: SearchUiState = SearchUiState(),
     val isGuestSession: Boolean = true,
-    val showClosedBetaDemoDisclosure: Boolean = false,
     val showGuideDiscoveryEntry: Boolean = true,
     val viewportPerformance: ExploreViewportPerformanceBinding = ExploreViewportPerformanceBinding.Disabled,
 )
@@ -354,7 +354,7 @@ private fun ExploreGuideDiscoveryEntry(strings: KwaborStrings, onClick: () -> Un
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { role = Role.Button },
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(KwaborRadius.Control),
+        shape = RoundedCornerShape(KwaborRadius.Panel),
     ) {
         Row(
             modifier = Modifier.padding(KwaborSpacing.Lg),
@@ -488,7 +488,11 @@ private fun ExploreHeader(
             isGuestSession = isGuestSession,
             onClick = actions.onCityClick,
         )
-        Text(text = strings.homeTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            text = strings.homeTitle,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
         ExploreTabs(state.selectedTab, strings, actions.onTabSelected)
         ExploreSearchControl(state = searchState, strings = strings, actions = actions)
         if (!searchState.isActive || searchState.scope == SearchScope.ActiveTab) {
@@ -507,11 +511,16 @@ private fun ExploreLocationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExploreCityControl(cityLabel = cityLabel, strings = strings, onClick = onClick, modifier = Modifier.weight(1f))
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(KwaborRadius.Control)) {
+        ExploreCityControl(
+            cityLabel = cityLabel,
+            strings = strings,
+            onClick = onClick,
+            modifier = Modifier.weight(1f, fill = false).padding(end = KwaborSpacing.Sm),
+        )
+        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape) {
             Text(
                 text = if (isGuestSession) strings.authGuestSession else strings.authConnectedSession,
                 modifier = Modifier.padding(horizontal = KwaborSpacing.Sm, vertical = KwaborSpacing.Xs),
@@ -527,29 +536,66 @@ private fun ExploreCityControl(cityLabel: String, strings: KwaborStrings, onClic
     Row(
         modifier = modifier
             .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = strings.location
                 stateDescription = cityLabel
                 role = Role.Button
-            },
+            }
+            .padding(horizontal = KwaborSpacing.Md),
         horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        Text(cityLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+        val foreground = MaterialTheme.colorScheme.onSurfaceVariant
+        Icon(
+            Icons.Filled.LocationOn,
+            contentDescription = null,
+            modifier = Modifier.size(KwaborSpacing.Xl),
+            tint = foreground,
+        )
+        Text(
+            text = cityLabel,
+            style = MaterialTheme.typography.labelLarge,
+            color = foreground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            modifier = Modifier.size(KwaborSpacing.Xl),
+            tint = foreground,
+        )
     }
 }
 
 @Composable
 private fun ExploreTabs(selectedTab: ExploreTab, strings: KwaborStrings, onTabSelected: (ExploreTab) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm)) {
+    val colors = MaterialTheme.colorScheme
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs)) {
         items(ExploreTab.entries) { tab ->
+            val selected = selectedTab == tab
             FilterChip(
-                selected = selectedTab == tab,
+                selected = selected,
                 onClick = { onTabSelected(tab) },
-                label = { Text(text = tab.label(strings)) },
+                label = {
+                    Text(
+                        text = tab.label(strings),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                },
+                shape = CircleShape,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = colors.surfaceVariant,
+                    labelColor = colors.onSurfaceVariant,
+                    selectedContainerColor = KwaborColors.SelectionSurface,
+                    selectedLabelColor = KwaborColors.Ink950,
+                ),
+                border = if (selected) BorderStroke(KwaborSizing.Hairline, colors.outline) else null,
             )
         }
     }
@@ -557,12 +603,20 @@ private fun ExploreTabs(selectedTab: ExploreTab, strings: KwaborStrings, onTabSe
 
 @Composable
 private fun ExploreChips(chips: List<ExploreChip>, selectedChipId: String?, onChipSelected: (ExploreChip) -> Unit) {
+    val colors = MaterialTheme.colorScheme
     LazyRow(horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm)) {
         items(chips, key = { chip -> chip.id }) { chip ->
+            val selected = selectedChipId == chip.id
             FilterChip(
-                selected = selectedChipId == chip.id,
+                selected = selected,
                 onClick = { onChipSelected(chip) },
-                label = { Text(text = chip.label) },
+                label = { Text(text = chip.label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
+                shape = CircleShape,
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = KwaborColors.SelectionSurface,
+                    selectedLabelColor = KwaborColors.Ink950,
+                ),
+                border = BorderStroke(KwaborSizing.Hairline, if (selected) colors.outline else colors.outlineVariant),
             )
         }
     }

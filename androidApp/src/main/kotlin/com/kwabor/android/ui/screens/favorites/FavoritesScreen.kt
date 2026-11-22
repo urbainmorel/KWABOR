@@ -66,14 +66,12 @@ internal fun FavoritesScreen(
     resources: FavoritesScreenResources,
     actions: FavoritesScreenActions,
     modifier: Modifier = Modifier,
-    showClosedBetaDemoDisclosure: Boolean = false,
 ) {
     FavoritesScaffold(
         state = state,
         resources = resources,
         actions = actions,
         modifier = modifier,
-        showClosedBetaDemoDisclosure = showClosedBetaDemoDisclosure,
     )
 }
 
@@ -84,7 +82,6 @@ private fun FavoritesScaffold(
     resources: FavoritesScreenResources,
     actions: FavoritesScreenActions,
     modifier: Modifier,
-    showClosedBetaDemoDisclosure: Boolean,
 ) {
     val strings = resources.strings
     Scaffold(
@@ -95,9 +92,6 @@ private fun FavoritesScaffold(
         },
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            if (showClosedBetaDemoDisclosure) {
-                KwaborInlineBanner(text = strings.closedBetaDemoDisclosure)
-            }
             if (state.isOffline) {
                 OfflineBanner(strings = strings)
             }

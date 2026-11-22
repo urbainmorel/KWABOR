@@ -38,7 +38,7 @@ Kwabor n'a pas une « charte décorative » : l'identité visuelle est un **levi
 
 1. **La photo est le héros, l'UI s'efface.** Le contenu occupe le plein cadre. L'interface vit en **overlays translucides** posés *sur* l'image, jamais dans une boîte à côté d'elle.
 2. **Monochrome par défaut, couleur par exception.** Tout le système est **noir / blanc / nuances de gris**. La couleur est **interdite sauf deux cas métier** : le **jaune Sponsorisé** (transparence publicitaire) et le **rouge billetterie/danger** (transaction, urgence). Sur fond monochrome, ces deux couleurs deviennent *plus* repérables.
-3. **Le noir est l'accent.** Les éléments actifs (CTA principal, FAB IA, item de navbar actif, bouton sélectionné) sont **noir plein** — signature « ink premium ». *(En thème sombre, ce noir s'inverse en surface claire — §3.3.)*
+3. **Le noir est l'accent des actions principales.** Le CTA principal et le FAB IA utilisent `ink/950`, inversé en thème sombre (§3.3). Sur Android, les sélections d'Explore utilisent un blanc translucide avec un contour gris. La barre flottante indique la destination active par une pastille légèrement teintée.
 4. **Premium par le design, jamais par le poids.** La cible utilise majoritairement des Android low/mid-range sur réseau dégradé. Tout effet premium est rendu **en Compose/SwiftUI**, jamais par des images lourdes empilées. Budget non négociable : mur d'exploration **P75 < 1,5 s** (§16).
 
 **Mood de référence.** Monochrome éditorial photo-first : grille de cartes plein cadre, en-tête légère, pastilles translucides, fiche détail immersive à hero plein écran. La couleur n'apparaît que sur le badge jaune *Sponsorisé* et le bouton rouge *Acheter un billet*.
@@ -70,7 +70,7 @@ Rampe neutre légèrement chaude (pour que les photos « respirent »). Elle por
 
 | Token | Hex (clair) | Usage |
 |---|---|---|
-| `ink/950` (**Accent**) | `#0E0E10` | CTA principal, FAB IA, item nav actif, app icon, surfaces actives |
+| `ink/950` (**Accent**) | `#0E0E10` | CTA principal, FAB IA, app icon, texte de sélection dans Explore Android |
 | `ink/900` | `#1A1A1C` | Texte principal |
 | `ink/700` | `#3C3C41` | Texte fort secondaire, icônes pleines |
 | `ink/500` | `#6E6E76` | Texte secondaire, placeholders, sous-titres |
@@ -109,7 +109,9 @@ L'accent étant le noir, le mode sombre impose une **inversion** : les élément
 | Texte principal | `#1A1A1C` | `#F2F2F4` | |
 | Texte secondaire | `#6E6E76` | `#9A9AA2` | |
 | Divider | `#E8E8EC` | `#2A2A2F` | |
-| **Accent actif** (CTA / FAB / nav) | `#0E0E10` | `#F2F2F4` + texte ink | **Inversion** : le « bouton noir » devient « bouton clair ». |
+| **Accent actif** (CTA / FAB) | `#0E0E10` | `#F2F2F4` + texte ink | Inversion en mode sombre. |
+| **Sélection Android** (onglets / filtres Explore) | Blanc à 78 % | Blanc à 78 % | Contour gris de 1 dp et texte `ink/950`. |
+| **Destination active Android** (barre flottante) | Encre à 8 % sur la surface | Texte clair à 8 % sur la surface | Fond sans contour sur toute la hauteur, icône dans la couleur de texte principale. |
 | `accent/sponsored` | `#F4B400` | `#FFC53D` | texte ink dans les deux cas |
 | `accent/ticket` | `#C5283D` | `#FF6B74` | texte : blanc (clair) / ink (sombre) |
 | `overlay/card` | `…0.78` | `…0.82` | légèrement renforcé en sombre |
@@ -146,7 +148,8 @@ Pairing premium éditorial **+ chiffres tabulaires** (essentiels au composant pr
 
 | Token | Valeur | Note |
 |---|---|---|
-| Radius carte | **16 px** | Rendu premium |
+| Radius carte photo | **16 dp sur Android**, 16 pt sur iOS | Coins des visuels |
+| Radius panneau Android | **24 dp** | Surfaces d'état et encarts |
 | Radius sheet (top) | **28 px** | Coins hauts des modales / bottom sheets |
 | Radius bouton / champ | 14 px | |
 | Radius chip / pill | **fully rounded** (999) | Pastilles, prix, ville, chips |
@@ -182,14 +185,15 @@ Kwabor affiche des prix dans **4 devises** (XOF référence, NGN, USD, EUR) × *
 
 **Règles encodées :**
 1. **XOF est la référence.** Tous les prix sont **stockés en XOF**. Les autres devises sont des **conversions d'affichage**, toujours préfixées de **`≈`** (le paiement réel se fait en XOF).
-2. **Formatage par la locale (ICU/CLDR).** FR `150 000 FCFA` · EN `150,000 FCFA` · DE `150.000 FCFA`. Symboles : **FCFA** (jamais « XOF »), **₦**, **$**, **€**.
+2. **Formatage par la locale (ICU/CLDR).** FR `150 000 FCFA` · EN `150,000 FCFA` · DE `150.000 FCFA`. Symboles : **FCFA** (**F** sur les cartes Android), **₦**, **$**, **€**.
 3. **Décimales par devise.** XOF & Naira : **0**. USD & Euro : **0** en navigation/liste, **2** en contexte transactionnel/facture.
 4. **Deux modes selon la surface.** **Compact (k/M)** sur surfaces denses (chip de carte, épingle, sparkline), **réservé aux montants ≥ 10 000** ; **Plein** sur fiche, billet, paiement, dashboard. **Règle d'or : un prix transactionnel (billet, facture, coût de campagne) n'est JAMAIS en compact.**
 5. **Largeur réservée + alignement constant** (chiffres `tnum`), pour que le layout ne « saute » pas entre `≈ $40` et `150 000 FCFA`.
 
 | Surface | Mode | Exemple FR (XOF / EUR) |
 |---|---|---|
-| Chip prix de carte | Compact | `25 k FCFA` / `≈ 38 €` |
+| Chip prix de carte Android | Compact, une ligne | `1 500 F`, `25 k F` / `≈ 38 €` |
+| Chip prix de carte iOS | Compact | `25 k FCFA` / `≈ 38 €` |
 | Fiche établissement (« à partir de ») | Plein | `À partir de 15 000 FCFA` |
 | Billet événement | Plein (jamais compact) | `5 000 FCFA` / `≈ 7,62 €` |
 | Coût de campagne promoteur | Plein, XOF only | `30 000 FCFA` |
@@ -220,10 +224,10 @@ Deux actions **distinctes**, jamais confondues :
 | Composant | Spécification | Réutilisé sur |
 |---|---|---|
 | **En-tête Explore (allégée)** | §7.1 — localisation + titre + onglets + recherche+filtre + chips. **Aucune cloche, aucun avatar.** | Écrans Explore |
-| **Bottom Nav (plate, 5 items)** | §7.2 — Accueil / **Social** (feed) / **Ajouter** (contextuel par rôle) / Notifications / Profil. **Pas de bouton central.** | Écrans racine |
-| **Onglets principaux** (Lieux / Événements / Hôtels & Restaurants) | Pills : actif = `ink/950` + texte blanc ; inactif = `ink/100` + texte `ink/700`. Scroll horizontal si débordement. | Explore ; variante soulignée sur Profil |
-| **Chips de sous-catégories** | Pill `ink/100` / `ink/700` ; sélectionnée = bord `ink/950` 1.5 px + texte `ink/950`. 1 tap = tri rapide. | Sous la recherche |
-| **Champ de recherche** | Hauteur 48, radius 14, fond `ink/100`, icône `search` 20 à gauche, **bouton filtre `tune`** carré 48 à droite. | Explore |
+| **Navigation basse (5 items)** | §7.2 — Accueil / **Social** (feed) / **Ajouter** (contextuel par rôle) / Notifications / Profil. Capsule flottante à cinq icônes sur Android. | Écrans racine |
+| **Onglets principaux** (Lieux / Événements / Hôtels & Restaurants) | Pilules. Actif Android selon le token Sélection Android (§3.3). Actif iOS `ink/950` avec texte blanc. Scroll horizontal si débordement. | Explore et variante soulignée sur Profil |
+| **Chips de sous-catégories** | Sur Android, le filtre sélectionné utilise le token Sélection Android (§3.3). Sur iOS, le filtre sélectionné utilise le bord et le texte `ink/950`. | Sous la recherche |
+| **Champ de recherche** | Sur Android, pilule compacte de 48 dp minimum, icône `search` et texte indicatif sur une ligne adapté à l'onglet ou au filtre. Champ standard 48 et rayon 14 sur iOS. Bouton filtre `tune` apparié lorsque disponible. | Explore |
 | **Carte d'exploration** | §8 — image 3:4 plein cadre, overlay, titre + ville + note + prix posés sur l'image. | Explore (3 variantes) |
 | **Badge Sponsorisé** | Pill ambre, texte ink `Sponsorisé` 12/600, coin haut-gauche. Jamais la couleur seule. | Cartes Hôtels & Restau., Notifications, aperçu campagne |
 | **Pastille note** | Frosted, `star` ambre 14 + valeur 13/600 blanc. | Cartes, hero |
@@ -280,13 +284,20 @@ De haut en bas, et **rien d'autre** :
 1. **Localisation** — `location_on` + ville courante + chevron, modifiable (ouvre le sélecteur de ville, §11 C5).
 2. **Titre** `Découvrez le Bénin` (H1 28/700, traduit).
 3. **Onglets principaux** — Lieux / Événements / Hôtels & Restaurants (pills).
-4. **Recherche + filtre** appariés (champ 48 + bouton `tune`).
+4. **Recherche + filtre** appariés lorsque le filtre est disponible. Sur Android, le champ compact
+   affiche le texte indicatif de l'onglet ou de la sous-catégorie sur une seule ligne.
 5. **Chips de sous-catégories** propres à l'onglet actif.
 
 > **Ni cloche ni avatar dans l'en-tête.** Notifications et Profil vivent **exclusivement** dans la navbar (§7.2).
 
-### 7.2 Barre de navigation basse — plate, 5 items égaux
+### 7.2 Barre de navigation basse — 5 items égaux
 `Accueil` · `Social` · `Ajouter` · `Notifications` · `Profil`. Icônes 28, label 12.
+
+Sur Android, la barre flottante présente cinq icônes dans une capsule sans bordure, avec leur nom accessible.
+Dans la bêta catalogue, les trois destinations différées sont visibles en retrait et désactivées.
+Le fond teinté s'étend sur toute la hauteur de la destination active. Aux extrémités,
+il épouse le contour de la barre flottante (§3.3).
+
 - **Aucun bouton central surdimensionné.** Pattern de découverte/consommation où la recherche en haut reste le point d'entrée dominant. « Ajouter » est un item égal.
 - **Social** = feed communautaire façon TikTok (photo/diaporama dès le MVP, vidéo en V1.1) — §11 Groupe J.
 - **Ajouter (« + ») est contextuel selon le rôle** (§11 H1) : un menu adapté s'ouvre (Utilisateur → contenu social ; Guide → social + événement + service ; Promoteur → social + événement + fiche ; Institution → social + fiche patrimoniale + enrichissement).
@@ -311,9 +322,9 @@ Composant signature. Grille **2 colonnes**, gutter 12, ratio **3:4**, image **co
 | **Pastille Like (cœur)** | haut-droite | frosted, cœur rouge si actif (§5) |
 | **Pastille Favori (marque-page)** | sous la note (si densité) | frosted, ink si actif (§5) |
 | **Badge Sponsorisé** | haut-gauche (remplace la note) | ambre, texte `Sponsorisé` — *seul élément coloré de la grille* |
-| Titre | tiers bas | blanc 16/700, 2 lignes max |
+| Titre | tiers bas | blanc, 2 lignes max, Android 14/400 et iOS 16/700 |
 | Ligne ville | sous le titre | `location_on` 14 + ville, blanc 80 % |
-| Chip prix | bas-droite | **Compact** dans la devise utilisateur (§4) |
+| Chip prix | bas-droite | **Compact** dans la devise utilisateur (§4), Android 12/400 sur une ligne |
 
 **Spécificités par onglet :**
 
@@ -853,7 +864,7 @@ Bottom sheet 80 % : liste des commentaires (avatar, nom, texte, **like de commen
 > est ignoré et l'app revient vers Explorer.
 
 ```
-Bottom Nav (plate, 5 items égaux — aucun central)
+Navigation basse (5 items égaux)
 ├── Accueil (Explore)
 │   ├── Onglet Lieux ───────────► DetailSheet Lieu  (Patrimonial ou Commercial)
 │   ├── Onglet Événements ─────► DetailSheet Événement
