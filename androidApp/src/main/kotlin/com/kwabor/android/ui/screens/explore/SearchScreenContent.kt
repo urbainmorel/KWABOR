@@ -1,17 +1,25 @@
 package com.kwabor.android.ui.screens.explore
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -22,7 +30,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,13 +38,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.media.ListingMediaUrlPolicy
@@ -48,6 +59,8 @@ import com.kwabor.android.ui.components.ListingCardActions
 import com.kwabor.android.ui.components.PriceTagMode
 import com.kwabor.android.ui.components.PriceTagOptions
 import com.kwabor.shared.i18n.KwaborStrings
+import com.kwabor.shared.i18n.SearchStrings
+import com.kwabor.shared.presentation.explore.ExploreTab
 import com.kwabor.shared.presentation.search.SearchScope
 import com.kwabor.shared.presentation.search.SearchUiState
 
@@ -59,16 +72,13 @@ internal fun ExploreSearchControl(state: SearchUiState, strings: KwaborStrings, 
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SearchInputField(
-                state = state,
-                strings = strings,
-                actions = actions,
-                modifier = Modifier.weight(1f),
+        SearchInputField(state = state, strings = strings, actions = actions)
+        state.queryErrorMessage?.let { message ->
+            Text(
+                text = message,
+                modifier = Modifier.padding(horizontal = KwaborSpacing.Md),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
         if (state.isActive) {
@@ -82,38 +92,23 @@ internal fun ExploreSearchControl(state: SearchUiState, strings: KwaborStrings, 
 }
 
 @Composable
-private fun SearchInputField(
-    state: SearchUiState,
-    strings: KwaborStrings,
-    actions: ExploreScreenActions,
-    modifier: Modifier,
-) {
+private fun SearchInputField(state: SearchUiState, strings: KwaborStrings, actions: ExploreScreenActions) {
     val focusManager = LocalFocusManager.current
-    OutlinedTextField(
+    val colors = MaterialTheme.colorScheme
+    val placeholder = state.searchPlaceholder(strings.search)
+    val interactions = remember { MutableInteractionSource() }
+    val focused by interactions.collectIsFocusedAsState()
+    BasicTextField(
         value = state.queryText,
         onValueChange = actions.onSearchQueryChanged,
-        modifier = modifier.searchInputSemantics(
+        modifier = Modifier.fillMaxWidth().searchInputSemantics(
             state = state,
-            strings = strings,
+            placeholder = placeholder,
             onActivate = actions.onSearchActivate,
         ),
-        placeholder = { Text(strings.search.placeholder) },
-        leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
-        trailingIcon = {
-            SearchTrailingActions(
-                state = state,
-                strings = strings,
-                onClear = actions.onSearchClear,
-                onClose = {
-                    focusManager.clearFocus()
-                    actions.onSearchClose()
-                },
-            )
-        },
-        supportingText = state.queryErrorMessage?.let { error ->
-            { Text(text = error, color = MaterialTheme.colorScheme.error) }
-        },
-        isError = state.queryErrorMessage != null,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurface),
+        cursorBrush = SolidColor(colors.primary),
+        interactionSource = interactions,
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(
@@ -122,12 +117,77 @@ private fun SearchInputField(
                 actions.onSearchSubmit()
             },
         ),
+        decorationBox = { input ->
+            SearchInputDecoration(state, placeholder, focused, input) {
+                SearchTrailingAction(state, strings, actions)
+            }
+        },
     )
+}
+
+@Composable
+private fun SearchInputDecoration(
+    state: SearchUiState,
+    placeholder: String,
+    focused: Boolean,
+    input: @Composable () -> Unit,
+    trailingAction: @Composable () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val borderColor = when {
+        state.queryErrorMessage != null -> colors.error
+        focused -> colors.primary
+        else -> colors.outlineVariant
+    }
+    val showsTrailingAction = state.isActive || state.queryText.isNotEmpty()
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(colors.surface)
+            .border(KwaborSizing.Hairline, borderColor, CircleShape)
+            .padding(start = KwaborSpacing.Md, end = if (showsTrailingAction) KwaborSpacing.Xs else KwaborSpacing.Md),
+        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = null,
+            modifier = Modifier.size(KwaborSpacing.Xl),
+            tint = colors.onSurfaceVariant,
+        )
+        Box(modifier = Modifier.weight(1f).padding(vertical = KwaborSpacing.Xs)) {
+            if (state.queryText.isEmpty()) {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            input()
+        }
+        if (showsTrailingAction) trailingAction()
+    }
+}
+
+internal fun SearchUiState.searchPlaceholder(strings: SearchStrings): String {
+    if (isActive && scope == SearchScope.All) return strings.placeholder
+    return when (context.selectedTab) {
+        ExploreTab.Places -> strings.placePlaceholder
+        ExploreTab.Events -> strings.eventPlaceholder
+        ExploreTab.HotelsRestaurants -> when (context.selectedChipId) {
+            "commercial-hotel" -> strings.hotelPlaceholder
+            "commercial-restaurant" -> strings.restaurantPlaceholder
+            "guide-touristique" -> strings.guidePlaceholder
+            else -> strings.establishmentPlaceholder
+        }
+    }
 }
 
 private fun Modifier.searchInputSemantics(
     state: SearchUiState,
-    strings: KwaborStrings,
+    placeholder: String,
     onActivate: () -> Unit,
 ): Modifier = this
     .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
@@ -136,32 +196,30 @@ private fun Modifier.searchInputSemantics(
             onActivate()
         }
     }
-    .semantics { contentDescription = strings.search.placeholder }
+    .semantics {
+        contentDescription = placeholder
+        state.queryErrorMessage?.let { error(it) }
+    }
     .testTag(SEARCH_FIELD_TEST_TAG)
 
 @Composable
-private fun SearchTrailingActions(
-    state: SearchUiState,
-    strings: KwaborStrings,
-    onClear: () -> Unit,
-    onClose: () -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (state.queryText.isNotEmpty()) {
-            IconButton(
-                onClick = onClear,
-                modifier = Modifier.semantics { contentDescription = strings.search.clear },
-            ) {
-                Icon(Icons.Filled.Close, contentDescription = null)
+private fun SearchTrailingAction(state: SearchUiState, strings: KwaborStrings, actions: ExploreScreenActions) {
+    val focusManager = LocalFocusManager.current
+    val hasQuery = state.queryText.isNotEmpty()
+    IconButton(
+        onClick = {
+            if (hasQuery) {
+                actions.onSearchClear()
+            } else {
+                focusManager.clearFocus()
+                actions.onSearchClose()
             }
-        } else if (state.isActive) {
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier.semantics { contentDescription = strings.search.close },
-            ) {
-                Icon(Icons.Filled.Close, contentDescription = null)
-            }
-        }
+        },
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = if (hasQuery) strings.search.clear else strings.search.close,
+        )
     }
 }
 
@@ -176,6 +234,7 @@ private fun SearchScopeSelector(
             FilterChip(
                 selected = selectedScope == scope,
                 onClick = { onSelected(scope) },
+                shape = CircleShape,
                 label = {
                     Text(
                         when (scope) {

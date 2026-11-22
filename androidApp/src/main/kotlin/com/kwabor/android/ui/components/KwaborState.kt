@@ -36,7 +36,7 @@ fun KwaborStateMessage(
             .fillMaxWidth()
             .background(
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(KwaborRadius.Card),
+                shape = RoundedCornerShape(KwaborRadius.Panel),
             )
             .padding(KwaborSpacing.Xxl),
         horizontalAlignment = Alignment.Start,

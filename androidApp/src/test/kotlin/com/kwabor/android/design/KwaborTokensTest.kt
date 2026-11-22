@@ -24,6 +24,7 @@ class KwaborTokensTest {
     @Test
     fun radius_matchesDesignFoundation() {
         assertEquals(16f, KwaborRadius.Card.value)
+        assertEquals(24f, KwaborRadius.Panel.value)
         assertEquals(28f, KwaborRadius.Sheet.value)
     }
 }

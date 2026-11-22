@@ -9,12 +9,10 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.ui.components.ListingCardState
-import com.kwabor.android.ui.components.PriceTagMode
-import com.kwabor.android.ui.components.PriceTagOptions
-import com.kwabor.android.ui.components.formatPriceTag
 import com.kwabor.shared.i18n.KwaborStrings
 import com.kwabor.shared.presentation.favorites.FavoriteListingItem
 import com.kwabor.shared.presentation.favorites.FavoritesUiState
+import com.kwabor.shared.presentation.money.PriceLabelFormatter
 
 internal fun favoritesLiveRegionStatus(state: FavoritesUiState, strings: KwaborStrings): String? = when {
     state.errorMessage != null -> listOf(strings.errorStateTitle, state.errorMessage).joinToString(SENTENCE_SEPARATOR)
@@ -82,7 +80,7 @@ internal fun FavoriteListingItem.favoriteCardAccessibilityDescription(strings: K
     add(
         listOf(
             strings.detail.price,
-            formatPriceTag(price, strings, PriceTagOptions(mode = PriceTagMode.Compact)),
+            PriceLabelFormatter.compactXof(price, strings.free),
         ).joinToString(WORD_SEPARATOR),
     )
 }.joinToString(SENTENCE_SEPARATOR)

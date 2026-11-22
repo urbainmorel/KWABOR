@@ -118,7 +118,7 @@ private fun ListingCardContent(
             modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(
                 start = KwaborSpacing.Lg,
                 top = KwaborSpacing.Lg,
-                end = KwaborSizing.MinimumAccessibleTouchTarget + KwaborSpacing.Md,
+                end = KwaborSpacing.Lg,
                 bottom = KwaborSpacing.Lg,
             ).clearVisualSemantics(actions.openAccessibilityDescription != null),
         )
@@ -168,17 +168,20 @@ private fun listingScrim(): Brush = Brush.verticalGradient(
 
 @Composable
 private fun ListingCardBody(state: ListingCardState, strings: KwaborStrings, modifier: Modifier = Modifier) {
+    val actionClearance = KwaborSizing.MinimumAccessibleTouchTarget + KwaborSpacing.Md - KwaborSpacing.Lg
+    val labelModifier = Modifier.padding(end = actionClearance)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Sm)) {
         Text(
             text = state.title,
+            modifier = labelModifier,
             color = KwaborColors.Surface0,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyMedium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = state.cityLabel,
+            modifier = labelModifier,
             color = KwaborColors.Ink100,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,

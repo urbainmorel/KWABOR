@@ -8,7 +8,50 @@ applicatif et données est fusionné dans `main` : corpus reproductible de 60 fi
 workflows staging et distributions internes. La cible V1 complète du PRD reste post-bêta ; aucune
 surface différée n'est déclarée terminée.
 
-## Snapshot courant — 21 août 2026
+## Jalon individuel Android — 21 novembre 2026
+
+- [ADR-0038](docs/adr/0038-single-maintainer-closed-beta-governance.md) autorise le mainteneur
+  unique à opérer le staging de démonstration reconstructible. Pour ce jalon, la restauration
+  B6.02 est facultative et les workflows vérifient l'identité du projet, le commit et les données
+  de test attendues.
+- La [migration ACL](https://github.com/urbainmorel/KWABOR/actions/runs/44882618152) et
+  [l'archivage des quatre fixtures](https://github.com/urbainmorel/KWABOR/actions/runs/44882783576)
+  sont vérifiés.
+- Les [180 JPEG](https://github.com/urbainmorel/KWABOR/actions/runs/44894907520) et les
+  [60 fiches publiées](https://github.com/urbainmorel/KWABOR/actions/runs/44895347086)
+  sont vérifiés sur `370996ca514b6f4f6a52c3e9d54ce0abb4ed6e3e` après sa
+  [CI main](https://github.com/urbainmorel/KWABOR/actions/runs/44892665910). En invité, les RPC
+  staging renvoient 15 résultats par famille, des images publiques valides et la fiche
+  « Cour des Mémoires de Ganhi » après recherche.
+- Sur le Tecno Android 16, `0.1.0-staging` issu du commit `365ad404c22f0e7ab43ee32ba5ffb708d71aa552`
+  et de sa [CI](https://github.com/urbainmorel/KWABOR/actions/runs/44896888398) ouvre le parcours
+  invité après le [correctif de navigation](https://github.com/urbainmorel/KWABOR/pull/73).
+  Les photos sur les cartes et dans le détail sont visibles pour les quatre familles.
+  La recherche au clavier « ganhi » conduit à la bonne fiche.
+- Le 21 novembre 2026, l'APK `0.1.0-staging` du commit
+  `cb8e376ac2530f96b3b482d2538e7bac81c414eb` a été installé par USB sur le Tecno Android 16.
+  En invité, la fiche « Marché des Paniers du Lac » a été ouverte en ligne, puis rouverte
+  depuis le catalogue après un redémarrage d'application sans réseau par défaut. Après
+  rétablissement de la connexion, la recherche « ganhi » et l'ouverture de la fiche attendue
+  ont réussi. Le cache de la [PR #74](https://github.com/urbainmorel/KWABOR/pull/74) passe
+  29 tests ciblés et la [CI de main](https://github.com/urbainmorel/KWABOR/actions/runs/44916550185).
+
+## Revue visuelle Android — 22 novembre 2026
+
+- Sur le Tecno, l'accueil affiche un champ compact dont le texte suit l'onglet et le filtre.
+  Les libellés lieu, événement, hôtel et restaurant tiennent sur une seule ligne. La recherche
+  au clavier et l'ouverture de la fiche fonctionnent.
+- La barre flottante présente cinq icônes dans une capsule sans bordure. Explorer et Compte
+  sont actifs. Les cartes photo utilisent un rayon de 16 dp. Les bandeaux sur les données
+  fictives sont retirés de l'interface Android. L'APK local de staging est installé sur le Tecno.
+- Les titres des cartes Android sont en 14 sp, en graisse normale. Les prix utilisent une graisse
+  normale et une seule ligne. Les montants `1 500 F` et `12 k F` sont vérifiés sur le Tecno
+  avec l'APK local `0.1.0-staging`.
+- Les onglets et filtres actifs d'Explorer utilisent un blanc translucide et un contour gris.
+  Dans la barre flottante, le fond teinté de l'icône active couvre toute la hauteur et suit
+  l'arrondi de la barre aux extrémités.
+
+## Historique du projet — à partir du 21 août 2026
 
 - REPO-GOV-001 est livré : le seul dépôt GitHub officiel et d'autorité est
   [`urbainmorel/KWABOR`](https://github.com/urbainmorel/KWABOR). L'audit du compte confirme un seul
@@ -49,8 +92,7 @@ surface différée n'est déclarée terminée.
 - Le projet Supabase existant est désormais l'autorité **staging** de la bêta. Une lecture distante
   protégée via le pooler de session TLS a confirmé PostgreSQL 17, 21 migrations, le catalogue Auth /
   Storage attendu, 286 contraintes dont 65 clés étrangères, zéro contrainte non validée et aucune
-  donnée Auth/Storage gérée. Quatre fixtures de développement restent publiées ; elles doivent être
-  archivées par le workflow exact et réversible avant le corpus de 60 fiches.
+  donnée Auth/Storage gérée. Quatre fixtures de développement étaient alors publiées.
 - L'autorité Supabase production distincte `KWABOR Production` est créée dans l'organisation choisie
   par le propriétaire, en `eu-west-1`, saine et vide. Sa référence non secrète alimente les guards
   GitHub ; aucun schéma, donnée ou réglage Auth de production n'y a été déployé.
@@ -61,8 +103,7 @@ surface différée n'est déclarée terminée.
   d'approbation. Les identités Firebase/OAuth, les signatures mobiles et les autorités Store
   restent incomplets.
 - Les PR `#63` et `#64` sont fusionnées. Le run post-fusion `44724652825` est vert sur
-  `0e9486bae71b2101691700048ee0cd8be5f7390b`. Le corpus staging reste à charger après
-  qualification du mode de démonstration et de la récupération B6.02.
+  `0e9486bae71b2101691700048ee0cd8be5f7390b`.
 - Sont présents dans la base `main` ou ajoutés par le présent lot : sécurité/architecture de la pile,
   intro Store-only, authentification et onboarding compacts, paramètres de compte et de
   confidentialité, persistance locale durcie, Explore Android/iOS offline-first, recherche lexicale
@@ -530,16 +571,11 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
-BETA-STAGING-001 est le chemin critique. Le code, les 60 fiches, les 180 médias, les tests dynamiques
-Supabase sur base CI éphémère et les workflows de distribution sont fusionnés et qualifiés ; il reste
-à fusionner le lot opérateur de la PR `#63`, désigner une autorité de revue indépendante légitime,
-provisionner l'escrow B6.02, exécuter la sauvegarde/restauration staging, appliquer puis vérifier la
-migration ACL, archiver les quatre fixtures, configurer Auth/SMTP/OAuth, publier puis vérifier Storage
-et le catalogue, produire les builds signés internes et exécuter le pilote. La checklist opérateur
-non sensible est suivie dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Aucun
-secret ne doit être publié dans GitHub Issues. Le dénominateur crash-free et la sonde first usable
-viewport sont prêts localement, mais leurs preuves Firebase, leurs valeurs réelles sur appareils et
-leurs validations CI exact-head restent incluses dans les gates ouvertes G4 à G7. La sonde décrit
+BETA-STAGING-001 est le chemin critique après la validation du catalogue sur le Tecno. La
+qualification Auth, le test iOS, les distributions signées et le pilote sont suivis dans
+[l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Le dénominateur crash-free et la
+sonde first usable viewport sont prêts localement. Leurs preuves Firebase, les mesures sur
+appareils et les validations CI du commit restent à obtenir pour G4 à G7. La sonde décrit
 seulement `first_process_explore`/`subsequent_explore` ; le mode B7.10 `cold`/`warm` relève
 exclusivement du harnais opérateur physique.
 
@@ -548,12 +584,9 @@ exclusivement du harnais opérateur physique.
 - ADR-0036 autorise explicitement le profil transitoire de bêta fermée `Explorer · Compte` et le
   report de Social, `+`, Notifications, B2B, paiement et IA. Cette autorisation ne vaut ni
   achèvement de la V1 complète du PRD ni ouverture publique de production.
-- Les protections GitHub fail-closed sont en place, mais aucun reviewer indépendant n'est configuré.
-  Le déploiement reste bloqué par l'escrow age hors dépôt à deux personnes,
-  l'exécution de la sauvegarde/restauration B6.02, les identités Firebase/OAuth/SMTP, les comptes
-  Stores, certificats, profils et secrets fournisseurs à provisionner via
-  [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61), jamais dans le dépôt ou dans un
-  commentaire.
+- Pour la cohorte, les contrôles de distribution restent à qualifier, dont la restauration B6.02,
+  les identités Firebase/OAuth/SMTP, les comptes Stores, les certificats et les profils. Leur
+  suivi se trouve dans [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61).
 - Pour le texte actif HISTORY V1, la rétention serveur glissante proposée de 180 jours et les
   modalités juridiques d'activation de la personnalisation restent bloquées par le Juridique/DPO.
   Les plafonds, le défaut désactivé et la resoumission sans doublon sont déjà actés par ADR-0029.
@@ -655,12 +688,6 @@ exclusivement du harnais opérateur physique.
 
 ## Prochaine tâche logique
 
-Les protections Environments et l'autorité Supabase production sont acquises. Résoudre
-[l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61) dans cet ordre : désigner une autorité
-de revue indépendante légitime, fusionner la PR `#63`, qualifier sa CI `push/main`, provisionner
-l'escrow age, exécuter B6.02, appliquer/vérifier la
-migration ACL, archiver les quatre fixtures, configurer Auth, publier/vérifier les 180 médias puis les
-60 fiches, exécuter les smokes staging, produire l'AAB Play Internal et l'IPA TestFlight Internal,
-puis ouvrir le pilote de 10 appareils Android et 5 iPhone
-pendant sept jours. Le go/no-go exige zéro P0/P1 et au moins 99,5 % de sessions sans crash. Les lots
-post-bêta restent différés tant que cette preuve n'est pas acquise.
+Le jalon individuel sur le Tecno est validé. Suivre le [plan de bêta fermée](docs/closed-beta-delivery-plan.md)
+pour qualifier l'inscription et les favoris sur staging, tester sur l'iPhone, préparer les builds
+signés et décider de l'ouverture de la cohorte.

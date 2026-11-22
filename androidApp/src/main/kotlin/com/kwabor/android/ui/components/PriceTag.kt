@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.kwabor.android.design.KwaborColors
 import com.kwabor.android.design.KwaborRadius
 import com.kwabor.android.design.KwaborSpacing
@@ -29,6 +30,8 @@ fun PriceTag(price: MoneyXof?, strings: KwaborStrings, options: PriceTagOptions 
         options = options,
     )
 
+    val compact = options.mode == PriceTagMode.Compact && !options.transactional
+    val typography = MaterialTheme.typography
     Text(
         text = label,
         modifier = Modifier
@@ -36,8 +39,18 @@ fun PriceTag(price: MoneyXof?, strings: KwaborStrings, options: PriceTagOptions 
                 color = KwaborColors.Ink100,
                 shape = RoundedCornerShape(KwaborRadius.Pill),
             )
-            .padding(horizontal = KwaborSpacing.Md, vertical = KwaborSpacing.Sm),
-        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            .padding(
+                horizontal = if (compact) KwaborSpacing.Sm else KwaborSpacing.Md,
+                vertical = if (compact) KwaborSpacing.Xs else KwaborSpacing.Sm,
+            ),
+        color = KwaborColors.Ink950,
+        style = if (compact) {
+            typography.labelSmall.copy(fontWeight = FontWeight.Normal)
+        } else {
+            typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+        },
+        maxLines = if (compact) 1 else Int.MAX_VALUE,
+        overflow = if (compact) TextOverflow.Ellipsis else TextOverflow.Clip,
     )
 }
 
@@ -70,6 +83,7 @@ internal fun formatPriceTag(
     val effectiveMode = if (options.transactional) PriceTagMode.Full else options.mode
     return when (effectiveMode) {
         PriceTagMode.Compact -> PriceLabelFormatter.compactXof(price, strings.free)
+            .removeSuffix(" ${KwaborCurrency.Xof.symbol}") + " F"
         PriceTagMode.Full -> PriceLabelFormatter.fullXof(price)
     }
 }

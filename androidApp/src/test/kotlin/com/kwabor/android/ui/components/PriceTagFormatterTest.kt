@@ -26,7 +26,7 @@ class PriceTagFormatterTest {
             options = PriceTagOptions(mode = PriceTagMode.Compact),
         )
 
-        assertEquals("25 k FCFA", label)
+        assertEquals("25 k F", label)
     }
 
     @Test
@@ -37,7 +37,7 @@ class PriceTagFormatterTest {
             options = PriceTagOptions(mode = PriceTagMode.Compact),
         )
 
-        assertEquals("5 000 FCFA", label)
+        assertEquals("5 000 F", label)
     }
 
     @Test

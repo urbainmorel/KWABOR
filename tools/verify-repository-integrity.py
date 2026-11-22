@@ -227,7 +227,7 @@ FUV_CRITICAL_SOURCE_SHA256 = {
     "shared/src/commonMain/kotlin/com/kwabor/shared/presentation/explore/ExploreSurfacePresentationRegistry.kt": "23bf7fbcc5f5d92e6d667ff357a286024a6eb827e3987263840650d35225face",
     "androidApp/src/main/kotlin/com/kwabor/android/observability/AndroidExploreFirstUsableViewportReporter.kt": "51fcc46bad4838bcaad51ca8142416952a424cb7d5240a99934d59ab0efbd9cf",
     "androidApp/src/main/kotlin/com/kwabor/android/ui/screens/explore/ExploreViewportPerformanceBinding.kt": "26c6e205392d13d6dbb2be7acabbb41e643bc80a88a31d948086a3aaa37a5b6c",
-    "androidApp/src/main/kotlin/com/kwabor/android/app/ExploreAppRoute.kt": "4739b0e372bc06bf0d5a58ba32cb041ca02cb4e74bca43848632e9505c36058b",
+    "androidApp/src/main/kotlin/com/kwabor/android/app/ExploreAppRoute.kt": "5259f0c6be7f56a778ae657eece99615b3e8799cb6bc30537702a63ac4a8980e",
     "iosApp/Kwabor/Explore/ExploreStore.swift": "97681a9aa1bb9c491d0239beb5dffc7a55e15ca67891ac002692279016ae0b62",
     "iosApp/Kwabor/Explore/ExploreView.swift": "1405c938a836ac383bfb752cfac76fda567729508ea5dd32764f8cdec37b371a",
     IOS_CONTENT_VIEW_PATH: "6d83d6cb63309a6ab8c4880a1bda9162671dc6512c1d763b784dc718fef6a177",

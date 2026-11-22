@@ -3,6 +3,12 @@ package com.kwabor.shared.i18n
 data class SearchStrings(
     val title: String,
     val placeholder: String,
+    val placePlaceholder: String,
+    val eventPlaceholder: String,
+    val establishmentPlaceholder: String,
+    val hotelPlaceholder: String,
+    val restaurantPlaceholder: String,
+    val guidePlaceholder: String,
     val submit: String,
     val clear: String,
     val close: String,
@@ -22,7 +28,13 @@ data class SearchStrings(
 
 internal val frenchSearchStrings = SearchStrings(
     title = "Recherche",
-    placeholder = "Rechercher un lieu, un événement",
+    placeholder = "Rechercher sur Kwabor",
+    placePlaceholder = "Rechercher un lieu",
+    eventPlaceholder = "Rechercher un événement",
+    establishmentPlaceholder = "Rechercher un établissement",
+    hotelPlaceholder = "Rechercher un hôtel",
+    restaurantPlaceholder = "Rechercher un restaurant",
+    guidePlaceholder = "Rechercher un guide",
     submit = "Rechercher",
     clear = "Effacer la recherche",
     close = "Fermer la recherche",

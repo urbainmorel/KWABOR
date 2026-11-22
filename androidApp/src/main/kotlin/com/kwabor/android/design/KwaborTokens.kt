@@ -14,6 +14,7 @@ object KwaborSpacing {
 
 object KwaborRadius {
     val Card = 16.dp
+    val Panel = 24.dp
     val Control = 14.dp
     val Sheet = 28.dp
     val Pill = 999.dp
@@ -35,6 +36,7 @@ object KwaborSizing {
     const val GUIDE_CARD_IMAGE_ASPECT_RATIO = 1.6f
     val GoogleLogo = 20.dp
     val BottomNavigationHeight = 76.dp
+    val FloatingNavigationHeight = 64.dp
     val FloatingActionButton = 56.dp
     val FloatingPill = 36.dp
     val BrandMark = 96.dp
@@ -44,6 +46,7 @@ object KwaborSizing {
 }
 
 object KwaborAlpha {
+    const val NAVIGATION_SELECTION = 0.08f
     const val SCRIM_LOW = 0.35f
     const val SCRIM_HIGH = 0.72f
     const val SCRIM_HERO = 0.86f
