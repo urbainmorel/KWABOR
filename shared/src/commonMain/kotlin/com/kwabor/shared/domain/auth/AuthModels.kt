@@ -117,17 +117,20 @@ private fun CompleteOnboardingValues.normalized(): CompleteOnboardingValues = co
     privacyDocumentId = privacyDocumentId.trim(),
 )
 
-private fun CompleteOnboardingValues.validationError(): DomainError.Validation? {
-    return when {
-        requiresProfileIdentity && (firstName.isBlank() || lastName.isBlank()) ->
-            DomainError.Validation("error.auth.name_required")
-        requiresProfileIdentity && cityId.isBlank() -> DomainError.Validation("error.auth.city_required")
-        firstName.length > MAX_ONBOARDING_NAME_LENGTH || lastName.length > MAX_ONBOARDING_NAME_LENGTH ->
-            DomainError.Validation("error.auth.name_too_long")
-        termsDocumentId.isBlank() || privacyDocumentId.isBlank() || termsDocumentId == privacyDocumentId ->
-            DomainError.Validation("error.auth.legal_acceptance_required")
-        else -> null
+private fun CompleteOnboardingValues.validationError(): DomainError.Validation? = identityValidationError()
+    ?: if (termsDocumentId.isBlank() || privacyDocumentId.isBlank() || termsDocumentId == privacyDocumentId) {
+        DomainError.Validation("error.auth.legal_acceptance_required")
+    } else {
+        null
     }
+
+private fun CompleteOnboardingValues.identityValidationError(): DomainError.Validation? = when {
+    requiresProfileIdentity && (firstName.isBlank() || lastName.isBlank()) ->
+        DomainError.Validation("error.auth.name_required")
+    firstName.length > MAX_ONBOARDING_NAME_LENGTH || lastName.length > MAX_ONBOARDING_NAME_LENGTH ->
+        DomainError.Validation("error.auth.name_too_long")
+    requiresProfileIdentity && cityId.isBlank() -> DomainError.Validation("error.auth.city_required")
+    else -> null
 }
 
 class SocialSignInRequest(

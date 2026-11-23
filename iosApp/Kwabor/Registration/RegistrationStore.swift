@@ -134,7 +134,7 @@ final class RegistrationStore: ObservableObject {
     }
 
     func updateLegalAcceptance(_ accepted: Bool) {
-        controller.updateLegalAcceptance(accepted: accepted)
+        controller.dispatch(intent: IosRegistrationUpdateLegalAcceptanceIntent(accepted: accepted))
     }
 
     func submitPrimaryAction() {

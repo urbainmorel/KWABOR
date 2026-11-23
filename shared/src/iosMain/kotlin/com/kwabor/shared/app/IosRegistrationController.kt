@@ -32,6 +32,8 @@ data class IosRegistrationUpdateLastNameIntent(val lastName: String) : IosRegist
 
 data class IosRegistrationSelectCityIntent(val cityId: String) : IosRegistrationFieldIntent
 
+data class IosRegistrationUpdateLegalAcceptanceIntent(val accepted: Boolean) : IosRegistrationFieldIntent
+
 data class IosRegistrationSelectCurrencyIntent(val currency: KwaborCurrency) : IosRegistrationFieldIntent
 
 sealed interface IosRegistrationAsyncIntent : IosRegistrationIntent
@@ -64,10 +66,6 @@ class IosRegistrationController internal constructor(
             field = value
             observer?.invoke(value)
         }
-
-    fun updateLegalAcceptance(accepted: Boolean) {
-        reduce(RegistrationIntent.UpdateLegalAcceptance(accepted))
-    }
 
     val isConfigured: Boolean get() = presenter != null
 
@@ -224,6 +222,7 @@ class IosRegistrationController internal constructor(
 }
 
 private fun IosRegistrationFieldIntent.toSharedIntent(): RegistrationIntent.Field = when (this) {
+    is IosRegistrationUpdateLegalAcceptanceIntent -> RegistrationIntent.UpdateLegalAcceptance(accepted)
     is IosRegistrationUpdateEmailIntent -> RegistrationIntent.UpdateEmail(email)
     is IosRegistrationUpdateFirstNameIntent -> RegistrationIntent.UpdateFirstName(firstName)
     is IosRegistrationUpdateLastNameIntent -> RegistrationIntent.UpdateLastName(lastName)
