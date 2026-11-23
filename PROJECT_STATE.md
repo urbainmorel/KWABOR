@@ -581,9 +581,23 @@ exclusivement du harnais opérateur physique.
 
 L’[ADR-0039](docs/adr/0039-single-maintainer-staging-auth-and-internal-builds.md) définit la
 politique du mainteneur unique pour Auth staging, la signature et les canaux internes.
-Sur le Tecno, le formulaire d’inscription par e-mail s’ouvre. Le service Auth staging répond
-avec l’inscription par e-mail active et la confirmation requise. La réception du code et la
-persistance des favoris restent à vérifier après la qualification du service d’envoi.
+L’inscription par e-mail et les favoris ont été qualifiés sur le Tecno lors du test individuel.
+La [PR #80](https://github.com/urbainmorel/KWABOR/pull/80) a depuis simplifié la dernière étape
+de l’inscription. Le commit `9b2263f4495e4766f666d513da4ab454293a80c9` a passé la
+[CI sur main](https://github.com/urbainmorel/KWABOR/actions/runs/45263087913), puis la migration
+`20261123134613` a été [appliquée](https://github.com/urbainmorel/KWABOR/actions/runs/45271247825)
+et [vérifiée](https://github.com/urbainmorel/KWABOR/actions/runs/45271570850) sur staging.
+
+Sur le Tecno, la version `0.1.0-staging` issue de ce commit s’est installée par USB. Explorer
+affiche le catalogue en mode invité et connecté sans pastille de session. Le mainteneur a vu
+l’étape finale de l’inscription de l’alias de test avec une case d’acceptation et quatre devises
+sur une rangée. Les trois champs du profil se chargent vides, peuvent être renseignés et relus,
+puis restent vides après effacement et redémarrage. L’ouverture de chaque lien légal et le
+parcours sur iPhone restent à vérifier sur appareil.
+
+Un essai involontaire de configuration à distance a déclenché le message d’échec de
+confidentialité sur cet APK. Le réglage est revenu à désactivé. Le message persiste après
+relance, en l’absence de Firebase configuré sur ce build de staging.
 
 ## Blocages / limites
 
@@ -696,5 +710,4 @@ persistance des favoris restent à vérifier après la qualification du service 
 ## Prochaine tâche logique
 
 Le jalon individuel sur le Tecno est validé. Suivre le [plan de bêta fermée](docs/closed-beta-delivery-plan.md)
-pour qualifier l'inscription et les favoris sur staging, tester sur l'iPhone, préparer les builds
-signés et décider de l'ouverture de la cohorte.
+pour vérifier le parcours sur iPhone, préparer les builds signés et décider de l’ouverture de la cohorte.
