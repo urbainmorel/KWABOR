@@ -505,7 +505,7 @@ Layout centré, **mark Kwabor**, **pastille de langue** en coin haut. Champ **em
 Deux chemins ; **ni téléphone ni âge** ; **CGU et politique de confidentialité** acceptées avant validation ; **langue** héritée de la détection (§E2).
 - **Par email — 4 écrans maximum :** `Email` → **OTP** (6 cases, collage/autoremplissage natif, auto-submit au sixième chiffre, renvoi 30 s, correction email) → **Mot de passe** (un seul champ, afficher/masquer, règles live, password manager) → **Finaliser mon profil**.
 - **Par Google / Apple (iOS) — 1 écran après fournisseur :** **Finaliser mon profil**, nom/prénom préremplis et modifiables.
-- **Profil final compact et défilant :** prénom, nom, ville recherchable, devise compacte XOF par défaut, deux acceptations légales séparées avec lien HTTPS et version visible. Les exigences sont préchargées dès E6 ; un retry ciblé ne réinitialise aucune saisie.
+- **Dernière étape e-mail** : rangée de quatre devises (XOF sélectionné par défaut) et une case commune aux CGU et à la politique de confidentialité. Les intitulés dans la phrase ouvrent chaque document. Le formulaire fédéré présente aussi les champs prénom, nom et ville. Ces champs sont disponibles dans les paramètres du profil après inscription.
 - **Progression :** aucun total avant le choix ; email affiche `2/4`, `3/4`, `4/4` ; fournisseur affiche **« Dernière étape »**.
 - **Sortie :** aucun écran succès. `Completed` est technique, ferme immédiatement E6 et reprend l'intention protégée. Aucun GPS, consentement observabilité ou prompt notification avant l'accueil.
 

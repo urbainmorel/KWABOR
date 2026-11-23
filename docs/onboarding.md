@@ -14,10 +14,10 @@ Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
 
 1. email puis OTP de 6 chiffres, avec collage/autoremplissage natif, soumission automatique, correction de l'email et renvoi après 30 secondes ;
 2. un seul champ de mot de passe d'au moins 8 caractères, compatible gestionnaire de mots de passe et jamais conservé dans l'état UI ;
-3. un écran défilant **Finaliser mon profil** : prénom, nom, ville recherchable, devise XOF par défaut et deux acceptations juridiques séparées avec liens HTTPS et versions visibles ;
+3. un écran **Finaliser mon profil** avec quatre devises en ligne et une seule case pour les CGU et la politique de confidentialité. Les deux intitulés ouvrent leurs documents. Le prénom, le nom et la ville se renseignent depuis les paramètres du profil ;
 4. finalisation serveur atomique puis fermeture immédiate du tunnel, sans écran succès ni permission.
 
-Le chemin email compte quatre écrans maximum et affiche `2/4`, `3/4`, `4/4` seulement après le choix de méthode. Google et Apple ouvrent directement le profil final avec les noms préremplis et modifiables ; la progression affiche **Dernière étape**. Les villes et documents légaux sont préchargés dès l'ouverture. Une erreur offre un retry ciblé sans perdre les saisies. Une ville n'est suggérée que si la softwall provient d'un lieu dont le `cityId` est valide.
+Le chemin email compte quatre écrans maximum et affiche `2/4`, `3/4`, `4/4` seulement après le choix de méthode. Google et Apple ouvrent directement le profil final avec les noms préremplis et modifiables ; la progression affiche **Dernière étape**. Les documents légaux sont préchargés dès l’ouverture. Les villes sont chargées pour le profil fédéré. Une erreur offre un retry ciblé sans perdre les saisies. Une ville n'est suggérée que si la softwall provient d'un lieu dont le `cityId` est valide.
 
 Aucune géolocalisation, permission notification ou demande de consentement d'observabilité n'appartient plus au tunnel. Les nouveaux comptes conservent Analytics, diagnostics et Remote Config à `false` jusqu'à leur future gestion dans Réglages ; l'intro locale reste donc le comportement par défaut.
 

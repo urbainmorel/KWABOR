@@ -283,6 +283,8 @@ La RPC `complete_user_onboarding` est l'unique voie de finalisation. Elle refuse
 tombstone de suppression, puis écrit atomiquement le profil, le rôle utilisateur de base, les deux
 preuves d'acceptation et `onboarding_completed_at`. Le client ne doit recevoir aucun droit direct
 d'écriture sur ce timestamp ou sur les preuves juridiques.
+La RPC `update_my_profile_details` permet au propriétaire d’un profil terminé de renseigner,
+modifier ou effacer son prénom, son nom et sa ville.
 
 ## Provisionnement Firebase propriétaire
 

@@ -40,7 +40,7 @@ class CompleteOnboardingRequestTest {
     }
 
     @Test
-    fun create_requiresThreeDistinctLegalDocumentRevisions() {
+    fun create_requiresTwoDistinctLegalDocumentRevisions() {
         val values = validValues()
         val result = CompleteOnboardingRequest.create(
             values.copy(privacyDocumentId = values.termsDocumentId),

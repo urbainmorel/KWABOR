@@ -212,7 +212,7 @@ internal sealed interface AuthIntent {
 
     data class SelectCurrency(val currency: KwaborCurrency) : ProfileField
 
-    data class ChangeLegalAcceptance(val type: LegalDocumentType, val accepted: Boolean) : ProfileField
+    data class ChangeLegalAcceptance(val accepted: Boolean) : ProfileField
 
     data object CompleteProfile : ProfileProgress
 

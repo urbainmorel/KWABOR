@@ -11,7 +11,6 @@ import com.kwabor.shared.domain.observability.AnalyticsAuthMethod
 import com.kwabor.shared.domain.observability.AnalyticsEvent
 import com.kwabor.shared.domain.observability.AnalyticsEventName
 import com.kwabor.shared.presentation.auth.RegistrationMethod
-import com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus
 import com.kwabor.shared.presentation.auth.RegistrationStartContext
 import com.kwabor.shared.presentation.auth.RegistrationStep
 import com.kwabor.shared.presentation.auth.initialAuthUiState
@@ -134,7 +133,7 @@ internal class AuthFederatedCoordinator(
             currentSession = session,
         )
         val preparedState = runtime.registrationState.value
-        return if (preparedState.requirementsStatus == RegistrationRequirementsStatus.Ready) {
+        return if (preparedState.requirementsReady && preparedState.cities.isNotEmpty()) {
             registrationState.copy(
                 startContext = preparedState.startContext,
                 requirementsStatus = preparedState.requirementsStatus,
@@ -158,7 +157,7 @@ internal class AuthFederatedCoordinator(
         )
         runtime.registrationRequirementsJob?.cancel()
         runtime.registrationState.value = runtime.registrationState.value.copy(
-            requirementsStatus = RegistrationRequirementsStatus.Loading,
+            requirementsStatus = com.kwabor.shared.presentation.auth.RegistrationRequirementsStatus.Loading,
             requirementsErrorMessage = null,
         )
         runtime.registrationRequirementsJob = runtime.coroutineScope.launch {

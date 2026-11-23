@@ -34,7 +34,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class RegistrationPresenterTest {
     private val strings = stringsFor(AppLocale.French)
@@ -146,7 +145,8 @@ class RegistrationPresenterTest {
         )
         val presenter = presenter(repository, FakeClock())
 
-        val result = presenter.loadRequirements(initialRegistrationUiState(), strings)
+        val state = initialRegistrationUiState().copy(method = RegistrationMethod.Federated)
+        val result = presenter.loadRequirements(state, strings)
 
         assertEquals(strings.registrationLegalUnavailable, result.requirementsErrorMessage)
         assertEquals(1, result.cities.size)
@@ -158,11 +158,13 @@ class RegistrationPresenterTest {
         val presenter = presenter(FakeRegistrationAuthRepository(), FakeClock())
 
         val valid = presenter.loadRequirements(
-            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "cotonou")),
+            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "cotonou"))
+                .copy(method = RegistrationMethod.Federated),
             strings,
         )
         val invalid = presenter.loadRequirements(
-            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "unknown")),
+            initialRegistrationUiState(RegistrationStartContext(suggestedCityId = "unknown"))
+                .copy(method = RegistrationMethod.Federated),
             strings,
         )
 
@@ -178,21 +180,22 @@ class RegistrationPresenterTest {
             firstName = "Afi",
             lastName = "Soglo",
             selectedCityId = "cotonou",
-            termsAccepted = true,
+            legalAccepted = true,
         )
-        val loadedRequirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
+        val state = initialRegistrationUiState().copy(method = RegistrationMethod.Federated)
+        val loadedRequirements = presenter.loadRequirements(state, strings)
 
         val merged = liveState.mergeRequirementsFrom(loadedRequirements)
 
         assertEquals("Afi", merged.firstName)
         assertEquals("Soglo", merged.lastName)
         assertEquals("cotonou", merged.selectedCityId)
-        assertTrue(merged.termsAccepted)
+        assertFalse(merged.legalAccepted)
         assertEquals(RegistrationRequirementsStatus.Ready, merged.requirementsStatus)
     }
 
     @Test
-    fun completeOnboardingSendsExplicitDocumentIdsAndCompletesImmediately() = runTest {
+    fun emailOnboardingSendsBothDocumentIdsAndOmitsProfileIdentity() = runTest {
         val repository = FakeRegistrationAuthRepository()
         val presenter = presenter(repository, FakeClock())
         val requirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
@@ -203,8 +206,7 @@ class RegistrationPresenterTest {
             lastName = " Kwabor ",
             selectedCityId = "cotonou",
             preferredCurrency = KwaborCurrency.Eur,
-            termsAccepted = true,
-            privacyAccepted = true,
+            legalAccepted = true,
         )
 
         val completed = presenter.completeOnboarding(ready, strings)
@@ -212,7 +214,10 @@ class RegistrationPresenterTest {
         val request = assertNotNull(repository.completedRequest)
         assertEquals("terms-id", request.termsDocumentId)
         assertEquals("privacy-id", request.privacyDocumentId)
-        assertEquals("Afi", request.firstName)
+        assertEquals("", request.firstName)
+        assertEquals("", request.lastName)
+        assertEquals("", request.cityId)
+        assertEquals(KwaborCurrency.Eur, request.preferredCurrency)
         assertEquals(RegistrationStep.Completed, completed.step)
         assertEquals(AccountSetupStatus.Complete, completed.currentSession?.accountSetupStatus)
     }
@@ -220,7 +225,8 @@ class RegistrationPresenterTest {
     @Test
     fun compactProfileValidationBlocksEveryRequiredValue() = runTest {
         val presenter = presenter(FakeRegistrationAuthRepository(), FakeClock())
-        val requirements = presenter.loadRequirements(initialRegistrationUiState(), strings)
+        val state = initialRegistrationUiState().copy(method = RegistrationMethod.Federated)
+        val requirements = presenter.loadRequirements(state, strings)
 
         val identityBlocked = presenter.reducer.reduce(
             requirements.copy(step = RegistrationStep.Profile),

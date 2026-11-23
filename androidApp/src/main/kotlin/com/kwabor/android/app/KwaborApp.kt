@@ -68,6 +68,7 @@ import com.kwabor.shared.presentation.navigation.isVisibleIn
 import com.kwabor.shared.presentation.navigation.label
 import com.kwabor.shared.presentation.onboarding.OnboardingEntry
 import com.kwabor.shared.presentation.onboarding.OnboardingEntryResolver
+import com.kwabor.shared.presentation.profile.ProfileDetailsPresenter
 import com.kwabor.shared.presentation.session.ViewerSessionScopeTracker
 import kotlinx.coroutines.flow.StateFlow
 
@@ -173,6 +174,7 @@ internal data class KwaborAppDependencies(
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
     val detailExternalActionLauncher: DetailExternalActionLauncher,
     val rootNavigationProfile: RootNavigationProfile,
+    val profileDetailsPresenter: ProfileDetailsPresenter? = null,
 )
 
 internal data class KwaborAppRuntimeState(
@@ -244,6 +246,7 @@ internal data class HomeShellDependencies(
     val listingMediaUrlPolicy: ListingMediaUrlPolicy,
     val detailExternalActionLauncher: DetailExternalActionLauncher,
     val rootNavigationProfile: RootNavigationProfile,
+    val profileDetailsPresenter: ProfileDetailsPresenter?,
 ) {
     constructor(dependencies: KwaborAppDependencies) : this(
         exploreViewModel = dependencies.exploreViewModel,
@@ -259,6 +262,7 @@ internal data class HomeShellDependencies(
         listingMediaUrlPolicy = dependencies.listingMediaUrlPolicy,
         detailExternalActionLauncher = dependencies.detailExternalActionLauncher,
         rootNavigationProfile = dependencies.rootNavigationProfile,
+        profileDetailsPresenter = dependencies.profileDetailsPresenter,
     )
 }
 
@@ -548,7 +552,7 @@ private fun KwaborRootNavHost(
     state: HomeShellState,
 ) {
     NavHost(navController = navController, startDestination = HomeRoute) {
-        homeExploreRoute(navController, paddingValues, strings, dependencies, state)
+        homeExploreRoute(navController, paddingValues, strings, dependencies)
         if (dependencies.rootNavigationProfile == RootNavigationProfile.Full) {
             guideDiscoveryChildRoute(
                 navController = navController,
@@ -575,13 +579,11 @@ private fun NavGraphBuilder.homeExploreRoute(
     paddingValues: PaddingValues,
     strings: KwaborStrings,
     dependencies: HomeShellDependencies,
-    state: HomeShellState,
 ) {
     composable<HomeRoute> {
         ExploreRoute(
             dependencies = dependencies,
             strings = strings,
-            isGuestSession = !state.auth.isAuthenticated,
             modifier = Modifier.padding(paddingValues),
             onGuideDiscoveryRequested = {
                 navController.navigate(GuideDiscoveryRoute) { launchSingleTop = true }

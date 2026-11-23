@@ -85,12 +85,16 @@ class RegistrationPresenter(
             requirementsStatus = RegistrationRequirementsStatus.Loading,
             requirementsErrorMessage = null,
         )
-        val cities = when (val result = catalogRepository.listCities()) {
-            is DomainResult.Success -> result.value
-            is DomainResult.Failure -> return loadingState.copy(
-                requirementsStatus = RegistrationRequirementsStatus.Failed,
-                requirementsErrorMessage = result.error.toAuthMessage(strings),
-            )
+        val cities = if (state.requiresProfileIdentity) {
+            when (val result = catalogRepository.listCities()) {
+                is DomainResult.Success -> result.value
+                is DomainResult.Failure -> return loadingState.copy(
+                    requirementsStatus = RegistrationRequirementsStatus.Failed,
+                    requirementsErrorMessage = result.error.toAuthMessage(strings),
+                )
+            }
+        } else {
+            emptyList()
         }
         val documents = when (val result = authRepository.listActiveLegalDocuments(AppLocale.French)) {
             is DomainResult.Success -> result.value
@@ -159,20 +163,21 @@ private fun List<LegalDocumentRevision>.singleRevisionOfType(type: LegalDocument
     filter { revision -> revision.type == type }.singleOrNull()
 
 private fun RegistrationUiState.toCompleteOnboardingRequest(): DomainResult<CompleteOnboardingRequest> {
-    if (!termsAccepted || !privacyAccepted) {
+    if (!legalAccepted) {
         return DomainResult.Failure(
             com.kwabor.shared.domain.core.DomainError.Validation("error.auth.legal_acceptance_required"),
         )
     }
     return CompleteOnboardingRequest.create(
         CompleteOnboardingValues(
-            firstName = firstName,
-            lastName = lastName,
-            cityId = selectedCityId.orEmpty(),
+            firstName = firstName.takeIf { requiresProfileIdentity }.orEmpty(),
+            lastName = lastName.takeIf { requiresProfileIdentity }.orEmpty(),
+            cityId = selectedCityId.takeIf { requiresProfileIdentity }.orEmpty(),
             preferredLocale = AppLocale.French,
             preferredCurrency = preferredCurrency,
             termsDocumentId = termsDocument?.id.orEmpty(),
             privacyDocumentId = privacyDocument?.id.orEmpty(),
+            requiresProfileIdentity = requiresProfileIdentity,
         ),
     )
 }

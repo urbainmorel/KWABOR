@@ -108,6 +108,7 @@ struct KwaborApp: App {
                 searchStore: searchStore,
                 guideDiscoveryStore: guideDiscoveryStore,
                 catalogDetailStore: catalogDetailStore,
+                profileDetailsPresenter: compositionRoot.profileDetailsPresenter,
                 onViewerContextChanged: { accountID in
                     compositionRoot.updateViewerSessionScope(
                         accountId: accountID,

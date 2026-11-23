@@ -293,29 +293,29 @@ private struct RegistrationStepContent: View {
 
     private var profileStep: some View {
         Group {
-            Section {
-                TextField(
-                    store.strings.authFirstName,
-                    text: Binding(
-                        get: { state.firstName },
-                        set: store.updateFirstName
-                    )
-                )
-                .textContentType(.givenName)
-                .accessibilityFocused($accessibilityFocus, equals: .profile)
-                TextField(
-                    store.strings.authLastName,
-                    text: Binding(
-                        get: { state.lastName },
-                        set: store.updateLastName
-                    )
-                )
-                .textContentType(.familyName)
+            if state.requiresProfileIdentity {
+                identitySection
+                citySection
             }
             requirementsSection
-            citySection
             currencySection
             legalSection
+        }
+    }
+
+    private var identitySection: some View {
+        Section {
+            TextField(
+                store.strings.authFirstName,
+                text: Binding(get: { state.firstName }, set: store.updateFirstName)
+            )
+            .textContentType(.givenName)
+            .accessibilityFocused($accessibilityFocus, equals: .profile)
+            TextField(
+                store.strings.authLastName,
+                text: Binding(get: { state.lastName }, set: store.updateLastName)
+            )
+            .textContentType(.familyName)
         }
     }
 
@@ -365,41 +365,65 @@ private struct RegistrationStepContent: View {
 
     private var currencySection: some View {
         Section(store.strings.registrationCurrencyTitle) {
-            Menu {
-                ForEach(availableCurrencies.indices, id: \.self) { index in
-                    let currency = availableCurrencies[index]
+            HStack(spacing: KwaborDesignTokens.Spacing.xs) {
+                ForEach(availableCurrencies, id: \.name) { currency in
+                    let selected = currency == state.preferredCurrency
                     Button {
                         store.selectCurrency(currency)
                     } label: {
-                        Text("\(currency.name.uppercased()) · \(currency.symbol)")
+                        Text(currency.name.uppercased())
+                            .font(.subheadline.weight(selected ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(selected ? Color.primary.opacity(0.08) : Color.clear, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.16)))
                     }
-                }
-            } label: {
-                HStack {
-                    Text("\(state.preferredCurrency.name.uppercased()) · \(state.preferredCurrency.symbol)")
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .accessibilityHidden(true)
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
         }
     }
 
     private var legalSection: some View {
-        Section(store.strings.registrationLegalTitle) {
-            legalAcceptance(
-                document: state.termsDocument,
-                title: store.strings.registrationTermsAcceptance,
-                isAccepted: state.termsAccepted,
-                onAcceptedChange: store.updateTermsAcceptance
-            )
-            legalAcceptance(
-                document: state.privacyDocument,
-                title: store.strings.registrationPrivacyAcceptance,
-                isAccepted: state.privacyAccepted,
-                onAcceptedChange: store.updatePrivacyAcceptance
-            )
+        Section {
+            if let text = legalAcceptanceText {
+                HStack(alignment: .center, spacing: KwaborDesignTokens.Spacing.sm) {
+                    Button {
+                        store.updateLegalAcceptance(!state.legalAccepted)
+                    } label: {
+                        Image(systemName: state.legalAccepted ? "checkmark.square.fill" : "square")
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(store.strings.authLegalAcceptance)
+                    .accessibilityAddTraits(state.legalAccepted ? .isSelected : [])
+                    .disabled(!state.requirementsReady || state.isLoading)
+                    Text(text)
+                }
+            } else if state.requirementsReady {
+                Text(store.strings.registrationLegalUnavailable)
+                    .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
+            }
         }
+    }
+
+    private var legalAcceptanceText: AttributedString? {
+        guard let terms = state.termsDocument.flatMap({ URL(string: $0.url) }),
+              let privacy = state.privacyDocument.flatMap({ URL(string: $0.url) }),
+              terms.scheme?.lowercased() == secureScheme, terms.host != nil,
+              privacy.scheme?.lowercased() == secureScheme, privacy.host != nil else {
+            return nil
+        }
+        var termsLabel = AttributedString(store.strings.registrationTermsLabel)
+        termsLabel.link = terms
+        var privacyLabel = AttributedString(store.strings.registrationPrivacyLabel)
+        privacyLabel.link = privacy
+        return AttributedString(store.strings.registrationLegalPrefix)
+            + termsLabel
+            + AttributedString(store.strings.registrationLegalConjunction)
+            + privacyLabel
     }
 
     @ViewBuilder
@@ -467,12 +491,7 @@ private struct RegistrationStepContent: View {
             return store.password.count < minimumPasswordLength
         }
         if state.step == .profile {
-            return !state.requirementsReady ||
-                state.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                state.lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                state.selectedCityId == nil ||
-                !state.termsAccepted ||
-                !state.privacyAccepted
+            return !state.canCompleteProfile || legalAcceptanceText == nil
         }
         return true
     }
@@ -504,20 +523,6 @@ private struct RegistrationStepContent: View {
         }
     }
 
-    private func legalAcceptance(
-        document: LegalDocumentRevision?,
-        title: String,
-        isAccepted: Bool,
-        onAcceptedChange: @escaping (Bool) -> Void
-    ) -> LegalAcceptanceRow {
-        LegalAcceptanceRow(
-            document: document,
-            title: title,
-            isAccepted: isAccepted,
-            unavailableMessage: store.strings.registrationLegalUnavailable,
-            onAcceptedChange: onAcceptedChange
-        )
-    }
 }
 
 private enum RegistrationAccessibilityFocus: Hashable {
@@ -525,42 +530,6 @@ private enum RegistrationAccessibilityFocus: Hashable {
     case otp
     case password
     case profile
-}
-
-private struct LegalAcceptanceRow: View {
-    let document: LegalDocumentRevision?
-    let title: String
-    let isAccepted: Bool
-    let unavailableMessage: String
-    let onAcceptedChange: (Bool) -> Void
-
-    @ViewBuilder
-    var body: some View {
-        if let document,
-           let url = URL(string: document.url),
-           url.scheme?.lowercased() == secureScheme {
-            VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
-                Link(destination: url) {
-                    VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.xs) {
-                        Text(title)
-                        Text(document.version)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Toggle(
-                    title,
-                    isOn: Binding(
-                        get: { isAccepted },
-                        set: onAcceptedChange
-                    )
-                )
-            }
-        } else {
-            Text(unavailableMessage)
-                .foregroundStyle(KwaborDesignTokens.ColorToken.ticket)
-        }
-    }
 }
 
 private let availableCurrencies: [KwaborCurrency] = [.xof, .ngn, .usd, .eur]

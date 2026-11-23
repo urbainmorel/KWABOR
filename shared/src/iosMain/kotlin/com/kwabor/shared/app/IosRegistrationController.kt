@@ -2,7 +2,6 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
-import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.i18n.stringsFor
@@ -51,18 +50,6 @@ sealed interface IosRegistrationNavigationIntent : IosRegistrationIntent
 
 data object IosRegistrationGoBackIntent : IosRegistrationNavigationIntent
 
-class IosLegalAcceptanceController internal constructor(
-    private val updateAcceptance: (LegalDocumentType, Boolean) -> Unit,
-) {
-    fun updateTerms(accepted: Boolean) {
-        updateAcceptance(LegalDocumentType.Terms, accepted)
-    }
-
-    fun updatePrivacy(accepted: Boolean) {
-        updateAcceptance(LegalDocumentType.PrivacyPolicy, accepted)
-    }
-}
-
 class IosRegistrationController internal constructor(
     private val presenter: RegistrationPresenter?,
     dispatcherProvider: DispatcherProvider,
@@ -78,8 +65,8 @@ class IosRegistrationController internal constructor(
             observer?.invoke(value)
         }
 
-    val legalAcceptance = IosLegalAcceptanceController { type, accepted ->
-        reduce(RegistrationIntent.UpdateLegalAcceptance(type, accepted))
+    fun updateLegalAcceptance(accepted: Boolean) {
+        reduce(RegistrationIntent.UpdateLegalAcceptance(accepted))
     }
 
     val isConfigured: Boolean get() = presenter != null

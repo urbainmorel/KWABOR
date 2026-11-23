@@ -28,7 +28,7 @@ internal data class RegistrationScreenActions(
     val onRetryRequirements: () -> Unit,
     val onCitySelected: (String) -> Unit,
     val onCurrencySelected: (KwaborCurrency) -> Unit,
-    val onLegalAcceptanceChanged: (LegalDocumentType, Boolean) -> Unit,
+    val onLegalAcceptanceChanged: (Boolean) -> Unit,
     val onOpenLegalDocument: (LegalDocumentType) -> Unit,
     val onCompleteProfile: () -> Unit,
 )

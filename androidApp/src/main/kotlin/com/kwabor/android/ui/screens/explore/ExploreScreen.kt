@@ -122,7 +122,6 @@ fun ExploreScreen(
 data class ExploreScreenUiModel(
     val state: ExploreUiState,
     val searchState: SearchUiState = SearchUiState(),
-    val isGuestSession: Boolean = true,
     val showGuideDiscoveryEntry: Boolean = true,
     val viewportPerformance: ExploreViewportPerformanceBinding = ExploreViewportPerformanceBinding.Disabled,
 )
@@ -144,7 +143,6 @@ private fun ExploreContent(
         searchState = searchState,
         strings = strings,
         mediaUrlPolicy = mediaUrlPolicy,
-        isGuestSession = model.isGuestSession,
         showGuideDiscoveryEntry = model.showGuideDiscoveryEntry,
         actions = actions,
     )
@@ -174,7 +172,6 @@ private data class ExploreGridContent(
     val searchState: SearchUiState,
     val strings: KwaborStrings,
     val mediaUrlPolicy: ListingMediaUrlPolicy,
-    val isGuestSession: Boolean,
     val showGuideDiscoveryEntry: Boolean,
     val actions: ExploreScreenActions,
 )
@@ -320,7 +317,7 @@ private fun LazyGridScope.exploreSurfaceItems(content: ExploreGridContent, onApp
     val strings = content.strings
     val actions = content.actions
     item(span = { GridItemSpan(maxLineSpan) }) {
-        ExploreHeader(state, searchState, strings, content.isGuestSession, actions)
+        ExploreHeader(state, searchState, strings, actions)
     }
     if (!searchState.isActive && content.showGuideDiscoveryEntry) {
         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -475,17 +472,15 @@ private fun ExploreHeader(
     state: ExploreUiState,
     searchState: SearchUiState,
     strings: KwaborStrings,
-    isGuestSession: Boolean,
     actions: ExploreScreenActions,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(KwaborSpacing.Md),
     ) {
-        ExploreLocationRow(
+        ExploreCityControl(
             cityLabel = state.cityLabel,
             strings = strings,
-            isGuestSession = isGuestSession,
             onClick = actions.onCityClick,
         )
         Text(
@@ -502,39 +497,9 @@ private fun ExploreHeader(
 }
 
 @Composable
-private fun ExploreLocationRow(
-    cityLabel: String,
-    strings: KwaborStrings,
-    isGuestSession: Boolean,
-    onClick: () -> Unit,
-) {
+private fun ExploreCityControl(cityLabel: String, strings: KwaborStrings, onClick: () -> Unit) {
     Row(
         modifier = Modifier
-            .fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ExploreCityControl(
-            cityLabel = cityLabel,
-            strings = strings,
-            onClick = onClick,
-            modifier = Modifier.weight(1f, fill = false).padding(end = KwaborSpacing.Sm),
-        )
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape) {
-            Text(
-                text = if (isGuestSession) strings.authGuestSession else strings.authConnectedSession,
-                modifier = Modifier.padding(horizontal = KwaborSpacing.Sm, vertical = KwaborSpacing.Xs),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ExploreCityControl(cityLabel: String, strings: KwaborStrings, onClick: () -> Unit, modifier: Modifier) {
-    Row(
-        modifier = modifier
             .heightIn(min = KwaborSizing.MinimumAccessibleTouchTarget)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)

@@ -82,7 +82,7 @@ EXCEPTION
 END;
 $$;
 
-SELECT plan(103);
+SELECT plan(106);
 
 INSERT INTO auth.users (id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 VALUES
@@ -1273,14 +1273,14 @@ SELECT ok(
     'aaaaaaaa-0000-4000-8000-000000000001',
     $sql$
       SELECT * FROM public.complete_user_onboarding(
-        '   ', 'Utilisateur', 'cotonou', 'fr', 'XOF',
+        repeat('A', 81), 'Utilisateur', 'cotonou', 'fr', 'XOF',
         '10000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000002',
         '10000000-0000-4000-8000-000000000003'
       )
     $sql$
   ),
-  'blank identity is rejected'
+  'names longer than the server limit are rejected'
 );
 
 SELECT ok(
@@ -1741,14 +1741,14 @@ SELECT ok(
     'bbbbbbbb-0000-4000-8000-000000000002',
     $sql$
       SELECT * FROM public.complete_user_onboarding(
-        'Grace', 'Utilisateur', 'ouidah', 'fr', 'XOF',
+        '', '', '', 'fr', 'XOF',
         '10000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000002',
         '10000000-0000-4000-8000-000000000003'
       )
     $sql$
   ),
-  'a second user can complete onboarding with the legacy RPC argument'
+  'the legacy RPC shape can complete onboarding without profile details'
 );
 
 SELECT is(
@@ -1790,6 +1790,38 @@ SELECT ok(
     'UPDATE'
   ),
   'onboarding completion timestamp is not client-writable'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = 'bbbbbbbb-0000-4000-8000-000000000002'
+      AND first_name IS NULL AND last_name IS NULL AND city_id IS NULL
+  ),
+  'onboarding stores absent details as null'
+);
+
+SELECT ok(
+  tests.statement_fails_as(
+    'authenticated',
+    'aaaaaaaa-0000-4000-8000-000000000001',
+    $$SELECT * FROM public.update_my_profile_details(
+      'bbbbbbbb-0000-4000-8000-000000000002', 'Grace', '', 'ouidah'
+    )$$
+  ),
+  'another account cannot update profile details'
+);
+
+SELECT is(
+  tests.count_as(
+    'authenticated',
+    'bbbbbbbb-0000-4000-8000-000000000002',
+    $$SELECT * FROM public.update_my_profile_details(
+      'bbbbbbbb-0000-4000-8000-000000000002', ' Grace ', '', 'ouidah'
+    ) WHERE first_name = 'Grace' AND last_name IS NULL AND city_id = 'ouidah'$$
+  ),
+  1::bigint,
+  'the owner can save a partial profile with a valid city'
 );
 
 SELECT * FROM finish();

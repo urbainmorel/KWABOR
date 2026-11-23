@@ -17,6 +17,7 @@ struct ContentView: View {
     let observabilityConsent: ObservabilityConsent
     let observabilityConsentErrorMessage: String?
     let accountSessionIdentity: String?
+    let profileDetailsPresenter: ProfileDetailsPresenter?
     let accountSecurityController: IosAuthController?
     let federatedIdentityHintStore: FederatedIdentityHintPersisting?
     let latestAccountSecurityError: () -> String?
@@ -62,6 +63,7 @@ struct ContentView: View {
         ),
         observabilityConsentErrorMessage: String? = nil,
         accountSessionIdentity: String? = nil,
+        profileDetailsPresenter: ProfileDetailsPresenter? = nil,
         accountSecurityController: IosAuthController? = nil,
         federatedIdentityHintStore: FederatedIdentityHintPersisting? = nil,
         latestAccountSecurityError: @escaping () -> String? = { nil },
@@ -99,6 +101,7 @@ struct ContentView: View {
         self.observabilityConsent = observabilityConsent
         self.observabilityConsentErrorMessage = observabilityConsentErrorMessage
         self.accountSessionIdentity = accountSessionIdentity
+        self.profileDetailsPresenter = profileDetailsPresenter
         self.accountSecurityController = accountSecurityController
         self.federatedIdentityHintStore = federatedIdentityHintStore
         self.latestAccountSecurityError = latestAccountSecurityError
@@ -442,6 +445,8 @@ private struct RootDestinationContent: View {
                     onboardingStrings: strings,
                     email: displayedAccountEmail,
                     authenticationMethodName: displayedAuthenticationMethodName,
+                    accountIdentity: accountSessionIdentity,
+                    profileDetailsPresenter: profileDetailsPresenter,
                     observabilityConsent: observabilityConsent,
                     observabilityConsentErrorMessage: observabilityConsentErrorMessage,
                     accountSecurityController: accountSecurityController,
@@ -537,6 +542,8 @@ private struct AccountSettingsView: View {
     let onboardingStrings: OnboardingStrings
     let email: String
     let authenticationMethodName: String
+    let accountIdentity: String?
+    let profileDetailsPresenter: ProfileDetailsPresenter?
     let observabilityConsent: ObservabilityConsent
     let observabilityConsentErrorMessage: String?
     let accountSecurityController: IosAuthController?
@@ -559,6 +566,14 @@ private struct AccountSettingsView: View {
                     email: email,
                     authenticationMethodName: authenticationMethodName
                 )
+                if let accountIdentity, let profileDetailsPresenter {
+                    ProfileDetailsEditor(
+                        ownerId: accountIdentity,
+                        presenter: profileDetailsPresenter,
+                        strings: onboardingStrings
+                    )
+                    .id(accountIdentity)
+                }
                 PrivacyPreferencesSection(
                     strings: settingsStrings,
                     consent: observabilityConsent,
@@ -587,6 +602,101 @@ private struct AccountSettingsView: View {
         .navigationTitle(settingsStrings.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+    }
+}
+
+private struct ProfileDetailsEditor: View {
+    let ownerId: String
+    let presenter: ProfileDetailsPresenter
+    let strings: OnboardingStrings
+    @State private var form: ProfileDetailsForm?
+    @State private var draft = ProfileDetails(firstName: "", lastName: "", cityId: nil)
+    @State private var saved = ProfileDetails(firstName: "", lastName: "", cityId: nil)
+    @State private var isLoading = true
+    @State private var reload = 0
+    @State private var saveTask: Task<Void, Never>?
+    @State private var feedback: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.md) {
+            Text(strings.settings.profileDetailsTitle).font(.headline)
+            if isLoading {
+                ProgressView()
+            } else if let form {
+                fields(form.cities)
+            } else {
+                Text(strings.settings.profileLoadFailed)
+                Button(strings.retry) { reload += 1 }
+            }
+        }
+        .task(id: reload) {
+            isLoading = true
+            let result = try? await presenter.load(ownerId: ownerId)
+            guard !Task.isCancelled else { return }
+            form = result
+            if let details = result?.details {
+                saved = details
+                draft = details
+            }
+            isLoading = false
+        }
+        .onDisappear {
+            saveTask?.cancel()
+            saveTask = nil
+        }
+    }
+
+    private func fields(_ cities: [City]) -> some View {
+        Group {
+            TextField(strings.authFirstName, text: Binding(
+                get: { draft.firstName },
+                set: { update(firstName: $0, lastName: draft.lastName, cityId: draft.cityId) }
+            ))
+            .textContentType(.givenName)
+            .textFieldStyle(.roundedBorder)
+            TextField(strings.authLastName, text: Binding(
+                get: { draft.lastName },
+                set: { update(firstName: draft.firstName, lastName: $0, cityId: draft.cityId) }
+            ))
+            .textContentType(.familyName)
+            .textFieldStyle(.roundedBorder)
+            Picker(strings.registrationCityTitle, selection: Binding(
+                get: { draft.cityId },
+                set: { update(firstName: draft.firstName, lastName: draft.lastName, cityId: $0) }
+            )) {
+                Text(strings.settings.profileNoCity).tag(Optional<String>.none)
+                ForEach(cities, id: \.id) { city in
+                    Text(city.name).tag(Optional(city.id))
+                }
+            }
+            Button(strings.settings.profileSave, action: save)
+                .buttonStyle(.borderedProminent)
+                .disabled(draft == saved)
+            if let feedback {
+                Text(feedback).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .disabled(saveTask != nil)
+    }
+
+    private func update(firstName: String, lastName: String, cityId: String?) {
+        draft = ProfileDetails(firstName: firstName, lastName: lastName, cityId: cityId)
+        feedback = nil
+    }
+
+    private func save() {
+        guard saveTask == nil, saved != draft else { return }
+        let details = draft
+        saveTask = Task {
+            let result = try? await presenter.save(ownerId: ownerId, details: details)
+            guard !Task.isCancelled else { return }
+            if let result {
+                saved = result
+                draft = result
+            }
+            feedback = result == nil ? strings.settings.profileSaveFailed : strings.settings.profileSaved
+            saveTask = nil
+        }
     }
 }
 

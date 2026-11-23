@@ -691,6 +691,7 @@ persistance des favoris restent à vérifier après la qualification du service 
   les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention
   du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU et de la politique de confidentialité reste une gate propriétaire avant release candidate.
+- L’ADR-0041 définit la dernière étape e-mail et l’édition facultative du prénom, du nom et de la ville dans le profil.
 
 ## Prochaine tâche logique
 

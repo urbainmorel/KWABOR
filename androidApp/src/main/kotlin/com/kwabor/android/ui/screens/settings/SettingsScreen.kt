@@ -113,6 +113,7 @@ internal object SettingsScreen {
         strings: KwaborStrings,
         callbacks: SettingsScreenCallbacks,
         modifier: Modifier = Modifier,
+        profileEditor: @Composable () -> Unit = {},
     ) {
         val account = settingsAccountPresentation(
             email = model.email,
@@ -134,6 +135,7 @@ internal object SettingsScreen {
             account = callbacks.account,
             privacy = sectionActions,
             onBack = callbacks.onBack,
+            profileEditor = profileEditor,
         )
         SettingsScaffold(
             model = SettingsScaffoldUiModel(
@@ -154,6 +156,7 @@ private data class SettingsScaffoldActions(
     val account: SettingsScreenActions,
     val privacy: PrivacySectionActions,
     val onBack: () -> Unit,
+    val profileEditor: @Composable () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -187,8 +190,7 @@ private fun SettingsScaffold(
         SettingsContent(
             model = model,
             strings = strings,
-            actions = actions.account,
-            privacyActions = actions.privacy,
+            actions = actions,
             modifier = Modifier.padding(paddingValues),
         )
     }
@@ -224,8 +226,7 @@ private fun SensitiveSettingsDialogs(
 private fun SettingsContent(
     model: SettingsScaffoldUiModel,
     strings: KwaborStrings,
-    actions: SettingsScreenActions,
-    privacyActions: PrivacySectionActions,
+    actions: SettingsScaffoldActions,
     modifier: Modifier,
 ) {
     Column(
@@ -238,19 +239,20 @@ private fun SettingsContent(
         verticalArrangement = Arrangement.Top,
     ) {
         AccountSection(account = model.account, strings = strings)
+        actions.profileEditor()
         Spacer(Modifier.height(KwaborSpacing.Xxxl))
         PrivacySection(
             consent = model.observabilityConsent,
             persistenceFailed = model.privacyPersistenceFailed,
             strings = strings,
-            actions = privacyActions,
+            actions = actions.privacy,
         )
         Spacer(Modifier.height(KwaborSpacing.Xxxl))
         DangerZone(
             authAccessState = model.authAccessState,
             accountDeletionAvailable = model.account.accountDeletionAvailable,
             strings = strings,
-            actions = actions,
+            actions = actions.account,
         )
     }
 }

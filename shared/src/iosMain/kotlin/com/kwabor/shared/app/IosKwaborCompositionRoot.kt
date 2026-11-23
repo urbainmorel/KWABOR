@@ -68,6 +68,7 @@ class IosKwaborCompositionRoot(
         dispatcherProvider = dispatcherProvider,
         interactionCoordinator = sharedRoot?.interactionCoordinator,
     )
+    val profileDetailsPresenter get() = sharedRoot?.profileDetailsPresenter
     val registrationController = IosRegistrationController(
         presenter = sharedRoot?.registrationPresenter,
         dispatcherProvider = dispatcherProvider,

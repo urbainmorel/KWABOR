@@ -3307,9 +3307,7 @@ private suspend fun TestScope.completeRegistrationProfile(viewModel: AuthViewMod
     viewModel.onIntent(AuthIntent.ChangeLastName("Soglo"))
     viewModel.onIntent(AuthIntent.SelectCity(TEST_CITY_ID))
     viewModel.onIntent(AuthIntent.SelectCurrency(KwaborCurrency.Eur))
-    LegalDocumentType.entries.forEach { type ->
-        viewModel.onIntent(AuthIntent.ChangeLegalAcceptance(type, accepted = true))
-    }
+    viewModel.onIntent(AuthIntent.ChangeLegalAcceptance(accepted = true))
     assertEquals(RegistrationStep.Profile, viewModel.registrationState.value.step)
     assertEquals(null, viewModel.registrationState.value.errorMessage, viewModel.registrationState.value.toString())
 }
