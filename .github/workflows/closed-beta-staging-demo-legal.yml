@@ -1,0 +1,126 @@
+name: Closed-beta staging test documents
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan, apply or verify the two French test documents
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - verify
+      expected_sha:
+        description: Exact approved main commit
+        required: true
+        type: string
+      validated_ci_run_id:
+        description: Successful push/main CI run for the same commit
+        required: true
+        type: string
+      plan_run_id:
+        description: Successful plan run ID for apply only
+        required: false
+        type: string
+      apply_confirmation:
+        description: For apply only, type LOAD-EXACT-STAGING-TEST-DOCUMENTS
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: closed-beta-demo-staging-operations
+  cancel-in-progress: false
+
+jobs:
+  test_documents:
+    if: >-
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
+    name: ${{ inputs.operation }} French staging test documents
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 10
+    env:
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+      APPLY_CONFIRMATION: ${{ inputs.apply_confirmation }}
+      KWABOR_ENVIRONMENT: ${{ vars.KWABOR_ENVIRONMENT }}
+      KWABOR_SUPABASE_URL: ${{ vars.KWABOR_SUPABASE_URL }}
+      KWABOR_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_SUPABASE_PROJECT_REF }}
+      KWABOR_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.KWABOR_PRODUCTION_SUPABASE_PROJECT_REF }}
+      KWABOR_STAGING_PROJECT_REF_SHA256: ${{ vars.KWABOR_STAGING_PROJECT_REF_SHA256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate exact CI and reviewed plan provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ && "$EXPECTED_SHA" == "$GITHUB_SHA" ]]
+          [[ "$VALIDATED_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATED_CI_RUN_ID" > "$RUNNER_TEMP/test-docs-ci.json"
+          python3 -B tools/closed-beta-gel.py validate-github-run \
+            --document "$RUNNER_TEMP/test-docs-ci.json" --run-id "$VALIDATED_CI_RUN_ID" \
+            --expected-sha "$EXPECTED_SHA" --workflow-path .github/workflows/ci.yml --allowed-event push
+          gh api "repos/$GITHUB_REPOSITORY/environments/staging" > "$RUNNER_TEMP/test-docs-environment.json"
+          if [[ "$OPERATION" == apply ]]; then
+            [[ "$APPLY_CONFIRMATION" == LOAD-EXACT-STAGING-TEST-DOCUMENTS && "$PLAN_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PLAN_RUN_ID" > "$RUNNER_TEMP/test-docs-plan.json"
+            python3 -B tools/closed-beta-gel.py validate-github-run \
+              --document "$RUNNER_TEMP/test-docs-plan.json" --run-id "$PLAN_RUN_ID" \
+              --expected-sha "$EXPECTED_SHA" --workflow-path .github/workflows/closed-beta-staging-demo-legal.yml \
+              --allowed-event workflow_dispatch
+            attempt="$(jq -er '.run_attempt | select(type == "number" and . > 0)' "$RUNNER_TEMP/test-docs-plan.json")"
+            mkdir -p "$RUNNER_TEMP/test-docs-reviewed"
+            gh run download "$PLAN_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "kwabor-staging-test-documents-plan-$EXPECTED_SHA-$attempt" \
+              --dir "$RUNNER_TEMP/test-docs-reviewed"
+          else
+            [[ -z "$PLAN_RUN_ID" && -z "$APPLY_CONFIRMATION" ]]
+          fi
+
+      - name: Validate the document transaction
+        shell: bash
+        run: python3 -B -m unittest tools.test_staging_demo_legal_documents
+
+      - name: Execute the protected staging transaction
+        shell: bash
+        env:
+          KWABOR_STAGING_DATABASE_URL: ${{ secrets.KWABOR_STAGING_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          mkdir -p build/staging-test-documents
+          args=()
+          if [[ "$OPERATION" == apply ]]; then
+            args+=(--plan "$RUNNER_TEMP/test-docs-reviewed/receipt.json")
+          fi
+          python3 -B tools/staging-demo-legal-documents.py "$OPERATION" \
+            --environment-file "$RUNNER_TEMP/test-docs-environment.json" \
+            --receipt build/staging-test-documents/receipt.json "${args[@]}"
+
+      - name: Archive document proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kwabor-staging-test-documents-${{ inputs.operation }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/staging-test-documents/receipt.json
+          if-no-files-found: error
+          retention-days: 90
