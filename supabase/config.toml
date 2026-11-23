@@ -214,6 +214,10 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
+[auth.email.template.confirmation]
+subject = "Votre code de vérification Kwabor"
+content_path = "./supabase/templates/magic_link.html"
+
 [auth.email.template.magic_link]
 subject = "Votre code de vérification Kwabor"
 content_path = "./supabase/templates/magic_link.html"

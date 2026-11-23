@@ -137,9 +137,21 @@ class DesiredConfigurationTests(unittest.TestCase):
         self.assertFalse(any(key.startswith(("external_google_", "external_apple_")) for key in desired.patch))
         self.assertEqual(desired.patch["mailer_otp_length"], 6)
         self.assertFalse(desired.patch["mailer_autoconfirm"])
+        self.assertEqual(
+            desired.patch["mailer_subjects_confirmation"],
+            desired.patch["mailer_subjects_magic_link"],
+        )
+        self.assertEqual(
+            desired.patch["mailer_templates_confirmation_content"],
+            desired.patch["mailer_templates_magic_link_content"],
+        )
+        self.assertIn("{{ .Token }}", desired.patch["mailer_templates_confirmation_content"])
         self.assertNotIn("googleProviderCredentialConfigured", auth.expected_snapshot(desired))
         current = {**desired.patch, "external_google_enabled": False, "external_apple_enabled": False}
         self.assertEqual(auth.auth_config_drift(current, desired), [])
+        current["mailer_templates_confirmation_content"] = "{{ .ConfirmationURL }}"
+        self.assertEqual(auth.auth_config_drift(current, desired), ["mailer_templates_confirmation_content"])
+        current["mailer_templates_confirmation_content"] = desired.patch["mailer_templates_confirmation_content"]
         del current["smtp_pass"]
         self.assertEqual(auth.auth_config_drift(current, desired), ["smtpCredentialConfigured"])
         self.assertEqual(auth.qualification_decision(desired.profile), "individual-email-qualified")

@@ -69,6 +69,7 @@ PUBLIC_FIELDS = (
     "mailer_autoconfirm",
     "mailer_secure_email_change_enabled",
     "security_captcha_enabled",
+    "mailer_subjects_confirmation",
     "mailer_subjects_magic_link",
     "mailer_subjects_recovery",
     "external_google_enabled",
@@ -82,6 +83,7 @@ PUBLIC_FIELDS = (
     "external_apple_email_optional",
 )
 TEMPLATE_FIELDS = (
+    "mailer_templates_confirmation_content",
     "mailer_templates_magic_link_content",
     "mailer_templates_recovery_content",
 )
@@ -322,7 +324,7 @@ def build_desired_configuration(
     parsed_smtp_port = int(smtp_port) if smtp_port.isdigit() else 0
     require(1 <= parsed_smtp_port <= 65535, "SMTP_PORT_INVALID")
 
-    magic_link_template = read_email_template(
+    verification_template = read_email_template(
         repository_root / "supabase" / "templates" / "magic_link.html",
         label="MAGIC_LINK",
     )
@@ -330,6 +332,7 @@ def build_desired_configuration(
         repository_root / "supabase" / "templates" / "recovery.html",
         label="RECOVERY",
     )
+    verification_subject = "Votre code de vérification Kwabor"
     write_only: dict[str, str] = {}
     if require_mutation_secrets:
         write_only = {
@@ -362,12 +365,14 @@ def build_desired_configuration(
         "mailer_autoconfirm": False,
         "mailer_secure_email_change_enabled": True,
         "security_captcha_enabled": False,
-        "mailer_subjects_magic_link": "Votre code de vérification Kwabor",
+        "mailer_subjects_confirmation": verification_subject,
+        "mailer_subjects_magic_link": verification_subject,
         "mailer_subjects_recovery": "Réinitialisez votre mot de passe Kwabor",
         **providers,
     }
     templates = {
-        "mailer_templates_magic_link_content": magic_link_template,
+        "mailer_templates_confirmation_content": verification_template,
+        "mailer_templates_magic_link_content": verification_template,
         "mailer_templates_recovery_content": recovery_template,
     }
     return DesiredAuthConfiguration(public=public, templates=templates, write_only=write_only, profile=profile)
