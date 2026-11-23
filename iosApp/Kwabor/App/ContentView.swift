@@ -140,6 +140,8 @@ struct ContentView: View {
                             settingsStrings: settingsStrings,
                             accountEmail: accountEmail,
                             accountAuthenticationMethod: accountAuthenticationMethod,
+                            accountSessionIdentity: accountSessionIdentity,
+                            profileDetailsPresenter: profileDetailsPresenter,
                             observabilityConsent: observabilityConsent,
                             observabilityConsentErrorMessage: observabilityConsentErrorMessage,
                             accountSecurityController: accountSecurityController,
@@ -360,6 +362,8 @@ private struct RootDestinationContent: View {
     let settingsStrings: SettingsStrings
     let accountEmail: String?
     let accountAuthenticationMethod: AuthenticationMethod?
+    let accountSessionIdentity: String?
+    let profileDetailsPresenter: ProfileDetailsPresenter?
     let observabilityConsent: ObservabilityConsent
     let observabilityConsentErrorMessage: String?
     let accountSecurityController: IosAuthController?
