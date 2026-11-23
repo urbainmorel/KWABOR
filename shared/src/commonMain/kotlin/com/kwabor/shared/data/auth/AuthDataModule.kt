@@ -1,6 +1,8 @@
 package com.kwabor.shared.data.auth
 
+import com.kwabor.shared.data.profile.SupabaseProfileDetailsRepository
 import com.kwabor.shared.domain.auth.AuthRepository
+import com.kwabor.shared.domain.profile.ProfileDetailsRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -35,4 +37,8 @@ internal val authDataModule: Module = module {
         )
     }
     single<AuthRepository> { DataAuthRepository(dataSource = get()) }
+    single<ProfileDetailsRepository> {
+        val client = get<SupabaseClient>()
+        SupabaseProfileDetailsRepository(auth = client.auth, postgrest = client.postgrest)
+    }
 }

@@ -1330,10 +1330,12 @@ class GitHubArtifactProofTest(unittest.TestCase):
 
 class FreshEmptyAndReconciliationTest(unittest.TestCase):
     def test_onboarding_schema_scope_requires_one_exact_reviewed_migration(self) -> None:
-        version = database.ONBOARDING_SCHEMA_VERSION
-        evidence = database.validate_onboarding_schema_scope(REPOSITORY_ROOT, [version])
-        self.assertEqual([entry["version"] for entry in evidence["checkedMigrations"]], [version])
-        for pending in ([], ["20260821012638"], ["20260821012638", version]):
+        versions = [database.ONBOARDING_SCHEMA_VERSION, database.PROFILE_DETAILS_SCHEMA_VERSION]
+        for version in versions:
+            with self.subTest(version=version):
+                evidence = database.validate_onboarding_schema_scope(REPOSITORY_ROOT, [version])
+                self.assertEqual([entry["version"] for entry in evidence["checkedMigrations"]], [version])
+        for pending in ([], ["20260821012638"], ["20260821012638", versions[0]], versions):
             with self.subTest(pending=pending), self.assertRaisesRegex(
                 database.StagingDatabaseError,
                 "ONBOARDING_SCHEMA_PENDING_SCOPE_INVALID",

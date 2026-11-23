@@ -26,7 +26,7 @@ internal class AuthProfileCoordinator(
             is AuthIntent.SelectCity -> runtime.reduce(RegistrationIntent.SelectCity(intent.cityId))
             is AuthIntent.SelectCurrency -> runtime.reduce(RegistrationIntent.SelectCurrency(intent.currency))
             is AuthIntent.ChangeLegalAcceptance -> runtime.reduce(
-                RegistrationIntent.UpdateLegalAcceptance(intent.type, intent.accepted),
+                RegistrationIntent.UpdateLegalAcceptance(intent.accepted),
             )
         }
     }

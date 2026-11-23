@@ -333,7 +333,7 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 1. **Intro vidéo interactive** (premier lancement, puis une fois après installation de chaque nouvelle révision embarquée) : vidéo d'arrière-plan immersive, **sautable**, avec les CTA **S'inscrire / Se connecter / Continuer sans compte disponibles immédiatement** ; la vidéo ne bloque jamais l'action. Fin de vidéo, échec, « Passer » ou mouvement réduit → même surface sur image statique. Une mise à jour qui conserve la même révision ne rejoue pas l'intro. Détail asset & performance en §6.9.3.
 2. **Surface « Se connecter ou s'inscrire »** : titre **« Découvrez le Bénin »** (langue détectée), **sélecteur de langue discret**, boutons **Se connecter** / **S'inscrire**, et option **« Continuer sans compte »**. Cette surface est superposée à l'intro puis conservée sur le fallback statique.
 3. **Choix de langue conditionnel** : **aucun écran par défaut** (voir §6.9.1) — sinon accessible via le sélecteur discret et les Paramètres.
-4. **Authentification** (§6.9.2) : Email **ou** Google (**+ Apple sur iOS**). Le profil final compact regroupe nom, ville, devise XOF par défaut et les deux acceptations légales.
+4. **Authentification** (§6.9.2) : Email **ou** Google (**+ Apple sur iOS**). La dernière étape e-mail propose le choix de la devise et une case commune aux CGU et à la politique de confidentialité.
 5. **Permissions contextuelles différées** : **aucune permission système, aucun consentement d'observabilité et aucun priming notifications ne sont demandés avant l'accueil**. Ils sont gérés plus tard dans Réglages ou au premier besoin réellement contextuel.
 6. **Mot de passe oublié** : flow dédié (identifiant → OTP → nouveau mot de passe).
 
@@ -350,7 +350,7 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 - **Inscription par email — quatre écrans maximum** : `Email` → `Code OTP` (6 chiffres, collage/autoremplissage, soumission automatique, renvoi 30 s et correction de l'email) → **un seul champ de mot de passe** avec règles en direct → **Finaliser mon profil**.
 - **Inscription par Google** : `Auth Google` → **Finaliser mon profil**, nom/prénom préremplis et modifiables.
 - **Sign in with Apple — iOS uniquement** : proposé avant Google au même niveau ; après le fournisseur, un seul écran **Finaliser mon profil**.
-- **Profil final compact** : prénom, nom, ville recherchable, devise XOF par défaut modifiable, puis acceptations séparées des CGU et de la politique de confidentialité avec versions et liens HTTPS. La ville n'est préremplie que lorsqu'une softwall issue d'un lieu transmet un `cityId` valide ; une inscription générique ne présélectionne rien.
+- **Dernière étape e-mail** : quatre devises d’affichage côte à côte, XOF par défaut, et une case pour accepter les CGU et la politique de confidentialité. Les deux intitulés ouvrent leurs documents. Les paramètres du profil permettent de renseigner le prénom, le nom et la ville après la création du compte. Le profil fédéré demande ces trois informations et peut suggérer une ville depuis une fiche.
 - **Résilience** : villes et documents légaux sont préchargés dès l'ouverture ; une erreur offre un retry ciblé sans effacer les saisies. L'état terminal technique ferme le tunnel immédiatement, sans écran de succès.
 
 **6.9.3 Écran d'intro vidéo.** Objectif : immerger instantanément dans l'univers touristique, culturel et festif du Bénin.

@@ -50,9 +50,7 @@ internal fun AuthViewModel.registrationActions(): RegistrationScreenActions = Re
     onRetryRequirements = { onIntent(AuthIntent.RetryRequirements) },
     onCitySelected = { cityId -> onIntent(AuthIntent.SelectCity(cityId)) },
     onCurrencySelected = { currency -> onIntent(AuthIntent.SelectCurrency(currency)) },
-    onLegalAcceptanceChanged = { type, accepted ->
-        onIntent(AuthIntent.ChangeLegalAcceptance(type, accepted))
-    },
+    onLegalAcceptanceChanged = { accepted -> onIntent(AuthIntent.ChangeLegalAcceptance(accepted)) },
     onOpenLegalDocument = { type -> onIntent(AuthIntent.OpenLegalDocument(type)) },
     onCompleteProfile = { onIntent(AuthIntent.CompleteProfile) },
 )

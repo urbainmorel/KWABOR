@@ -21,15 +21,12 @@
     <string name="registration_change_city">Modifier la ville</string>
     <string name="registration_city_search">Rechercher une ville</string>
     <string name="registration_city_empty">Aucune ville ne correspond à votre recherche.</string>
-    <string name="registration_currency_support">Les conversions sont indicatives. Les paiements restent effectués en FCFA.</string>
-    <string name="registration_currency_option">%1$s · %2$s</string>
     <string name="registration_legal_support">Consultez et acceptez les trois documents applicables.</string>
     <string name="registration_profile_title">Finaliser mon profil</string>
-    <string name="registration_profile_support">Quelques informations pour personnaliser votre découverte du Bénin.</string>
+    <string name="registration_profile_support">Choisissez comment les prix s’affichent et acceptez les documents du compte.</string>
     <string name="registration_complete_default">Terminer et découvrir Kwabor</string>
     <string name="registration_complete_favorite">Créer mon compte et enregistrer ce lieu</string>
     <string name="registration_complete_like">Créer mon compte et aimer ce lieu</string>
-    <string name="registration_read_document">Lire la version %1$s</string>
     <string name="registration_back_accessibility">Revenir à l’étape précédente</string>
     <string name="registration_softwall_title">Créez un compte pour continuer</string>
     <string name="registration_softwall_support">Enregistrez vos favoris, interagissez et affichez les prix en €, $ ou ₦.</string>

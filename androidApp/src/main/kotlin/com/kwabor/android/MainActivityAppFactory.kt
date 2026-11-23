@@ -101,6 +101,7 @@ internal class MainActivityAppFactory(
         listingMediaUrlPolicy = PublicHttpsListingMediaUrlPolicy,
         detailExternalActionLauncher = AndroidDetailExternalActionLauncher(activity.applicationContext),
         rootNavigationProfile = compositionRoot.rootNavigationProfile,
+        profileDetailsPresenter = compositionRoot.profileDetailsPresenter,
     )
 
     private fun createExploreViewModel(): ExploreViewModel = ViewModelProvider(

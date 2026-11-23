@@ -13,6 +13,7 @@ import com.kwabor.android.observability.AndroidObservabilityController
 import com.kwabor.android.ui.screens.profile.ProfileScreen
 import com.kwabor.android.ui.screens.profile.ProfileScreenActions
 import com.kwabor.android.ui.screens.profile.ProfileScreenUiModel
+import com.kwabor.android.ui.screens.settings.ProfileDetailsEditor
 import com.kwabor.android.ui.screens.settings.SettingsPrivacyActions
 import com.kwabor.android.ui.screens.settings.SettingsScreen
 import com.kwabor.android.ui.screens.settings.SettingsScreenCallbacks
@@ -79,6 +80,12 @@ internal fun NavGraphBuilder.settingsRoute(
                 onBack = { navController.popBackStack() },
             ),
             modifier = Modifier.padding(bottom = paddingValues.calculateBottomPadding()),
+            profileEditor = {
+                val presenter = dependencies.profileDetailsPresenter
+                if (ownerUserId != null && state.auth.isAuthenticated && presenter != null) {
+                    ProfileDetailsEditor(ownerId = ownerUserId, presenter = presenter, strings = strings)
+                }
+            },
         )
     }
 }

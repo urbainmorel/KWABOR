@@ -9,13 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,11 +25,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import com.kwabor.android.R
-import com.kwabor.android.design.KwaborSizing
 import com.kwabor.android.design.KwaborSpacing
 import com.kwabor.android.presentation.auth.AuthProtectedAction
-import com.kwabor.shared.domain.auth.LegalDocumentRevision
 import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.money.KwaborCurrency
@@ -44,55 +51,49 @@ internal fun ProfileStep(
     modifier: Modifier,
 ) {
     val state = screenState.registration
-    var selector by remember { mutableStateOf(ProfileSelector.None) }
-    ProfileForm(
-        screenState = screenState,
-        strings = strings,
-        actions = actions,
-        selectionActions = ProfileSelectionActions(
-            onOpenCity = { selector = ProfileSelector.City },
-            onOpenCurrency = { selector = ProfileSelector.Currency },
-        ),
-        modifier = modifier,
-    )
-    ProfileSelectorSheet(
-        selector = selector,
-        state = state,
-        actions = actions,
-        onDismiss = { selector = ProfileSelector.None },
-    )
-}
-
-@Composable
-private fun ProfileForm(
-    screenState: RegistrationScreenState,
-    strings: KwaborStrings,
-    actions: RegistrationScreenActions,
-    selectionActions: ProfileSelectionActions,
-    modifier: Modifier,
-) {
-    val state = screenState.registration
-    val selectedCity = state.cities.firstOrNull { city -> city.id == state.selectedCityId }
+    var showCitySelector by remember { mutableStateOf(false) }
     RegistrationScrollableColumn(modifier) {
         StepHeading(
             title = stringResource(R.string.registration_profile_title),
             supportingText = stringResource(R.string.registration_profile_support),
         )
-        ProfileIdentityFields(state = state, strings = strings, actions = actions)
-        ProfilePreferenceFields(
-            state = state,
-            selectedCity = selectedCity,
-            strings = strings,
-            selectionActions = selectionActions,
-        )
         RequirementsLoadingIndicator(state = state, strings = strings)
-        ProfileLegalAcceptances(state = state, strings = strings, actions = actions)
+        if (state.requiresProfileIdentity) {
+            ProfileIdentityFields(state = state, strings = strings, actions = actions)
+            RegistrationCityField(state, strings) { showCitySelector = true }
+        }
+        CurrencyOptions(state = state, strings = strings, onSelected = actions.onCurrencySelected)
+        ProfileLegalAcceptance(state = state, strings = strings, actions = actions)
         ContinueButton(
             label = profileCtaLabel(screenState),
             loading = state.isLoading,
-            enabled = state.canCompleteProfile(selectedCity),
+            enabled = state.canCompleteProfile,
             onClick = actions.onCompleteProfile,
         )
+    }
+    if (showCitySelector) {
+        CitySelectionSheet(
+            cities = state.cities,
+            selectedCityId = state.selectedCityId,
+            onSelected = { cityId ->
+                actions.onCitySelected(cityId)
+                showCitySelector = false
+            },
+            onDismiss = { showCitySelector = false },
+        )
+    }
+}
+
+@Composable
+private fun RegistrationCityField(state: RegistrationUiState, strings: KwaborStrings, onClick: () -> Unit) {
+    Text(strings.registrationCityTitle)
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = state.requirementsReady && !state.isLoading,
+    ) {
+        val city = state.cities.firstOrNull { it.id == state.selectedCityId }
+        Text(city?.name ?: stringResource(R.string.registration_choose_city))
     }
 }
 
@@ -121,39 +122,22 @@ private fun ProfileIdentityFields(
 }
 
 @Composable
-private fun ProfilePreferenceFields(
-    state: RegistrationUiState,
-    selectedCity: City?,
-    strings: KwaborStrings,
-    selectionActions: ProfileSelectionActions,
-) {
-    Text(strings.registrationCityTitle)
-    OutlinedButton(
-        onClick = selectionActions.onOpenCity,
+private fun CurrencyOptions(state: RegistrationUiState, strings: KwaborStrings, onSelected: (KwaborCurrency) -> Unit) {
+    Text(strings.registrationCurrencyTitle, style = MaterialTheme.typography.titleSmall)
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        enabled = state.requirementsReady && !state.isLoading,
+        horizontalArrangement = Arrangement.spacedBy(KwaborSpacing.Xs),
     ) {
-        Text(selectedCity?.name ?: stringResource(R.string.registration_choose_city))
+        KwaborCurrency.entries.forEach { currency ->
+            FilterChip(
+                selected = currency == state.preferredCurrency,
+                onClick = { onSelected(currency) },
+                label = { Text(currency.name.uppercase(), maxLines = 1) },
+                modifier = Modifier.weight(1f),
+                enabled = !state.isLoading,
+            )
+        }
     }
-    Text(strings.registrationCurrencyTitle)
-    OutlinedButton(
-        onClick = selectionActions.onOpenCurrency,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !state.isLoading,
-    ) {
-        Text(
-            stringResource(
-                R.string.registration_currency_option,
-                state.preferredCurrency.name.uppercase(),
-                state.preferredCurrency.symbol,
-            ),
-        )
-    }
-    Text(
-        text = stringResource(R.string.registration_currency_support),
-        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-        color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-    )
 }
 
 @Composable
@@ -170,72 +154,38 @@ private fun RequirementsLoadingIndicator(state: RegistrationUiState, strings: Kw
 }
 
 @Composable
-private fun ProfileLegalAcceptances(
+private fun ProfileLegalAcceptance(
     state: RegistrationUiState,
     strings: KwaborStrings,
     actions: RegistrationScreenActions,
 ) {
-    LegalAcceptanceRow(
-        document = state.termsDocument,
-        accepted = state.termsAccepted,
-        label = strings.registrationTermsAcceptance,
-        type = LegalDocumentType.Terms,
-        actions = actions,
+    if (state.termsDocument == null || state.privacyDocument == null) return
+    val linkStyle = TextLinkStyles(
+        style = SpanStyle(color = MaterialTheme.colorScheme.onSurface, textDecoration = TextDecoration.Underline),
     )
-    LegalAcceptanceRow(
-        document = state.privacyDocument,
-        accepted = state.privacyAccepted,
-        label = strings.registrationPrivacyAcceptance,
-        type = LegalDocumentType.PrivacyPolicy,
-        actions = actions,
-    )
-}
-
-@Composable
-private fun ProfileSelectorSheet(
-    selector: ProfileSelector,
-    state: RegistrationUiState,
-    actions: RegistrationScreenActions,
-    onDismiss: () -> Unit,
-) {
-    when (selector) {
-        ProfileSelector.None -> Unit
-        ProfileSelector.City -> CitySelectionSheet(
-            cities = state.cities,
-            selectedCityId = state.selectedCityId,
-            onSelected = { cityId ->
-                actions.onCitySelected(cityId)
-                onDismiss()
-            },
-            onDismiss = onDismiss,
+    val termsLink = LinkAnnotation.Clickable("terms", linkStyle) {
+        actions.onOpenLegalDocument(LegalDocumentType.Terms)
+    }
+    val privacyLink = LinkAnnotation.Clickable("privacy", linkStyle) {
+        actions.onOpenLegalDocument(LegalDocumentType.PrivacyPolicy)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(
+            checked = state.legalAccepted,
+            onCheckedChange = actions.onLegalAcceptanceChanged,
+            enabled = state.requirementsReady && !state.isLoading,
+            modifier = Modifier.semantics { contentDescription = strings.authLegalAcceptance },
         )
-        ProfileSelector.Currency -> CurrencySelectionSheet(
-            selectedCurrency = state.preferredCurrency,
-            onSelected = { currency ->
-                actions.onCurrencySelected(currency)
-                onDismiss()
+        Text(
+            text = buildAnnotatedString {
+                append(strings.registrationLegalPrefix)
+                withLink(termsLink) { append(strings.registrationTermsLabel) }
+                append(strings.registrationLegalConjunction)
+                withLink(privacyLink) { append(strings.registrationPrivacyLabel) }
             },
-            onDismiss = onDismiss,
+            modifier = Modifier.weight(1f),
         )
     }
-}
-
-private fun RegistrationUiState.canCompleteProfile(selectedCity: City?): Boolean = requirementsReady &&
-    firstName.isNotBlank() &&
-    lastName.isNotBlank() &&
-    selectedCity != null &&
-    termsAccepted &&
-    privacyAccepted
-
-private data class ProfileSelectionActions(
-    val onOpenCity: () -> Unit,
-    val onOpenCurrency: () -> Unit,
-)
-
-private enum class ProfileSelector {
-    None,
-    City,
-    Currency,
 }
 
 @Composable
@@ -245,37 +195,9 @@ private fun profileCtaLabel(state: RegistrationScreenState): String = when (stat
     AuthProtectedAction.Other, null -> stringResource(R.string.registration_complete_default)
 }
 
-@Composable
-private fun LegalAcceptanceRow(
-    document: LegalDocumentRevision?,
-    accepted: Boolean,
-    label: String,
-    type: LegalDocumentType,
-    actions: RegistrationScreenActions,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = accepted,
-                onCheckedChange = { updated -> actions.onLegalAcceptanceChanged(type, updated) },
-                enabled = document != null,
-            )
-            Text(label, modifier = Modifier.weight(1f))
-        }
-        document?.let { revision ->
-            TextButton(
-                onClick = { actions.onOpenLegalDocument(type) },
-                modifier = Modifier.padding(start = KwaborSizing.TouchTarget),
-            ) {
-                Text(stringResource(R.string.registration_read_document, revision.version))
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CitySelectionSheet(
+internal fun CitySelectionSheet(
     cities: List<City>,
     selectedCityId: String?,
     onSelected: (String) -> Unit,
@@ -315,34 +237,6 @@ private fun CitySelectionSheet(
                         onClick = { onSelected(filteredCities[index].id) },
                     )
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CurrencySelectionSheet(
-    selectedCurrency: KwaborCurrency,
-    onSelected: (KwaborCurrency) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = KwaborSpacing.Xxl, vertical = KwaborSpacing.Lg),
-        ) {
-            KwaborCurrency.entries.forEach { currency ->
-                SelectionRow(
-                    selected = currency == selectedCurrency,
-                    label = stringResource(
-                        R.string.registration_currency_option,
-                        currency.name.uppercase(),
-                        currency.symbol,
-                    ),
-                    onClick = { onSelected(currency) },
-                )
             }
         }
     }

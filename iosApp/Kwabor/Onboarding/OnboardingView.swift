@@ -8,6 +8,7 @@ struct OnboardingView: View {
     @ObservedObject var searchStore: SearchStore
     let guideDiscoveryStore: GuideDiscoveryStore
     let catalogDetailStore: CatalogDetailStore
+    let profileDetailsPresenter: ProfileDetailsPresenter?
     let onViewerContextChanged: (String?) -> ViewerSessionScope
     @State private var contextualSoftWallRequest: ExploreAuthenticationRequest?
 
@@ -37,6 +38,7 @@ struct OnboardingView: View {
                     observabilityConsent: coordinator.observabilityConsent,
                     observabilityConsentErrorMessage: coordinator.observabilityConsentErrorMessage,
                     accountSessionIdentity: coordinator.accountSettingsSession?.userId,
+                    profileDetailsPresenter: profileDetailsPresenter,
                     accountSecurityController: coordinator.authController,
                     federatedIdentityHintStore: coordinator.federatedIdentityHintStore,
                     latestAccountSecurityError: { coordinator.authState?.errorMessage },

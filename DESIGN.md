@@ -496,7 +496,7 @@ Plein écran, **vidéo d'arrière-plan verticale** (univers touristique/culturel
 Titre **« Découvrez le Bénin »**, sous-titre court et pastille de langue en haut à droite. En bas : CTA **« S'inscrire »** → E6, **« Se connecter »** → E5, puis **« Continuer sans compte »** avec disclosure FCFA. La surface ne change pas entre la vidéo et l'image statique et tolère grande police, clavier, TalkBack/VoiceOver et petits écrans.
 
 **E4. Invite d'inscription (mur souple)** *(déclenchée en session invité)*
-Bottom sheet contextuelle selon l'action (« aimer » / « enregistrer ce lieu »). Elle propose directement Apple puis Google sur iOS, Google sur Android, inscription email, **« J'ai déjà un compte »** et **« Plus tard »**. Le `cityId` du lieu est transmis comme suggestion au profil final s'il est valide. L'action protégée est rejouée exactement une fois après auth ; annulation ou « Plus tard » l'efface, erreur récupérable la conserve.
+Bottom sheet contextuelle selon l'action (« aimer » / « enregistrer ce lieu »). Elle propose directement Apple puis Google sur iOS, Google sur Android, inscription email, **« J'ai déjà un compte »** et **« Plus tard »**. Le `cityId` du lieu suggère une ville dans le profil final fédéré s'il est valide. L'action protégée est rejouée exactement une fois après auth ; annulation ou « Plus tard » l'efface, erreur récupérable la conserve.
 
 **E5. Connexion**
 Layout centré, **mark Kwabor**, **pastille de langue** en coin haut. Champ **email** + bouton **Continuer** → **écran mot de passe** (avec « Mot de passe oublié » → E7). Boutons **« Se connecter avec Google »** et **« Se connecter avec Apple » (iOS uniquement)**. Lien vers Inscription. Validation inline, CTA désactivé tant qu'invalide, spinner inline (pas de layout shift). Erreurs : identifiants invalides, compte non vérifié.
@@ -505,7 +505,7 @@ Layout centré, **mark Kwabor**, **pastille de langue** en coin haut. Champ **em
 Deux chemins ; **ni téléphone ni âge** ; **CGU et politique de confidentialité** acceptées avant validation ; **langue** héritée de la détection (§E2).
 - **Par email — 4 écrans maximum :** `Email` → **OTP** (6 cases, collage/autoremplissage natif, auto-submit au sixième chiffre, renvoi 30 s, correction email) → **Mot de passe** (un seul champ, afficher/masquer, règles live, password manager) → **Finaliser mon profil**.
 - **Par Google / Apple (iOS) — 1 écran après fournisseur :** **Finaliser mon profil**, nom/prénom préremplis et modifiables.
-- **Profil final compact et défilant :** prénom, nom, ville recherchable, devise compacte XOF par défaut, deux acceptations légales séparées avec lien HTTPS et version visible. Les exigences sont préchargées dès E6 ; un retry ciblé ne réinitialise aucune saisie.
+- **Dernière étape e-mail** : rangée de quatre devises (XOF sélectionné par défaut) et une case commune aux CGU et à la politique de confidentialité. Les intitulés dans la phrase ouvrent chaque document. Le formulaire fédéré présente aussi les champs prénom, nom et ville. Ces champs sont disponibles dans les paramètres du profil après inscription.
 - **Progression :** aucun total avant le choix ; email affiche `2/4`, `3/4`, `4/4` ; fournisseur affiche **« Dernière étape »**.
 - **Sortie :** aucun écran succès. `Completed` est technique, ferme immédiatement E6 et reprend l'intention protégée. Aucun GPS, consentement observabilité ou prompt notification avant l'accueil.
 

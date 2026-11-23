@@ -2,7 +2,6 @@ package com.kwabor.shared.app
 
 import com.kwabor.shared.domain.auth.AccountSetupStatus
 import com.kwabor.shared.domain.auth.AuthSession
-import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.i18n.stringsFor
@@ -33,6 +32,8 @@ data class IosRegistrationUpdateLastNameIntent(val lastName: String) : IosRegist
 
 data class IosRegistrationSelectCityIntent(val cityId: String) : IosRegistrationFieldIntent
 
+data class IosRegistrationUpdateLegalAcceptanceIntent(val accepted: Boolean) : IosRegistrationFieldIntent
+
 data class IosRegistrationSelectCurrencyIntent(val currency: KwaborCurrency) : IosRegistrationFieldIntent
 
 sealed interface IosRegistrationAsyncIntent : IosRegistrationIntent
@@ -51,18 +52,6 @@ sealed interface IosRegistrationNavigationIntent : IosRegistrationIntent
 
 data object IosRegistrationGoBackIntent : IosRegistrationNavigationIntent
 
-class IosLegalAcceptanceController internal constructor(
-    private val updateAcceptance: (LegalDocumentType, Boolean) -> Unit,
-) {
-    fun updateTerms(accepted: Boolean) {
-        updateAcceptance(LegalDocumentType.Terms, accepted)
-    }
-
-    fun updatePrivacy(accepted: Boolean) {
-        updateAcceptance(LegalDocumentType.PrivacyPolicy, accepted)
-    }
-}
-
 class IosRegistrationController internal constructor(
     private val presenter: RegistrationPresenter?,
     dispatcherProvider: DispatcherProvider,
@@ -77,10 +66,6 @@ class IosRegistrationController internal constructor(
             field = value
             observer?.invoke(value)
         }
-
-    val legalAcceptance = IosLegalAcceptanceController { type, accepted ->
-        reduce(RegistrationIntent.UpdateLegalAcceptance(type, accepted))
-    }
 
     val isConfigured: Boolean get() = presenter != null
 
@@ -237,6 +222,7 @@ class IosRegistrationController internal constructor(
 }
 
 private fun IosRegistrationFieldIntent.toSharedIntent(): RegistrationIntent.Field = when (this) {
+    is IosRegistrationUpdateLegalAcceptanceIntent -> RegistrationIntent.UpdateLegalAcceptance(accepted)
     is IosRegistrationUpdateEmailIntent -> RegistrationIntent.UpdateEmail(email)
     is IosRegistrationUpdateFirstNameIntent -> RegistrationIntent.UpdateFirstName(firstName)
     is IosRegistrationUpdateLastNameIntent -> RegistrationIntent.UpdateLastName(lastName)

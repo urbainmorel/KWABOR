@@ -98,8 +98,10 @@ class OnboardingStrings internal constructor(
     val registrationLocationOutsideBenin: String = registration.legacy.registrationLocationOutsideBenin
     val registrationCurrencyTitle: String = registration.registrationCurrencyTitle
     val registrationLegalTitle: String = registration.registrationLegalTitle
-    val registrationTermsAcceptance: String = registration.registrationTermsAcceptance
-    val registrationPrivacyAcceptance: String = registration.registrationPrivacyAcceptance
+    val registrationTermsLabel: String = registration.registrationTermsLabel
+    val registrationPrivacyLabel: String = registration.registrationPrivacyLabel
+    val registrationLegalPrefix: String = registration.registrationLegalPrefix
+    val registrationLegalConjunction: String = registration.registrationLegalConjunction
     val registrationObservabilityTitle: String = registration.legacy.registrationObservabilityTitle
     val registrationObservabilitySupport: String = registration.legacy.registrationObservabilitySupport
     val registrationAnalyticsConsent: String = registration.legacy.registrationAnalyticsConsent
@@ -225,8 +227,10 @@ internal data class OnboardingRegistrationStrings(
     val registrationCityTitle: String,
     val registrationCurrencyTitle: String,
     val registrationLegalTitle: String,
-    val registrationTermsAcceptance: String,
-    val registrationPrivacyAcceptance: String,
+    val registrationTermsLabel: String,
+    val registrationPrivacyLabel: String,
+    val registrationLegalPrefix: String,
+    val registrationLegalConjunction: String,
     val registrationContinue: String,
     val registrationBack: String,
     val registrationOtpWait: String,
@@ -370,8 +374,10 @@ private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrat
         registrationCityTitle = registrationCityTitle,
         registrationCurrencyTitle = registrationCurrencyTitle,
         registrationLegalTitle = registrationLegalTitle,
-        registrationTermsAcceptance = registrationTermsAcceptance,
-        registrationPrivacyAcceptance = registrationPrivacyAcceptance,
+        registrationTermsLabel = registrationTermsLabel,
+        registrationPrivacyLabel = registrationPrivacyLabel,
+        registrationLegalPrefix = registrationLegalPrefix,
+        registrationLegalConjunction = registrationLegalConjunction,
         registrationContinue = registrationContinue,
         registrationBack = registrationBack,
         registrationOtpWait = registrationOtpWait,

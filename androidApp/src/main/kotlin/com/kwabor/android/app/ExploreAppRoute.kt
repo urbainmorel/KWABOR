@@ -27,7 +27,6 @@ import com.kwabor.shared.presentation.explore.ExploreUiState
 internal fun ExploreRoute(
     dependencies: HomeShellDependencies,
     strings: KwaborStrings,
-    isGuestSession: Boolean,
     modifier: Modifier = Modifier,
     onGuideDiscoveryRequested: () -> Unit,
 ) {
@@ -50,7 +49,6 @@ internal fun ExploreRoute(
         model = ExploreScreenUiModel(
             state = exploreState,
             searchState = searchState,
-            isGuestSession = isGuestSession,
             showGuideDiscoveryEntry = dependencies.rootNavigationProfile ==
                 com.kwabor.shared.presentation.navigation.RootNavigationProfile.Full,
             viewportPerformance = ExploreViewportPerformanceBinding(

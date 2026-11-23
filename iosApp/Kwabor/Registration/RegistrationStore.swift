@@ -133,12 +133,8 @@ final class RegistrationStore: ObservableObject {
         controller.dispatch(intent: IosRegistrationSelectCurrencyIntent(currency: currency))
     }
 
-    func updateTermsAcceptance(_ accepted: Bool) {
-        controller.legalAcceptance.updateTerms(accepted: accepted)
-    }
-
-    func updatePrivacyAcceptance(_ accepted: Bool) {
-        controller.legalAcceptance.updatePrivacy(accepted: accepted)
+    func updateLegalAcceptance(_ accepted: Bool) {
+        controller.dispatch(intent: IosRegistrationUpdateLegalAcceptanceIntent(accepted: accepted))
     }
 
     func submitPrimaryAction() {

@@ -2,7 +2,6 @@ package com.kwabor.shared.presentation.auth
 
 import com.kwabor.shared.domain.auth.AuthSession
 import com.kwabor.shared.domain.auth.LegalDocumentRevision
-import com.kwabor.shared.domain.auth.LegalDocumentType
 import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.money.KwaborCurrency
 
@@ -19,10 +18,7 @@ sealed interface RegistrationIntent {
 
     data class SelectCurrency(val currency: KwaborCurrency) : Field
 
-    data class UpdateLegalAcceptance(
-        val type: LegalDocumentType,
-        val accepted: Boolean,
-    ) : Field
+    data class UpdateLegalAcceptance(val accepted: Boolean) : Field
 
     sealed interface Navigation : RegistrationIntent
 
@@ -74,8 +70,7 @@ data class RegistrationUiState(
     val preferredCurrency: KwaborCurrency = KwaborCurrency.Xof,
     val termsDocument: LegalDocumentRevision? = null,
     val privacyDocument: LegalDocumentRevision? = null,
-    val termsAccepted: Boolean = false,
-    val privacyAccepted: Boolean = false,
+    val legalAccepted: Boolean = false,
     val currentSession: AuthSession? = null,
     val resendAvailableAtEpochMilliseconds: Long? = null,
     val isLoading: Boolean = false,
@@ -98,11 +93,17 @@ data class RegistrationUiState(
             RegistrationStep.Completed -> null
         }
 
+    val requiresProfileIdentity: Boolean get() = method == RegistrationMethod.Federated
+
     val requirementsReady: Boolean
         get() = requirementsStatus == RegistrationRequirementsStatus.Ready &&
-            cities.isNotEmpty() &&
+            (!requiresProfileIdentity || cities.isNotEmpty()) &&
             termsDocument != null &&
             privacyDocument != null
+
+    val canCompleteProfile: Boolean
+        get() = requirementsReady && legalAccepted &&
+            (!requiresProfileIdentity || (firstName.isNotBlank() && lastName.isNotBlank() && selectedCityId != null))
 
     fun canResendOtp(nowEpochMilliseconds: Long): Boolean =
         resendAvailableAtEpochMilliseconds?.let { availableAt -> nowEpochMilliseconds >= availableAt } ?: true
@@ -118,6 +119,8 @@ fun RegistrationUiState.mergeRequirementsFrom(source: RegistrationUiState): Regi
     selectedCityId = selectedCityId ?: source.selectedCityId,
     termsDocument = source.termsDocument,
     privacyDocument = source.privacyDocument,
+    legalAccepted = legalAccepted && termsDocument?.id == source.termsDocument?.id &&
+        privacyDocument?.id == source.privacyDocument?.id,
 )
 
 private const val EMAIL_REGISTRATION_STEP_COUNT = 4
