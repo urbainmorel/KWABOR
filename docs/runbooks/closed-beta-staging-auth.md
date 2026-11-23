@@ -21,8 +21,10 @@ protégé et sans Docker. Il ne cible jamais `production` et n'applique aucun re
 | CAPTCHA | désactivé | Aucun échange de jeton CAPTCHA n'est livré dans les deux clients |
 
 Le Site URL est un deep link mobile final valide : les deux applications enregistrent le schéma
-`kwabor`, l'hôte `app` et la route publique `home`. Les emails d'inscription et de récupération
-utilisent `{{ .Token }}` et ne dépendent d'aucun callback web. Aucun wildcard, localhost, URL de
+`kwabor`, l'hôte `app` et la route publique `home`. Supabase utilise le modèle `confirmation`
+au premier envoi à une nouvelle adresse et le modèle `magic_link` pour une adresse déjà vérifiée.
+Ces deux modèles partagent le même code `{{ .Token }}`. Le modèle `recovery` utilise aussi un code.
+Aucun de ces emails ne dépend d'un callback web. Aucun wildcard, localhost, URL de
 preview ou callback OAuth web n'entre dans l'allow-list Auth.
 
 Le callback Google à enregistrer dans Google Cloud est une configuration fournisseur distincte :
