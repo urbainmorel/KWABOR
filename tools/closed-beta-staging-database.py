@@ -46,7 +46,7 @@ BACKUP_ARTIFACT_RETENTION_DAYS = 90
 # pinned byte-for-byte here. Unknown or modified migrations fail closed.
 BACKUP_EXCLUDED_MANAGED_DATA_PENDING_ALLOWLIST = {
     "20260821012638": "f5d307628db654c49464b607729df1a59776725070113e93e5cc9a8e372434fc",
-    ONBOARDING_SCHEMA_VERSION: "1697c1212e09c8a8221bedafd63fcd511dd69c321a1cc0504e28ace00a363d4f",
+    ONBOARDING_SCHEMA_VERSION: "02ddb45573501452d626fde4633a4e62bda616b225a4b69fa3db176daf247c11",
 }
 REMOTE_MIGRATION_QUERY = (
     "select unnest(xpath('/table/row/version/text()', query_to_xml("

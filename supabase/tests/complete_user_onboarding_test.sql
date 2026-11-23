@@ -437,7 +437,7 @@ SELECT ok(
 SELECT ok(
   NOT has_function_privilege(
     'authenticated',
-    'app_private.complete_user_onboarding_internal(text, text, text, text, text, uuid, uuid, uuid)',
+    'app_private.complete_user_onboarding_internal(text, text, text, text, text, uuid, uuid)',
     'EXECUTE'
   ),
   'authenticated users cannot execute the private onboarding implementation'
