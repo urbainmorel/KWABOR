@@ -142,7 +142,7 @@ class RegistrationPresenterTest {
     @Test
     fun loadRequirements_requiresOneActiveRevisionPerLegalType() = runTest {
         val repository = FakeRegistrationAuthRepository(
-            legalDocuments = legalDocuments().filterNot { revision -> revision.type == LegalDocumentType.UgcLicense },
+            legalDocuments = legalDocuments().filterNot { it.type == LegalDocumentType.PrivacyPolicy },
         )
         val presenter = presenter(repository, FakeClock())
 
@@ -205,7 +205,6 @@ class RegistrationPresenterTest {
             preferredCurrency = KwaborCurrency.Eur,
             termsAccepted = true,
             privacyAccepted = true,
-            ugcAccepted = true,
         )
 
         val completed = presenter.completeOnboarding(ready, strings)
@@ -213,7 +212,6 @@ class RegistrationPresenterTest {
         val request = assertNotNull(repository.completedRequest)
         assertEquals("terms-id", request.termsDocumentId)
         assertEquals("privacy-id", request.privacyDocumentId)
-        assertEquals("ugc-id", request.ugcDocumentId)
         assertEquals("Afi", request.firstName)
         assertEquals(RegistrationStep.Completed, completed.step)
         assertEquals(AccountSetupStatus.Complete, completed.currentSession?.accountSetupStatus)
@@ -382,7 +380,6 @@ private fun authSession(status: AccountSetupStatus): AuthSession = AuthSession(
 private fun legalDocuments(): List<LegalDocumentRevision> = listOf(
     legalDocument("terms-id", LegalDocumentType.Terms),
     legalDocument("privacy-id", LegalDocumentType.PrivacyPolicy),
-    legalDocument("ugc-id", LegalDocumentType.UgcLicense),
 )
 
 private fun legalDocument(id: String, type: LegalDocumentType): LegalDocumentRevision = LegalDocumentRevision(

@@ -142,7 +142,6 @@ internal class AuthFederatedCoordinator(
                 selectedCityId = preparedState.selectedCityId,
                 termsDocument = preparedState.termsDocument,
                 privacyDocument = preparedState.privacyDocument,
-                ugcDocument = preparedState.ugcDocument,
             )
         } else {
             runtime.registrationPresenter.loadRequirements(

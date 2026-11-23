@@ -51,7 +51,6 @@ private fun RegistrationUiState.updateLegalAcceptance(
 ): RegistrationUiState = when (type) {
     LegalDocumentType.Terms -> copy(termsAccepted = accepted, errorMessage = null)
     LegalDocumentType.PrivacyPolicy -> copy(privacyAccepted = accepted, errorMessage = null)
-    LegalDocumentType.UgcLicense -> copy(ugcAccepted = accepted, errorMessage = null)
 }
 
 private fun RegistrationUiState.validateProfile(strings: KwaborStrings): RegistrationUiState = when {
@@ -62,7 +61,7 @@ private fun RegistrationUiState.validateProfile(strings: KwaborStrings): Registr
         errorMessage = strings.registrationNameTooLong,
     )
     selectedCityId == null -> copy(errorMessage = strings.registrationCityRequired)
-    !termsAccepted || !privacyAccepted || !ugcAccepted -> copy(errorMessage = strings.registrationLegalRequired)
+    !termsAccepted || !privacyAccepted -> copy(errorMessage = strings.registrationLegalRequired)
     else -> copy(errorMessage = null)
 }
 

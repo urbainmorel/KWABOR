@@ -141,10 +141,6 @@ final class RegistrationStore: ObservableObject {
         controller.legalAcceptance.updatePrivacy(accepted: accepted)
     }
 
-    func updateUgcAcceptance(_ accepted: Bool) {
-        controller.legalAcceptance.updateUgc(accepted: accepted)
-    }
-
     func submitPrimaryAction() {
         guard let state, !state.isLoading else { return }
         if state.step == .email {

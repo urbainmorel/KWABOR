@@ -9,9 +9,9 @@ import kotlin.test.assertIs
 
 class CompleteOnboardingRequestTest {
     @Test
-    fun create_requiresCityAndThreeLegalDocuments() {
+    fun create_requiresCity() {
         val result = CompleteOnboardingRequest.create(
-            validValues().copy(cityId = "", ugcDocumentId = ""),
+            validValues().copy(cityId = ""),
         )
 
         assertIs<DomainResult.Failure>(result)
@@ -43,7 +43,7 @@ class CompleteOnboardingRequestTest {
     fun create_requiresThreeDistinctLegalDocumentRevisions() {
         val values = validValues()
         val result = CompleteOnboardingRequest.create(
-            values.copy(ugcDocumentId = values.termsDocumentId),
+            values.copy(privacyDocumentId = values.termsDocumentId),
         )
 
         assertIs<DomainResult.Failure>(result)
@@ -59,5 +59,4 @@ private fun validValues(): CompleteOnboardingValues = CompleteOnboardingValues(
     preferredCurrency = KwaborCurrency.Xof,
     termsDocumentId = "00000000-0000-4000-8000-000000000001",
     privacyDocumentId = "00000000-0000-4000-8000-000000000002",
-    ugcDocumentId = "00000000-0000-4000-8000-000000000003",
 )

@@ -129,12 +129,19 @@ Après validation des protections de l’Environment, `plan` :
 4. vérifie la cohérence du compteur d’historique avec la liste distante ;
 5. émet le reçu GEL et son sidecar SHA-256.
 
-Un plan peut être vert tout en indiquant `freshEmptyEligible=false` : il décrit alors correctement un
-staging non vierge, mais il n’autorise pas l’exception sans backup. Conserver le `run-id`,
+Un plan vert avec `freshEmptyEligible=false` décrit un staging non vierge. Suivre le mode
+d’application indiqué ci-dessous pour la migration. Conserver le `run-id`,
 l’`artifact-id` et le digest brut de 64 hexadécimaux renvoyé par `upload-artifact`. L’API GitHub expose
 le même digest sous `sha256:<digest>` ; le runner exige les deux représentations exactes.
 
-## Opération `apply` — staging vierge ou backup B6.02 qualifié
+## Opération `apply`
+
+Pour le passage à deux documents à l’inscription, utiliser `plan`, puis
+`APPLY-EXACT-STAGING-ONBOARDING-SCHEMA` lors de `apply`, avec le même SHA, le même run CI et
+l’artefact exact du plan. Laisser `reconstructible_demo` à `false` et les entrées backup vides.
+Le workflow exige que `20261123105000` soit l’unique migration pending et vérifie son empreinte
+juste avant l’écriture. Cette migration remplace deux fonctions et ne modifie aucune ligne
+applicative, Auth ou Storage. Après l’application, lancer `verify`.
 
 Pour le jalon individuel [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md),
 ajouter `-f reconstructible_demo=true` à `plan` et `apply`, en laissant les entrées backup vides.

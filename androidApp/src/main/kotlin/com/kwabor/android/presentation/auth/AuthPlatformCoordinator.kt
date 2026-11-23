@@ -20,7 +20,6 @@ internal class AuthPlatformCoordinator(
         val url = when (type) {
             LegalDocumentType.Terms -> state.termsDocument?.url
             LegalDocumentType.PrivacyPolicy -> state.privacyDocument?.url
-            LegalDocumentType.UgcLicense -> state.ugcDocument?.url
         } ?: return
         runtime.platformState.value = runtime.platformState.value.copy(legalDocumentOpenFailed = false)
         runtime.coroutineScope.launch {

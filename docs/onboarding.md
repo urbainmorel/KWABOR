@@ -14,7 +14,7 @@ Android Compose et iOS SwiftUI suivent le même parcours unidirectionnel :
 
 1. email puis OTP de 6 chiffres, avec collage/autoremplissage natif, soumission automatique, correction de l'email et renvoi après 30 secondes ;
 2. un seul champ de mot de passe d'au moins 8 caractères, compatible gestionnaire de mots de passe et jamais conservé dans l'état UI ;
-3. un écran défilant **Finaliser mon profil** : prénom, nom, ville recherchable, devise XOF par défaut et trois acceptations juridiques séparées avec liens HTTPS et versions visibles ;
+3. un écran défilant **Finaliser mon profil** : prénom, nom, ville recherchable, devise XOF par défaut et deux acceptations juridiques séparées avec liens HTTPS et versions visibles ;
 4. finalisation serveur atomique puis fermeture immédiate du tunnel, sans écran succès ni permission.
 
 Le chemin email compte quatre écrans maximum et affiche `2/4`, `3/4`, `4/4` seulement après le choix de méthode. Google et Apple ouvrent directement le profil final avec les noms préremplis et modifiables ; la progression affiche **Dernière étape**. Les villes et documents légaux sont préchargés dès l'ouverture. Une erreur offre un retry ciblé sans perdre les saisies. Une ville n'est suggérée que si la softwall provient d'un lieu dont le `cityId` est valide.

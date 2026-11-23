@@ -585,8 +585,8 @@ select is(
     from public.user_legal_acceptances
     where user_id = '91000000-0000-4000-8000-000000000007'
   ),
-  3::bigint,
-  'Google onboarding records all legal acceptances'
+  2::bigint,
+  'Google onboarding records the terms and privacy acceptances'
 );
 
 select is(

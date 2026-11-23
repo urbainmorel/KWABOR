@@ -189,13 +189,6 @@ private fun ProfileLegalAcceptances(
         type = LegalDocumentType.PrivacyPolicy,
         actions = actions,
     )
-    LegalAcceptanceRow(
-        document = state.ugcDocument,
-        accepted = state.ugcAccepted,
-        label = strings.registrationUgcAcceptance,
-        type = LegalDocumentType.UgcLicense,
-        actions = actions,
-    )
 }
 
 @Composable
@@ -232,8 +225,7 @@ private fun RegistrationUiState.canCompleteProfile(selectedCity: City?): Boolean
     lastName.isNotBlank() &&
     selectedCity != null &&
     termsAccepted &&
-    privacyAccepted &&
-    ugcAccepted
+    privacyAccepted
 
 private data class ProfileSelectionActions(
     val onOpenCity: () -> Unit,

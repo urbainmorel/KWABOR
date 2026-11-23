@@ -25,7 +25,7 @@ séparément soumise au [plan de livraison production](v1-production-delivery.md
   complets ;
 - migrations testées sur une stack isolée, puis préflight sur toute base persistante ;
 - version Android/iOS cohérente et supérieure à la dernière version distribuée ;
-- CGU, confidentialité, licences média/UGC et formulaires Stores validés ;
+- CGU, confidentialité, licences des médias et formulaires Stores validés ;
 - sauvegarde, rollback, observabilité et responsables d'incident identifiés.
 
 ## Flux Android

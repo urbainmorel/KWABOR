@@ -61,10 +61,6 @@ class IosLegalAcceptanceController internal constructor(
     fun updatePrivacy(accepted: Boolean) {
         updateAcceptance(LegalDocumentType.PrivacyPolicy, accepted)
     }
-
-    fun updateUgc(accepted: Boolean) {
-        updateAcceptance(LegalDocumentType.UgcLicense, accepted)
-    }
 }
 
 class IosRegistrationController internal constructor(

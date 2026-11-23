@@ -136,8 +136,7 @@ private fun RegistrationUiState.withLoadedRequirements(
 ): RegistrationUiState {
     val terms = documents.singleRevisionOfType(LegalDocumentType.Terms)
     val privacy = documents.singleRevisionOfType(LegalDocumentType.PrivacyPolicy)
-    val ugc = documents.singleRevisionOfType(LegalDocumentType.UgcLicense)
-    if (terms == null || privacy == null || ugc == null) {
+    if (terms == null || privacy == null) {
         return copy(
             cities = cities,
             requirementsStatus = RegistrationRequirementsStatus.Failed,
@@ -151,7 +150,6 @@ private fun RegistrationUiState.withLoadedRequirements(
         selectedCityId = selectedCityId ?: suggestedCityId,
         termsDocument = terms,
         privacyDocument = privacy,
-        ugcDocument = ugc,
         requirementsStatus = RegistrationRequirementsStatus.Ready,
         requirementsErrorMessage = null,
     )
@@ -161,7 +159,7 @@ private fun List<LegalDocumentRevision>.singleRevisionOfType(type: LegalDocument
     filter { revision -> revision.type == type }.singleOrNull()
 
 private fun RegistrationUiState.toCompleteOnboardingRequest(): DomainResult<CompleteOnboardingRequest> {
-    if (!termsAccepted || !privacyAccepted || !ugcAccepted) {
+    if (!termsAccepted || !privacyAccepted) {
         return DomainResult.Failure(
             com.kwabor.shared.domain.core.DomainError.Validation("error.auth.legal_acceptance_required"),
         )
@@ -175,7 +173,6 @@ private fun RegistrationUiState.toCompleteOnboardingRequest(): DomainResult<Comp
             preferredCurrency = preferredCurrency,
             termsDocumentId = termsDocument?.id.orEmpty(),
             privacyDocumentId = privacyDocument?.id.orEmpty(),
-            ugcDocumentId = ugcDocument?.id.orEmpty(),
         ),
     )
 }

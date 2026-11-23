@@ -63,7 +63,6 @@ data class AuthSession(
 enum class LegalDocumentType {
     Terms,
     PrivacyPolicy,
-    UgcLicense,
 }
 
 data class LegalDocumentRevision(
@@ -83,7 +82,6 @@ data class CompleteOnboardingValues(
     val preferredCurrency: KwaborCurrency,
     val termsDocumentId: String,
     val privacyDocumentId: String,
-    val ugcDocumentId: String,
 )
 
 class CompleteOnboardingRequest private constructor(
@@ -96,7 +94,6 @@ class CompleteOnboardingRequest private constructor(
     val preferredCurrency: KwaborCurrency get() = values.preferredCurrency
     val termsDocumentId: String get() = values.termsDocumentId
     val privacyDocumentId: String get() = values.privacyDocumentId
-    val ugcDocumentId: String get() = values.ugcDocumentId
 
     companion object {
         fun create(values: CompleteOnboardingValues): DomainResult<CompleteOnboardingRequest> {
@@ -117,17 +114,15 @@ private fun CompleteOnboardingValues.normalized(): CompleteOnboardingValues = co
     cityId = cityId.trim(),
     termsDocumentId = termsDocumentId.trim(),
     privacyDocumentId = privacyDocumentId.trim(),
-    ugcDocumentId = ugcDocumentId.trim(),
 )
 
 private fun CompleteOnboardingValues.validationError(): DomainError.Validation? {
-    val legalDocumentIds = listOf(termsDocumentId, privacyDocumentId, ugcDocumentId)
     return when {
         firstName.isBlank() || lastName.isBlank() -> DomainError.Validation("error.auth.name_required")
         firstName.length > MAX_ONBOARDING_NAME_LENGTH || lastName.length > MAX_ONBOARDING_NAME_LENGTH ->
             DomainError.Validation("error.auth.name_too_long")
         cityId.isBlank() -> DomainError.Validation("error.auth.city_required")
-        legalDocumentIds.any(String::isBlank) || legalDocumentIds.toSet().size != legalDocumentIds.size ->
+        termsDocumentId.isBlank() || privacyDocumentId.isBlank() || termsDocumentId == privacyDocumentId ->
             DomainError.Validation("error.auth.legal_acceptance_required")
         else -> null
     }
