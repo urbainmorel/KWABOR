@@ -69,6 +69,16 @@ synthétique du mainteneur. Il utilise les paramètres et secrets SMTP avec
 `SUPABASE_ACCESS_TOKEN`. Les fournisseurs Google et Apple restent hors du PATCH de ce
 profil. Son reçu porte la décision `individual-email-qualified`.
 
+Pour terminer le profil du compte synthétique, le staging doit présenter les
+[conditions d’essai](../staging-demo/conditions-d-essai.md) et la
+[confidentialité d’essai](../staging-demo/confidentialite-d-essai.md) françaises.
+Le workflow `closed-beta-staging-demo-legal.yml` contrôle leurs URL et empreintes depuis
+le commit approuvé. Lancer `plan` avec le même commit et son run CI `push/main` réussi.
+Relire le reçu, puis lancer `apply` avec le run du plan et la confirmation
+`LOAD-EXACT-STAGING-TEST-DOCUMENTS`. Lancer `verify` pour confirmer les deux révisions
+actives. L’opération refuse toute révision active différente et ajoute les deux lignes
+dans une transaction.
+
 Lancer `.github/workflows/closed-beta-staging-auth.yml` depuis la branche `main` sélectionnée avec :
 
 1. `operation=plan`, le profil retenu, le SHA complet exact et l'identifiant du run CI
