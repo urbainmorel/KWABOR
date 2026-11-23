@@ -579,6 +579,12 @@ appareils et les validations CI du commit restent à obtenir pour G4 à G7. La s
 seulement `first_process_explore`/`subsequent_explore` ; le mode B7.10 `cold`/`warm` relève
 exclusivement du harnais opérateur physique.
 
+L’[ADR-0039](docs/adr/0039-single-maintainer-staging-auth-and-internal-builds.md) définit la
+politique du mainteneur unique pour Auth staging, la signature et les canaux internes.
+Sur le Tecno, le formulaire d’inscription par e-mail s’ouvre. Le service Auth staging répond
+avec l’inscription par e-mail active et la confirmation requise. La réception du code et la
+persistance des favoris restent à vérifier après la qualification du service d’envoi.
+
 ## Blocages / limites
 
 - ADR-0036 autorise explicitement le profil transitoire de bêta fermée `Explorer · Compte` et le

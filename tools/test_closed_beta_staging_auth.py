@@ -119,6 +119,31 @@ class DesiredConfigurationTests(unittest.TestCase):
         self.assertNotIn("external_apple_additional_client_ids", desired.patch)
         self.assertEqual(set(desired.write_only), set(auth.WRITE_ONLY_FIELDS))
 
+    def test_individual_email_profile_qualifies_smtp_without_patching_federated_providers(self) -> None:
+        environment = {
+            key: value for key, value in valid_environment().items()
+            if key.startswith("KWABOR_AUTH_SMTP_")
+        }
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repository = Path(temporary_directory)
+            make_repository(repository)
+            desired = auth.build_desired_configuration(
+                environment=environment,
+                repository_root=repository,
+                require_mutation_secrets=True,
+                profile="email-test",
+            )
+        self.assertEqual(set(desired.write_only), {"smtp_user", "smtp_pass"})
+        self.assertFalse(any(key.startswith(("external_google_", "external_apple_")) for key in desired.patch))
+        self.assertEqual(desired.patch["mailer_otp_length"], 6)
+        self.assertFalse(desired.patch["mailer_autoconfirm"])
+        self.assertNotIn("googleProviderCredentialConfigured", auth.expected_snapshot(desired))
+        current = {**desired.patch, "external_google_enabled": False, "external_apple_enabled": False}
+        self.assertEqual(auth.auth_config_drift(current, desired), [])
+        del current["smtp_pass"]
+        self.assertEqual(auth.auth_config_drift(current, desired), ["smtpCredentialConfigured"])
+        self.assertEqual(auth.qualification_decision(desired.profile), "individual-email-qualified")
+
     def test_verify_contract_does_not_require_provider_or_smtp_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             repository = Path(temporary_directory)
@@ -307,6 +332,7 @@ class DriftAndEvidenceTests(unittest.TestCase):
             "taskId": "B6.AUTH",
             "workflow": auth.EXPECTED_WORKFLOW,
             "operation": "plan",
+            "authProfile": "full",
             "environment": "staging",
             "repository": auth.EXPECTED_REPOSITORY,
             "expectedSha": EXPECTED_SHA,
@@ -443,10 +469,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("pull_request:", workflow)
         self.assertNotIn("push:", workflow)
         self.assertIn("environment: staging", workflow)
+        self.assertIn("github.repository == 'urbainmorel/KWABOR'", workflow)
+        self.assertIn("github.ref == 'refs/heads/main' &&\n      github.ref_protected &&", workflow)
+        self.assertIn("github.actor_id == '146450999' &&\n      github.triggering_actor == 'urbainmorel'", workflow)
+        self.assertIn('length == 1 and .[0].type == "branch_policy"', workflow)
+        self.assertIn(".can_admins_bypass == false", workflow)
         self.assertIn("APPLY-EXACT-STAGING-AUTH", workflow)
         self.assertIn("validated_plan_run_id:", workflow)
         self.assertIn("validated_plan_artifact_id:", workflow)
         self.assertIn("validated_plan_artifact_digest:", workflow)
+        self.assertIn("          - email-test", workflow)
+        self.assertEqual(workflow.count('--profile "$AUTH_PROFILE"'), 2)
         self.assertIn("SUPABASE_ACCESS_TOKEN", workflow)
         self.assertIn("KWABOR_GOOGLE_WEB_CLIENT_SECRET", workflow)
         self.assertIn("KWABOR_AUTH_SMTP_PASSWORD", workflow)

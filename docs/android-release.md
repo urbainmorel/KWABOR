@@ -154,12 +154,12 @@ Les GitHub Environments `staging` et `play-internal` sont distincts. Chacun doit
 
 - imposer `deployment_branch_policy.protected_branches=true` et
   `deployment_branch_policy.custom_branch_policies=false` ;
-- définir au moins un reviewer obligatoire ;
-- interdire l'auto-approbation avec `prevent_self_review` ;
+- exposer uniquement la règle `branch_policy` ;
 - interdire le bypass administrateur avec `can_admins_bypass`.
 
-Le workflow lit ces règles avec l'API GitHub et échoue fermé si une condition manque. Les secrets ne
-doivent pas être placés au niveau dépôt pour contourner ces Environments.
+L’[ADR-0039](adr/0039-single-maintainer-staging-auth-and-internal-builds.md) réserve les
+exécutions et relances au mainteneur canonique sur `main` protégée. Le workflow vérifie ces
+règles avec l’API GitHub. Les secrets sont stockés dans leurs Environments respectifs.
 
 ### Environment `staging` — build B7.02
 

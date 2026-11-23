@@ -122,9 +122,9 @@ Ces commandes valident le projet et les ressources ; elles ne produisent pas un 
 
 Le workflow `iOS closed beta archive and TestFlight` s'exécute uniquement depuis `main`.
 `archive-only` utilise l'Environment `staging` ; `upload-testflight-internal` réaudite `staging` puis
-exige `testflight-internal`. Tous deux doivent interdire le bypass administrateur, n'admettre que les
-branches protégées sans politique personnalisée hybride, exiger un reviewer et empêcher
-l'auto-approbation. L'Environment `staging` contient :
+exige `testflight-internal`. Les deux Environments exigent uniquement la règle des branches
+protégées et interdisent le bypass administrateur. L’[ADR-0039](adr/0039-single-maintainer-staging-auth-and-internal-builds.md)
+réserve les exécutions et relances au mainteneur canonique. L'Environment `staging` contient :
 
 | Nom | Type | Contenu |
 |---|---|---|

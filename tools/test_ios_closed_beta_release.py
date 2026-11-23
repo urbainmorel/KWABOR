@@ -389,9 +389,12 @@ class WorkflowPolicyTest(unittest.TestCase):
         self.assertIn("--name staging", archive_job)
         self.assertIn("environment: testflight-internal", upload_job)
         self.assertIn("for environment_name in staging testflight-internal", upload_job)
+        for job in (archive_job, upload_job):
+            self.assertIn("github.repository == 'urbainmorel/KWABOR'", job)
+            self.assertIn("github.ref == 'refs/heads/main' &&\n      github.ref_protected &&", job)
+            self.assertIn("github.actor_id == '146450999' &&\n      github.triggering_actor == 'urbainmorel'", job)
         helper = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn('document.get("can_admins_bypass") is False', helper)
-        self.assertIn('reviewer_rule.get("prevent_self_review") is True', helper)
         self.assertNotIn("environment: production", workflow)
         self.assertNotIn("- production", workflow)
         self.assertNotIn("--upload-app", workflow)
@@ -404,17 +407,7 @@ class EnvironmentProtectionTest(unittest.TestCase):
             "name": name,
             "updated_at": "2026-08-12T10:00:00Z",
             "can_admins_bypass": False,
-            "protection_rules": [
-                {
-                    "id": 1,
-                    "type": "required_reviewers",
-                    "prevent_self_review": True,
-                    "reviewers": [
-                        {"type": "User", "reviewer": {"id": 42, "login": "owner"}}
-                    ],
-                },
-                {"id": 2, "type": "branch_policy"},
-            ],
+            "protection_rules": [{"id": 2, "type": "branch_policy"}],
             "deployment_branch_policy": {
                 "protected_branches": True,
                 "custom_branch_policies": False,
@@ -426,14 +419,17 @@ class EnvironmentProtectionTest(unittest.TestCase):
             self.safe_environment("testflight-internal"),
             expected_name="testflight-internal",
         )
-        self.assertEqual(result["reviewerCount"], 1)
-        self.assertEqual(result["reviewerTypes"], ["User"])
-        self.assertNotIn("owner", json.dumps(result))
+        self.assertEqual(result["reviewerCount"], 0)
+        self.assertEqual(result["governanceMode"], "single-maintainer-internal")
+        self.assertTrue(result["protectedBranchesOnly"])
 
-    def test_missing_reviewer_unprotected_branch_and_admin_bypass_are_rejected(self) -> None:
-        missing_reviewer = self.safe_environment("staging")
-        missing_reviewer["protection_rules"] = [
-            {"id": 2, "type": "branch_policy"}
+    def test_invalid_single_maintainer_environment_is_rejected(self) -> None:
+        missing_branch = self.safe_environment("staging")
+        missing_branch["protection_rules"] = []
+        other_rule = self.safe_environment("staging")
+        other_rule["protection_rules"] = [
+            {"id": 2, "type": "branch_policy"},
+            {"id": 1, "type": "required_reviewers"},
         ]
         unprotected = self.safe_environment("staging")
         unprotected["deployment_branch_policy"] = {
@@ -442,9 +438,7 @@ class EnvironmentProtectionTest(unittest.TestCase):
         }
         bypass = self.safe_environment("staging")
         bypass["can_admins_bypass"] = True
-        self_review = self.safe_environment("staging")
-        self_review["protection_rules"][0]["prevent_self_review"] = False  # type: ignore[index]
-        for document in (missing_reviewer, unprotected, bypass, self_review):
+        for document in (missing_branch, other_rule, unprotected, bypass):
             with self.subTest(document=document), self.assertRaises(release.ReleaseError):
                 release.validate_environment_protection(document, expected_name="staging")
 

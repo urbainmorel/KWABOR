@@ -380,7 +380,8 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   `supabase_database` sur une base éphémère ne clôt pas ce ticket.
   - [x] BETA-STAGING-001A — Les Environments GitHub sont sans bypass administrateur et limités aux
     branches protégées. L'accès staging via pooler TLS et la politique du mainteneur unique sur
-    `main` pour le catalogue fictif sont validés. Auth et distribution gardent une revue indépendante.
+    `main` pour le catalogue fictif sont validés. L’ADR-0039 définit la politique de mainteneur
+    unique pour Auth et les canaux internes.
   - [x] BETA-STAGING-001B — Livrer sans exécution live les workflows plan/apply/verify Auth,
     sauvegarde/restauration B6.02, migrations et archivage exact des quatre fixtures.
   - [x] BETA-STAGING-001C — Terminer le jalon catalogue sur le Tecno. La preuve de staging

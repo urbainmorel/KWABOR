@@ -50,7 +50,13 @@ concurrency:
 jobs:
   archive:
     name: Archive and export staging IPA
-    if: inputs.operation == 'archive-only'
+    if: >-
+      inputs.operation == 'archive-only' &&
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     runs-on: macos-15
     timeout-minutes: 75
     environment: staging
@@ -555,7 +561,13 @@ jobs:
 
   upload_testflight:
     name: Upload exact archive to internal TestFlight
-    if: inputs.operation == 'upload-testflight-internal'
+    if: >-
+      inputs.operation == 'upload-testflight-internal' &&
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     runs-on: macos-15
     timeout-minutes: 75
     environment: testflight-internal

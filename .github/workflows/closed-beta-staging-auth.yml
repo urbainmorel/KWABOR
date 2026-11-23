@@ -11,6 +11,14 @@ on:
           - plan
           - apply
           - verify
+      profile:
+        description: Full Auth qualification or the individual email signup test
+        required: true
+        type: choice
+        default: full
+        options:
+          - full
+          - email-test
       expected_sha:
         description: Exact full lowercase SHA currently selected on main
         required: true
@@ -47,6 +55,12 @@ concurrency:
 
 jobs:
   staging_auth:
+    if: >-
+      github.repository == 'urbainmorel/KWABOR' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      github.actor_id == '146450999' &&
+      github.triggering_actor == 'urbainmorel'
     name: ${{ inputs.operation }} protected staging Auth
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -55,6 +69,7 @@ jobs:
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       VALIDATED_CI_RUN_ID: ${{ inputs.validated_ci_run_id }}
       OPERATION: ${{ inputs.operation }}
+      AUTH_PROFILE: ${{ inputs.profile }}
       APPLY_CONFIRMATION_INPUT: ${{ inputs.apply_confirmation }}
       VALIDATED_PLAN_RUN_ID: ${{ inputs.validated_plan_run_id }}
       VALIDATED_PLAN_ARTIFACT_ID: ${{ inputs.validated_plan_artifact_id }}
@@ -125,12 +140,7 @@ jobs:
             .can_admins_bypass == false and
             .deployment_branch_policy.protected_branches == true and
             .deployment_branch_policy.custom_branch_policies == false and
-            any(
-              .protection_rules[];
-              .type == "required_reviewers" and
-              .prevent_self_review == true and
-              (.reviewers | length) > 0
-            )
+            (.protection_rules | type == "array" and length == 1 and .[0].type == "branch_policy")
           ' <<<"$environment_json" >/dev/null; then
             echo "The staging Environment is not protected for an Auth operation." >&2
             exit 1
@@ -221,6 +231,7 @@ jobs:
           done
           python3 -B tools/closed-beta-staging-auth.py execute \
             --operation "$OPERATION" \
+            --profile "$AUTH_PROFILE" \
             --expected-sha "$EXPECTED_SHA" \
             --validated-ci-run-id "$VALIDATED_CI_RUN_ID" \
             --apply-confirmation "$APPLY_CONFIRMATION_INPUT" \
@@ -241,6 +252,7 @@ jobs:
           python3 -B tools/closed-beta-staging-auth.py verify-receipt \
             --receipt "$GITHUB_WORKSPACE/build/closed-beta-staging-auth-evidence/GEL-G5-STAGING-AUTH.json" \
             --operation "$OPERATION" \
+            --profile "$AUTH_PROFILE" \
             --expected-sha "$EXPECTED_SHA" \
             --validated-ci-run-id "$VALIDATED_CI_RUN_ID"
 

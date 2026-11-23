@@ -33,6 +33,7 @@ EXPECTED_SITE_URL = "kwabor://app/home"
 EXPECTED_REDIRECT_URLS = ("kwabor://auth/promoter-activate",)
 EXPECTED_APPLE_CLIENT_ID = "com.kwabor.ios"
 EXPECTED_SMTP_SENDER_NAME = "Kwabor"
+AUTH_PROFILES = ("full", "email-test")
 APPLY_CONFIRMATION = "APPLY-EXACT-STAGING-AUTH"
 RECEIPT_NAME = "GEL-G5-STAGING-AUTH.json"
 MANAGEMENT_API_ORIGIN = "https://api.supabase.com"
@@ -84,11 +85,8 @@ TEMPLATE_FIELDS = (
     "mailer_templates_magic_link_content",
     "mailer_templates_recovery_content",
 )
-WRITE_ONLY_FIELDS = (
-    "external_google_secret",
-    "smtp_user",
-    "smtp_pass",
-)
+SMTP_WRITE_ONLY_FIELDS = ("smtp_user", "smtp_pass")
+WRITE_ONLY_FIELDS = ("external_google_secret", *SMTP_WRITE_ONLY_FIELDS)
 WRITE_ONLY_EVIDENCE_FIELDS = {
     "external_google_secret": "googleProviderCredentialConfigured",
     "smtp_user": "smtpIdentityConfigured",
@@ -140,6 +138,11 @@ class DesiredAuthConfiguration:
     public: dict[str, Any]
     templates: dict[str, str]
     write_only: dict[str, str]
+    profile: str = "full"
+
+    @property
+    def required_credentials(self) -> tuple[str, ...]:
+        return SMTP_WRITE_ONLY_FIELDS if self.profile == "email-test" else WRITE_ONLY_FIELDS
 
     @property
     def patch(self) -> dict[str, Any]:
@@ -150,6 +153,8 @@ class DesiredAuthConfiguration:
         # the read-back representation distinct from the write representation.
         for provider in ("google", "apple"):
             client_id_field = f"external_{provider}_client_id"
+            if client_id_field not in payload:
+                continue
             additional_field = f"external_{provider}_additional_client_ids"
             primary = str(payload[client_id_field])
             additional = normalize_list(payload.pop(additional_field))
@@ -267,12 +272,7 @@ def read_email_template(path: Path, *, label: str) -> str:
     return content
 
 
-def build_desired_configuration(
-    *,
-    environment: Mapping[str, str],
-    repository_root: Path,
-    require_mutation_secrets: bool,
-) -> DesiredAuthConfiguration:
+def federated_provider_configuration(environment: Mapping[str, str]) -> dict[str, Any]:
     google_web_client_id = required_value(environment, "KWABOR_GOOGLE_WEB_CLIENT_ID")
     google_server_client_id = required_value(environment, "KWABOR_GOOGLE_SERVER_CLIENT_ID")
     google_ios_client_id = required_value(environment, "KWABOR_GOOGLE_IOS_CLIENT_ID")
@@ -291,7 +291,29 @@ def build_desired_configuration(
         google_reversed_client_id == reversed_google_client_id(google_ios_client_id),
         "GOOGLE_REVERSED_CLIENT_ID_MISMATCH",
     )
+    return {
+        "external_google_enabled": True,
+        "external_google_client_id": google_web_client_id,
+        "external_google_additional_client_ids": google_ios_client_id,
+        "external_google_skip_nonce_check": False,
+        "external_google_email_optional": False,
+        "external_apple_enabled": True,
+        "external_apple_client_id": EXPECTED_APPLE_CLIENT_ID,
+        "external_apple_additional_client_ids": "",
+        "external_apple_email_optional": False,
+    }
 
+
+def build_desired_configuration(
+    *,
+    environment: Mapping[str, str],
+    repository_root: Path,
+    require_mutation_secrets: bool,
+    profile: str = "full",
+) -> DesiredAuthConfiguration:
+    require(profile in AUTH_PROFILES, "AUTH_PROFILE_INVALID")
+    full_auth = profile == "full"
+    providers = federated_provider_configuration(environment) if full_auth else {}
     smtp_admin_email = required_value(environment, "KWABOR_AUTH_SMTP_ADMIN_EMAIL")
     smtp_host = required_value(environment, "KWABOR_AUTH_SMTP_HOST")
     smtp_port = required_value(environment, "KWABOR_AUTH_SMTP_PORT")
@@ -311,10 +333,13 @@ def build_desired_configuration(
     write_only: dict[str, str] = {}
     if require_mutation_secrets:
         write_only = {
-            "external_google_secret": required_value(environment, "KWABOR_GOOGLE_WEB_CLIENT_SECRET"),
             "smtp_user": required_value(environment, "KWABOR_AUTH_SMTP_USER"),
             "smtp_pass": required_value(environment, "KWABOR_AUTH_SMTP_PASSWORD"),
         }
+        if full_auth:
+            write_only["external_google_secret"] = required_value(
+                environment, "KWABOR_GOOGLE_WEB_CLIENT_SECRET"
+            )
 
     public: dict[str, Any] = {
         "site_url": EXPECTED_SITE_URL,
@@ -339,21 +364,13 @@ def build_desired_configuration(
         "security_captcha_enabled": False,
         "mailer_subjects_magic_link": "Votre code de vérification Kwabor",
         "mailer_subjects_recovery": "Réinitialisez votre mot de passe Kwabor",
-        "external_google_enabled": True,
-        "external_google_client_id": google_web_client_id,
-        "external_google_additional_client_ids": google_ios_client_id,
-        "external_google_skip_nonce_check": False,
-        "external_google_email_optional": False,
-        "external_apple_enabled": True,
-        "external_apple_client_id": EXPECTED_APPLE_CLIENT_ID,
-        "external_apple_additional_client_ids": "",
-        "external_apple_email_optional": False,
+        **providers,
     }
     templates = {
         "mailer_templates_magic_link_content": magic_link_template,
         "mailer_templates_recovery_content": recovery_template,
     }
-    return DesiredAuthConfiguration(public=public, templates=templates, write_only=write_only)
+    return DesiredAuthConfiguration(public=public, templates=templates, write_only=write_only, profile=profile)
 
 
 def normalize_list(value: Any) -> tuple[str, ...]:
@@ -408,7 +425,13 @@ def safe_snapshot(document: Mapping[str, Any]) -> dict[str, Any]:
 
 def expected_snapshot(desired: DesiredAuthConfiguration) -> dict[str, Any]:
     expectation = safe_snapshot({**desired.public, **desired.templates})
-    for field in WRITE_ONLY_FIELDS:
+    if desired.profile == "email-test":
+        expectation = {
+            key: value for key, value in expectation.items()
+            if not key.startswith(("external_google_", "external_apple_"))
+            and key != WRITE_ONLY_EVIDENCE_FIELDS["external_google_secret"]
+        }
+    for field in desired.required_credentials:
         expectation[WRITE_ONLY_EVIDENCE_FIELDS[field]] = True
     expectation["appleWebCredentialConfigured"] = False
     expectation["unexpectedExternalProvidersEnabled"] = []
@@ -437,7 +460,7 @@ def auth_config_drift(
     for field, expected in desired.templates.items():
         if current.get(field) != expected:
             drift.append(field)
-    for field in WRITE_ONLY_FIELDS:
+    for field in desired.required_credentials:
         current_value = current.get(field)
         if not isinstance(current_value, str) or not current_value.strip():
             drift.append(WRITE_ONLY_EVIDENCE_FIELDS[field])
@@ -630,6 +653,7 @@ def validate_plan_artifact_bundle(
         "taskId": "B6.AUTH",
         "workflow": EXPECTED_WORKFLOW,
         "operation": "plan",
+        "authProfile": desired.profile,
         "environment": EXPECTED_ENVIRONMENT,
         "repository": EXPECTED_REPOSITORY,
         "expectedSha": expected_sha,
@@ -737,6 +761,7 @@ def base_receipt(
     operation: str,
     expected_sha: str,
     validated_ci_run_id: str,
+    profile: str,
 ) -> dict[str, Any]:
     run_id = int(os.environ.get("GITHUB_RUN_ID", "0") or "0")
     return {
@@ -745,6 +770,7 @@ def base_receipt(
         "taskId": "B6.AUTH",
         "workflow": EXPECTED_WORKFLOW,
         "operation": operation,
+        "authProfile": profile,
         "environment": EXPECTED_ENVIRONMENT,
         "repository": EXPECTED_REPOSITORY,
         "expectedSha": expected_sha,
@@ -809,6 +835,7 @@ def execute(args: argparse.Namespace) -> None:
         operation=args.operation,
         expected_sha=args.expected_sha,
         validated_ci_run_id=args.validated_ci_run_id,
+        profile=args.profile,
     )
     secret_values = [
         os.environ.get("SUPABASE_ACCESS_TOKEN", ""),
@@ -847,6 +874,7 @@ def execute(args: argparse.Namespace) -> None:
             environment=os.environ,
             repository_root=Path(args.repository_root).resolve(),
             require_mutation_secrets=args.operation in {"plan", "apply"},
+            profile=args.profile,
         )
         receipt["configurationFingerprint"] = configuration_fingerprint(desired)
         receipt["mutationConfigurationFingerprint"] = (
@@ -913,7 +941,7 @@ def execute(args: argparse.Namespace) -> None:
             receipt["currentAfter"] = receipt["currentBefore"]
             receipt.update(
                 status="succeeded",
-                gateDecision="qualified",
+                gateDecision=qualification_decision(args.profile),
                 mutationState="not-requested",
                 executionDisposition="VERIFIED",
             )
@@ -927,7 +955,7 @@ def execute(args: argparse.Namespace) -> None:
             require(not receipt["driftFields"], "POST_APPLY_AUTH_CONFIG_DRIFT")
             receipt.update(
                 status="succeeded",
-                gateDecision="qualified",
+                gateDecision=qualification_decision(args.profile),
                 mutationState="committed",
                 executionDisposition="EXECUTED",
             )
@@ -951,6 +979,10 @@ def execute(args: argparse.Namespace) -> None:
     print(f"OK staging Auth operation={args.operation} GEL={RECEIPT_NAME}")
 
 
+def qualification_decision(profile: str) -> str:
+    return "individual-email-qualified" if profile == "email-test" else "qualified"
+
+
 def verify_receipt(args: argparse.Namespace) -> None:
     path = Path(args.receipt)
     try:
@@ -966,6 +998,7 @@ def verify_receipt(args: argparse.Namespace) -> None:
         "environment": EXPECTED_ENVIRONMENT,
         "repository": EXPECTED_REPOSITORY,
         "operation": args.operation,
+        "authProfile": args.profile,
         "expectedSha": args.expected_sha,
         "validatedCiRunId": int(args.validated_ci_run_id),
     }
@@ -994,10 +1027,10 @@ def verify_receipt(args: argparse.Namespace) -> None:
             require(document.get("mutationState") == "not-requested", "GEL_PLAN_MUTATION_INVALID")
             require(document.get("planProof") is None, "GEL_PLAN_PROOF_UNEXPECTED")
         elif args.operation == "verify":
-            require(document.get("gateDecision") == "qualified", "GEL_VERIFY_DECISION_INVALID")
+            require(document.get("gateDecision") == qualification_decision(args.profile), "GEL_VERIFY_DECISION_INVALID")
             require(document.get("driftFields") == [], "GEL_VERIFY_DRIFT_INVALID")
         else:
-            require(document.get("gateDecision") == "qualified", "GEL_APPLY_DECISION_INVALID")
+            require(document.get("gateDecision") == qualification_decision(args.profile), "GEL_APPLY_DECISION_INVALID")
             require(document.get("mutationState") == "committed", "GEL_APPLY_MUTATION_INVALID")
             require(document.get("driftFields") == [], "GEL_APPLY_DRIFT_INVALID")
             plan_proof = document.get("planProof")
@@ -1028,6 +1061,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     execute_parser = subparsers.add_parser("execute")
     execute_parser.add_argument("--operation", choices=("plan", "apply", "verify"), required=True)
+    execute_parser.add_argument("--profile", choices=AUTH_PROFILES, default="full")
     execute_parser.add_argument("--expected-sha", required=True)
     execute_parser.add_argument("--validated-ci-run-id", required=True)
     execute_parser.add_argument("--apply-confirmation", default="")
@@ -1045,6 +1079,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser = subparsers.add_parser("verify-receipt")
     verify_parser.add_argument("--receipt", required=True)
     verify_parser.add_argument("--operation", choices=("plan", "apply", "verify"), required=True)
+    verify_parser.add_argument("--profile", choices=AUTH_PROFILES, default="full")
     verify_parser.add_argument("--expected-sha", required=True)
     verify_parser.add_argument("--validated-ci-run-id", required=True)
     verify_parser.set_defaults(handler=verify_receipt)

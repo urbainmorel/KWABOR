@@ -64,15 +64,21 @@ Apple nécessiterait une décision et une rotation de secret séparées.
 
 ## Exécution
 
+Le profil `full` qualifie le contrat complet. Le profil `email-test` sert au compte
+synthétique du mainteneur. Il utilise les paramètres et secrets SMTP avec
+`SUPABASE_ACCESS_TOKEN`. Les fournisseurs Google et Apple restent hors du PATCH de ce
+profil. Son reçu porte la décision `individual-email-qualified`.
+
 Lancer `.github/workflows/closed-beta-staging-auth.yml` depuis la branche `main` sélectionnée avec :
 
-1. `operation=plan`, le SHA complet exact et l'identifiant du run CI `push/main` vert de ce SHA ;
+1. `operation=plan`, le profil retenu, le SHA complet exact et l'identifiant du run CI
+   `push/main` vert de ce SHA ;
 2. relire le GEL, ses champs de dérive, puis relever l'identifiant du run, l'identifiant de
    l'artefact `kwabor-gel-g5-staging-auth-plan-*` et son SHA-256 brut ;
-3. `operation=apply` sur le même exact-head avec la phrase
+3. `operation=apply` sur le même commit et profil avec la phrase
    `APPLY-EXACT-STAGING-AUTH`, `validated_plan_run_id`, `validated_plan_artifact_id` et
-   `validated_plan_artifact_digest`, après l'approbation du GitHub Environment ;
-4. `operation=verify` indépendamment après application.
+   `validated_plan_artifact_digest`, après la revue du plan par le mainteneur ;
+4. `operation=verify` sur le même profil après application.
 
 `plan` effectue uniquement un `GET` Management API. `apply` envoie un unique `PATCH`, puis relit
 la configuration. L'apply refuse un plan d'un autre SHA, CI, projet, configuration publique ou jeu
@@ -87,6 +93,10 @@ Le GEL ne contient ni project ref brut, ni PAT, ni secret Google, ni identité/c
 adresse d'expéditeur SMTP en clair. Il conserve le digest du project ref, la provenance CI, le
 fingerprint de la configuration publique, les hashes des templates et des champs SMTP sensibles,
 les champs en dérive et des booléens de présence des credentials.
+
+L’[ADR-0039](../adr/0039-single-maintainer-staging-auth-and-internal-builds.md) réserve les
+exécutions et relances au mainteneur canonique sur `main` protégée. L’Environment
+`staging` exige la seule règle de branche protégée et interdit le bypass administrateur.
 
 ## Gates externes qui restent obligatoires
 
