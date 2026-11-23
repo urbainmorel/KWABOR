@@ -393,35 +393,13 @@ def validate_environment_protection(
     require(document.get("can_admins_bypass") is False, "GitHub Environment permits administrator bypass")
 
     rules = document.get("protection_rules")
-    require(isinstance(rules, list), "GitHub Environment protection rules are missing")
-    required_reviewer_rules = [
-        rule for rule in rules if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
-    ]
-    branch_rules = [
-        rule for rule in rules if isinstance(rule, dict) and rule.get("type") == "branch_policy"
-    ]
-    require(len(required_reviewer_rules) == 1, "Exactly one required-reviewer rule must be configured")
-    require(len(branch_rules) == 1, "Exactly one protected-branch rule must be configured")
-    reviewer_rule = required_reviewer_rules[0]
-    reviewers = reviewer_rule.get("reviewers")
-    require(isinstance(reviewers, list) and bool(reviewers), "At least one Environment reviewer is required")
     require(
-        reviewer_rule.get("prevent_self_review") is True,
-        "Environment must prevent workflow initiators from self-approving",
+        isinstance(rules, list)
+        and len(rules) == 1
+        and isinstance(rules[0], dict)
+        and rules[0].get("type") == "branch_policy",
+        "The single-maintainer Environment must have exactly one protected-branch rule",
     )
-    reviewer_types: set[str] = set()
-    for reviewer_link in reviewers:
-        require(isinstance(reviewer_link, dict), "Environment reviewer linkage is invalid")
-        reviewer_type = reviewer_link.get("type")
-        reviewer = reviewer_link.get("reviewer")
-        require(reviewer_type in {"User", "Team"}, "Environment reviewer type is invalid")
-        require(
-            isinstance(reviewer, dict)
-            and isinstance(reviewer.get("id"), int)
-            and reviewer["id"] > 0,
-            "Environment reviewer identity is invalid",
-        )
-        reviewer_types.add(str(reviewer_type))
 
     branch_policy = document.get("deployment_branch_policy")
     require(isinstance(branch_policy, dict), "Environment deployment branch policy is missing")
@@ -436,10 +414,9 @@ def validate_environment_protection(
         "canAdminsBypass": False,
         "environmentId": environment_id,
         "name": expected_name,
-        "preventSelfReview": True,
+        "governanceMode": "single-maintainer-internal",
         "protectedBranchesOnly": True,
-        "reviewerCount": len(reviewers),
-        "reviewerTypes": sorted(reviewer_types),
+        "reviewerCount": 0,
         "schemaVersion": 1,
         "updatedAt": document.get("updated_at"),
     }
