@@ -188,7 +188,7 @@ confondus avec une nouvelle livraison fonctionnelle.
 - [ ] Préflight des données historiques, sauvegarde/restauration et quarantaine éventuelle approuvées.
 - [ ] SEC-001A déployé et qualifié sur staging avant production.
 - [ ] Matrice RLS/IDOR, Storage, uploads malveillants, secrets, advisors et rate limits qualifiés.
-- [ ] CGU, politique de confidentialité, licence UGC et rétentions approuvées.
+- [ ] CGU, politique de confidentialité et rétentions approuvées.
 
 ### Appareils et qualité
 

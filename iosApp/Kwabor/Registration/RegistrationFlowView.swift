@@ -399,12 +399,6 @@ private struct RegistrationStepContent: View {
                 isAccepted: state.privacyAccepted,
                 onAcceptedChange: store.updatePrivacyAcceptance
             )
-            legalAcceptance(
-                document: state.ugcDocument,
-                title: store.strings.registrationUgcAcceptance,
-                isAccepted: state.ugcAccepted,
-                onAcceptedChange: store.updateUgcAcceptance
-            )
         }
     }
 
@@ -478,8 +472,7 @@ private struct RegistrationStepContent: View {
                 state.lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 state.selectedCityId == nil ||
                 !state.termsAccepted ||
-                !state.privacyAccepted ||
-                !state.ugcAccepted
+                !state.privacyAccepted
         }
         return true
     }

@@ -74,10 +74,8 @@ data class RegistrationUiState(
     val preferredCurrency: KwaborCurrency = KwaborCurrency.Xof,
     val termsDocument: LegalDocumentRevision? = null,
     val privacyDocument: LegalDocumentRevision? = null,
-    val ugcDocument: LegalDocumentRevision? = null,
     val termsAccepted: Boolean = false,
     val privacyAccepted: Boolean = false,
-    val ugcAccepted: Boolean = false,
     val currentSession: AuthSession? = null,
     val resendAvailableAtEpochMilliseconds: Long? = null,
     val isLoading: Boolean = false,
@@ -104,8 +102,7 @@ data class RegistrationUiState(
         get() = requirementsStatus == RegistrationRequirementsStatus.Ready &&
             cities.isNotEmpty() &&
             termsDocument != null &&
-            privacyDocument != null &&
-            ugcDocument != null
+            privacyDocument != null
 
     fun canResendOtp(nowEpochMilliseconds: Long): Boolean =
         resendAvailableAtEpochMilliseconds?.let { availableAt -> nowEpochMilliseconds >= availableAt } ?: true
@@ -121,7 +118,6 @@ fun RegistrationUiState.mergeRequirementsFrom(source: RegistrationUiState): Regi
     selectedCityId = selectedCityId ?: source.selectedCityId,
     termsDocument = source.termsDocument,
     privacyDocument = source.privacyDocument,
-    ugcDocument = source.ugcDocument,
 )
 
 private const val EMAIL_REGISTRATION_STEP_COUNT = 4

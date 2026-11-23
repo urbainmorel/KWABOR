@@ -100,7 +100,6 @@ class OnboardingStrings internal constructor(
     val registrationLegalTitle: String = registration.registrationLegalTitle
     val registrationTermsAcceptance: String = registration.registrationTermsAcceptance
     val registrationPrivacyAcceptance: String = registration.registrationPrivacyAcceptance
-    val registrationUgcAcceptance: String = registration.registrationUgcAcceptance
     val registrationObservabilityTitle: String = registration.legacy.registrationObservabilityTitle
     val registrationObservabilitySupport: String = registration.legacy.registrationObservabilitySupport
     val registrationAnalyticsConsent: String = registration.legacy.registrationAnalyticsConsent
@@ -228,7 +227,6 @@ internal data class OnboardingRegistrationStrings(
     val registrationLegalTitle: String,
     val registrationTermsAcceptance: String,
     val registrationPrivacyAcceptance: String,
-    val registrationUgcAcceptance: String,
     val registrationContinue: String,
     val registrationBack: String,
     val registrationOtpWait: String,
@@ -374,7 +372,6 @@ private fun KwaborStrings.toOnboardingRegistrationStrings(): OnboardingRegistrat
         registrationLegalTitle = registrationLegalTitle,
         registrationTermsAcceptance = registrationTermsAcceptance,
         registrationPrivacyAcceptance = registrationPrivacyAcceptance,
-        registrationUgcAcceptance = registrationUgcAcceptance,
         registrationContinue = registrationContinue,
         registrationBack = registrationBack,
         registrationOtpWait = registrationOtpWait,

@@ -174,7 +174,7 @@ n'autorise pas une publication publique en production.
 **Transverse**
 - **Langue : FR** livrée ; i18n complète câblée pour les 6 langues.
 - **Devises d'affichage : XOF, NGN, USD, EUR** (conversion indicative ; **€/$/₦ réservés aux comptes**).
-- **Licence de contenu UGC + procédure de retrait** dans les CGU (acceptées à l'inscription).
+- **Procédure de retrait des contenus communautaires** dans les CGU (acceptées à l'inscription).
 - **Applications Android/iOS uniquement**, offline partiel sur le mur (cache lecture seule), bannière offline persistante.
 
 ### 5.2 V1.1 (post-lancement rapide)
@@ -333,7 +333,7 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 1. **Intro vidéo interactive** (premier lancement, puis une fois après installation de chaque nouvelle révision embarquée) : vidéo d'arrière-plan immersive, **sautable**, avec les CTA **S'inscrire / Se connecter / Continuer sans compte disponibles immédiatement** ; la vidéo ne bloque jamais l'action. Fin de vidéo, échec, « Passer » ou mouvement réduit → même surface sur image statique. Une mise à jour qui conserve la même révision ne rejoue pas l'intro. Détail asset & performance en §6.9.3.
 2. **Surface « Se connecter ou s'inscrire »** : titre **« Découvrez le Bénin »** (langue détectée), **sélecteur de langue discret**, boutons **Se connecter** / **S'inscrire**, et option **« Continuer sans compte »**. Cette surface est superposée à l'intro puis conservée sur le fallback statique.
 3. **Choix de langue conditionnel** : **aucun écran par défaut** (voir §6.9.1) — sinon accessible via le sélecteur discret et les Paramètres.
-4. **Authentification** (§6.9.2) : Email **ou** Google (**+ Apple sur iOS**). Le profil final compact regroupe nom, ville, devise XOF par défaut et les trois acceptations légales.
+4. **Authentification** (§6.9.2) : Email **ou** Google (**+ Apple sur iOS**). Le profil final compact regroupe nom, ville, devise XOF par défaut et les deux acceptations légales.
 5. **Permissions contextuelles différées** : **aucune permission système, aucun consentement d'observabilité et aucun priming notifications ne sont demandés avant l'accueil**. Ils sont gérés plus tard dans Réglages ou au premier besoin réellement contextuel.
 6. **Mot de passe oublié** : flow dédié (identifiant → OTP → nouveau mot de passe).
 
@@ -350,7 +350,7 @@ Destination permanente de la navbar (badge pastille rouge quand non-lu). **Quatr
 - **Inscription par email — quatre écrans maximum** : `Email` → `Code OTP` (6 chiffres, collage/autoremplissage, soumission automatique, renvoi 30 s et correction de l'email) → **un seul champ de mot de passe** avec règles en direct → **Finaliser mon profil**.
 - **Inscription par Google** : `Auth Google` → **Finaliser mon profil**, nom/prénom préremplis et modifiables.
 - **Sign in with Apple — iOS uniquement** : proposé avant Google au même niveau ; après le fournisseur, un seul écran **Finaliser mon profil**.
-- **Profil final compact** : prénom, nom, ville recherchable, devise XOF par défaut modifiable, puis acceptations séparées des CGU, de la politique de confidentialité et de la licence UGC avec versions et liens HTTPS. La ville n'est préremplie que lorsqu'une softwall issue d'un lieu transmet un `cityId` valide ; une inscription générique ne présélectionne rien.
+- **Profil final compact** : prénom, nom, ville recherchable, devise XOF par défaut modifiable, puis acceptations séparées des CGU et de la politique de confidentialité avec versions et liens HTTPS. La ville n'est préremplie que lorsqu'une softwall issue d'un lieu transmet un `cityId` valide ; une inscription générique ne présélectionne rien.
 - **Résilience** : villes et documents légaux sont préchargés dès l'ouverture ; une erreur offre un retry ciblé sans effacer les saisies. L'état terminal technique ferme le tunnel immédiatement, sans écran de succès.
 
 **6.9.3 Écran d'intro vidéo.** Objectif : immerger instantanément dans l'univers touristique, culturel et festif du Bénin.
@@ -425,7 +425,7 @@ Kwabor sépare **deux axes indépendants** : la **classe de la fiche** (sa natur
 - **Rattachement obligatoire et techniquement bloquant** à une entité du catalogue (Lieu / Établissement / Événement) : impossible de publier sans avoir sélectionné une entité. Un **message contextuel** — « vos médias doivent avoir un lien avec un lieu ou un événement de l'app » — s'affiche **à l'ouverture du composeur**.
 - **Deux entrées** : depuis une **fiche** (entité **pré-remplie**, publication en 1 tap) ou via le **« + » global** (sélection obligatoire de l'entité).
 - **Affichage** : dans le **feed Social** et le **profil de l'auteur** (onglet Publications) — **jamais sur la fiche** (fiche = catalogue only). La **mention** ouvre un aperçu de fiche ≤ 25 % (§6.15).
-- **Modération UGC** : contrôle image automatique + signalement ; **watermark non maskable** sur tout export hors app ; **licence de contenu** accordée à Kwabor + **procédure de retrait** (CGU).
+- **Modération UGC** : contrôle image automatique + signalement ; **watermark non maskable** sur tout export hors app ; **procédure de retrait** (CGU).
 
 **6.11.5 Wizard d'enregistrement de fiche** (`ListingWizard`, rôles créateurs uniquement, paramétré par type puis sous-type) : Type & base → Localisation (map picker biaisé Bénin, **GPS obligatoirement dans le Bénin**) → **Détails** (branche dynamique selon le sous-type) → Médias (**≥ 1 photo cover requise, ≥ 3 recommandées**, drag-reorder, alt text éditable) → **Récap & publication** (preview réelle de la fiche + de la carte) → statut de modération. **Brouillon auto-sauvegardé.** **Prix saisis en XOF** (affichage multidevise calculé, §6.14).
 
@@ -562,7 +562,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 | **Offline / résilience** | Cache local du dernier mur (lecture seule) ; **bannière « Vous êtes hors ligne » persistante** ; **file locale** pour les actions (Like/Favori) synchronisée à la reconnexion ; saisie de brouillon de fiche autorisée (upload média et géocodage mis en file). Les fiches Détail ne sont pas garanties hors-ligne au MVP. |
 | **Accessibilité (WCAG AA)** | Contrastes ≥ **4.5:1** sur tous textes/overlays (y compris titre sur hero et sur cartes) ; labels ARIA/VoiceOver sur tout composant interactif ; **focus order documenté par écran** ; **alt text** généré (éditable) par image ; cibles tactiles ≥ 44 px ; états annoncés (« Événement terminé », « Ouvre une app externe »…). |
 | **Internationalisation** | **6 langues** (FR au MVP, EN en V1.1, puis PT/DE/ES/IT) ; **toute** l'UI via i18n dès le MVP ; **4 devises** d'affichage (conversion indicative, formatage ICU/CLDR) ; formats date/heure localisés ; **tolérance à l'expansion de texte** (DE +30–40 %), aucune largeur de label figée, tests pseudo-localisés. Pas de RTL (langues latines). |
-| **Sécurité & confidentialité** | Auth sécurisée : **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS)** ; TLS ; **secrets paiement/OAuth côté serveur uniquement** ; historique limité aux recherches soumises, propriétaire via RLS, effaçable et distinct du consentement de personnalisation ; aucun texte de requête dans les analytics ou logs ; minimisation de données pour le ciblage (§6.8) ; **licence de contenu UGC + procédure de retrait** et politique de confidentialité accessibles depuis Paramètres → À propos. Pas de collecte de numéro de téléphone ni d'âge à l'inscription. |
+| **Sécurité & confidentialité** | Auth sécurisée : **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS)** ; TLS ; **secrets paiement/OAuth côté serveur uniquement** ; historique limité aux recherches soumises, propriétaire via RLS, effaçable et distinct du consentement de personnalisation ; aucun texte de requête dans les analytics ou logs ; minimisation de données pour le ciblage (§6.8) ; **CGU avec procédure de retrait** et politique de confidentialité accessibles depuis Paramètres → À propos. Pas de collecte de numéro de téléphone ni d'âge à l'inscription. |
 | **Disponibilité** | Cible **99,5 %** de disponibilité backend en heures d'usage (18h–00h GMT, Bénin). |
 | **Scalabilité** | Architecture capable d'absorber la croissance du catalogue et du trafic au Bénin sans refonte (objectif mono-pays). |
 | **Modération** | Pipeline hybride : règles automatiques (mots-clés, GPS Bénin, doublon, image) + file de revue humaine pour contenu et comptes Promoteur. |
@@ -576,7 +576,7 @@ Permettre à un créateur de publier un contenu simultanément dans le réseau s
 - **Client : Kotlin Multiplatform mobile** — `shared` pour domaine, data, contrats, use cases et états ; Android en Compose Multiplatform ; iOS en SwiftUI natif. Aucune autre cible applicative n'est prévue.
 - **Backend : Supabase** (PostgreSQL managé, Auth, Storage, Realtime pour compteurs et notifications, **Row Level Security**). RLS pilotée par le couple **rôle × `listing_class`** (§6.11) : lecture publique des fiches publiées ; écriture d'une fiche selon le rôle et la classe (Promoteur → ses fiches Commercial/Événementiel ; Institution/Admin → Patrimonial ; Utilisateur → aucun droit de fiche, seulement UGC et signalement). Colonnes/tables nullable « TikTok-ready » dès le MVP, chiffrées au repos, sans UI ni OAuth avant V1.2.
 - **Authentification** : Supabase Auth — **email + OTP + mot de passe**, **Google OAuth**, **Apple Sign-In (iOS uniquement)** ; **flux d'activation** par lien invité pour les promoteurs pré-inscrits ; secrets OAuth côté serveur.
-- **UGC & médias sociaux** : Storage + pipeline d'images (AVIF/JPG/PNG) ; **rattachement obligatoire** d'un média à une entité (contrainte applicative + FK) ; **watermark non maskable** à l'export ; modération image automatique ; **licence + retrait** journalisés.
+- **UGC & médias sociaux** : Storage + pipeline d'images (AVIF/JPG/PNG) ; **rattachement obligatoire** d'un média à une entité (contrainte applicative + FK) ; **watermark non maskable** à l'export ; modération image automatique ; **retraits** journalisés.
 - **Vidéo d'intro** : asset **embarqué et révisionné** dans les binaires Android/iOS ; remplacement exclusivement par nouvelle release Store, jamais par Remote Config/CDN ; H.264, muet, vertical, budget de poids serré ; **analytics de skip**.
 - **Paiement Promoteur** : Mobile Money béninois (**MTN MoMo**, **Moov Money**) via agrégateurs (**CinetPay**, **FedaPay**) ; orchestration anti-fraude côté serveur ; **transactions en XOF uniquement**.
 - **Devises & taux** : prix stockés en XOF ; service backend de taux de change pour l'affichage indicatif (NGN/USD/EUR) ; formatage localisé ICU/CLDR côté client.
@@ -616,7 +616,7 @@ Chaque événement porte : `ville`, `type_entite`, `entite_id`, `source_session`
 |---|---|---|
 | **Densité de contenu au lancement (amplifiée)** | Adoption faible | La création étant **réservée** (plus de suggestion ouverte), le seed est **critique** : **~1000 promoteurs pré-inscrits** + **patrimonial créé par l'équipe** en amont ; rencontres avec les **associations de promoteurs** ; **flux d'activation** dédié (§6.9.5). |
 | **Mur d'inscription qui casse la conversion** | Perte d'utilisateurs (surtout touristes) | **Mur souple** : contenu visible sans compte, prix FCFA ; le mur ne se lève qu'à l'action engageante (dont changement de devise) — le contenu convainc avant de demander l'inscription. |
-| **UGC inapproprié rattaché à un commerce** | Nuisance au promoteur, risque légal | **Rattachement obligatoire** + contrôle image automatique + signalement + **licence/retrait** (CGU) ; UGC hors des fiches (feed/profil only). |
+| **UGC inapproprié rattaché à un commerce** | Nuisance au promoteur, risque légal | **Rattachement obligatoire** + contrôle image automatique + signalement + **procédure de retrait** (CGU) ; UGC hors des fiches (feed/profil only). |
 | **Vidéo d'intro trop lourde / lente** | Premier lancement dégradé | Asset **embarqué** (indépendant du réseau), **≤ ~2–3 Mo**, H.264 muet, **sautable**, contrôlé en CI sur Android/iOS et publié uniquement via les Stores ; fallback `reduced-motion` et analytics de skip. |
 | Confusion organique / sponsorisé | Perte de confiance | Badge texte « Sponsorisé » jaune systématique (jamais la couleur seule), plafond de slots ; **mise en avant éditoriale** jamais labellisée « Sponsorisé ». |
 | Hallucination de l'IA | Perte de confiance, risque réputationnel | Réponses ancrées au catalogue, citation systématique de la source, **état « aucun résultat »**, pas de promesse de réservation. |
@@ -658,7 +658,7 @@ Chaque événement porte : `ville`, `type_entite`, `entite_id`, `source_session`
 - **Bouton « + » contextuel par rôle.**
 - **Réseau social dès le MVP** : feed façon TikTok **photo + diaporama** (**vidéo en V1.1**) ; **UGC rattaché obligatoirement** à une entité, **jamais sur la fiche** (feed + profil) ; **mention → aperçu de fiche ≤ 25 %**.
 - **Mise en avant éditoriale** gratuite (patrimonial/événements), **distincte** du sponsoring payant, jamais labellisée « Sponsorisé ».
-- **Licence de contenu UGC + procédure de retrait** dans les CGU.
+- **Procédure de retrait des contenus communautaires** dans les CGU.
 - **Billetterie événement : tranches multiples dès le MVP** ; prix billet toujours en **mode plein**.
 - **Classification hôtelière** : étoiles **déclaratives** (promoteur), contrôlées par la modération.
 - **Langue du contenu** : `content_lang` stockée + **traduction automatique à l'affichage**.

@@ -52,6 +52,9 @@ Le GitHub Environment protégé `staging` doit contenir les variables suivantes 
 - `KWABOR_AUTH_SMTP_HOST` ;
 - `KWABOR_AUTH_SMTP_PORT`.
 
+L’expéditeur de KWABOR Staging est `kwabor@k.trucdigital.com`. La clé SMTP Resend doit autoriser
+l’envoi depuis `k.trucdigital.com`.
+
 Secrets requis pour `plan` et `apply` :
 
 - `SUPABASE_ACCESS_TOKEN`, PAT ou jeton fin permettant la lecture et l'écriture de la configuration

@@ -625,7 +625,6 @@ private fun completeRequest(): CompleteOnboardingRequest = assertIs<DomainResult
             preferredCurrency = KwaborCurrency.Xof,
             termsDocumentId = "terms-id",
             privacyDocumentId = "privacy-id",
-            ugcDocumentId = "ugc-id",
         ),
     ),
 ).value

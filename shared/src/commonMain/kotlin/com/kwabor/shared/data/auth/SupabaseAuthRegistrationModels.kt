@@ -15,7 +15,6 @@ internal fun CompleteOnboardingRequest.toRpcDto(): CompleteOnboardingRpcDto = Co
     preferredCurrency = preferredCurrency.name.uppercase(),
     termsDocumentId = termsDocumentId,
     privacyDocumentId = privacyDocumentId,
-    ugcDocumentId = ugcDocumentId,
 )
 
 internal fun LegalDocumentRevisionDto.toDomain(): LegalDocumentRevision = LegalDocumentRevision(
@@ -30,7 +29,6 @@ internal fun LegalDocumentRevisionDto.toDomain(): LegalDocumentRevision = LegalD
 private fun String.toDomainType(): LegalDocumentType = when (this) {
     "terms" -> LegalDocumentType.Terms
     "privacy_policy" -> LegalDocumentType.PrivacyPolicy
-    "ugc_license" -> LegalDocumentType.UgcLicense
     else -> invalidDatabaseValue("legal_documents.document_type", this)
 }
 
@@ -69,6 +67,4 @@ internal data class CompleteOnboardingRpcDto(
     val termsDocumentId: String,
     @SerialName("p_privacy_document_id")
     val privacyDocumentId: String,
-    @SerialName("p_ugc_document_id")
-    val ugcDocumentId: String,
 )

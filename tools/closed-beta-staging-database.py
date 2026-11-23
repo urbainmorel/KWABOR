@@ -25,6 +25,8 @@ EXPECTED_DATABASE_WORKFLOW = ".github/workflows/closed-beta-staging-database.yml
 EXPECTED_BACKUP_WORKFLOW = ".github/workflows/closed-beta-staging-database-backup.yml"
 EXPECTED_SUPABASE_CLI_VERSION = "2.111.0"
 APPLY_CONFIRMATION = "APPLY-EXACT-STAGING-MIGRATIONS"
+ONBOARDING_SCHEMA_CONFIRMATION = "APPLY-EXACT-STAGING-ONBOARDING-SCHEMA"
+ONBOARDING_SCHEMA_VERSION = "20261123105000"
 BACKUP_PRODUCER_AVAILABLE = True
 FRESH_EMPTY_PROOF_POLICY = "zero-objects-types-and-managed-catalog-v3"
 FRESH_EMPTY_REQUIRED_SYSTEM_TABLES = 3
@@ -44,6 +46,7 @@ BACKUP_ARTIFACT_RETENTION_DAYS = 90
 # pinned byte-for-byte here. Unknown or modified migrations fail closed.
 BACKUP_EXCLUDED_MANAGED_DATA_PENDING_ALLOWLIST = {
     "20260821012638": "f5d307628db654c49464b607729df1a59776725070113e93e5cc9a8e372434fc",
+    ONBOARDING_SCHEMA_VERSION: "02ddb45573501452d626fde4633a4e62bda616b225a4b69fa3db176daf247c11",
 }
 REMOTE_MIGRATION_QUERY = (
     "select unnest(xpath('/table/row/version/text()', query_to_xml("
@@ -460,8 +463,13 @@ def validate_operation_inputs(
         require(not any(apply_only_values), "APPLY_AUTHORITY_UNEXPECTED")
         return None
 
-    require(confirmation == APPLY_CONFIRMATION, "APPLY_CONFIRMATION_INVALID")
+    require(
+        confirmation in {APPLY_CONFIRMATION, ONBOARDING_SCHEMA_CONFIRMATION},
+        "APPLY_CONFIRMATION_INVALID",
+    )
     backup_values = (backup_run_id, backup_artifact_id, backup_artifact_digest)
+    onboarding_schema_only = confirmation == ONBOARDING_SCHEMA_CONFIRMATION
+    require(not onboarding_schema_only or not any(backup_values), "ONBOARDING_SCHEMA_BACKUP_CONFLICT")
     backup_authority: dict[str, Any] | None = None
     if any(backup_values):
         require(all(backup_values), "BACKUP_AUTHORITY_INCOMPLETE")
@@ -486,6 +494,7 @@ def validate_operation_inputs(
     )
     return {
         "backup": backup_authority,
+        **({"onboardingSchemaOnly": True} if onboarding_schema_only else {}),
         "planArtifactDigest": validated_plan_artifact_digest,
         "planArtifactId": plan_artifact,
         "planRunId": plan_run,
@@ -2057,6 +2066,14 @@ def validate_pending_migration_scope(
     }
 
 
+def validate_onboarding_schema_scope(
+    repository_root: Path,
+    pending_versions: Sequence[str],
+) -> dict[str, Any]:
+    require(list(pending_versions) == [ONBOARDING_SCHEMA_VERSION], "ONBOARDING_SCHEMA_PENDING_SCOPE_INVALID")
+    return validate_pending_migration_scope(repository_root, pending_versions)
+
+
 def parse_remote_migration_versions(csv_output: str) -> list[str]:
     lines = [line for line in csv_output.replace("\r\n", "\n").split("\n") if line.strip()]
     header_index = next(
@@ -2872,11 +2889,13 @@ def execute(args: argparse.Namespace) -> None:
             validated_plan_artifact_digest=args.validated_plan_artifact_digest,
         )
         reconstructible_demo = reconstructible_demo_requested()
+        onboarding_schema_only = bool(apply_authority and apply_authority.get("onboardingSchemaOnly"))
         if reconstructible_demo:
             require(
                 apply_authority is None or apply_authority["backup"] is None,
                 "RECONSTRUCTIBLE_DEMO_BACKUP_CONFLICT",
             )
+            require(not onboarding_schema_only, "ONBOARDING_SCHEMA_DEMO_CONFLICT")
         request_evidence = validate_request_identity(
             repository=os.environ.get("GITHUB_REPOSITORY", ""),
             event_name=os.environ.get("GITHUB_EVENT_NAME", ""),
@@ -3015,7 +3034,9 @@ def execute(args: argparse.Namespace) -> None:
                 plan_evidence,
                 secret_values=authority.secret_values,
             )
-            uses_fresh_empty_exception = apply_authority["backup"] is None and not reconstructible_demo
+            uses_fresh_empty_exception = (
+                apply_authority["backup"] is None and not reconstructible_demo and not onboarding_schema_only
+            )
             if apply_authority["backup"] is not None:
                 backup_authority = apply_authority["backup"]
                 require(isinstance(backup_authority, dict), "BACKUP_AUTHORITY_MISSING")
@@ -3213,6 +3234,12 @@ def execute(args: argparse.Namespace) -> None:
                     evidence_directory=evidence_directory,
                     authority=authority,
                     repository_root=repository_root,
+                )
+            if onboarding_schema_only:
+                write_json_exclusive(
+                    evidence_directory / "ONBOARDING-SCHEMA-SCOPE.json",
+                    validate_onboarding_schema_scope(repository_root, pre_apply_state["pendingVersions"]),
+                    secret_values=authority.secret_values,
                 )
             attempt = run_apply_mutation(
                 evidence_path=evidence_directory / "APPLY-DB-PUSH.txt",

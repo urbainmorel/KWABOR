@@ -156,7 +156,7 @@ Ces actions ne peuvent pas être remplacées par du code ou des valeurs fictives
 - KYC et création/validation des comptes Supabase, Firebase et FedaPay ;
 - Apple Developer, Google Play Console, certificats et provisioning profiles ;
 - secrets fournisseurs et autorisations de production ;
-- validation juridique des CGU, de la politique de confidentialité et de la licence UGC ;
+- validation juridique des CGU et de la politique de confidentialité ;
 - recrutement des bêta-testeurs et validation des transactions live ;
 - décision finale de passage 5 % → 25 % → 50 % → 100 %.
 

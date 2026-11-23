@@ -690,7 +690,7 @@ persistance des favoris restent à vérifier après la qualification du service 
 - La configuration Supabase production, les projets Firebase staging/production, le compte FedaPay,
   les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention
   du propriétaire pendant les tranches concernées.
-- La validation juridique des CGU, de la politique de confidentialité et de la licence UGC reste une gate propriétaire avant release candidate.
+- La validation juridique des CGU et de la politique de confidentialité reste une gate propriétaire avant release candidate.
 
 ## Prochaine tâche logique
 

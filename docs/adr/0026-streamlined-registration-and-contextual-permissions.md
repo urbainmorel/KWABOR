@@ -5,6 +5,7 @@
 - **Décideurs** : Équipe
 - **Complète** : ADR-0021
 - **Remplace** : le séquencement d'inscription AUTH-003, sans remplacer ses garanties serveur
+- **Mise à jour** [ADR-0040](0040-two-legal-documents-for-onboarding.md) définit les acceptations demandées à l’inscription.
 
 ## Contexte
 

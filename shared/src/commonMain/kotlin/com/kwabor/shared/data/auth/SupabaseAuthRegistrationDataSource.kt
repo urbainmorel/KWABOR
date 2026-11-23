@@ -50,6 +50,7 @@ internal class SupabaseAuthRegistrationDataSource(
                 filter {
                     eq("active", true)
                     eq("locale", locale.tag)
+                    isIn("document_type", listOf("terms", "privacy_policy"))
                 }
                 order("document_type", Order.ASCENDING)
             }

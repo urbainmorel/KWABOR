@@ -25,11 +25,11 @@ on:
         required: true
         type: string
       apply_confirmation:
-        description: For apply only, type APPLY-EXACT-STAGING-MIGRATIONS
+        description: For apply only, use APPLY-EXACT-STAGING-MIGRATIONS or APPLY-EXACT-STAGING-ONBOARDING-SCHEMA
         required: false
         type: string
       backup_run_id:
-        description: Qualified B6.02 run ID; leave all backup inputs empty only for fresh-empty
+        description: Qualified B6.02 run ID when apply uses a backup
         required: false
         type: string
       backup_artifact_id:

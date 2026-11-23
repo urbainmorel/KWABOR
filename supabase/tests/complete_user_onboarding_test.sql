@@ -437,7 +437,7 @@ SELECT ok(
 SELECT ok(
   NOT has_function_privilege(
     'authenticated',
-    'app_private.complete_user_onboarding_internal(text, text, text, text, text, uuid, uuid, uuid)',
+    'app_private.complete_user_onboarding_internal(text, text, text, text, text, uuid, uuid)',
     'EXECUTE'
   ),
   'authenticated users cannot execute the private onboarding implementation'
@@ -1403,12 +1403,11 @@ SELECT ok(
       SELECT * FROM public.complete_user_onboarding(
         '  Ada  ', '  Utilisateur  ', 'cotonou', 'fr', 'EUR',
         '10000000-0000-4000-8000-000000000001',
-        '10000000-0000-4000-8000-000000000002',
-        '10000000-0000-4000-8000-000000000003'
+        '10000000-0000-4000-8000-000000000002'
       )
     $sql$
   ),
-  'an authenticated user completes onboarding through the RPC'
+  'an authenticated user completes onboarding with terms and privacy only'
 );
 
 SELECT tests.use_auth_context(
@@ -1513,8 +1512,8 @@ SELECT is(
     FROM public.user_legal_acceptances
     WHERE user_id = 'aaaaaaaa-0000-4000-8000-000000000001'
   ),
-  3::bigint,
-  'completion records the three legal acceptances'
+  2::bigint,
+  'completion records both required legal acceptances'
 );
 
 SELECT is(
@@ -1571,7 +1570,7 @@ SELECT is(
     FROM public.user_legal_acceptances
     WHERE user_id = 'aaaaaaaa-0000-4000-8000-000000000001'
   ),
-  3::bigint,
+  2::bigint,
   'retry does not duplicate legal acceptances'
 );
 
@@ -1645,7 +1644,7 @@ SELECT is(
     'aaaaaaaa-0000-4000-8000-000000000001',
     'SELECT legal_document_id FROM public.user_legal_acceptances'
   ),
-  3::bigint,
+  2::bigint,
   'a user reads their own legal acceptance evidence'
 );
 
@@ -1749,7 +1748,7 @@ SELECT ok(
       )
     $sql$
   ),
-  'a second user can complete onboarding independently'
+  'a second user can complete onboarding with the legacy RPC argument'
 );
 
 SELECT is(
@@ -1769,8 +1768,8 @@ SELECT is(
     'bbbbbbbb-0000-4000-8000-000000000002',
     'SELECT legal_document_id FROM public.user_legal_acceptances'
   ),
-  3::bigint,
-  'the second user reads only their three acceptance rows'
+  2::bigint,
+  'the legacy RPC argument does not create a third acceptance'
 );
 
 SELECT ok(

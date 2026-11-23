@@ -220,7 +220,7 @@ Les tâches détaillées existantes restent dans `BACKLOG.md`. Les lots ci-desso
 | DATA-001 | Valider taxonomie, villes et champs éditoriaux du lancement | Décision villes/catégories | Critique / moyenne | Dataset versionné, contraintes DB, revue éditoriale | Oui |
 | DATA-002 | Importer un corpus réel sans PII ni URL factice | DATA-001, ADMIN-001 | Critique / élevée | Minimum éditorial approuvé, doublons/GPS contrôlés | Oui |
 | MEDIA-001 | Créer buckets, RLS, upload temporaire, validation et dérivés | SEC-002 | Critique / élevée | Formats/tailles/ownership testés, images réelles optimisées | Oui |
-| LEGAL-001 | Publier CGU, confidentialité et licence UGC approuvées | Juridique | Critique / moyenne | Révisions actives, hashées, accessibles et acceptées | Oui |
+| LEGAL-001 | Publier les CGU et la politique de confidentialité approuvées | Juridique | Critique / moyenne | Révisions actives, hashées, accessibles et acceptées | Oui |
 
 ### Phase 5 — Administration
 
@@ -341,7 +341,7 @@ La tranche suivante, après validation du périmètre/navigation, touchera princ
 5. Choisir les villes, catégories, volume et responsables éditoriaux du lancement.
 6. Confirmer que `kwabor_icone_app.png` (1254 × 1254) est le master haute définition officiel du
    symbole « K » ou fournir son remplacement officiel avant validation perceptuelle finale.
-7. Valider CGU, confidentialité, licence UGC et rétention de suppression.
+7. Valider les CGU, la politique de confidentialité et la rétention de suppression.
 8. Provisionner les organisations/plans Supabase et Firebase, OAuth, SMTP, APNs, stores, certificats et clé Android.
 9. Confirmer Android 26 minimum et iOS 17 minimum.
 10. Nommer les bêta-testeurs et le responsable du go/no-go.
