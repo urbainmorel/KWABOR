@@ -3,6 +3,7 @@ package com.kwabor.android.observability
 import android.content.Context
 import android.os.Bundle
 import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.installations.FirebaseInstallations
@@ -44,6 +45,9 @@ private class FirebaseAndroidObservabilityBackend(
 
     override val isConfigured: Boolean
         get() = firebaseApp != null
+
+    override val hasBundledConfiguration: Boolean
+        get() = FirebaseOptions.fromResource(context) != null
 
     override fun ensureConfigured(): Boolean {
         if (isConfigured) return true

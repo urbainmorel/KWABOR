@@ -16,6 +16,43 @@ class SharedPreferencesObservabilityConsentStoreTest {
     }
 
     @Test
+    fun disablingRemoteConfigurationWithoutFirebaseClearsTheWarningAndPreservesMaintenance() {
+        val preferences = FakeObservabilityPreferences()
+        val store = SharedPreferencesObservabilityConsentStore(preferences)
+        val backend = TestObservabilityBackend(hasBundledConfiguration = false)
+        val controller = AndroidObservabilityController(backend, store)
+        controller.start()
+        controller.bindToAuthenticatedUser(USER_ID)
+
+        assertTrue(controller.updateConsent(USER_ID, ObservabilityConsent(remoteConfigurationAllowed = true)))
+        assertTrue(controller.privacyOperationFailed.value)
+
+        assertTrue(controller.updateConsent(USER_ID, ObservabilityConsent()))
+        assertFalse(controller.privacyOperationFailed.value)
+        val revoked = store.read()
+        assertEquals(ObservabilityConsent(), revoked.stagedConsent)
+        assertTrue(revoked.hasPendingBackendMaintenance)
+        assertEquals(0, backend.ensureConfiguredCount)
+        assertFalse(backend.remoteConfigurationFetched)
+
+        val restartedStore = SharedPreferencesObservabilityConsentStore(preferences.restart())
+        val restarted = AndroidObservabilityController(backend, restartedStore)
+        restarted.start()
+        restarted.bindToAuthenticatedUser(USER_ID)
+
+        assertEquals(ObservabilityConsent(), restarted.consent.value)
+        assertFalse(restarted.privacyOperationFailed.value)
+        assertEquals(revoked, restartedStore.read())
+
+        val configuredBuild = AndroidObservabilityController(
+            TestObservabilityBackend(ensureConfiguredSucceeds = false),
+            restartedStore,
+        )
+        configuredBuild.start()
+        assertTrue(configuredBuild.privacyOperationFailed.value)
+    }
+
+    @Test
     fun missingForceDisabledMarkerFailsClosedButPreservesHistoricalConsent() {
         val preferences = FakeObservabilityPreferences()
         preferences.seedConsent(

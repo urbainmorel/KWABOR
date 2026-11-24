@@ -106,6 +106,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       Privacy Report de l'archive Release sur macOS et publier les réponses App Store Connect.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
+    - [x] Android — Vérifier la disparition du message après désactivation sur un APK sans Firebase et la conservation des demandes de retrait après redémarrage.
   - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et la capacité Remote Config générique sur appareils avec consentement, valeurs sûres et révocation ; aucun canal média n'y est autorisé.
 - [x] PR-OBS-001A — PR `#28` livrée après tests ciblés, `quality`, pgTAP et les trois configurations iOS simulateur vertes.
 

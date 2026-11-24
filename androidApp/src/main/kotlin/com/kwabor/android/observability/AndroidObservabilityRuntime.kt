@@ -115,10 +115,15 @@ internal class AndroidObservabilityRuntime(
     private fun ensureBackend(stored: StoredObservabilityConsent): Boolean {
         val requiresBackend = desiredConsent.allowsAnyCollection || stored.hasPendingBackendMaintenance
         if (!requiresBackend) return true
-        val configured = backend.isConfigured || backend.ensureConfigured()
+        val hasBundledConfiguration = backend.hasBundledConfiguration
+        val configured = backend.isConfigured || (hasBundledConfiguration && backend.ensureConfigured())
         if (!configured) {
-            backendConfigurationFailed = true
-            callbacks.onPrivacyOperationFailed(true)
+            val requestedConsent = stored.stagedConsent ?: desiredConsent
+            // Keep pending maintenance for a configured build without asking for an impossible retry.
+            if (hasBundledConfiguration || requestedConsent.allowsAnyCollection) {
+                backendConfigurationFailed = true
+                callbacks.onPrivacyOperationFailed(true)
+            }
             applyEffectiveConsent(ObservabilityConsent())
             return false
         }

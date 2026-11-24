@@ -595,9 +595,11 @@ sur une rangée. Les trois champs du profil se chargent vides, peuvent être ren
 puis restent vides après effacement et redémarrage. L’ouverture de chaque lien légal et le
 parcours sur iPhone restent à vérifier sur appareil.
 
-Un essai involontaire de configuration à distance a déclenché le message d’échec de
-confidentialité sur cet APK. Le réglage est revenu à désactivé. Le message persiste après
-relance, en l’absence de Firebase configuré sur ce build de staging.
+Sur Android, un APK sans ressources Firebase laisse les opérations de retrait en attente
+pour une version configurée. Lorsque tous les réglages sont désactivés, l’absence de
+configuration ne déclenche plus le message de confidentialité. Les erreurs de stockage et
+les échecs de maintenance avec Firebase configuré continuent à être signalés. L’absence du
+message a été vérifiée sur le Tecno après mise à jour de l’APK staging et redémarrage à froid.
 
 ## Blocages / limites
 

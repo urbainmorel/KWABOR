@@ -260,6 +260,7 @@ internal class TestObservabilityBackend(
     var ensureConfiguredSucceeds: Boolean = true,
     private val fetchSucceeds: Boolean = true,
     private val operationLog: MutableList<String>? = null,
+    override val hasBundledConfiguration: Boolean = true,
 ) : AndroidObservabilityBackend {
     private var configured = initiallyConfigured
     private val diagnosticsCheckCallbacks = ArrayDeque<(DiagnosticsReportCheckResult) -> Unit>()
