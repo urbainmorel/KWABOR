@@ -202,14 +202,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$ROBOLECTRIC_RUNTIME_DIR"
-          base=https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented
+          repositories=(
+            https://maven-central.storage-download.googleapis.com/maven2
+            https://repo.maven.apache.org/maven2
+          )
           while read -r version digest; do
             name="android-all-instrumented-$version.jar"
             jar="$ROBOLECTRIC_RUNTIME_DIR/$name"
             if [[ ! -f "$jar" ]] || ! sha512sum --check --status <<<"$digest  $jar"; then
-              curl --fail --silent --show-error --retry 4 --retry-all-errors \
-                --connect-timeout 15 --retry-max-time 180 --max-time 120 \
-                "$base/$version/$name" --output "$jar.part"
+              artifact="org/robolectric/android-all-instrumented/$version/$name"
+              for repository in "${repositories[@]}"; do
+                if curl --fail --silent --show-error --remove-on-error --retry 2 --retry-all-errors \
+                  --connect-timeout 15 --retry-max-time 75 --max-time 120 \
+                  "$repository/$artifact" --output "$jar.part"; then
+                  break
+                fi
+              done
               sha512sum --check <<<"$digest  $jar.part"
               mv -- "$jar.part" "$jar"
             fi
