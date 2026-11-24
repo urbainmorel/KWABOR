@@ -27,6 +27,27 @@ import kotlin.test.assertIs
 
 class SupabaseCatalogDataSourceTest {
     @Test
+    fun suggestListingsCallsThePrefixRpcAndDecodesItsCompactRows() = runTest {
+        val client = createCatalogSearchTestClient { request ->
+            assertEquals("/rest/v1/rpc/suggest_catalog_listings_v1", request.url.encodedPath)
+            val body = assertIs<OutgoingContent.ByteArrayContent>(request.body).bytes().decodeToString()
+            val parameters = Json.parseToJsonElement(body).jsonObject
+            assertEquals("cot", parameters.getValue("p_query").jsonPrimitive.content)
+            assertEquals("lieu", parameters.getValue("p_listing_type").jsonPrimitive.content)
+            """[{"id":"$VALID_LISTING_ID","name":"Place du Marché","city_name":"Cotonou"}]"""
+        }
+
+        try {
+            val suggestions = SupabaseCatalogDataSource(client.postgrest).suggestListings(
+                ListingSearchQuery(text = "cot", filters = ListingFilters(listingType = ListingType.Place)),
+            )
+            assertEquals(listOf(ListingSuggestionDto(VALID_LISTING_ID, "Place du Marché", "Cotonou")), suggestions)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun searchListings_callsTheVersionedRpcWithCanonicalParametersAndBuildsAKeysetPage() = runTest {
         val client = createCatalogSearchTestClient { request ->
             assertEquals("/rest/v1/rpc/search_catalog_summaries_v1", request.url.encodedPath)

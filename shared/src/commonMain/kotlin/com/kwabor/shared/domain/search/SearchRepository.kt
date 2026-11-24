@@ -1,6 +1,7 @@
 package com.kwabor.shared.domain.search
 
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
@@ -74,6 +75,8 @@ data class SearchResult(
 
 interface SearchRepository {
     suspend fun search(query: SearchQuery, page: SearchPageRequest = SearchPageRequest()): DomainResult<SearchResult>
+
+    suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>>
 }
 
 private fun ListingFilters.isValidForSearch(): Boolean =

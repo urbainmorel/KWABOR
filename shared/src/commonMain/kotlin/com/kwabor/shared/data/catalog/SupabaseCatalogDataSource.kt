@@ -58,6 +58,19 @@ internal class SupabaseCatalogDataSource(
                 .toSummaryPage(page.limit)
         }
 
+    override suspend fun suggestListings(query: ListingSearchQuery): List<ListingSuggestionDto> = runPostgrest {
+        postgrest.rpc(
+            function = "suggest_catalog_listings_v1",
+            parameters = CatalogSuggestionRpcDto(
+                query = query.text,
+                cityId = query.filters.cityId,
+                categoryId = query.filters.categoryId,
+                listingType = query.filters.listingType?.toDatabaseValue(),
+                listingClass = query.filters.listingClass?.toDatabaseValue(),
+            ),
+        ).decodeList()
+    }
+
     override suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto = runPostgrest {
         postgrest.rpc(
             function = GET_CATALOG_DETAIL,

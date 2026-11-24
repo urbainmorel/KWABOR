@@ -21,6 +21,7 @@ import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.ClockProvider
@@ -343,6 +344,9 @@ private class FakeRegistrationCatalogRepository : CatalogRepository {
         filters: ListingFilters,
         page: ListingPageRequest,
     ): DomainResult<ListingSummaryPage> = unused()
+
+    override suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
 
     override suspend fun searchListings(
         query: ListingSearchQuery,

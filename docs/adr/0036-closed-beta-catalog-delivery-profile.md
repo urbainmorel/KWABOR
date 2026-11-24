@@ -35,12 +35,16 @@ la vision cible du PRD et ne transforme pas les fonctionnalités reportées en �
 Nous retenons l'option C parce qu'elle permet de tester rapidement la proposition de valeur réelle
 de Kwabor sans affaiblir les exigences de sécurité, de confidentialité, de qualité ou de données.
 
+Le 24 novembre 2026, le propriétaire a choisi de poursuivre le développement de la V1 pendant
+la préparation des comptes de distribution. Les suggestions de fiches publiées sont le premier
+lot et rejoignent la recherche du parcours catalogue après qualification.
+
 ### Parcours inclus
 
 - introduction, accès invité et authentification utile au premier engagement ;
 - Explorer avec les trois murs `Lieux`, `Événements`, `Hôtels & Restaurants`, ville, catégories,
   pagination, refresh, cache hors ligne et états chargement/vide/erreur ;
-- recherche lexicale simple et résultats publiés uniquement ;
+- recherche lexicale et suggestions par préfixe sur les fiches publiées ;
 - fiche native typée Android/iOS, galerie officielle, horaires et prix XOF ; les lanceurs externes
   restent disponibles pour de futures fiches réelles mais sont masqués sur le corpus fictif ;
 - Like, Favori, outbox durable et `Compte → Favoris` ;
@@ -57,7 +61,7 @@ deep link non admis revient vers Explorer avec un message neutre.
 - centre de notifications et push ;
 - assistant IA et « Surprenez-moi » ;
 - avis, partage public, signalement et revendication de fiche ;
-- filtres avancés, récents de recherche et autocomplétion ;
+- filtres avancés et récents de recherche ;
 - B2B, sponsoring commercial, paiement, facturation et conversion multidevise ;
 - guide, langues supplémentaires, thème sombre complet et 2FA tant que leurs parcours complets ne
   sont pas qualifiés pour cette cohorte.

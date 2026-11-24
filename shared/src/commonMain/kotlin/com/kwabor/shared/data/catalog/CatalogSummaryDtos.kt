@@ -80,6 +80,28 @@ internal data class CatalogSearchSummaryPageRpcDto(
     val limit: Int,
 )
 
+@Serializable
+internal data class CatalogSuggestionRpcDto(
+    @SerialName("p_query")
+    val query: String,
+    @SerialName("p_city_id")
+    val cityId: String?,
+    @SerialName("p_category_id")
+    val categoryId: String?,
+    @SerialName("p_listing_type")
+    val listingType: String?,
+    @SerialName("p_listing_class")
+    val listingClass: String?,
+)
+
+@Serializable
+internal data class ListingSuggestionDto(
+    val id: String,
+    val name: String,
+    @SerialName("city_name")
+    val cityName: String,
+)
+
 internal fun ListingSummaryDto.toDomain(): ListingSummary = ListingSummary(
     id = id,
     type = type.toListingType(),

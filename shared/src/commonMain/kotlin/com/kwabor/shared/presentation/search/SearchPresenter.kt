@@ -1,5 +1,6 @@
 package com.kwabor.shared.presentation.search
 
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.core.DomainError
 import com.kwabor.shared.domain.core.DomainResult
@@ -19,6 +20,17 @@ private const val RATING_DECIMAL_DIVISOR = 10.0
 class SearchPresenter(
     private val repository: SearchRepository,
 ) {
+    suspend fun suggest(state: SearchUiState): List<ListingSuggestion> {
+        val query = when (val result = SearchQuery.from(state.queryText, state.context.filtersFor(state.scope))) {
+            is DomainResult.Success -> result.value
+            is DomainResult.Failure -> return emptyList()
+        }
+        return when (val result = repository.suggest(query)) {
+            is DomainResult.Success -> result.value
+            is DomainResult.Failure -> emptyList()
+        }
+    }
+
     suspend fun submit(state: SearchUiState, strings: SearchStrings): SearchUiState {
         val query = when (
             val result = SearchQuery.from(

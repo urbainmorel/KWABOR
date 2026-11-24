@@ -31,7 +31,7 @@ exception
 end;
 $$;
 
-select plan(61);
+select plan(69);
 
 select ok(
   to_regprocedure(
@@ -780,6 +780,78 @@ select throws_ok(
   '22023',
   'p_cursor does not match catalog search parameters',
   'search cursor cannot be reused with another filter scope'
+);
+
+select ok(
+  not pro.prosecdef and pro.provolatile = 's'
+    and has_function_privilege('anon', pro.oid, 'EXECUTE')
+    and has_function_privilege('authenticated', pro.oid, 'EXECUTE')
+    and not has_function_privilege('service_role', pro.oid, 'EXECUTE'),
+  'suggestions are read-only and run under the guest or authenticated caller RLS'
+)
+from pg_catalog.pg_proc pro
+where pro.oid =
+  'public.suggest_catalog_listings_v1(text,text,text,public.listing_type,public.listing_class)'::regprocedure;
+
+select is(
+  tests.count_as(
+    'anon', null,
+    $$select * from public.suggest_catalog_listings_v1('port ret atl', p_city_id => 'ouidah')
+      where id = '00000000-0000-4000-8000-000000000101'$$
+  ),
+  1::bigint,
+  'a guest gets a suggestion combining listing-title and current-city prefixes'
+);
+
+select is(
+  tests.count_as('anon', null, $$select * from public.suggest_catalog_listings_v1('Hidden sea')$$),
+  0::bigint,
+  'a guest does not see draft suggestions'
+);
+
+select is(
+  tests.count_as(
+    'authenticated', 'ca000000-0000-4000-8000-000000000001',
+    $$select * from public.suggest_catalog_listings_v1('Hidden sea')$$
+  ),
+  0::bigint,
+  'an owner does not see their own drafts in public suggestions'
+);
+
+select is(
+  (select count(*) from public.suggest_catalog_listings_v1('port ret', p_listing_type => 'evenement')),
+  0::bigint,
+  'suggestions respect the active listing type'
+);
+
+select is(
+  (
+    select count(*)
+    from public.suggest_catalog_listings_v1('searchsubtypeu porto', p_category_id => 'search-category-id-unique')
+    where id = '5ea2c001-0000-4000-8000-000000000002'
+  ),
+  1::bigint,
+  'suggestions match category and city prefixes within the selected category'
+);
+
+select is(
+  (select count(*) from public.suggest_catalog_listings_v1('mémoi') where id = '00000000-0000-4000-8000-000000000101'),
+  1::bigint,
+  'suggestions match accented prefixes'
+);
+
+insert into public.listings (
+  type, subtype, listing_class, category_id, status, name, slug, description, content_lang, city_id, published_at
+)
+select 'lieu', 'historique', 'patrimonial', 'heritage-historique', 'publie',
+  'Termelimite ' || n, 'termelimite-' || n,
+  'Published fixture used to verify the fixed suggestion response limit.', 'fr', 'ouidah', now()
+from pg_catalog.generate_series(1, 8) as n;
+
+select is(
+  (select count(*) from public.suggest_catalog_listings_v1('termelim'))::integer,
+  6,
+  'suggestions return at most six rows'
 );
 
 select * from finish();

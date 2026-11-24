@@ -241,6 +241,16 @@ data class ListingSearchQuery(
     }
 }
 
+data class ListingSuggestion(
+    val id: String,
+    val title: String,
+    val cityName: String?,
+) {
+    companion object {
+        const val LIMIT = 6
+    }
+}
+
 private fun String?.isValidListingSearchFilterId(): Boolean =
     this == null || (isNotBlank() && length <= MAX_LISTING_SEARCH_FILTER_ID_LENGTH && none(Char::isISOControl))
 

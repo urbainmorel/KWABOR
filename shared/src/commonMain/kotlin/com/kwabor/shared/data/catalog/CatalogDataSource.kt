@@ -16,6 +16,8 @@ internal interface CatalogQueryDataSource {
 
     suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto
 
+    suspend fun suggestListings(query: ListingSearchQuery): List<ListingSuggestionDto>
+
     suspend fun getListingDetail(listingId: String): CatalogDetailPayloadDto
 }
 

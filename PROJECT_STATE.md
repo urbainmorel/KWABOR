@@ -571,6 +571,12 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 
 ## Tâche en cours
 
+Le développement V1 reprend avec `SEARCH-001B1` pendant la préparation des comptes de
+distribution. La branche `codex/search-autocomplete` ajoute des suggestions de fiches par
+préfixe après une courte pause de saisie. Elles respectent la portée et les filtres de la recherche.
+Une sélection ouvre le détail et le cache de catalogue sert de repli hors ligne.
+La CI doit qualifier la migration `20261124112808` avant son application protégée sur staging.
+
 BETA-STAGING-001 est le chemin critique après la validation du catalogue sur le Tecno. La
 qualification Auth, le test iOS, les distributions signées et le pilote sont suivis dans
 [l'issue #61](https://github.com/urbainmorel/KWABOR/issues/61). Le dénominateur crash-free et la
@@ -660,7 +666,7 @@ message a été vérifiée sur le Tecno après mise à jour de l’APK staging e
 - Explore Android et iOS consomment désormais le RPC Explore v2 pour le mur courant, avec ordre
   serveur, snapshot/cursor, cache Room v3 et plafond sponsorisé validé sur l'ensemble des pages. Ils
   ouvrent le détail connecté et exposent la recherche lexicale SEARCH-001A. Les récents durables,
-  l’autocomplétion, le drawer prix/date, les presets civils, le multi-ville, le compteur live, la
+  le drawer prix/date, les presets civils, le multi-ville, le compteur live, la
   recherche filtrée, l’Assistant IA, la carte, les avis, le partage public, le signalement et le
   claim restent à livrer. Itinéraire, contact, menu et billetterie externe sont déjà intégrés.
 - Le contrat v2 courant accepte une ville scalaire et ne fournit pas de compteur dédié. Produit doit

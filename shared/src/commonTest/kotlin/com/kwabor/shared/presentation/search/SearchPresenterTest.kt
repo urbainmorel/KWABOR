@@ -2,6 +2,7 @@ package com.kwabor.shared.presentation.search
 
 import com.kwabor.shared.domain.catalog.ListingClass
 import com.kwabor.shared.domain.catalog.ListingStatus
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.DomainError
@@ -154,8 +155,15 @@ class SearchPresenterTest {
 
 internal class RecordingSearchRepository(
     private val results: MutableList<DomainResult<SearchResult>> = mutableListOf(),
+    private val suggestions: List<ListingSuggestion> = emptyList(),
 ) : SearchRepository {
     val requests = mutableListOf<Pair<SearchQuery, SearchPageRequest>>()
+    val suggestionRequests = mutableListOf<SearchQuery>()
+
+    override suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>> {
+        suggestionRequests += query
+        return DomainResult.Success(suggestions)
+    }
 
     override suspend fun search(query: SearchQuery, page: SearchPageRequest): DomainResult<SearchResult> {
         requests += query to page

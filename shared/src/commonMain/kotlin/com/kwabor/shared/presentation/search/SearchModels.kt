@@ -1,6 +1,7 @@
 package com.kwabor.shared.presentation.search
 
 import com.kwabor.shared.domain.catalog.ListingFilters
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.money.KwaborCurrency
 import com.kwabor.shared.domain.search.SearchResultSource
 import com.kwabor.shared.presentation.explore.ExploreCityOption
@@ -27,6 +28,7 @@ data class SearchUiState(
     val scope: SearchScope = SearchScope.ActiveTab,
     val queryText: String = "",
     val submittedQueryText: String? = null,
+    val suggestions: List<ListingSuggestion> = emptyList(),
     val listings: List<ExploreListingItem> = emptyList(),
     val nextCursor: String? = null,
     val resultSource: SearchResultSource? = null,

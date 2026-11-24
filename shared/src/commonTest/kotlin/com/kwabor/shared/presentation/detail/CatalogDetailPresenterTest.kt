@@ -28,6 +28,7 @@ import com.kwabor.shared.domain.catalog.ListingContact
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.catalog.PriceUnit
@@ -513,6 +514,9 @@ internal class FakeDetailCatalogQueryRepository(
         filters: ListingFilters,
         page: ListingPageRequest,
     ): DomainResult<ListingSummaryPage> = unexpectedCatalogCall()
+
+    override suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
 
     override suspend fun searchListings(
         query: ListingSearchQuery,
