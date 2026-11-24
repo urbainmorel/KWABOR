@@ -192,7 +192,7 @@ gh workflow run closed-beta-staging-database.yml \
   -f validated_plan_artifact_digest=<plan-artifact-raw-sha256>
 ```
 
-Pour un staging non vierge, ajouter obligatoirement :
+Pour le parcours par défaut sur un staging non vierge, ajouter les références du backup B6.02.
 
 ```bash
   -f backup_run_id=<qualified-b602-run-id> \
@@ -206,7 +206,7 @@ Après validation du plan et de la confirmation de l’opérateur, le runner :
 2. vérifie dépôt, workflow, run, attempt, SHA, branche, statut, expiration, nom, taille et digest ;
 3. vérifie le ZIP, le reçu interne, son sidecar, la cible, le run CI, le manifeste, la liste pending et
    la preuve `fresh empty` ;
-4. sans backup, exige un plan vierge : historique distant vide et toutes les migrations locales
+4. pour le parcours par défaut sans backup, exige un plan vierge : historique distant vide et toutes les migrations locales
    pending ; avec backup, télécharge par ID le ZIP B6.02 et valide l’ensemble exact
    ciphertext/GEL/sidecar, le digest/expiration API, snapshot partagé, Auth/Storage vide,
    fingerprint source=restauré, contraintes, escrow et RPO/RTO ;
@@ -215,12 +215,14 @@ Après validation du plan et de la confirmation de l’opérateur, le runner :
 7. reprend la preuve agrégée juste avant mutation ; le chemin vierge exige le même digest, le chemin
    backup exige Auth/Storage toujours vides, préfixe distant égal au backup, fenêtre RPO active et
    uniquement des migrations pending revues et épinglées byte-for-byte pour le périmètre B6.02
-   excluant les données `auth`/`storage` ;
+   excluant les données `auth`/`storage`. Le parcours de schéma ciblé exige la migration unique
+   et l'empreinte approuvée correspondant à la confirmation ;
 8. exécute uniquement `supabase db push --yes --db-url '<protected-staging-uri>'` ;
 9. archive la liste des migrations, les lints `public`/`app_private`, les advisors sécurité/performance,
    un second dry-run et la comparaison exacte de l’historique local/distant.
 
-Toute non-vacuité sans backup, dérive ou absence de preuve read-only avant l’étape 8 produit un
+Dans le parcours par défaut, la non-vacuité sans backup produit un reçu rouge. Une dérive ou
+l’absence de preuve en lecture seule avant l’étape 8 produit un
 reçu rouge ou `status=prepared_not_executable`, `mutationState=not_started`. La base n’est pas
 mutée. Un backup expiré, une donnée Auth/Storage apparue ou un scope pending incompatible impose
 une nouvelle capture B6.02 pour le parcours par défaut.

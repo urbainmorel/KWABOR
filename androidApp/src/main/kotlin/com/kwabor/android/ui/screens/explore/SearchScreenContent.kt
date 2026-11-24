@@ -350,8 +350,8 @@ private fun LazyGridScope.searchPrimaryItems(
                 headlineContent = { Text(suggestion.title) },
                 supportingContent = suggestion.cityName?.let { city -> @Composable { Text(city) } },
                 modifier = Modifier.clickable(role = Role.Button) {
-                    focusManager.clearFocus()
                     actions.onSearchListingClick(suggestion.id)
+                    focusManager.clearFocus()
                 },
             )
         }

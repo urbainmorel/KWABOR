@@ -572,11 +572,14 @@ Le snapshot courant ci-dessus prévaut pour l'état des branches, des PR et des 
 ## Tâche en cours
 
 Le développement V1 reprend avec `SEARCH-001B1` pendant la préparation des comptes de
-distribution. La branche `codex/search-autocomplete` ajoute des suggestions de fiches par
-préfixe après une courte pause de saisie. Elles respectent la portée et les filtres de la recherche.
-Une sélection ouvre le détail et le cache de catalogue sert de repli hors ligne.
-La CI doit qualifier la migration `20261124112808` avant son application protégée sur staging.
-Le propriétaire a autorisé l'application de cette seule migration par le parcours de schéma ciblé.
+distribution. La [PR #83](https://github.com/urbainmorel/KWABOR/pull/83) ajoute les suggestions par
+préfixe après une courte pause de saisie, avec repli hors ligne sur le catalogue en cache.
+Après la [CI sur main](https://github.com/urbainmorel/KWABOR/actions/runs/45400874129), la migration
+`20261124112808` a été [appliquée](https://github.com/urbainmorel/KWABOR/actions/runs/45406920757)
+et [vérifiée](https://github.com/urbainmorel/KWABOR/actions/runs/45407183771) sur staging.
+En invité, « mém gan » renvoie la Cour des Mémoires de Ganhi à Cotonou dans la portée Lieux.
+Le test sur émulateur Android a identifié un chevauchement du clavier et de la première suggestion
+sur petit écran. L'en-tête pendant la saisie est compact et la grille tient compte du clavier.
 
 BETA-STAGING-001 est le chemin critique après la validation du catalogue sur le Tecno. La
 qualification Auth, le test iOS, les distributions signées et le pilote sont suivis dans
@@ -720,6 +723,6 @@ message a été vérifiée sur le Tecno après mise à jour de l’APK staging e
 
 ## Prochaine tâche logique
 
-Qualifier les suggestions de recherche sur staging, puis poursuivre le parcours de découverte de
-la [V1 complète](docs/v1-production-delivery.md). La distribution interne reste suivie dans le
-[plan de bêta fermée](docs/closed-beta-delivery-plan.md).
+Poursuivre le parcours de découverte de la [V1 complète](docs/v1-production-delivery.md).
+La vérification des suggestions sur les appareils physiques et la distribution interne restent
+suivies dans le [plan de bêta fermée](docs/closed-beta-delivery-plan.md).

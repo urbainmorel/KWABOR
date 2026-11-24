@@ -257,9 +257,10 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
     - [x] Prouver le commit exact par la CI GitHub parallèle, dont Xcode Debug/Staging/Release, puis
       l'intégrer dans `main` via `#50`.
   - [ ] SEARCH-001B — Livrer les suggestions, les filtres avancés et le raccord aux récents de HISTORY-001.
-    - [ ] SEARCH-001B1 — Qualifier les suggestions de fiches Android/iOS sur staging après les
-      contrôles CI. Le contrat publié uniquement borne les résultats à six et utilise le cache
-      de catalogue hors ligne. Les frappes restent hors de l'historique de recherche.
+    - [x] SEARCH-001B1 — Intégrer les suggestions Android/iOS et vérifier le RPC public en mode
+      invité sur staging. La réponse est bornée à six fiches publiées et le catalogue en cache
+      sert de repli hors ligne. Les frappes restent hors de l'historique de recherche.
+    - [ ] Vérifier la saisie, la sélection et l'ouverture de la fiche sur le Tecno et sur un iPhone.
 - [ ] DETAIL-001 — Livrer le DetailSheet paramétrable avec médias officiels, champs typés, carte et billetterie externe.
   - [x] DETAIL-001A — Livrer le read model atomique publié-only `get_catalog_detail_v1`, ses champs typés,
     contraintes/ACL, son mapping KMP strict et les garde-fous honnêtes du mur Android.
