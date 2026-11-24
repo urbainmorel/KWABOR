@@ -576,6 +576,7 @@ distribution. La branche `codex/search-autocomplete` ajoute des suggestions de f
 préfixe après une courte pause de saisie. Elles respectent la portée et les filtres de la recherche.
 Une sélection ouvre le détail et le cache de catalogue sert de repli hors ligne.
 La CI doit qualifier la migration `20261124112808` avant son application protégée sur staging.
+Le propriétaire a autorisé l'application de cette seule migration par le parcours de schéma ciblé.
 
 BETA-STAGING-001 est le chemin critique après la validation du catalogue sur le Tecno. La
 qualification Auth, le test iOS, les distributions signées et le pilote sont suivis dans
@@ -719,5 +720,6 @@ message a été vérifiée sur le Tecno après mise à jour de l’APK staging e
 
 ## Prochaine tâche logique
 
-Le jalon individuel sur le Tecno est validé. Suivre le [plan de bêta fermée](docs/closed-beta-delivery-plan.md)
-pour vérifier le parcours sur iPhone, préparer les builds signés et décider de l’ouverture de la cohorte.
+Qualifier les suggestions de recherche sur staging, puis poursuivre le parcours de découverte de
+la [V1 complète](docs/v1-production-delivery.md). La distribution interne reste suivie dans le
+[plan de bêta fermée](docs/closed-beta-delivery-plan.md).

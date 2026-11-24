@@ -11,6 +11,7 @@ import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
@@ -707,6 +708,9 @@ private class ViewModelCatalogRepository(
             DomainResult.Success(ListingSummaryPage(items = nextPageListings, nextCursor = null))
         }
     }
+
+    override suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
 
     override suspend fun searchListings(
         query: ListingSearchQuery,

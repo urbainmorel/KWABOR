@@ -657,12 +657,14 @@ class ApplyAuthorityAndCommandPolicyTest(unittest.TestCase):
             values.update(mutation)
             with self.subTest(mutation=mutation), self.assertRaises(database.StagingDatabaseError):
                 database.validate_operation_inputs(**values)
-        base["confirmation"] = database.ONBOARDING_SCHEMA_CONFIRMATION
-        onboarding = database.validate_operation_inputs(**base)
-        self.assertTrue(onboarding["onboardingSchemaOnly"])
-        self.assertIsNone(onboarding["backup"])
-        with self.assertRaisesRegex(database.StagingDatabaseError, "ONBOARDING_SCHEMA_BACKUP_CONFLICT"):
-            database.validate_operation_inputs(**{**base, "backup_run_id": "400"})
+        for confirmation in (database.ONBOARDING_SCHEMA_CONFIRMATION, database.SEARCH_SCHEMA_CONFIRMATION):
+            with self.subTest(confirmation=confirmation):
+                scoped = {**base, "confirmation": confirmation}
+                authority = database.validate_operation_inputs(**scoped)
+                self.assertEqual(authority["schemaOnlyConfirmation"], confirmation)
+                self.assertIsNone(authority["backup"])
+                with self.assertRaisesRegex(database.StagingDatabaseError, "SCHEMA_ONLY_BACKUP_CONFLICT"):
+                    database.validate_operation_inputs(**{**scoped, "backup_run_id": "400"})
 
     def test_non_apply_operations_reject_apply_only_inputs(self) -> None:
         for operation in ("plan", "verify"):
@@ -1329,18 +1331,24 @@ class GitHubArtifactProofTest(unittest.TestCase):
 
 
 class FreshEmptyAndReconciliationTest(unittest.TestCase):
-    def test_onboarding_schema_scope_requires_one_exact_reviewed_migration(self) -> None:
-        versions = [database.ONBOARDING_SCHEMA_VERSION, database.PROFILE_DETAILS_SCHEMA_VERSION]
-        for version in versions:
-            with self.subTest(version=version):
-                evidence = database.validate_onboarding_schema_scope(REPOSITORY_ROOT, [version])
-                self.assertEqual([entry["version"] for entry in evidence["checkedMigrations"]], [version])
-        for pending in ([], ["20260821012638"], ["20260821012638", versions[0]], versions):
-            with self.subTest(pending=pending), self.assertRaisesRegex(
-                database.StagingDatabaseError,
-                "ONBOARDING_SCHEMA_PENDING_SCOPE_INVALID",
-            ):
-                database.validate_onboarding_schema_scope(REPOSITORY_ROOT, pending)
+    def test_schema_only_scope_requires_one_exact_reviewed_migration_for_its_confirmation(self) -> None:
+        onboarding = (database.ONBOARDING_SCHEMA_VERSION, database.PROFILE_DETAILS_SCHEMA_VERSION)
+        search = (database.SEARCH_SCHEMA_VERSION,)
+        cases = (
+            (database.ONBOARDING_SCHEMA_CONFIRMATION, onboarding, search),
+            (database.SEARCH_SCHEMA_CONFIRMATION, search, onboarding),
+        )
+        for confirmation, allowed, other in cases:
+            for version in allowed:
+                with self.subTest(confirmation=confirmation, version=version):
+                    evidence = database.validate_schema_only_scope(REPOSITORY_ROOT, [version], confirmation)
+                    self.assertEqual([entry["version"] for entry in evidence["checkedMigrations"]], [version])
+            for pending in ([], ["20260821012638"], [other[0]], [allowed[0], other[0]]):
+                with self.subTest(confirmation=confirmation, pending=pending), self.assertRaisesRegex(
+                    database.StagingDatabaseError,
+                    "SCHEMA_ONLY_PENDING_SCOPE_INVALID",
+                ):
+                    database.validate_schema_only_scope(REPOSITORY_ROOT, pending, confirmation)
 
     def test_backup_scope_accepts_only_byte_reviewed_pending_migrations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

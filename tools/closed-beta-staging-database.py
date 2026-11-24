@@ -26,8 +26,14 @@ EXPECTED_BACKUP_WORKFLOW = ".github/workflows/closed-beta-staging-database-backu
 EXPECTED_SUPABASE_CLI_VERSION = "2.111.0"
 APPLY_CONFIRMATION = "APPLY-EXACT-STAGING-MIGRATIONS"
 ONBOARDING_SCHEMA_CONFIRMATION = "APPLY-EXACT-STAGING-ONBOARDING-SCHEMA"
+SEARCH_SCHEMA_CONFIRMATION = "APPLY-EXACT-STAGING-SEARCH-SCHEMA"
 ONBOARDING_SCHEMA_VERSION = "20261123105000"
 PROFILE_DETAILS_SCHEMA_VERSION = "20261123134613"
+SEARCH_SCHEMA_VERSION = "20261124112808"
+SCHEMA_ONLY_MIGRATION_VERSIONS = {
+    ONBOARDING_SCHEMA_CONFIRMATION: (ONBOARDING_SCHEMA_VERSION, PROFILE_DETAILS_SCHEMA_VERSION),
+    SEARCH_SCHEMA_CONFIRMATION: (SEARCH_SCHEMA_VERSION,),
+}
 BACKUP_PRODUCER_AVAILABLE = True
 FRESH_EMPTY_PROOF_POLICY = "zero-objects-types-and-managed-catalog-v3"
 FRESH_EMPTY_REQUIRED_SYSTEM_TABLES = 3
@@ -49,6 +55,7 @@ BACKUP_EXCLUDED_MANAGED_DATA_PENDING_ALLOWLIST = {
     "20260821012638": "f5d307628db654c49464b607729df1a59776725070113e93e5cc9a8e372434fc",
     ONBOARDING_SCHEMA_VERSION: "02ddb45573501452d626fde4633a4e62bda616b225a4b69fa3db176daf247c11",
     PROFILE_DETAILS_SCHEMA_VERSION: "0dc01b97251f72f0e298a82c49c70c71f6bd544b137644d5a4c161d39b67384a",
+    SEARCH_SCHEMA_VERSION: "41fda0c40c2ea0d072ce049f6678a7bc7dd7da112060f45139212696f548da5a",
 }
 REMOTE_MIGRATION_QUERY = (
     "select unnest(xpath('/table/row/version/text()', query_to_xml("
@@ -466,12 +473,12 @@ def validate_operation_inputs(
         return None
 
     require(
-        confirmation in {APPLY_CONFIRMATION, ONBOARDING_SCHEMA_CONFIRMATION},
+        confirmation == APPLY_CONFIRMATION or confirmation in SCHEMA_ONLY_MIGRATION_VERSIONS,
         "APPLY_CONFIRMATION_INVALID",
     )
     backup_values = (backup_run_id, backup_artifact_id, backup_artifact_digest)
-    onboarding_schema_only = confirmation == ONBOARDING_SCHEMA_CONFIRMATION
-    require(not onboarding_schema_only or not any(backup_values), "ONBOARDING_SCHEMA_BACKUP_CONFLICT")
+    schema_only = confirmation in SCHEMA_ONLY_MIGRATION_VERSIONS
+    require(not schema_only or not any(backup_values), "SCHEMA_ONLY_BACKUP_CONFLICT")
     backup_authority: dict[str, Any] | None = None
     if any(backup_values):
         require(all(backup_values), "BACKUP_AUTHORITY_INCOMPLETE")
@@ -496,7 +503,7 @@ def validate_operation_inputs(
     )
     return {
         "backup": backup_authority,
-        **({"onboardingSchemaOnly": True} if onboarding_schema_only else {}),
+        **({"schemaOnlyConfirmation": confirmation} if schema_only else {}),
         "planArtifactDigest": validated_plan_artifact_digest,
         "planArtifactId": plan_artifact,
         "planRunId": plan_run,
@@ -2068,13 +2075,14 @@ def validate_pending_migration_scope(
     }
 
 
-def validate_onboarding_schema_scope(
+def validate_schema_only_scope(
     repository_root: Path,
     pending_versions: Sequence[str],
+    confirmation: str,
 ) -> dict[str, Any]:
     require(
-        len(pending_versions) == 1 and pending_versions[0] in (ONBOARDING_SCHEMA_VERSION, PROFILE_DETAILS_SCHEMA_VERSION),
-        "ONBOARDING_SCHEMA_PENDING_SCOPE_INVALID",
+        len(pending_versions) == 1 and pending_versions[0] in SCHEMA_ONLY_MIGRATION_VERSIONS.get(confirmation, ()),
+        "SCHEMA_ONLY_PENDING_SCOPE_INVALID",
     )
     return validate_pending_migration_scope(repository_root, pending_versions)
 
@@ -2894,13 +2902,13 @@ def execute(args: argparse.Namespace) -> None:
             validated_plan_artifact_digest=args.validated_plan_artifact_digest,
         )
         reconstructible_demo = reconstructible_demo_requested()
-        onboarding_schema_only = bool(apply_authority and apply_authority.get("onboardingSchemaOnly"))
+        schema_only_confirmation = apply_authority.get("schemaOnlyConfirmation") if apply_authority else None
         if reconstructible_demo:
             require(
                 apply_authority is None or apply_authority["backup"] is None,
                 "RECONSTRUCTIBLE_DEMO_BACKUP_CONFLICT",
             )
-            require(not onboarding_schema_only, "ONBOARDING_SCHEMA_DEMO_CONFLICT")
+            require(not schema_only_confirmation, "SCHEMA_ONLY_DEMO_CONFLICT")
         request_evidence = validate_request_identity(
             repository=os.environ.get("GITHUB_REPOSITORY", ""),
             event_name=os.environ.get("GITHUB_EVENT_NAME", ""),
@@ -3040,7 +3048,7 @@ def execute(args: argparse.Namespace) -> None:
                 secret_values=authority.secret_values,
             )
             uses_fresh_empty_exception = (
-                apply_authority["backup"] is None and not reconstructible_demo and not onboarding_schema_only
+                apply_authority["backup"] is None and not reconstructible_demo and not schema_only_confirmation
             )
             if apply_authority["backup"] is not None:
                 backup_authority = apply_authority["backup"]
@@ -3240,10 +3248,13 @@ def execute(args: argparse.Namespace) -> None:
                     authority=authority,
                     repository_root=repository_root,
                 )
-            if onboarding_schema_only:
+            if schema_only_confirmation:
+                scope = schema_only_confirmation.removeprefix("APPLY-EXACT-STAGING-")
                 write_json_exclusive(
-                    evidence_directory / "ONBOARDING-SCHEMA-SCOPE.json",
-                    validate_onboarding_schema_scope(repository_root, pre_apply_state["pendingVersions"]),
+                    evidence_directory / f"{scope}-SCOPE.json",
+                    validate_schema_only_scope(
+                        repository_root, pre_apply_state["pendingVersions"], schema_only_confirmation
+                    ),
                     secret_values=authority.secret_values,
                 )
             attempt = run_apply_mutation(

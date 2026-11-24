@@ -25,7 +25,7 @@ on:
         required: true
         type: string
       apply_confirmation:
-        description: For apply only, use APPLY-EXACT-STAGING-MIGRATIONS or APPLY-EXACT-STAGING-ONBOARDING-SCHEMA
+        description: Apply confirmation from the staging database runbook for the exact migration scope
         required: false
         type: string
       backup_run_id:
