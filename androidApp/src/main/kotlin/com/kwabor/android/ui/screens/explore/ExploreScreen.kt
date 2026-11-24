@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -287,6 +288,7 @@ private fun ExploreListingsGrid(content: ExploreGridContent, gridState: LazyGrid
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .exploreLiveRegion(liveRegionStatus),
     ) {
         val columnCount = exploreColumnCount(
@@ -483,11 +485,13 @@ private fun ExploreHeader(
             strings = strings,
             onClick = actions.onCityClick,
         )
-        Text(
-            text = strings.homeTitle,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+        if (!searchState.isActive || searchState.hasSubmittedQuery) {
+            Text(
+                text = strings.homeTitle,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         ExploreTabs(state.selectedTab, strings, actions.onTabSelected)
         ExploreSearchControl(state = searchState, strings = strings, actions = actions)
         if (!searchState.isActive || searchState.scope == SearchScope.ActiveTab) {
