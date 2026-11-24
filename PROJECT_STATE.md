@@ -592,8 +592,9 @@ Sur le Tecno, la version `0.1.0-staging` issue de ce commit s’est installée p
 affiche le catalogue en mode invité et connecté sans pastille de session. Le mainteneur a vu
 l’étape finale de l’inscription de l’alias de test avec une case d’acceptation et quatre devises
 sur une rangée. Les trois champs du profil se chargent vides, peuvent être renseignés et relus,
-puis restent vides après effacement et redémarrage. L’ouverture de chaque lien légal et le
-parcours sur iPhone restent à vérifier sur appareil.
+puis restent vides après effacement et redémarrage. Le mainteneur a confirmé sur le Tecno que
+les liens CGU et politique de confidentialité ouvrent les deux documents et que le formulaire
+est toujours accessible au retour. Le parcours sur iPhone reste à vérifier sur appareil.
 
 Sur Android, un APK sans ressources Firebase laisse les opérations de retrait en attente
 pour une version configurée. Lorsque tous les réglages sont désactivés, l’absence de
@@ -695,15 +696,16 @@ message a été vérifiée sur le Tecno après mise à jour de l’APK staging e
 - Les templates OTP d'inscription et Recovery exigent un plan Supabase compatible ou un SMTP personnalisé vérifié sur staging/production ; cette configuration propriétaire doit être prouvée avant toute bêta.
 - Le réagrandissement destructeur du monogramme Android est corrigé dans BRAND-002 et la matrice KVM `30661731938` est techniquement et perceptuellement recevable sur ses neuf cellules. La revue Pixel/Samsung/iOS physique et la confirmation du master officiel restent obligatoires.
 - La vidéo d'intro ne dépend plus d'ENV-001B/OBS-001B, d'un CDN ou de Firebase. Chaque nouvelle révision exige toutefois provenance, droits de diffusion, approbation éditoriale, preuves Android/iOS, builds signés et publication Store.
-- ENV-001B dépend encore du propriétaire : staging Supabase existe et son accès DB protégé est
-  qualifié en lecture, l'autorité Supabase production distincte est créée, mais les projets Firebase
-  restent absents. L'activation
-  Auth staging exige les identités Google et SMTP réelles ; aucune valeur fictive ne doit lever les
-  guards. L'authentification Firebase CLI existante doit être réauthentifiée avant création des
-  projets Firebase requis.
-- OBS-001B dépend du propriétaire : les configurations Firebase réelles staging/production et la vérification sur appareils d'Analytics, Crashlytics, Performance et Remote Config générique ne peuvent commencer qu'après cette réauthentification et le provisionnement des deux projets.
-- La clé d'upload Android, ses secrets GitHub production et l'inscription Play App Signing doivent être créés et conservés par le propriétaire avant le premier AAB de distribution ; le projet échoue volontairement en leur absence.
-- La configuration Supabase production, les projets Firebase staging/production, le compte FedaPay,
+- ENV-001B : les autorités Supabase staging et production sont distinctes. L’accès protégé à la
+  base staging et l’envoi SMTP pour l’inscription par e-mail sont qualifiés. Les identités OAuth
+  Google et Apple restent à qualifier pour les parcours fédérés.
+- OBS-001B : `kwabor-staging` est actif avec `com.kwabor.android` et `com.kwabor.ios`. Les
+  configurations vérifiées sont enregistrées dans `staging` et la configuration iOS est aussi
+  disponible dans `testflight-internal`. Les identités OAuth Google, les signatures et le test
+  sur les builds internes restent à qualifier.
+- La clé d’upload Android, ses secrets de signature et l’inscription Play App Signing restent
+  requis avant le premier AAB de distribution interne.
+- La configuration Supabase production, le projet Firebase production, le compte FedaPay,
   les comptes stores, le KYC, les certificats et les secrets fournisseurs nécessitent l'intervention
   du propriétaire pendant les tranches concernées.
 - La validation juridique des CGU et de la politique de confidentialité reste une gate propriétaire avant release candidate.
