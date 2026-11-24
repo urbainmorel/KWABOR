@@ -329,6 +329,8 @@ internal interface AndroidObservabilityBackend :
 internal interface AndroidCollectionBackend {
     val isConfigured: Boolean
 
+    val hasBundledConfiguration: Boolean
+
     fun ensureConfigured(): Boolean
 
     fun applyConsent(consent: ObservabilityConsent)

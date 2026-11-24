@@ -106,7 +106,9 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
       Privacy Report de l'archive Release sur macOS et publier les réponses App Store Connect.
 - [ ] OBS-001 — Intégrer Firebase Android/iOS pour Analytics, Crashlytics, Performance et Remote Config avec consentement.
   - [x] OBS-001A — Livrer les SDK natifs, contrats typés, consentement refusé par défaut, injection de configuration et gates CI sans secret versionné.
+    - [x] Android — Vérifier la disparition du message après désactivation sur un APK sans Firebase et la conservation des demandes de retrait après redémarrage.
   - [ ] OBS-001B — Provisionner les projets Firebase staging/production et vérifier Analytics, Crashlytics, Performance et la capacité Remote Config générique sur appareils avec consentement, valeurs sûres et révocation ; aucun canal média n'y est autorisé.
+    - [x] Enregistrer les deux applications dans `kwabor-staging` et injecter leurs configurations dans les Environments GitHub protégés.
 - [x] PR-OBS-001A — PR `#28` livrée après tests ciblés, `quality`, pgTAP et les trois configurations iOS simulateur vertes.
 
 ### Auth et onboarding
@@ -140,7 +142,7 @@ Feuille de route et gates : [docs/v1-production-delivery.md](docs/v1-production-
   - [x] Validations finales, base Supabase éphémère, pgTAP/Deno, gates Gradle et compilation Kotlin iOS Simulator terminés.
   - [x] Build Xcode macOS, PR et CI validés avant fusion.
 - [x] AUTH-UX-001 — Réduire l'inscription à quatre écrans email/un profil fédéré, rendre l'intro interactive, contextualiser la softwall et différer toute permission avant l'accueil ; portage local validé sur la ligne avancée Store-only.
-- [ ] AUTH-UX-002 — Simplifier la dernière étape e-mail et vérifier sur appareil la modification des informations du profil depuis les paramètres.
+- [x] AUTH-UX-002 — Dernière étape e-mail simplifiée et édition du profil vérifiée sur le Tecno avec `0.1.0-staging` au commit `9b2263f`.
 - [x] PR-AUTH-UX-001 — AUTH-UX-001 intégrée dans `main` via `#50`, avec tests Swift et builds
   Xcode simulateur Debug/Staging/Release exact-head verts ; l'ancienne PR `#34` est fermée sans
   fusion avec commentaire de supersession.

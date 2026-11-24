@@ -189,9 +189,40 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
+      - name: Cache Robolectric runtimes
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/robolectric-runtimes
+          key: robolectric-4.16-api35-api36-v1
+
+      - name: Verify Robolectric runtimes
+        shell: bash
+        env:
+          ROBOLECTRIC_RUNTIME_DIR: ${{ runner.temp }}/robolectric-runtimes
+        run: |
+          set -euo pipefail
+          mkdir -p "$ROBOLECTRIC_RUNTIME_DIR"
+          base=https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented
+          while read -r version digest; do
+            name="android-all-instrumented-$version.jar"
+            jar="$ROBOLECTRIC_RUNTIME_DIR/$name"
+            if [[ ! -f "$jar" ]] || ! sha512sum --check --status <<<"$digest  $jar"; then
+              curl --fail --silent --show-error --retry 4 --retry-all-errors \
+                --connect-timeout 15 --retry-max-time 180 --max-time 120 \
+                "$base/$version/$name" --output "$jar.part"
+              sha512sum --check <<<"$digest  $jar.part"
+              mv -- "$jar.part" "$jar"
+            fi
+          done <<'RUNTIMES'
+          15-robolectric-13954326-i7 5fc64ffccf4788154162686b3966ddd63abea8326542c465e2a7f0129fc92770d0e1e8ddcfabd7f1500e491ec02e3b4104b9e51b61fccd9cf08006c9dc02987c
+          16-robolectric-13921718-i7 0576318b89abb0a1c9a760a61bb68ccd2d509b33164b8265d6b1fb587a4b7629e1e805b6c7f8fbefab94fc03c8db8100b1d4856a32728803c242d2677aa7ec76
+          RUNTIMES
+
       - name: Quality gate
         env:
-          JAVA_TOOL_OPTIONS: -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
+          JAVA_TOOL_OPTIONS: >-
+            -Drobolectric.offline=true
+            -Drobolectric.dependency.dir=${{ runner.temp }}/robolectric-runtimes
         run: ./gradlew check --build-cache --console=plain
 
   edge_function:
