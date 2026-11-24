@@ -1,5 +1,6 @@
 package com.kwabor.shared.presentation.search
 
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.core.DomainResult
 import com.kwabor.shared.domain.i18n.AppLocale
 import com.kwabor.shared.domain.money.KwaborCurrency
@@ -26,6 +27,38 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchRuntimeTest {
     private val strings = stringsFor(AppLocale.French).search
+
+    @Test
+    fun typingDebouncesSuggestionsAndPickingOneOpensTheDetail() = runTest {
+        val suggestion = ListingSuggestion(SEARCH_LISTING_ID, "Musée de Ouidah", "Ouidah")
+        val repository = RecordingSearchRepository(suggestions = listOf(suggestion))
+        val runtime = SearchRuntime(SearchPresenter(repository), strings, this)
+        runtime.dispatch(SearchIntent.Activate(activeState("x").context))
+        runtime.dispatch(SearchIntent.QueryChanged("Ou"))
+        runCurrent()
+        runtime.dispatch(SearchIntent.QueryChanged("Oui"))
+        runCurrent()
+        assertTrue(repository.suggestionRequests.isEmpty())
+
+        advanceUntilIdle()
+        assertEquals("Oui", repository.suggestionRequests.single().text)
+        assertEquals(listOf(suggestion), runtime.state.value.suggestions)
+        assertFalse(runtime.state.value.hasSubmittedQuery)
+        assertTrue(repository.requests.isEmpty())
+
+        runtime.dispatch(SearchIntent.SelectScope(SearchScope.All))
+        advanceUntilIdle()
+        assertNull(repository.suggestionRequests.last().filters.listingType)
+        assertNull(repository.suggestionRequests.last().filters.categoryId)
+
+        val effect = async { runtime.effects.first() }
+        runtime.dispatch(SearchIntent.OpenListing(suggestion.id))
+        assertEquals(SearchEffect.OpenCatalogDetail(suggestion.id), effect.await())
+        runtime.dispatch(SearchIntent.Clear)
+        runCurrent()
+        assertTrue(runtime.state.value.suggestions.isEmpty())
+        runtime.close()
+    }
 
     @Test
     fun submitIsExplicitAndPublishesNoRawQueryEffect() = runTest {
@@ -174,6 +207,9 @@ private class OutOfOrderSearchRepository : SearchRepository {
     val firstRequestStarted = CompletableDeferred<Unit>()
     private val firstResult = CompletableDeferred<SearchResult>()
 
+    override suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
+
     override suspend fun search(query: SearchQuery, page: SearchPageRequest): DomainResult<SearchResult> {
         if (query.text == "ancienne") {
             firstRequestStarted.complete(Unit)
@@ -196,6 +232,9 @@ private class ContextSwitchSearchRepository : SearchRepository {
     private val firstResult = CompletableDeferred<SearchResult>()
     var requestCount = 0
         private set
+
+    override suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
 
     override suspend fun search(query: SearchQuery, page: SearchPageRequest): DomainResult<SearchResult> {
         requestCount += 1

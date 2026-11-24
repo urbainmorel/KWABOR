@@ -177,7 +177,9 @@ struct SearchActiveContent: View {
 
     @ViewBuilder
     private var submittedContent: some View {
-        if !store.state.hasSubmittedQuery {
+        if !store.state.suggestions.isEmpty {
+            suggestions
+        } else if !store.state.hasSubmittedQuery {
             SearchInitialHint(text: store.strings.initialHint)
         } else if store.state.isLoading && store.state.listings.isEmpty {
             SearchLoadingGrid(
@@ -186,6 +188,35 @@ struct SearchActiveContent: View {
             )
         } else {
             loadedContent
+        }
+    }
+
+    private var suggestions: some View {
+        LazyVStack(spacing: KwaborDesignTokens.Spacing.xs) {
+            ForEach(store.state.suggestions, id: \.id) { suggestion in
+                Button {
+                    store.openListing(suggestion.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: KwaborDesignTokens.Spacing.xs) {
+                        Text(suggestion.title)
+                            .font(.body)
+                            .foregroundStyle(KwaborDesignTokens.ColorToken.ink950)
+                        if let city = suggestion.cityName {
+                            Text(city)
+                                .font(.subheadline)
+                                .foregroundStyle(KwaborDesignTokens.ColorToken.ink700)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: KwaborDesignTokens.Sizing.touchTarget)
+                    .padding(.horizontal, KwaborDesignTokens.Spacing.md)
+                    .padding(.vertical, KwaborDesignTokens.Spacing.sm)
+                    .background(KwaborDesignTokens.ColorToken.surface0)
+                    .clipShape(RoundedRectangle(cornerRadius: KwaborDesignTokens.Radius.control))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 

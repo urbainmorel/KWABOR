@@ -2,6 +2,7 @@ package com.kwabor.android.ui.screens.explore
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +45,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -337,6 +340,21 @@ private fun LazyGridScope.searchPrimaryItems(
             actionLabel = strings.retry,
             onAction = actions.onSearchRetry,
         )
+        state.suggestions.isNotEmpty() -> items(
+            items = state.suggestions,
+            key = { it.id },
+            span = { GridItemSpan(maxLineSpan) },
+        ) { suggestion ->
+            val focusManager = LocalFocusManager.current
+            ListItem(
+                headlineContent = { Text(suggestion.title) },
+                supportingContent = suggestion.cityName?.let { city -> @Composable { Text(city) } },
+                modifier = Modifier.clickable(role = Role.Button) {
+                    focusManager.clearFocus()
+                    actions.onSearchListingClick(suggestion.id)
+                },
+            )
+        }
         !state.hasSubmittedQuery -> searchStateMessage(
             title = strings.search.title,
             supportingText = strings.search.initialHint,

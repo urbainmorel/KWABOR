@@ -19,6 +19,8 @@ interface CatalogQueryRepository {
         page: ListingPageRequest = ListingPageRequest(),
     ): DomainResult<ListingSummaryPage>
 
+    suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>>
+
     suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail>
 }
 

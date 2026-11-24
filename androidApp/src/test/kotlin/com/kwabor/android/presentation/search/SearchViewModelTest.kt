@@ -2,6 +2,7 @@ package com.kwabor.android.presentation.search
 
 import com.kwabor.shared.domain.catalog.ListingClass
 import com.kwabor.shared.domain.catalog.ListingStatus
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingType
 import com.kwabor.shared.domain.core.DomainResult
@@ -117,6 +118,9 @@ class SearchViewModelTest {
 private class RecordingSearchRepository : SearchRepository {
     var requestCount = 0
         private set
+
+    override suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>> =
+        DomainResult.Success(emptyList())
 
     override suspend fun search(query: SearchQuery, page: SearchPageRequest): DomainResult<SearchResult> {
         requestCount += 1

@@ -13,6 +13,7 @@ import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingType
@@ -35,6 +36,26 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class OfflineFirstSearchRepositoryTest {
+    @Test
+    fun suggestionsFallbackMatchesAccentedPrefixesAndKeepsFilters() = runTest {
+        val offline = DomainResult.Failure(DomainError.NetworkUnavailable())
+        val catalog = FakeSearchCatalogRepository(offline, suggestionResult = offline)
+        val local = FakeSearchLocalCache(
+            candidates = listOf(
+                candidate(listing(name = "Café des Palmiers")),
+                candidate(listing(id = "other", name = "Café Bleu").copy(cityId = "ouidah")),
+            ),
+        )
+        val query = validQuery("caf pal", ListingFilters(cityId = "cotonou"))
+        val result = searchRepository(catalog, local).suggest(query)
+
+        assertEquals(
+            listOf(ListingSuggestion("listing-1", "Café des Palmiers", "Cotonou")),
+            assertIs<DomainResult.Success<List<ListingSuggestion>>>(result).value,
+        )
+        assertEquals(1, local.readCount)
+    }
+
     @Test
     fun networkSuccessIsCanonicalizedWithoutReadingLocalCache() = runTest {
         val duplicate = listing(id = "listing-network")
@@ -331,8 +352,12 @@ private class FakeSearchLocalCache(
 
 private class FakeSearchCatalogRepository(
     private val searchResult: DomainResult<ListingSummaryPage>,
+    private val suggestionResult: DomainResult<List<ListingSuggestion>> = DomainResult.Success(emptyList()),
 ) : CatalogRepository {
     val requests = mutableListOf<Pair<ListingSearchQuery, ListingPageRequest>>()
+
+    override suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>> =
+        suggestionResult
 
     override suspend fun searchListings(
         query: ListingSearchQuery,

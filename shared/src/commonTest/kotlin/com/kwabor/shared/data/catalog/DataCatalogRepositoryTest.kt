@@ -472,6 +472,8 @@ private class FakeCatalogDataSource(
         return listingsPage
     }
 
+    override suspend fun suggestListings(query: ListingSearchQuery): List<ListingSuggestionDto> = emptyList()
+
     override suspend fun searchListings(query: ListingSearchQuery, page: ListingPageRequest): ListingSummaryPageDto {
         listingsException?.let { exception -> throw exception }
         searchCallCount += 1

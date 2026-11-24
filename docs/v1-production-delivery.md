@@ -115,6 +115,9 @@ L'onboarding complet précède les préférences, notifications, profils et droi
 
 Le résumé catalogue paginé supprime le N+1 avant d'étendre Explore. La recherche, le détail, les avis, le profil et les paramètres s'appuient ensuite sur les mêmes contrats et données locales.
 
+Le premier lot de reprise est `SEARCH-001B1`, les suggestions de recherche sur Android et iOS.
+Il avance pendant la préparation des comptes de distribution.
+
 ### 5. Social, contribution et modération
 
 Le schéma/RLS Social précède les feeds Android/iOS. Le composeur et le ListingWizard précèdent le pipeline de modération, qui reste fail-closed : une indisponibilité du service automatique ne publie jamais un contenu ambigu.

@@ -9,6 +9,7 @@ import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
 import com.kwabor.shared.domain.catalog.ListingStatus
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummary
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.core.DomainError
@@ -27,6 +28,35 @@ internal class OfflineFirstSearchRepository(
     private val localCache: SearchLocalCache?,
     private val localSearchDispatcher: CoroutineDispatcher,
 ) : SearchRepository {
+    override suspend fun suggest(query: SearchQuery): DomainResult<List<ListingSuggestion>> =
+        when (val result = catalogRepository.suggestListings(ListingSearchQuery(query.text, query.filters))) {
+            is DomainResult.Success -> result
+            is DomainResult.Failure -> if (result.error is DomainError.NetworkUnavailable) {
+                suggestLocal(query, result)
+            } else {
+                result
+            }
+        }
+
+    private suspend fun suggestLocal(
+        query: SearchQuery,
+        fallbackFailure: DomainResult.Failure,
+    ): DomainResult<List<ListingSuggestion>> = withContext(localSearchDispatcher) {
+        val candidates = localCache?.readCandidatesOrNull(query.filters) ?: return@withContext fallbackFailure
+        val prefixes = query.text.toSearchTokens()
+        val matches = candidates.asSequence()
+            .filter { candidate -> candidate.listing.matches(query.filters) }
+            .filter { candidate ->
+                val tokens = candidate.searchTokens()
+                prefixes.isNotEmpty() && prefixes.all { prefix -> tokens.any { it.startsWith(prefix) } }
+            }
+            .distinctBy { it.listing.id }
+            .take(ListingSuggestion.LIMIT)
+            .map { ListingSuggestion(id = it.listing.id, title = it.listing.name, cityName = it.cityName) }
+            .toList()
+        DomainResult.Success(matches)
+    }
+
     override suspend fun search(query: SearchQuery, page: SearchPageRequest): DomainResult<SearchResult> {
         val localSequence = page.cursor.toLocalCursorSequenceOrNull()
         if (localSequence != null) {
@@ -161,18 +191,16 @@ private fun localNextCursor(hasNextPage: Boolean, localSequence: Int): String? =
         null
     }
 
-private fun SearchCacheCandidate.matches(queryTokens: Set<String>): Boolean {
-    if (queryTokens.isEmpty()) return false
-    val searchableText = buildString {
-        append(listing.name)
-        append(' ').append(listing.cityId)
-        append(' ').append(listing.categoryId)
-        cityName?.let { city -> append(' ').append(city) }
-        categoryNameKey?.let { category -> append(' ').append(category) }
-    }
-    val candidateTokens = searchableText.toSearchTokens()
-    return queryTokens.all(candidateTokens::contains)
-}
+private fun SearchCacheCandidate.matches(queryTokens: Set<String>): Boolean =
+    queryTokens.isNotEmpty() && queryTokens.all(searchTokens()::contains)
+
+private fun SearchCacheCandidate.searchTokens(): Set<String> = buildString {
+    append(listing.name)
+    append(' ').append(listing.cityId)
+    append(' ').append(listing.categoryId)
+    cityName?.let { city -> append(' ').append(city) }
+    categoryNameKey?.let { category -> append(' ').append(category) }
+}.toSearchTokens()
 
 private fun String.toSearchTokens(): Set<String> =
     normalizeForSearch().split(SEARCH_TOKEN_SEPARATOR).filter(String::isNotEmpty).toSet()

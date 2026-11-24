@@ -8,6 +8,7 @@ import com.kwabor.shared.domain.catalog.City
 import com.kwabor.shared.domain.catalog.ListingFilters
 import com.kwabor.shared.domain.catalog.ListingPageRequest
 import com.kwabor.shared.domain.catalog.ListingSearchQuery
+import com.kwabor.shared.domain.catalog.ListingSuggestion
 import com.kwabor.shared.domain.catalog.ListingSummaryPage
 import com.kwabor.shared.domain.catalog.ListingViewerInteraction
 import com.kwabor.shared.domain.core.DomainResult
@@ -43,6 +44,19 @@ class DataCatalogRepository internal constructor(
         dataSource.searchListings(query = query, page = page)
             .toDomain()
     }
+
+    override suspend fun suggestListings(query: ListingSearchQuery): DomainResult<List<ListingSuggestion>> =
+        runDataCall {
+            val suggestions = dataSource.suggestListings(query)
+            val invalidRow = suggestions.any { it.name.isBlank() || it.cityName.isBlank() || !it.id.isValidUuid() }
+            if (suggestions.size > ListingSuggestion.LIMIT ||
+                suggestions.distinctBy(ListingSuggestionDto::id).size != suggestions.size ||
+                invalidRow
+            ) {
+                throw CatalogDataException.Unexpected(IllegalStateException("Invalid catalog suggestions."))
+            }
+            suggestions.map { ListingSuggestion(id = it.id, title = it.name, cityName = it.cityName) }
+        }
 
     override suspend fun getListingDetail(listingId: String): DomainResult<CatalogDetail> = runDataCall {
         val id = listingId.toRequiredCanonicalListingId()

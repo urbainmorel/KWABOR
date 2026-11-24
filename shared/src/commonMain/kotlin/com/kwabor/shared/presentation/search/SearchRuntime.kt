@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,7 +57,9 @@ class SearchRuntime(
 
     private suspend fun activate(context: SearchContext) {
         lifecycleMutex.withLock {
-            mutableState.value = mutableState.value.copy(context = context, isActive = true)
+            val current = mutableState.value
+            mutableState.value = current.copy(context = context, isActive = true)
+            if (!current.isActive && !current.hasSubmittedQuery) startSuggestionsLocked()
         }
     }
 
@@ -65,6 +68,7 @@ class SearchRuntime(
             val current = mutableState.value
             val contextChanged = current.context != context
             mutableState.value = current.copy(context = context)
+            if (contextChanged && !current.hasSubmittedQuery) startSuggestionsLocked()
             contextChanged && current.hasSubmittedQuery
         }
         if (shouldReload) startLoad()
@@ -74,7 +78,6 @@ class SearchRuntime(
         lifecycleMutex.withLock {
             val current = mutableState.value
             if (text == current.queryText) return@withLock
-            cancelOperationLocked()
             mutableState.value = current.copy(
                 queryText = text,
                 submittedQueryText = null,
@@ -91,6 +94,7 @@ class SearchRuntime(
                 refreshMessage = null,
                 appendErrorMessage = null,
             )
+            startSuggestionsLocked()
         }
     }
 
@@ -99,29 +103,10 @@ class SearchRuntime(
             val current = mutableState.value
             if (scope == current.scope) return@withLock false
             mutableState.value = current.copy(scope = scope)
+            if (!current.hasSubmittedQuery) startSuggestionsLocked()
             current.hasSubmittedQuery
         }
         if (shouldReload) startLoad()
-    }
-
-    private suspend fun submit() {
-        val submission = lifecycleMutex.withLock {
-            val current = mutableState.value
-            val canonicalQuery = when (
-                val result = SearchQuery.from(current.queryText, current.context.filtersFor(current.scope))
-            ) {
-                is DomainResult.Success -> result.value.text
-                is DomainResult.Failure -> null
-            }
-            PendingSearchSubmission(
-                canonicalQuery = canonicalQuery,
-                displayCurrency = current.context.currency,
-            )
-        }
-        val submitted = startLoad(canonicalSubmittedQuery = submission.canonicalQuery)
-        if (submitted && submission.canonicalQuery != null) {
-            effectChannel.send(SearchEffect.QuerySubmitted(submission.displayCurrency))
-        }
     }
 
     private suspend fun startLoad(canonicalSubmittedQuery: String? = null): Boolean = lifecycleMutex.withLock {
@@ -132,6 +117,7 @@ class SearchRuntime(
         val loadingState = current.copy(
             queryText = canonicalSubmittedQuery ?: current.queryText,
             submittedQueryText = canonicalSubmittedQuery ?: current.submittedQueryText,
+            suggestions = emptyList(),
             listings = emptyList(),
             nextCursor = null,
             resultSource = null,
@@ -203,10 +189,24 @@ class SearchRuntime(
     private suspend fun openListing(listingId: String) {
         val normalizedId = listingId.trim()
         val exists = lifecycleMutex.withLock {
-            mutableState.value.listings.any { listing -> listing.id == normalizedId }
+            val current = mutableState.value
+            current.listings.any { it.id == normalizedId } || current.suggestions.any { it.id == normalizedId }
         }
         if (exists) {
             effectChannel.send(SearchEffect.OpenCatalogDetail(normalizedId))
+        }
+    }
+
+    private fun startSuggestionsLocked() {
+        cancelOperationLocked()
+        val state = mutableState.value.copy(suggestions = emptyList())
+        mutableState.value = state
+        if (!state.isActive || state.queryText.trim().length < MIN_SUGGESTION_QUERY_LENGTH) return
+        val requestGeneration = generation
+        operationJob = runtimeScope.launch {
+            delay(SUGGESTION_DEBOUNCE_MS)
+            val suggestions = presenter.suggest(state)
+            commit(requestGeneration, state.copy(suggestions = suggestions))
         }
     }
 
@@ -226,6 +226,26 @@ class SearchRuntime(
     }
 
     private inner class IntentHandler {
+        private suspend fun submit() {
+            val submission = lifecycleMutex.withLock {
+                val current = mutableState.value
+                val canonicalQuery = when (
+                    val result = SearchQuery.from(current.queryText, current.context.filtersFor(current.scope))
+                ) {
+                    is DomainResult.Success -> result.value.text
+                    is DomainResult.Failure -> null
+                }
+                PendingSearchSubmission(
+                    canonicalQuery = canonicalQuery,
+                    displayCurrency = current.context.currency,
+                )
+            }
+            val submitted = startLoad(canonicalSubmittedQuery = submission.canonicalQuery)
+            if (submitted && submission.canonicalQuery != null) {
+                effectChannel.send(SearchEffect.QuerySubmitted(submission.displayCurrency))
+            }
+        }
+
         suspend fun handle(intent: SearchIntent) {
             when (intent) {
                 is SearchIntent.Activate -> activate(intent.context)
@@ -271,3 +291,5 @@ private data class PendingSearchSubmission(
 
 private const val PARAMETERIZED_INTENT_AS_ACTION_ERROR =
     "A parameterized search intent cannot be handled as an action."
+private const val MIN_SUGGESTION_QUERY_LENGTH = 2
+private const val SUGGESTION_DEBOUNCE_MS = 250L

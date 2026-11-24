@@ -146,6 +146,14 @@ Auth ou Storage. Après l’application, lancer `verify`.
 - `20261123105000` — passage à deux documents à l’inscription.
 - `20261123134613` — prénom, nom et ville facultatifs et modifiables depuis les paramètres du profil.
 
+Pour les suggestions de recherche, le propriétaire a autorisé le 24 novembre 2026 l'application
+de la seule migration `20261124112808`, qui ajoute le RPC de lecture
+`suggest_catalog_listings_v1`. Exécuter `plan`, puis `apply` avec la confirmation
+`APPLY-EXACT-STAGING-SEARCH-SCHEMA`, le même SHA, le run CI et l'artefact du plan. Laisser les
+entrées backup vides et `reconstructible_demo=false`. Le workflow contrôle que cette migration
+est la seule version en attente et que ses octets correspondent à l'empreinte approuvée.
+Exécuter ensuite `verify` et appeler le RPC en invité sur le catalogue publié.
+
 Pour le jalon individuel [ADR-0038](../adr/0038-single-maintainer-closed-beta-governance.md),
 ajouter `-f reconstructible_demo=true` à `plan` et `apply`, en laissant les entrées backup vides.
 Le plan publie `RECONSTRUCTIBLE-DEMO.json` après contrôle du jeu fictif exact et de la vacuité
